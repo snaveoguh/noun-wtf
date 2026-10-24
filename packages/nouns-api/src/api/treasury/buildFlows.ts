@@ -618,7 +618,8 @@ export function buildTreasuryFlows(input: BuildInput): TreasuryFlowsResponse {
     k.usd += f.usd;
     k.count++;
     if (f.asset === 'NOUN') nounsGiven += f.amount;
-    else if (f.eth === 0 && f.usd === 0) {
+    else if (f.eth === 0 && f.usd === 0 && f.amount > 0) {
+      // (a cancelled stream that paid nothing nets to 0: not an unpriced payout)
       unpriced++;
       const sym = f.asset === 'TOKEN' ? (f.token ?? 'TOKEN') : f.asset;
       otherTokens[sym] = (otherTokens[sym] ?? 0) + f.amount;
@@ -729,6 +730,9 @@ export function buildTreasuryFlows(input: BuildInput): TreasuryFlowsResponse {
     version: 2,
     generatedAt: now,
     indexing: input.indexing,
+    // filled in by the route from a live chain read (holdings.ts)
+    holdings: null,
+    reconciliation: null,
     stats,
     years,
     nodes: nodeList,

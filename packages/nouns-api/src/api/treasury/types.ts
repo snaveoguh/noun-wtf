@@ -154,10 +154,99 @@ export interface ProposalRef {
   executedAt: number;
 }
 
+// ── Live holdings (read on chain, cached ~5 min; see holdings.ts) ──
+
+/** How a token is valued: 1:1 ETH, by an on-chain rate, in dollars, or not at all. */
+export type HoldingTokenKind = 'eth' | 'wsteth' | 'reth' | 'meth' | 'usd' | 'other';
+
+export interface Holding {
+  symbol: string; // 'ETH' | 'WETH' | 'stETH' | 'wstETH' | 'rETH' | 'mETH' | 'USDC' | 'ENS'
+  /** Token contract (lowercase); null for ETH. */
+  token: string | null;
+  amount: number;
+  /** ETH per token (1 for ETH/WETH/stETH); null = not valued in ETH (USDC, ENS). */
+  rate: number | null;
+  /** ETH-equivalent; null when not valued in ETH. */
+  eth: number | null;
+  /** Dollars (USDC only). */
+  usd: number | null;
+}
+
+export interface Holder {
+  address: string;
+  name: string;
+  description: string;
+  /** ETH-equivalent of this holder's ETH-valued tokens. */
+  eth: number;
+  /** USDC, in dollars. */
+  usd: number;
+  /** Non-dust balances only; empty = holds nothing worth listing. */
+  holdings: Holding[];
+}
+
+export interface TreasuryHoldings {
+  /** unix s of the read */
+  at: number;
+  block: number | null;
+  /** False when any balance or rate read failed (totals are then a floor). */
+  complete: boolean;
+  /** ETH-equivalent across every holder (ETH, WETH, stETH, wstETH, rETH, mETH). */
+  totalEth: number;
+  /** USDC across every holder, in dollars. Never added to totalEth. */
+  totalUsd: number;
+  /** totalUsd at Chainlink's ETH/USD, for reference only. */
+  usdInEth: number | null;
+  ethUsd: number | null;
+  ethUsdUpdatedAt: number | null;
+  /** ETH per token, read on chain. */
+  rates: { wstETH: number | null; rETH: number | null; mETH: number | null };
+  rateSources: Record<'wstETH' | 'rETH' | 'mETH' | 'ethUsd', { address: string; fn: string }>;
+  /** Summed across holders, biggest ETH value first. */
+  byToken: {
+    symbol: string;
+    amount: number;
+    eth: number | null;
+    usd: number | null;
+    rate: number | null;
+  }[];
+  holders: Holder[];
+}
+
+/**
+ * in − paidOut − soldForUsdc − fork − stakedOut + residual = now (ETH-equivalent).
+ * `residual` ("staking yield & other") is derived; the rest are counted.
+ */
+export interface Reconciliation {
+  /** Auction proceeds (stats.inEth). */
+  inEth: number;
+  /** ETH/WETH/stETH paid out by proposals: stats.outEth minus forks. */
+  paidOutEth: number;
+  /** ETH sent to the Token Buyer for USDC (stats.ethToUsdc). */
+  soldForUsdcEth: number;
+  /** ETH/stETH forks took (stats.byKind.fork.eth). */
+  forkEth: number;
+  /** wstETH/rETH/mETH paid out (stats.otherTokens), valued at today's rate. */
+  stakedOutEth: number;
+  stakedOut: { symbol: string; amount: number; rate: number; eth: number }[];
+  /** in − paidOut − soldForUsdc − fork − stakedOut. */
+  flowNetEth: number;
+  /** now − flowNet: staking yield & other (derived). */
+  residualEth: number;
+  /** holdings.totalEth */
+  nowEth: number;
+  /** holdings.totalUsd (USDC, kept apart). */
+  nowUsd: number;
+  complete: boolean;
+}
+
 export interface TreasuryFlowsResponse {
   version: 2;
   generatedAt: number;
   indexing: { complete: boolean; block: number | null; timestamp: number | null };
+  /** Live balances; null when the chain read failed (the flows still load). */
+  holdings: TreasuryHoldings | null;
+  /** Flows squared with holdings; null without holdings. */
+  reconciliation: Reconciliation | null;
   stats: FlowStats;
   years: YearSlice[];
   nodes: FlowNode[];

@@ -61,6 +61,8 @@ export const STETH = '0xae7ab96520de3a18e5e111b5eaab095312d7fe84';
 export const WSTETH = '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0';
 export const RETH = '0xae78736cd615f374d3085123a210448e74fc6393';
 export const METH = '0xd5f7838f5c461feff7fe49ea5ebaf7728bb0adfa';
+/** ENS token: the DAO holds 500 ENS (read on mainnet 2026-10); listed, not valued. */
+export const ENS_TOKEN = '0xc18360217d8f7ab5e7c516566761ea12ce7f9d72';
 
 export const TOKENS: Readonly<Record<string, TokenInfo>> = {
   [WETH]: { symbol: 'WETH', decimals: 18, ethLike: true },
