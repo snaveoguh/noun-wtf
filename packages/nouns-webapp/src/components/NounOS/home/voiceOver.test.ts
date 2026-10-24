@@ -31,7 +31,7 @@ describe('hero voice-over', () => {
 describe('clip sync under the voice-over', () => {
   it('slows the clip to end with the voice, never speeds it up, never below 0.75x', async () => {
     const { syncRate, VO_SECONDS } = await import('./voiceOver');
-    expect(syncRate(16.875)).toBeCloseTo(16.875 / VO_SECONDS, 5);
+    expect(syncRate(VO_SECONDS * 0.9)).toBeCloseTo(0.9, 5);
     expect(syncRate(40)).toBe(1);
     expect(syncRate(5)).toBe(0.75);
     expect(syncRate(Number.NaN)).toBe(1);
