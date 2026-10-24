@@ -1,0 +1,20 @@
+# `railway up` uploads the repo root and honours .gitignore + this file, not
+# .dockerignore. Upload only what the root Dockerfile COPYs (the API image);
+# the full repo is ~330 MB (mostly nouns-webapp assets) and the upload times out.
+/*
+!/Dockerfile
+!/railway.json
+!/package.json
+!/pnpm-lock.yaml
+!/pnpm-workspace.yaml
+!/turbo.json
+!/.npmrc
+!/packages/
+/packages/*
+!/packages/nouns-api/
+!/packages/nouns-sdk/
+!/packages/nouns-contracts/
+!/packages/vote-permit/
+node_modules
+.ponder
+dist
