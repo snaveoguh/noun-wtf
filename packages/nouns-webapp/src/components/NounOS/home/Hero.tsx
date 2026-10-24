@@ -1,5 +1,5 @@
 // The featured banner. Rotates through HERO_SLIDES (rows.ts): pre-rendered
-// clips play muted on loop (with sound only if the visitor turned it on and
+// clips play muted on loop (with sound only if sound is on, the default, and
 // the clip has a track), stills get a slow Ken Burns. Title, teaser and
 // PLAY / MORE INFO sit over a gradient. Hovering lifts it a little and, with
 // sound on, plays that game's stinger. Clips pause when the hero is off
