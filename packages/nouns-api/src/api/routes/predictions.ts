@@ -100,7 +100,32 @@ const RESOLVED_PROPOSAL_STATUSES = [
   'EXPIRED',
   'EXECUTED',
   'VETOED',
+  'ENDED',
 ];
+
+/**
+ * The Lil Nouns subgraph only moves a proposal's status on events (created,
+ * queued, executed, cancelled, vetoed). Voting simply ending (defeated, or
+ * passed but not yet queued) emits nothing, so those proposals stay ACTIVE
+ * there forever. Past their end block they've ended either way: their markets
+ * need resolving (the contract reads the governor's real state).
+ */
+export function lilProposalStatus(
+  status: string,
+  endBlock: bigint | null,
+  latestBlock: bigint,
+): string {
+  const s = status.toUpperCase();
+  if (
+    (s === 'ACTIVE' || s === 'PENDING') &&
+    endBlock != null &&
+    latestBlock > 0n &&
+    latestBlock > endBlock
+  ) {
+    return 'ENDED';
+  }
+  return s;
+}
 
 /** Pick a market status bucket from the proposal status + market outcome. */
 function classifyProposalMarket(proposalStatus: string, outcome: number): MarketEntry['status'] {
@@ -316,7 +341,11 @@ export function registerPredictionRoutes(app: Hono) {
           title:
             ((p.title as string | null | undefined) ?? '').trim() ||
             extractProposalTitle((p.description as string) ?? '', `Lil Proposal ${p.id}`),
-          status: String(p.status ?? '').toUpperCase(),
+          status: lilProposalStatus(
+            String(p.status ?? ''),
+            p.endBlock != null ? BigInt(p.endBlock as string | number | bigint) : null,
+            latestBlock,
+          ),
           link: `/vote/${p.id}?dao=lil`,
           createdAtBlock: Number(p.createdBlock ?? 0),
         }));
