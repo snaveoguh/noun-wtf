@@ -282,6 +282,7 @@ const COVERED_PATHS = new Set([
 const COVER_FILES: Partial<Record<string, string>> = {
   '/world/voice': 'voice-booth',
   '/books/meme-value': 'meme-value',
+  '/cc0': 'cc0-library',
 };
 
 /** The poster for a catalog path, if it has one. */

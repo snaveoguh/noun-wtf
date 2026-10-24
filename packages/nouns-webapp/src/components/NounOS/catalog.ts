@@ -61,6 +61,12 @@ export const CATALOG: Section[] = [
       { path: '/playground', name: 'PLAYGROUND', blurb: 'mix traits, make a noun, dream one up.' },
       { path: '/studio', name: 'STUDIO', blurb: 'make things with noun parts.' },
       { path: '/traits', name: 'TRAITS', blurb: 'every head, body, accessory, glasses.' },
+      {
+        path: '/cc0',
+        name: 'CC0 LIBRARY',
+        blurb: 'free nouns art, voxels, sounds and 3d. take it. add yours.',
+        hot: true,
+      },
       { path: '/terraforms', name: 'TERRAFORMS', blurb: 'on-chain land, rendered.' },
       { path: '/nonsense', name: 'NONSENSE', blurb: 'exactly what it says.' },
       {

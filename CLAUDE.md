@@ -208,6 +208,23 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
 - **Reader:** `src/pages/Books/`. `bookMath.ts` is the pure part (views/spreads, the fold geometry, search) and is tested. `Flipbook.tsx` draws the page curl with nested transformed boxes only, no dependencies; reduced motion falls back to a fade. `?p=N` deep-links a page.
 - **License:** the book's Viral Public License stays in the book as page 2. The About panel credits it as printed ("LIL 67", "written and illustrated by 67 unless specified otherwise") and links the original and its PDF.
 
+### CC0 library
+
+- **Route:** `/cc0` ("CC0 LIBRARY", `src/pages/Cc0Library/`), opened in the NounOS navigator; catalog entry on the ART / CULTURE shelf, poster `public/home/covers/cc0-library.webp`.
+- **Sources** (`assets.ts` merges them; `useCc0Assets.ts` loads each on its own and tolerates failures):
+  - the curated archive: `public/cc0-archive/index.json` + `creators/*.json`, loaded by `src/cc0-archive` only when the page opens (~2.8 MB);
+  - cc0-lib.wtf's API (best-effort; its domain lapsed in Oct 2026, so it shows "offline");
+  - approved community uploads.
+- **Uploads** (`netlify/functions/cc0-uploads.ts`, rules shared with the form in `uploadRules.ts`):
+  - png / jpg / gif / webp / svg, mp3 / wav / ogg, glb / gltf; ≤ 10 MB, sent in 3 MB parts (`begin` → `part` → `finish`).
+  - Checks: magic bytes; SVGs with scripts, handlers, outside refs or DOCTYPEs are refused; a .gltf must embed its buffers. JPEG EXIF and PNG text chunks are stripped (WebP metadata is not).
+  - The CC0 consent box must be `true`. Rate limits are per IP hash. Stored in the Netlify Blobs store `cc0-uploads`.
+- **Serving:** `netlify/functions/cc0-file.ts` (streaming; `?id=`, `&dl=1` to download) serves only approved, visible files: a year of browser cache, 10 min at the CDN, Range supported.
+- **Moderation:**
+  - Uploads stay pending until an admin approves them. POST `admin-pending` lists pending and reported uploads. POST `admin-decide {id, approve: true|false}` publishes or deletes; `{id, hidden: true|false}` hides or unhides.
+  - Both need `X-World-Admin: $WORLD_ADMIN_TOKEN`; the same header lets an admin preview a pending file from `cc0-file`.
+  - Anyone can POST `report {id, reason}` on an approved upload (the detail panel's report button).
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.
