@@ -392,6 +392,27 @@ export const streamEvent = onchainTable(
   }),
 );
 
+// ── Treasury sends (fork payouts) ───────────────────────────────────────────
+// ETHSent / ERC20Sent on nouns.eth (Timelock V2). Only the governor can call
+// sendETH / sendERC20 and only the fork paths do, so every row is ETH or a
+// token a DAO fork took with it. token = null for ETH.
+
+export const treasurySend = onchainTable(
+  'treasury_send',
+  t => ({
+    id: t.text().primaryKey(), // `${txHash}-${logIndex}`
+    to: t.hex().notNull(),
+    token: t.hex(),
+    amount: t.bigint().notNull(),
+    createdAt: t.timestamp().notNull(),
+    createdAtBlock: t.bigint().notNull(),
+    createdAtTransaction: t.text().notNull(),
+  }),
+  t => ({
+    createdAtBlockIndex: index().on(t.createdAtBlock),
+  }),
+);
+
 // ── Fork Events ──────────────────────────────────────────────────────────────
 // EscrowedToFork / JoinFork / WithdrawFromForkEscrow / ExecuteFork on the governor.
 

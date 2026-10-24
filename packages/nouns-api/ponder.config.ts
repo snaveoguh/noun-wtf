@@ -8,6 +8,7 @@ import { nounsDataAbi } from '@nouns/sdk/data';
 import { nounsStreamFactoryAbi } from '@nouns/sdk/stream-factory';
 import { nounsStreamAbi } from '@nouns/sdk/stream';
 import { smallGrantsTreasuryAbi } from './src/abi/SmallGrantsTreasury';
+import { nounsTimelockV2Abi } from './src/abi/NounsTimelockV2';
 import {
   cryptoPunksMarketAbi,
   ensRegistrarControllerAbi,
@@ -131,6 +132,15 @@ const mainnetConfig = createConfig({
       startBlock: 16576500,
     },
 
+    // nouns.eth (Timelock V2): only ETHSent / ERC20Sent, i.e. fork payouts.
+    // Deployed with DAO V3 (Aug 2023); the first fork executed at 18094362.
+    NounsTimelockV2: {
+      chain: 'mainnet',
+      address: '0xb1a32FC9F9D8b2cf86C068Cae13108809547ef71',
+      abi: nounsTimelockV2Abi,
+      startBlock: 17812145,
+    },
+
     // Small Grants Treasury — noun.wtf exclusive governance
     SmallGrantsTreasury: {
       chain: 'mainnet',
@@ -221,6 +231,12 @@ const sepoliaConfig = createConfig({
       address: '0xb78ccF3BD015f209fb9B2d3d132FD8784Df78DF5',
       abi: nounsStreamFactoryAbi,
       startBlock: 2564095,
+    },
+    NounsTimelockV2: {
+      chain: 'sepolia',
+      address: '0x07e5D6a1550aD5E597A9b0698A474AA080A2fB28',
+      abi: nounsTimelockV2Abi,
+      startBlock: 3594846,
     },
 
     Stream: {
