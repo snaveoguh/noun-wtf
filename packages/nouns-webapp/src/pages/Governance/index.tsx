@@ -8,7 +8,7 @@ import {
 } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
 import { Col, Row } from 'react-bootstrap';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { formatEther, formatUnits } from 'viem';
 
 import Proposals from '@/components/Proposals';
@@ -186,9 +186,9 @@ const GovernancePage = () => {
               <Row className={classes.treasuryInfoCard}>
                 <Col lg={8} className={classes.treasuryAmtWrapper}>
                   <Row className={classes.headerRow}>
-                    <span>
+                    <Link to="/nonsense" className={classes.treasuryLink}>
                       <Trans>Treasury</Trans>
-                    </span>
+                    </Link>
                   </Row>
                   <Row>
                     <Col className={clsx(classes.ethTreasuryAmt)} lg={3}>
@@ -214,7 +214,10 @@ const GovernancePage = () => {
                     This treasury exists for <span className={classes.boldText}>Nouns DAO</span>{' '}
                     participants to allocate resources for the long-term growth and prosperity of
                     the Nouns project.
-                  </Trans>
+                  </Trans>{' '}
+                  <Link to="/nonsense" className={classes.treasuryLink}>
+                    <Trans>What it holds, where it came from and where it went →</Trans>
+                  </Link>
                 </Col>
               </Row>
             </Col>

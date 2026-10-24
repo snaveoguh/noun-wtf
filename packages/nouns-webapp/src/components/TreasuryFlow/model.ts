@@ -2,7 +2,14 @@
 // per-view totals. Everything here is computed from the /api/treasury/flows
 // response; nothing is guessed client-side.
 
-import type { EntityType, Flow, FlowKind, FlowNode, TreasuryFlowsResponse } from './types';
+import type {
+  EntityType,
+  Flow,
+  FlowKind,
+  FlowNode,
+  Reconciliation,
+  TreasuryFlowsResponse,
+} from './types';
 
 // Flow-kind colours: validated as a categorical palette on the dark surface
 // (dataviz validate_palette.js — lightness band, chroma, CVD ΔE, contrast all pass).
@@ -294,3 +301,110 @@ export function flowsOf(data: TreasuryFlowsResponse, id: string, year: number | 
     .filter(f => (f.to === id || f.from === id) && inYear(f, year))
     .sort((a, b) => b.t - a.t);
 }
+
+// ── Treasury now + reconciliation ──
+
+export interface WaterfallStep {
+  key: string;
+  label: string;
+  /** Signed change; for the two totals (first and last), the total itself. */
+  eth: number;
+  /** The bar runs from → to on one shared ETH scale. */
+  from: number;
+  to: number;
+  total?: boolean;
+  /** Worked out as the balancing item, not counted. */
+  derived?: boolean;
+  color: string;
+  explain: string;
+  tip: string;
+}
+
+const fmtUnits = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
+
+/** The reconciliation as a waterfall: in, the outs, the residual, now. */
+export function waterfallSteps(r: Reconciliation): WaterfallStep[] {
+  const steps: WaterfallStep[] = [];
+  let level = 0;
+  const push = (s: Omit<WaterfallStep, 'from' | 'to'>) => {
+    const from = s.total === true ? 0 : level;
+    const to = s.total === true ? s.eth : level + s.eth;
+    steps.push({ ...s, from, to });
+    level = to;
+  };
+  push({
+    key: 'in',
+    label: 'auction proceeds',
+    eth: r.inEth,
+    total: true,
+    color: KIND_META.auction.color,
+    explain: 'every winning bid for a Noun since 2021',
+    tip: 'All the ETH paid for Nouns at auction. The only income this page counts directly.',
+  });
+  push({
+    key: 'paid',
+    label: 'paid out',
+    eth: -r.paidOutEth,
+    color: KIND_META.direct.color,
+    explain: 'ETH, WETH and stETH that proposals sent to people, teams and contracts',
+    tip: 'Direct transfers, streams and ETH sent with contract calls by executed proposals. Dollar (USDC) payments are not in this figure: they were paid with the USDC from the next step.',
+  });
+  push({
+    key: 'usdc',
+    label: 'sold for USDC to pay grants in dollars',
+    eth: -r.soldForUsdcEth,
+    color: KIND_META.payer.color,
+    explain: 'ETH the Token Buyer swapped into USDC, which then paid the dollar grants',
+    tip: "Many proposals ask for dollars. The DAO's Token Buyer sells treasury ETH for USDC and hands it to the USDC Payer, which pays them. The dollar payments themselves are listed under WHAT WAS SPENT.",
+  });
+  push({
+    key: 'fork',
+    label: 'fork payouts',
+    eth: -r.forkEth,
+    color: KIND_META.fork.color,
+    explain: 'what members took with them when they left in the 2023 forks',
+    tip: 'When Nouners forked away, each took their share of the treasury in ETH and stETH. (Their USDC and other tokens are not in this ETH figure.)',
+  });
+  if (r.stakedOutEth > 0) {
+    push({
+      key: 'staked',
+      label: 'staked ETH paid out',
+      eth: -r.stakedOutEth,
+      color: KIND_META.stream.color,
+      explain: `${r.stakedOut.map(s => `${fmtUnits(s.amount)} ${s.symbol}`).join(' + ')}, valued at today's rate`,
+      tip: "wstETH and rETH sent out by proposals and forks. They're priced at today's on-chain rate, so older payouts are counted a few % high.",
+    });
+  }
+  push({
+    key: 'residual',
+    label: 'staking yield & other (derived)',
+    eth: r.residualEth,
+    derived: true,
+    color: '#8d8c84',
+    explain: 'the difference that is left: mostly interest earned on staked ETH',
+    tip: "Not counted, worked out: treasury now minus everything above. Staked ETH earns about 3–4% a year and most of the treasury has been staked for years (stETH grows; wstETH, rETH and mETH rise in value). Token payouts we can't price, refunds, other income and small items land here too.",
+  });
+  push({
+    key: 'now',
+    label: 'treasury now',
+    eth: r.nowEth,
+    total: true,
+    color: '#d4ff3a',
+    explain: 'what the DAO holds today in ETH and staked ETH (USDC shown separately)',
+    tip: "Live balances of nouns.eth and the DAO's other contracts, with staked tokens converted at their on-chain rates. USDC is not added in: its ETH already left in the USDC step.",
+  });
+  return steps;
+}
+
+/** Share of the ETH-equivalent total, 0..1 (0 when the total is 0 or the value unknown). */
+export const shareOf = (eth: number | null, total: number) =>
+  eth === null || total <= 0 ? 0 : Math.max(0, Math.min(1, eth / total));
+
+export function fmtToken(amount: number, symbol: string): string {
+  if (symbol === 'USDC') return `$${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+  const d = amount >= 1000 ? 0 : amount >= 1 ? 2 : 4;
+  return `${amount.toLocaleString('en-US', { maximumFractionDigits: d })} ${symbol}`;
+}
+
+export const etherscanToken = (token: string, holder: string) =>
+  `https://etherscan.io/token/${token}?a=${holder}`;

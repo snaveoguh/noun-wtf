@@ -1,4 +1,4 @@
-import type { TreasuryFlowsResponse } from '../treasury/types.js';
+import type { TreasuryFlowsResponse, TreasuryHoldings } from '../treasury/types.js';
 import type { Hono } from 'hono';
 
 import { eq, lte, sql } from 'drizzle-orm';
@@ -15,13 +15,17 @@ import {
   type BuildInput,
   type CodeKind,
 } from '../treasury/buildFlows.js';
+import { reconcile } from '../treasury/holdings.js';
+import { readHoldings as readHoldingsWith } from '../treasury/readHoldings.js';
 
 // ============================================================
 // Treasury Flows — /api/treasury/flows (the Nonsense page)
 // ============================================================
 // Rows → buildTreasuryFlows (pure, unit-tested) → JSON. This file only reads
 // the tables and fills two caches the builder needs: eth_getCode verdicts
-// (person / Safe multisig / contract) and primary ENS names.
+// (person / Safe multisig / contract) and primary ENS names. It also reads the
+// live holdings (one multicall, cached 5 min) and attaches them, with the
+// reconciliation (holdings.ts), to each response.
 
 const rpc = createPublicClient({
   chain: mainnet,
@@ -98,6 +102,53 @@ async function lookupEns(addrs: string[]): Promise<Record<string, string>> {
     if (n) out[a] = n;
   }
   return out;
+}
+
+// Holdings are cached 5 min (stale-while-revalidate); a failed read keeps the
+// last good one, and the page still loads without them.
+const HOLDINGS_MS = 5 * 60_000;
+let holdingsCache: { data: TreasuryHoldings; at: number } | null = null;
+let holdingsInflight: Promise<TreasuryHoldings | null> | null = null;
+
+function refreshHoldings(): Promise<TreasuryHoldings | null> {
+  if (!holdingsInflight) {
+    holdingsInflight = readHoldingsWith(rpc)
+      .then(data => {
+        holdingsCache = { data, at: Date.now() };
+        return data;
+      })
+      .catch(err => {
+        console.error('Treasury holdings read failed:', err);
+        return holdingsCache?.data ?? null;
+      })
+      .finally(() => {
+        holdingsInflight = null;
+      });
+  }
+  return holdingsInflight;
+}
+
+async function currentHoldings(): Promise<TreasuryHoldings | null> {
+  if (holdingsCache) {
+    if (Date.now() - holdingsCache.at > HOLDINGS_MS) void refreshHoldings();
+    return holdingsCache.data;
+  }
+  // First request: wait for the read, but never hold the page up for long.
+  return Promise.race([
+    refreshHoldings(),
+    new Promise<null>(r => setTimeout(() => r(null), 12_000)),
+  ]);
+}
+
+function withHoldings(
+  data: TreasuryFlowsResponse,
+  holdings: TreasuryHoldings | null,
+): TreasuryFlowsResponse {
+  return {
+    ...data,
+    holdings,
+    reconciliation: holdings ? reconcile(data.stats, holdings) : null,
+  };
 }
 
 // ── Ponder sync state (the API is served while a deploy backfills) ──
@@ -232,11 +283,11 @@ export function registerTreasuryRoutes(app: Hono) {
         const ttl = cache.data.indexing.complete ? FRESH_MS : BACKFILL_MS;
         if (Date.now() - cache.at > ttl) void refresh().catch(() => {}); // stale-while-revalidate
         c.header('Cache-Control', 'public, max-age=60');
-        return c.json(cache.data);
+        return c.json(withHoldings(cache.data, await currentHoldings()));
       }
-      const data = await refresh();
+      const [data, holdings] = await Promise.all([refresh(), currentHoldings()]);
       c.header('Cache-Control', 'public, max-age=60');
-      return c.json(data);
+      return c.json(withHoldings(data, holdings));
     } catch (err) {
       console.error('Treasury flows error:', err);
       return c.json({ error: 'Failed to compute treasury flows' }, 500);

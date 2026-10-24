@@ -5,9 +5,11 @@
  * winning auction bid in, every executed proposal's decoded payout and every
  * fork payout out. This page only filters and lays it out (model.ts).
  *
- * Layout, top to bottom: IN / OUT / NET, a flow summary (Sankey), money per
- * year (click to filter), then who got what (sortable) with a detail panel.
- * The 3D view is an optional "explore" mode.
+ * Layout, top to bottom: TREASURY NOW (live holdings per holder), WHERE IT
+ * CAME FROM / WHERE IT WENT (the reconciliation waterfall, all time), then
+ * WHAT WAS SPENT: IN / OUT / SOLD FOR USDC, the by-kind Sankey, money per year
+ * (click to filter), and who got what (sortable) with a detail panel. The 3D
+ * view is an optional "explore" mode.
  */
 import type { ExploreNode } from './Explore3D';
 import type { EntityType, FlowKind, TreasuryFlowsResponse } from './types';
@@ -35,6 +37,9 @@ import {
 } from './model';
 import { NONSENSE_CSS } from './styles';
 import { BiddersTable, RecipientsTable } from './Tables';
+import Tip from './Tip';
+import TreasuryNow from './TreasuryNow';
+import Waterfall from './Waterfall';
 import YearBars from './YearBars';
 
 const Explore3D = lazy(() => import('./Explore3D'));
@@ -74,14 +79,6 @@ function hasWebGL(): boolean {
   }
 }
 
-function Tip({ text }: { text: string }) {
-  return (
-    <span className="nz-tip" tabIndex={0} role="note" aria-label={text} data-tip={text}>
-      ?
-    </span>
-  );
-}
-
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="nz">
@@ -89,8 +86,8 @@ function Shell({ children }: { children: React.ReactNode }) {
       <header className="nz-head">
         <h1 data-keep-font>NONSENSE</h1>
         <p>
-          where nouns money comes from, and where it goes. every auction in, every executed proposal
-          out, read straight off the chain. it&apos;s exactly what it says.
+          what the nouns treasury holds right now, where the money came from, and where it went.
+          every auction in, every executed proposal out, read straight off the chain.
         </p>
       </header>
       {children}
@@ -214,6 +211,36 @@ export default function TreasuryFlowSection() {
         </div>
       )}
 
+      {data.holdings ? (
+        <TreasuryNow h={data.holdings} />
+      ) : (
+        <section className="nz-card">
+          <h2 className="nz-h" data-keep-font>
+            TREASURY NOW
+          </h2>
+          <p className="nz-muted">
+            live balances didn&apos;t load this time (the chain read failed or the API is older).
+            the money flows below are unaffected.
+          </p>
+        </section>
+      )}
+
+      {data.reconciliation && (
+        <section className="nz-card" aria-label="where it came from and where it went">
+          <h2 className="nz-h" data-keep-font>
+            WHERE IT CAME FROM / WHERE IT WENT
+          </h2>
+          <p className="nz-muted nz-sub">
+            all time, in ETH. start with every auction, take away each way money left, and you
+            should land on what&apos;s held today. the gap is worked out, not guessed.
+          </p>
+          <Waterfall r={data.reconciliation} />
+        </section>
+      )}
+
+      <h2 className="nz-h nz-section-h" data-keep-font>
+        WHAT WAS SPENT {year !== null && <span className="nz-h-year">{year}</span>}
+      </h2>
       <section className="nz-tiles" aria-label="totals">
         <div className="nz-tile is-in">
           <span className="nz-tile-k">
@@ -238,19 +265,19 @@ export default function TreasuryFlowSection() {
             {forks > 0 ? ' and fork exits' : ''}
           </span>
         </div>
-        <div className={`nz-tile ${totals.netEth >= 0 ? 'is-net-pos' : 'is-net-neg'}`}>
+        <div className="nz-tile is-usdc">
           <span className="nz-tile-k">
-            <span data-keep-font>NET</span>{' '}
-            <Tip text="Auction ETH in, minus ETH paid out, minus ETH swapped into USDC (via the Token Buyer) to pay USDC bills. Ignores staking yield and other income." />
+            <span data-keep-font>SOLD FOR USDC</span>{' '}
+            <Tip text="ETH the DAO's Token Buyer sold for USDC, to pay grants that were asked for in dollars. Those dollar payments are already in OUT, so this isn't extra spending: it's how the dollars were paid for." />
           </span>
-          <span className="nz-tile-v">{fmtEth(totals.netEth, { sign: true })}</span>
-          <span className="nz-tile-s">after {fmtEth(totals.ethToUsdc)} swapped to USDC</span>
+          <span className="nz-tile-v">{fmtEth(totals.ethToUsdc)}</span>
+          <span className="nz-tile-s">sold for USDC to pay grants in dollars {period}</span>
         </div>
       </section>
 
       <section className="nz-card">
         <h2 className="nz-h" data-keep-font>
-          WHERE IT WENT {year !== null && <span className="nz-h-year">{year}</span>}
+          BY KIND {year !== null && <span className="nz-h-year">{year}</span>}
         </h2>
         <FlowSummary totals={totals} />
         <ul className="nz-facts">

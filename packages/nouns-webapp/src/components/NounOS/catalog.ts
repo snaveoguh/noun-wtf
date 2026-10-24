@@ -68,7 +68,11 @@ export const CATALOG: Section[] = [
         hot: true,
       },
       { path: '/terraforms', name: 'TERRAFORMS', blurb: 'on-chain land, rendered.' },
-      { path: '/nonsense', name: 'NONSENSE', blurb: 'exactly what it says.' },
+      {
+        path: '/nonsense',
+        name: 'NONSENSE',
+        blurb: 'where the treasury money goes: what it holds, what came in, what was spent.',
+      },
       {
         path: '/world/classic',
         name: 'WORLD (CLASSIC)',

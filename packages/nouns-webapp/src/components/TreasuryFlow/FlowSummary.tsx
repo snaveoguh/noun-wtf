@@ -37,21 +37,22 @@ function buckets(t: ViewTotals): { inSide: Bucket[]; outSide: Bucket[] } {
   }));
   outSide.push({
     key: 'usdc',
-    label: 'swapped to USDC',
+    label: 'sold for USDC (dollar grants)',
     color: KIND_META.payer.color,
     eth: t.ethToUsdc,
     usd: t.byKind.payer.usd,
     explain:
-      'ETH the DAO sold for USDC (via its Token Buyer) to fund USDC payments. The $ figure is what the USDC Payer paid out in this period.',
+      'ETH the DAO sold for USDC (via its Token Buyer) to pay grants in dollars. The $ figure is what the USDC Payer paid out in this period: those payments, not extra spending.',
   });
   if (t.netEth > 0) {
     outSide.push({
       key: 'kept',
-      label: 'kept',
+      label: 'not spent',
       color: '#5c5c58',
       eth: t.netEth,
       usd: 0,
-      explain: 'Auction ETH that has not been paid out or swapped (as far as these flows go).',
+      explain:
+        'Auction ETH in this period that was not paid out or sold for USDC. What the treasury actually holds is at the top of the page.',
       hatch: true,
     });
   } else if (t.netEth < 0) {
