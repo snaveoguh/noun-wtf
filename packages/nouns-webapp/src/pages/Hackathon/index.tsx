@@ -13,8 +13,9 @@ const CONTRACTS = [
     name: 'NounV2Token',
     address: '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9',
     chain: 'Ethereum',
-    desc: 'ERC-721 for the NounV2 fork launched 2026-04-24. Starts at #0, no nounder reward, shares the mainnet Nouns art pipeline. seeds(), balanceOf(), getPriorVotes().',
-    caption: 'Build a physical device that mints, bids on, or just tracks NounV2 — the concurrent no-reserve auction alongside mainnet.',
+    desc: 'ERC-721 for the NounV2 fork launched 2026-04-24. Starts at #0, no nounder reward. Uses a copy of the mainnet art with its own seeder, which adds the V2-only slobber accessory. seeds(), balanceOf(), getPriorVotes().',
+    caption:
+      'Build a physical device that mints, bids on, or just tracks NounV2 — the concurrent no-reserve auction alongside mainnet.',
     tag: 'NOUNV2',
     tagClass: 'tagTarget',
     etherscan: 'https://etherscan.io/address/0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9',
@@ -23,8 +24,9 @@ const CONTRACTS = [
     name: 'NounV2AuctionHouse',
     address: '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc',
     chain: 'Ethereum',
-    desc: 'The NounV2 daily auction. 24hr, no reserve (0.001 ETH floor), 2% min bid increment. Proceeds route to NounV2Treasury. auction(), createBid(), settleCurrentAndCreateNewAuction().',
-    caption: 'Build a public bid buzzer that fires when NounV2 goes below mainnet reserve, or a settle bot racing for the perfect seed.',
+    desc: 'The NounV2 daily auction. 24hr, effectively no reserve (50 wei), 2% min bid increment, 5-min anti-snipe. Proceeds route to NounV2Treasury. auction(), createBid(), settleCurrentAndCreateNewAuction().',
+    caption:
+      'Build a public bid buzzer that fires when NounV2 goes below mainnet reserve, or a settle bot racing for the perfect seed.',
     tag: 'NOUNV2',
     tagClass: 'tagTarget',
     etherscan: 'https://etherscan.io/address/0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc',
@@ -34,7 +36,8 @@ const CONTRACTS = [
     address: '0x2cdeb0d251674710840d9fa990d1de138dfe7c00',
     chain: 'Ethereum',
     desc: 'Single-contract governor + treasury for NounV2. 1-noun proposal threshold, 12hr vote, 12hr timelock, admin veto. propose(), castVote(), queue(), execute().',
-    caption: 'Small DAO, small hack. Build a single-noun proposal bot or a real-time proposal-outcome display.',
+    caption:
+      'Small DAO, small hack. Build a single-noun proposal bot or a real-time proposal-outcome display.',
     tag: 'NOUNV2',
     tagClass: 'tagTarget',
     etherscan: 'https://etherscan.io/address/0x2cdeb0d251674710840d9fa990d1de138dfe7c00',
@@ -44,7 +47,8 @@ const CONTRACTS = [
     address: '0xBAc9233725440c595b19d975309CC98cb259253a',
     chain: 'Ethereum',
     desc: 'The original grants target. 12hr vote, 12hr lock, no quorum. 1 Noun vote passes a prop. propose(), castVote(), queue(), execute().',
-    caption: 'Build a physical device that submits proposals or casts votes. A one-button grant machine.',
+    caption:
+      'Build a physical device that submits proposals or casts votes. A one-button grant machine.',
     tag: 'TARGET',
     tagClass: 'tagTarget',
     etherscan: 'https://etherscan.io/address/0xBAc9233725440c595b19d975309CC98cb259253a',
@@ -54,7 +58,8 @@ const CONTRACTS = [
     address: '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03',
     chain: 'Ethereum',
     desc: 'ERC-721 governance token. 1 Noun = 1 vote. balanceOf(), delegates(), votesToDelegate(). Used by the treasury for voting power.',
-    caption: 'Build a delegation kiosk. Show who holds power and let people delegate from a physical terminal.',
+    caption:
+      'Build a delegation kiosk. Show who holds power and let people delegate from a physical terminal.',
     tag: 'CORE',
     tagClass: 'tagCore',
     etherscan: 'https://etherscan.io/address/0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03',
@@ -63,18 +68,20 @@ const CONTRACTS = [
     name: 'NounsDAOV4',
     address: '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d',
     chain: 'Ethereum',
-    desc: 'Main DAO governor. proposals(), state(), castVote(). The big treasury ($52M+).',
-    caption: 'Build a proposal ticker or governance dashboard that runs on an e-ink display or Raspberry Pi.',
+    desc: 'Main DAO governor. proposals(), state(), castVote(). Spends from the nouns.eth treasury (live totals at noun.wtf/nonsense).',
+    caption:
+      'Build a proposal ticker or governance dashboard that runs on an e-ink display or Raspberry Pi.',
     tag: 'CORE',
     tagClass: 'tagCore',
     etherscan: 'https://etherscan.io/address/0x6f3E6272A167e8AcCb32072d08E0957F9c79223d',
   },
   {
-    name: 'NounsAuctionHouseV2',
+    name: 'NounsAuctionHouse (V4)',
     address: '0x830BD73E4184ceF73443C15111a1DF14e495C706',
     chain: 'Ethereum',
-    desc: 'Daily auctions. One Noun per day. settleCurrentAndCreateNewAuction(), createBid(). The heartbeat of Nouns.',
-    caption: 'Build an auction alert device — a bell, buzzer, or light that goes off when bids land or auctions end.',
+    desc: 'Daily auctions. One Noun per day. Since V4 (Prop 968, 2026-05-25) a Noun with no bids goes to the nouns.eth treasury instead of being burned. settleCurrentAndCreateNewAuction(), createBid(). The heartbeat of Nouns.',
+    caption:
+      'Build an auction alert device — a bell, buzzer, or light that goes off when bids land or auctions end.',
     tag: 'CORE',
     tagClass: 'tagCore',
     etherscan: 'https://etherscan.io/address/0x830BD73E4184ceF73443C15111a1DF14e495C706',
@@ -84,7 +91,8 @@ const CONTRACTS = [
     address: '0x2ea7502C4db5B8cfB329d8a9866EB6705b036608',
     chain: 'Ethereum',
     desc: 'Bet on whether Nouns proposals pass or fail. Parimutuel pools. stake(), claim(), resolve(). Auto-creates markets on first bet.',
-    caption: 'Build a physical voting booth where people predict proposal outcomes with real ETH at stake.',
+    caption:
+      'Build a physical voting booth where people predict proposal outcomes with real ETH at stake.',
     tag: 'MARKET',
     tagClass: 'tagMarket',
     etherscan: 'https://etherscan.io/address/0x2ea7502C4db5B8cfB329d8a9866EB6705b036608',
@@ -94,7 +102,8 @@ const CONTRACTS = [
     address: '0x06d7c7d70c685d58686FF6E0b0DB388209fCCC6e',
     chain: 'Base',
     desc: 'Daily newspaper NFTs (ERC-721). One edition per day since March 2026. mint(), mintFor(). On Base L2.',
-    caption: 'Build a dot matrix printer that prints the daily Pooter edition as a physical newspaper every morning.',
+    caption:
+      'Build a dot matrix printer that prints the daily Pooter edition as a physical newspaper every morning.',
     tag: 'NFT',
     tagClass: 'tagNft',
     etherscan: 'https://basescan.org/address/0x06d7c7d70c685d58686FF6E0b0DB388209fCCC6e',
@@ -143,7 +152,7 @@ const TOOLS = [
   {
     name: 'Terminal',
     path: '/',
-    desc: 'AI chat with governance tool access (now on the homepage feed). Vote, propose, bid, delegate — all through natural language.',
+    desc: 'AI chat with governance tool access (now the ask bar on the noun.wtf homepage). Vote, propose, bid, delegate — all through natural language.',
     art: `$ noun-terminal v1.0
 > vote for prop 948
 preparing your vote...
@@ -173,8 +182,7 @@ quorum: none (!)`,
   },
   {
     name: 'Predictions',
-    path: 'https://pooter.world/predictions',
-    external: true,
+    path: '/predictions',
     desc: 'Bet on whether Nouns proposals will pass or fail. Resolved by onchain governor state.',
     art: `┌──────────────────┐
 │ Prop #948        │
@@ -232,13 +240,14 @@ export default function HackathonPage() {
       <div className={classes.hero}>
         <h1 className={classes.heroTitle}>Hack the Treasury</h1>
         <p className={classes.heroSub}>
-          {balance ? `${formatEth(balance.value)} ETH` : '0.42 ETH'} permissionless grants
+          {balance !== undefined ? `${formatEth(balance.value)} ETH in` : '…'} permissionless grants
         </p>
         <p className={classes.heroDesc}>
-          0.42 ETH sitting in a SmallGrantsTreasury contract on Ethereum mainnet.
-          No quorum. 1 Noun vote passes a proposal. 12hr vote + 12hr lock = funds in 24hrs.
-          Build something physical that interacts with a Nouns contract — or find a vulnerability
-          and hack the treasury. Permissionless. The ETH is for someone's taking.
+          {balance !== undefined ? `${formatEth(balance.value)} ETH` : 'ETH'} sitting in a
+          SmallGrantsTreasury contract on Ethereum mainnet. No quorum. 1 Noun vote passes a
+          proposal. 12hr vote + 12hr lock = funds in 24hrs. Build something physical that interacts
+          with a Nouns contract — or find a vulnerability and hack the treasury. Permissionless. The
+          ETH is for someone&apos;s taking.
         </p>
 
         <div className={classes.treasuryBadge}>
@@ -286,9 +295,9 @@ export default function HackathonPage() {
           <div className={classes.ruleCard}>
             <div className={classes.ruleNum}>1</div>
             <div className={classes.ruleText}>
-              <strong>Build something physical</strong> that interacts with at least one Nouns
-              smart contract. A Pi terminal, a printer, a display, a button — anything IRL that
-              talks to the chain.
+              <strong>Build something physical</strong> that interacts with at least one Nouns smart
+              contract. A Pi terminal, a printer, a display, a button — anything IRL that talks to
+              the chain.
             </div>
           </div>
           <div className={classes.ruleCard}>
@@ -302,16 +311,16 @@ export default function HackathonPage() {
             <div className={classes.ruleNum}>3</div>
             <div className={classes.ruleText}>
               <strong>Submit a proposal</strong> to the treasury at{' '}
-              <a href="/grants">noun.wtf/grants</a>. Describe what you built, link proof.
-              Anyone can propose — no Noun ownership required to submit.
+              <a href="/grants">noun.wtf/grants</a>. Describe what you built, link proof. Anyone can
+              propose — no Noun ownership required to submit.
             </div>
           </div>
           <div className={classes.ruleCard}>
             <div className={classes.ruleNum}>4</div>
             <div className={classes.ruleText}>
-              <strong>1 vote passes.</strong> Nouns holders vote (1 Noun = 1 vote). No quorum
-              means a single FOR vote with no opposition passes the prop. 12hr vote window,
-              12hr timelock, funds in 24hrs.
+              <strong>1 vote passes.</strong> Nouns holders vote (1 Noun = 1 vote). No quorum means
+              a single FOR vote with no opposition passes the prop. 12hr vote window, 12hr timelock,
+              funds in 24hrs.
             </div>
           </div>
         </div>
@@ -378,7 +387,7 @@ export default function HackathonPage() {
         </p>
         <div className={classes.cartridgeGrid}>
           {TOOLS.map(t => {
-            const isExternal = 'external' in t && t.external;
+            const isExternal = t.path.startsWith('http');
             return (
               <a
                 key={t.name}
@@ -403,8 +412,8 @@ export default function HackathonPage() {
       <div className={classes.section}>
         <h2 className={classes.sectionTitle}>Physical Build Ideas</h2>
         <p className={classes.sectionDesc}>
-          The only requirement is that it's physical and it talks to a Nouns contract.
-          Here are some starting points.
+          The only requirement is that it&apos;s physical and it talks to a Nouns contract. Here are
+          some starting points.
         </p>
         <div className={classes.ideaGrid}>
           {PHYSICAL_IDEAS.map((idea, i) => (
@@ -423,28 +432,49 @@ export default function HackathonPage() {
       <div className={classes.section}>
         <h2 className={classes.sectionTitle}>Quick Start</h2>
         <div className={classes.codeBlock}>
-          <div><span className={classes.comment}># The treasury contract is live on Ethereum mainnet</span></div>
-          <div><span className={classes.comment}># Read it, poke it, propose to it</span></div>
+          <div>
+            <span className={classes.comment}>
+              # The treasury contract is live on Ethereum mainnet
+            </span>
+          </div>
+          <div>
+            <span className={classes.comment}># Read it, poke it, propose to it</span>
+          </div>
           <div style={{ marginTop: '0.5rem' }}>
-            <span className={classes.prompt}>$</span> cast call 0xBAc9233725440c595b19d975309CC98cb259253a "proposalCount()(uint256)" --rpc-url https://ethereum-rpc.publicnode.com
+            <span className={classes.prompt}>$</span> cast call
+            0xBAc9233725440c595b19d975309CC98cb259253a &quot;proposalCount()(uint256)&quot;
+            --rpc-url https://ethereum-rpc.publicnode.com
           </div>
           <div style={{ marginTop: '1rem' }}>
             <span className={classes.comment}># Or use the noun.wtf stack</span>
           </div>
-          <div><span className={classes.prompt}>$</span> git clone https://github.com/snaveoguh/noun-wtf.git</div>
-          <div><span className={classes.prompt}>$</span> cd noun-wtf && pnpm install</div>
-          <div><span className={classes.prompt}>$</span> cd packages/nouns-webapp && CI=true pnpm dev</div>
+          <div>
+            <span className={classes.prompt}>$</span> git clone
+            https://github.com/snaveoguh/noun-wtf.git
+          </div>
+          <div>
+            <span className={classes.prompt}>$</span> cd noun-wtf && pnpm install
+          </div>
+          <div>
+            <span className={classes.prompt}>$</span> cd packages/nouns-webapp && CI=true pnpm dev
+          </div>
           <div style={{ marginTop: '0.5rem' }}>
             <span className={classes.comment}># GraphQL API (no setup needed)</span>
           </div>
           <div>
-            <span className={classes.prompt}>$</span> curl -s '{DEFAULT_API_BASE}/graphql' -H 'Content-Type: application/json' -d '&#123;"query":"&#123; nouns(limit:1) &#123; items &#123; id &#125; &#125; &#125;"&#125;'
+            <span className={classes.prompt}>$</span> curl -s &apos;{DEFAULT_API_BASE}/graphql&apos;
+            -H &apos;Content-Type: application/json&apos; -d
+            &apos;&#123;&quot;query&quot;:&quot;&#123; nouns(limit:1) &#123; items &#123; id &#125;
+            &#125; &#125;&quot;&#125;&apos;
           </div>
           <div style={{ marginTop: '0.5rem' }}>
             <span className={classes.comment}># Free LLM (no API key)</span>
           </div>
           <div>
-            <span className={classes.prompt}>$</span> curl -X POST https://heartfelt-flow-production-d872.up.railway.app/v1/generate -H 'Content-Type: application/json' -d '&#123;"user":"What should I build for Nouns?","task":"chat"&#125;'
+            <span className={classes.prompt}>$</span> curl -X POST
+            https://heartfelt-flow-production-d872.up.railway.app/v1/generate -H &apos;Content-Type:
+            application/json&apos; -d &apos;&#123;&quot;user&quot;:&quot;What should I build for
+            Nouns?&quot;,&quot;task&quot;:&quot;chat&quot;&#125;&apos;
           </div>
         </div>
       </div>
@@ -453,7 +483,8 @@ export default function HackathonPage() {
       <div className={classes.footer}>
         <div>CC0. No rights reserved. Fork everything.</div>
         <div style={{ marginTop: '0.25rem' }}>
-          <a href="https://noun.wtf">noun.wtf</a>, <a href="https://pooter.world">pooter.world</a>, Client ID 37
+          <a href="https://noun.wtf">noun.wtf</a>, <a href="https://pooter.world">pooter.world</a>,
+          Client ID 37
         </div>
       </div>
     </div>

@@ -135,7 +135,7 @@ const Documentation = (props: DocumentationProps = { backgroundColor: 'var(--the
                 </li>
                 <li>
                   <Trans>
-                    Nounders receive rewards in the form of Nouns (10% of supply for first 5 years).
+                    Nounders received rewards in the form of Nouns (10% of supply up to Noun 1820).
                   </Trans>
                 </li>
               </ul>
@@ -160,6 +160,12 @@ const Documentation = (props: DocumentationProps = { backgroundColor: 'var(--the
                 <Trans>
                   Each time an auction is settled, the settlement transaction will also cause a new
                   Noun to be minted and a new 24 hour auction to begin.{' '}
+                </Trans>
+              </p>
+              <p className={classes.aboutText}>
+                <Trans>
+                  Since V4 (Prop 968, May 2026), a Noun that gets no bids goes to the treasury
+                  rather than being burned.
                 </Trans>
               </p>
               <p>
@@ -421,10 +427,9 @@ const Documentation = (props: DocumentationProps = { backgroundColor: 'var(--the
               <p>
                 <Trans>
                   Because 100% of Noun auction proceeds are sent to Nouns DAO, Nounders have chosen
-                  to compensate themselves with Nouns. Every 10th Noun for the first 5 years of the
-                  project (Noun ids #0, #10, #20, #30 and so on) will be automatically sent to the
-                  Nounder&apos;s multisig to be vested and shared among the founding members of the
-                  project.
+                  to compensate themselves with Nouns. Every 10th Noun up to Noun 1820 (Noun ids #0,
+                  #10, #20, #30 and so on) was automatically sent to the Nounder&apos;s multisig to
+                  be vested and shared among the founding members of the project.
                 </Trans>
               </p>
               <p>

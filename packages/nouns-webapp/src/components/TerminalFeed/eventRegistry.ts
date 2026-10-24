@@ -509,10 +509,9 @@ const candidateLink = (data: EventData): string | null => {
   const id = str(data.candidateId);
   return id ? `/candidates/${id}` : null;
 };
-const forkLink = (data: EventData): string | null => {
-  const id = str(data.forkId);
-  return id ? `/fork/${id}` : null;
-};
+// No fork page on noun.wtf (there's no /fork route), so fork rows get no
+// "view" link rather than one that 404s.
+const forkLink = (): string | null => null;
 
 // ─── Registry ──────────────────────────────────────────────────────────────
 

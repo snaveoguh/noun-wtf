@@ -97,9 +97,8 @@ const NounderNounContent: React.FC<NounderNounContentProps> = props => {
               .{' '}
               <Trans>
                 For this reason, we, the project&#39;s founders (‘Nounders’) have chosen to
-                compensate compensate ourselves with Nouns. Every 10th Noun for the first 5 years of
-                the project will be sent to our multisig (5/10), where it will be vested and
-                distributed Nounders.
+                compensate ourselves with Nouns. Every 10th Noun up to Noun 1820 (the first 5 years)
+                was sent to our multisig (5/10), where it was vested and distributed to Nounders.
               </Trans>
             </li>
           </ul>

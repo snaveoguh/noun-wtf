@@ -18,8 +18,8 @@ msgstr ""
 #~ msgstr "更新提案"
 
 #: src/components/ProposalHeader/index.tsx
-msgid "You voted <0>Against</0> this proposal"
-msgstr "您对此提案投了<0>反对</0>票"
+#~ msgid "You voted <0>Against</0> this proposal"
+#~ msgstr "您对此提案投了<0>反对</0>票"
 
 #. placeholder {0}: bodyCount?.toString()
 #: src/components/Documentation/index.tsx
@@ -31,8 +31,8 @@ msgstr "身体（{0}）"
 #~ msgstr "这将清除所有先前的支持者和反馈投票"
 
 #: src/components/Documentation/index.tsx
-msgid "Because 100% of Noun auction proceeds are sent to Nouns DAO, Nounders have chosen to compensate themselves with Nouns. Every 10th Noun for the first 5 years of the project (Noun ids #0, #10, #20, #30 and so on) will be automatically sent to the Nounder's multisig to be vested and shared among the founding members of the project."
-msgstr "由于 100% 的 Noun 拍卖收入都发往 Nouns DAO，Nounders 决定以 Noun 形式自我补偿。项目头 5 年内的每第 10 个 Noun（ID#0、#10、#20、#30 等）将自动发送到 Nounders 的多签钱包，进行归属并在创始成员间分配。"
+#~ msgid "Because 100% of Noun auction proceeds are sent to Nouns DAO, Nounders have chosen to compensate themselves with Nouns. Every 10th Noun for the first 5 years of the project (Noun ids #0, #10, #20, #30 and so on) will be automatically sent to the Nounder's multisig to be vested and shared among the founding members of the project."
+#~ msgstr "由于 100% 的 Noun 拍卖收入都发往 Nouns DAO，Nounders 决定以 Noun 形式自我补偿。项目头 5 年内的每第 10 个 Noun（ID#0、#10、#20、#30 等）将自动发送到 Nounders 的多签钱包，进行归属并在创始成员间分配。"
 
 #: src/components/ProposalActionsModal/steps/StreamPaymentsPaymentDetailsStep/index.tsx
 msgid "At this time only USDC and WETH streams are supported"
@@ -69,15 +69,14 @@ msgid "You must have {0} votes to submit a proposal"
 msgstr "您必须拥有 {0} 票才能提交提案"
 
 #: src/components/Footer.tsx
-msgid "made with <0/>"
-msgstr "由<0/>制作"
+#~ msgid "made with <0/>"
+#~ msgstr "由<0/>制作"
 
 #: src/components/ProposalActionsModal/steps/StreamPaymentsReviewStep/index.tsx
 msgid "Review Streaming Payment Action"
 msgstr "审核流支付操作"
 
 #: src/pages/Playground/index.tsx
-#: src/components/Footer.tsx
 #: src/components/Documentation/index.tsx
 msgid "Playground"
 msgstr "游乐场"
@@ -120,15 +119,12 @@ msgstr "添加函数调用参数"
 #~ msgstr "从乌干达的一所学校，到洛杉矶的咖啡店；从圣保罗的加密中心，到墨尔本的熟食店，只要有创造力的人把想法变为现实，Nouns 就在那里。通过 Nounspot 探索 nounish 的人物、地点和事物。"
 
 #: src/pages/Governance/index.tsx
-#: src/components/Footer.tsx
-#: src/components/NavBarTreasury/index.tsx
 msgid "Treasury"
 msgstr "金库"
 
-#. placeholder {0}: i18n.number(availableVotes)
 #: src/components/VoteModal/index.tsx
-msgid "Voting with <0>{0}</0> Nouns"
-msgstr "使用 <0>{0}</0> 个 Nouns 投票"
+#~ msgid "Voting with <0>{0}</0> Nouns"
+#~ msgstr "使用 <0>{0}</0> 个 Nouns 投票"
 
 #: src/components/BidHistoryModal/index.tsx
 msgid "Bids will appear here"
@@ -148,7 +144,11 @@ msgid "Edit fee: {0} ETH"
 msgstr ""
 
 #: src/components/Footer.tsx
-msgid "Stats"
+#~ msgid "Stats"
+#~ msgstr ""
+
+#: src/components/Documentation/index.tsx
+msgid "Since V4 (Prop 968, May 2026), a Noun that gets no bids goes to the treasury rather than being burned."
 msgstr ""
 
 #: src/components/ProposalActionsModal/steps/FunctionCallEnterArgsStep/index.tsx
@@ -167,8 +167,8 @@ msgid "Winner"
 msgstr "获胜者"
 
 #: src/components/Footer.tsx
-msgid "Candidates"
-msgstr "候选提案"
+#~ msgid "Candidates"
+#~ msgstr "候选提案"
 
 #: src/components/CurrentDelegatePannel/index.tsx
 msgid "Noun votes are not transferable, but are <0>delegatable</0>, which means you can assign your vote to someone else as long as you own your Noun."
@@ -248,8 +248,8 @@ msgid "Add Proposal Action"
 msgstr "添加提案操作"
 
 #: src/components/ProposalHeader/index.tsx
-msgid "<0>Proposed by: </0><1>{proposer}</1><2>{transactionLink}</2>"
-msgstr "<0>提案者：</0><1>{proposer}</1><2>{transactionLink}</2>"
+#~ msgid "<0>Proposed by: </0><1>{proposer}</1><2>{transactionLink}</2>"
+#~ msgstr "<0>提案者：</0><1>{proposer}</1><2>{transactionLink}</2>"
 
 #: src/pages/Nounders/index.tsx
 msgid "3.5 artists, 6.5 technologists"
@@ -260,10 +260,9 @@ msgstr "3.5 位艺术家，6.5 位技术专家"
 #~ msgid "Proposals"
 #~ msgstr "提案列表"
 
-#. placeholder {0}: endDate.fromNow()
 #: src/components/StartOrEndTime/index.tsx
-msgid "starts {0}"
-msgstr "开始于 {0}"
+#~ msgid "starts {0}"
+#~ msgstr "开始于 {0}"
 
 #. placeholder {0}: glassesCount?.toString()
 #: src/components/Documentation/index.tsx
@@ -274,14 +273,13 @@ msgstr "眼镜（{0}）"
 msgid "bribe voters to facilitate withdraws of the treasury for personal gain"
 msgstr "贿赂选民以便从国库中提取资金以谋取个人利益"
 
-#. placeholder {0}: dayjs(endDate).fromNow()
 #: src/components/StartOrEndTime/index.tsx
-msgid "ends {0}"
-msgstr "结束于 {0}"
+#~ msgid "ends {0}"
+#~ msgstr "结束于 {0}"
 
 #: src/components/Banner/index.tsx
-msgid "FOREVER."
-msgstr "永远。"
+#~ msgid "FOREVER."
+#~ msgstr "永远。"
 
 #: src/pages/CreateCandidate/index.tsx
 msgid "Proposal candidates can be created by anyone. If a candidate receives enough signatures by Nouns voters, it can be promoted to a proposal. "
@@ -327,17 +325,14 @@ msgstr "Nouns 协议"
 msgid "Loading traits..."
 msgstr "加载特征..."
 
-#: src/pages/NounsPage.tsx
 #: src/pages/Playground/index.tsx
 msgid "Explore"
 msgstr "探索"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Queued"
 msgstr "已排队"
 
-#: src/components/ProposalHeader/index.tsx
 #: src/components/ProposalHeader/CandidateHeader.tsx
 msgid "You have no votes."
 msgstr "您没有可投的票。"
@@ -363,8 +358,8 @@ msgid "Add your feedback"
 msgstr "添加您的反馈"
 
 #: src/components/ProposalHeader/index.tsx
-msgid "Submit vote"
-msgstr "提交投票"
+#~ msgid "Submit vote"
+#~ msgstr "提交投票"
 
 #: src/pages/NotFound/index.tsx
 msgid "404: This is not the person, place, or thing you're looking for..."
@@ -402,10 +397,9 @@ msgstr "秒"
 #~ msgid "The Threshold (minimum number of For votes required to pass a proposal) is set as a function of the number of Against votes a proposal has received. The number of For votes required to pass Proposal {0} is given by the following curve:"
 #~ msgstr "门槛（通过提案所需的最低支持票数）是反对票数的函数。提案 {0} 所需的支持票数由以下曲线给出："
 
-#. placeholder {0}: mins + 1
 #: src/components/SettleManuallyBtn/index.tsx
-msgid "You can settle manually in {0} minutes"
-msgstr "您可在 {0} 分钟内手动结算"
+#~ msgid "You can settle manually in {0} minutes"
+#~ msgstr "您可在 {0} 分钟内手动结算"
 
 #. placeholder {0}: endDate.locale(SUPPORTED_LOCALE_TO_DAYSJS_LOCALE[locale] ?? en).fromNow()
 #: src/components/Proposals/index.tsx
@@ -413,8 +407,8 @@ msgid "Ends {0}"
 msgstr "结束于 {0}"
 
 #: src/components/Footer.tsx
-msgid "Dreams"
-msgstr ""
+#~ msgid "Dreams"
+#~ msgstr ""
 
 #: src/components/ByLineHoverCard/index.tsx
 msgid "<0>Delegated Votes: </0>"
@@ -441,6 +435,10 @@ msgstr "一个 Noun 等于一票。"
 msgid "Nouns DUNA"
 msgstr "Nouns DUNA"
 
+#: src/pages/Nounders/index.tsx
+msgid "All Noun auction proceeds are sent to the Nouns DAO. For this reason, we, the project's founders (‘Nounders’) have chosen to compensate ourselves with Nouns. Every 10th Noun up to Noun 1820 (the first five years) was sent to our multisig (5/10), to be vested and distributed to individual Nounders."
+msgstr ""
+
 #: src/components/ProposalActionsModal/steps/FunctionCallReviewStep/index.tsx
 msgid "Address"
 msgstr "地址"
@@ -450,7 +448,6 @@ msgid "Proposal Canceled!"
 msgstr "提案已取消！"
 
 #: src/pages/Governance/index.tsx
-#: src/components/Footer.tsx
 msgid "Nouns"
 msgstr "Nouns"
 
@@ -471,7 +468,6 @@ msgstr "无"
 #~ msgid "View Threshold Info"
 #~ msgstr "查看门槛信息"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Active"
 msgstr "活跃"
@@ -496,7 +492,6 @@ msgstr "创建提案候选"
 #~ msgid "Against"
 #~ msgstr "反对"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Canceled"
 msgstr "已取消"
@@ -523,7 +518,6 @@ msgstr "您已提供 <0>{0}</0> 条反馈 {1}"
 msgid "About Proposal Candidates"
 msgstr "关于提案候选"
 
-#: src/pages/NounsPage.tsx
 #: src/pages/Playground/index.tsx
 msgid "Background"
 msgstr "背景"
@@ -534,8 +528,8 @@ msgid "You don't have enough votes to submit a proposal"
 msgstr "您的票数不足，无法提交提案"
 
 #: src/components/Footer.tsx
-msgid "NounV2"
-msgstr ""
+#~ msgid "NounV2"
+#~ msgstr ""
 
 #. placeholder {0}: headCount?.toString()
 #: src/components/Documentation/index.tsx
@@ -546,7 +540,6 @@ msgstr "头部（{0}）"
 #~ msgid "minutes"
 #~ msgstr "分钟"
 
-#: src/pages/NounsPage.tsx
 #: src/pages/Playground/index.tsx
 msgid "Accessory"
 msgstr "配件"
@@ -577,12 +570,11 @@ msgid "Winning bid"
 msgstr "最高出价"
 
 #: src/components/Footer.tsx
-msgid "Crystal ball"
-msgstr ""
+#~ msgid "Crystal ball"
+#~ msgstr ""
 
 #. placeholder {0}: i18n.number(Number(proposal.id || '0'))
 #: src/pages/ProposalHistory/index.tsx
-#: src/components/ProposalHeader/index.tsx
 msgid "Proposal {0}"
 msgstr "提案 {0}"
 
@@ -627,7 +619,6 @@ msgstr "结算流程虽然主要激励的是中标者，但妙处在于任何人
 msgid "View the candidate"
 msgstr "查看候选人"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Succeeded"
 msgstr "成功"
@@ -647,7 +638,6 @@ msgstr "注意"
 #~ msgid "Add to escrow"
 #~ msgstr "添加到托管"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Executed"
 msgstr "已执行"
@@ -673,14 +663,13 @@ msgid "Auction ended"
 msgstr "拍卖已结束"
 
 #: src/components/Footer.tsx
-msgid "Probe"
-msgstr ""
+#~ msgid "Probe"
+#~ msgstr ""
 
 #: src/components/VoteModal/index.tsx
-msgid "Submit Vote"
-msgstr "提交投票"
+#~ msgid "Submit Vote"
+#~ msgstr "提交投票"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Expired"
 msgstr "已过期"
@@ -695,8 +684,8 @@ msgid "Submitting…"
 msgstr ""
 
 #: src/components/LanguageSelectionModal/index.tsx
-msgid "Select Language"
-msgstr "选择语言"
+#~ msgid "Select Language"
+#~ msgstr "选择语言"
 
 #: src/components/NavBar/index.tsx
 #: src/components/NavBar/index.tsx
@@ -735,8 +724,8 @@ msgid "Description"
 msgstr "描述"
 
 #: src/components/ProposalHeader/index.tsx
-msgid "Sponsored by"
-msgstr "赞助者"
+#~ msgid "Sponsored by"
+#~ msgstr "赞助者"
 
 #: src/pages/Playground/index.tsx
 msgid "Upload"
@@ -811,8 +800,8 @@ msgid "Starts {0}"
 msgstr "{0}开始"
 
 #: src/components/VoteModal/index.tsx
-msgid "Gas spent on voting will be refunded to you."
-msgstr "投票所花费的燃料费将退还给您。"
+#~ msgid "Gas spent on voting will be refunded to you."
+#~ msgstr "投票所花费的燃料费将退还给您。"
 
 #: src/components/Documentation/index.tsx
 msgid "Noun Seeder Contract"
@@ -846,6 +835,10 @@ msgstr ""
 msgid "Your <0>{availableVotes}</0> votes have been delegated to a new account."
 msgstr "您的 <0>{availableVotes}</0> 票已委托给一个新账户。"
 
+#: src/pages/Nounders/index.tsx
+msgid "The Nounders reward is intended as compensation for our pre and post-launch contributions to the project, and to help us participate meaningfully in governance as the project matures. Since there are 10 Nounders, each Nounder received up to 1% of the Noun supply."
+msgstr ""
+
 #: src/pages/Fork/DeployForkButton.tsx
 #~ msgid "Deploy Nouns fork"
 #~ msgstr "部署 Nouns 分叉"
@@ -859,20 +852,20 @@ msgid "On-Chain Artwork"
 msgstr "链上艺术品"
 
 #: src/components/Footer.tsx
-msgid "Descriptor"
-msgstr "描述符"
+#~ msgid "Descriptor"
+#~ msgstr "描述符"
 
 #: src/components/SettleManuallyBtn/index.tsx
-msgid "You can settle manually in 1 minute"
-msgstr "您可以在 1 分钟内手动结算"
+#~ msgid "You can settle manually in 1 minute"
+#~ msgstr "您可以在 1 分钟内手动结算"
 
 #: src/pages/Nounders/index.tsx
 msgid "Nounders' Reward"
 msgstr "Nounders 奖励"
 
 #: src/components/DelegateHoverCard/index.tsx
-msgid "Voted with<0>{numVotesForProp}</0>Nouns"
-msgstr "使用<0>{numVotesForProp}</0>个 Nouns 进行投票"
+#~ msgid "Voted with<0>{numVotesForProp}</0>Nouns"
+#~ msgstr "使用<0>{numVotesForProp}</0>个 Nouns 进行投票"
 
 #: src/pages/BrandAssets/BrandAssetsPage.tsx
 #~ msgid "Download the individual traits that compose Nouns"
@@ -887,8 +880,8 @@ msgid "One Noun is trustlessly auctioned every 24 hours, forever."
 msgstr "每 24 小时无需信任地拍卖一个 Noun，永远如此。"
 
 #: src/components/VoteModal/index.tsx
-msgid "Error"
-msgstr "错误"
+#~ msgid "Error"
+#~ msgstr "错误"
 
 #: src/components/ProposalActionsModal/steps/StreamPaymentsPaymentDetailsStep/index.tsx
 msgid "Add Stream Date Details"
@@ -903,12 +896,12 @@ msgstr "添加流支付日期详情"
 #~ msgstr "探索特征"
 
 #: src/components/Footer.tsx
-msgid "Token"
-msgstr "令牌"
+#~ msgid "Token"
+#~ msgstr "令牌"
 
 #: src/components/Footer.tsx
-msgid "Nounders"
-msgstr ""
+#~ msgid "Nounders"
+#~ msgstr ""
 
 #: src/pages/BrandAssets/BrandAssetsPage.tsx
 #~ msgid "The logos, traits and every Noun generated on the playground are <0>CC0</0> (Creative Commons Zero), meaning they are in the public domain and free to use for any purpose without restriction."
@@ -930,16 +923,14 @@ msgstr "未找到候选人"
 msgid "The proposal veto right was initially envisioned as a temporary solution to the problem of ‘51% attacks’ on the Nouns DAO treasury. While Nounders initially believed that a healthy distribution of Nouns would be sufficient protection for the DAO, a more complete understanding of the incentives and risks has led to general consensus within the Nounders, the Nouns Foundation, and the wider community that a more robust game-theoretic solution should be implemented before the right is removed."
 msgstr "提案否决权最初被设想为解决 Nouns DAO 资金库“51% 攻击”问题的临时方案。虽然 Nounders 最初认为健康的 Nouns 分布足以保护 DAO，但对激励和风险的更全面理解已在 Nounders、Nouns 基金会和更广泛的社区中达成共识，即在移除该权利之前应实施更强大的博弈论解决方案。"
 
-#. placeholder {0}: dayjs(endDate).fromNow()
 #: src/components/StartOrEndTime/index.tsx
-msgid "ended {0}"
-msgstr "{0}结束"
+#~ msgid "ended {0}"
+#~ msgstr "{0}结束"
 
 #: src/components/Footer.tsx
 #~ msgid "Brand Assets"
 #~ msgstr "品牌资产"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Pending"
 msgstr "待处理"
@@ -978,14 +969,13 @@ msgstr "审核并添加"
 #~ msgstr "<0>注意：</0>链上提案的所有签名者都有权取消该提案。"
 
 #: src/components/VoteModal/index.tsx
-msgid "There was an error voting for your account."
-msgstr "您的账户投票时出现错误。"
+#~ msgid "There was an error voting for your account."
+#~ msgstr "您的账户投票时出现错误。"
 
 #: src/components/CandidateCard/index.tsx
 msgid "noun votes"
 msgstr ""
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Defeated"
 msgstr "不通过"
@@ -1090,8 +1080,8 @@ msgid "You <0>MUST</0> maintain enough voting power to meet the proposal thresho
 msgstr "您<0>必须</0>保持足够的投票权以达到提案门槛，直到您的提案被执行。如果未能做到这一点，任何人都可以取消您的提案。"
 
 #: src/components/SettleManuallyBtn/index.tsx
-msgid "Settle manually"
-msgstr "手动结算"
+#~ msgid "Settle manually"
+#~ msgstr "手动结算"
 
 #: src/components/AddNounsToForkModal/index.tsx
 #~ msgid "Set approval"
@@ -1117,16 +1107,14 @@ msgstr "CryptoPunks"
 #~ msgid "Available to withdraw"
 #~ msgstr "可提取"
 
-#. placeholder {0}: i18n.number(Number(proposalId || '0'))
 #: src/components/VoteModal/index.tsx
-msgid "You've successfully voted on on prop {0}"
-msgstr "您已成功对提案 {0} 进行投票"
+#~ msgid "You've successfully voted on on prop {0}"
+#~ msgstr "您已成功对提案 {0} 进行投票"
 
 #: src/components/DelegateHoverCard/index.tsx
-msgid "Voted with<0>{numVotesForProp}</0>Noun"
-msgstr "使用<0>{numVotesForProp}</0>个 Noun 进行投票"
+#~ msgid "Voted with<0>{numVotesForProp}</0>Noun"
+#~ msgstr "使用<0>{numVotesForProp}</0>个 Noun 进行投票"
 
-#: src/pages/NounsPage.tsx
 #: src/pages/Playground/index.tsx
 msgid "Body"
 msgstr "身体"
@@ -1136,9 +1124,13 @@ msgstr "身体"
 msgid "Nouns voters can cast voting signals to give proposers of pending proposals an idea of how they intend to vote and helpful guidance on proposal changes to change their vote."
 msgstr "Nouns 投票者可以发出投票信号，这既能让待定提案的提出者预估到他们的投票倾向，也能为提案修改提供宝贵指引，以争取（或引导）投票者转变其最终投票。"
 
+#: src/components/NounderNounContent/index.tsx
+msgid "For this reason, we, the project's founders (‘Nounders’) have chosen to compensate ourselves with Nouns. Every 10th Noun up to Noun 1820 (the first 5 years) was sent to our multisig (5/10), where it was vested and distributed to Nounders."
+msgstr ""
+
 #: src/components/VoteModal/index.tsx
-msgid "Thank you for voting."
-msgstr "感谢您的投票。"
+#~ msgid "Thank you for voting."
+#~ msgstr "感谢您的投票。"
 
 #: src/pages/Candidate/index.tsx
 msgid "<0>Note: </0>This proposal candidate has been proposed onchain."
@@ -1154,12 +1146,12 @@ msgid "Consequently, the Nouns Foundation anticipates being the steward of the v
 msgstr "因此，Nouns 基金会预计将在 Nouns DAO 准备好替代方案前继续管理否决权，并希望明确行使此权力的条件。"
 
 #: src/components/ProposalHeader/index.tsx
-msgid "You voted <0>For</0> this proposal"
-msgstr "您对此提案投了<0>赞成</0>票"
+#~ msgid "You voted <0>For</0> this proposal"
+#~ msgstr "您对此提案投了<0>赞成</0>票"
 
 #: src/components/VoteModal/index.tsx
-msgid "Reason (Optional)"
-msgstr "理由（可选）"
+#~ msgid "Reason (Optional)"
+#~ msgstr "理由（可选）"
 
 #: src/components/Documentation/index.tsx
 msgid "Settlement of one auction kicks off the next."
@@ -1174,7 +1166,6 @@ msgid "Delegate Update Failed"
 msgstr "委托更新失败"
 
 #: src/pages/Governance/index.tsx
-#: src/components/Footer.tsx
 msgid "Governance"
 msgstr "治理"
 
@@ -1195,8 +1186,8 @@ msgid "Summary"
 msgstr "摘要"
 
 #: src/components/Footer.tsx
-msgid "Governor"
-msgstr "治理者"
+#~ msgid "Governor"
+#~ msgstr "治理者"
 
 #: src/components/Proposals/index.tsx
 msgid "Proposal candidates can be created by anyone. If a candidate receives enough signatures by Nouns voters, it can be promoted to a proposal."
@@ -1252,7 +1243,6 @@ msgid "Candidate Created!"
 msgstr "候选已创建！"
 
 #: src/pages/CreateProposal/index.tsx
-#: src/components/CampShell/CampCreateProposal.tsx
 msgid "Proposal Created!"
 msgstr "提案已创建！"
 
@@ -1266,8 +1256,8 @@ msgid "accessories ({0}) "
 msgstr "配饰 ({0}) "
 
 #: src/components/Documentation/index.tsx
-msgid "Nounders receive rewards in the form of Nouns (10% of supply for first 5 years)."
-msgstr "Nounders 以 Noun 形式获得奖励（前五年供应的 10%）。"
+#~ msgid "Nounders receive rewards in the form of Nouns (10% of supply for first 5 years)."
+#~ msgstr "Nounders 以 Noun 形式获得奖励（前五年供应的 10%）。"
 
 #: src/pages/Governance/index.tsx
 #: src/components/NounderNounContent/index.tsx
@@ -1296,9 +1286,6 @@ msgstr "Nounders"
 #: src/pages/CreateProposal/index.tsx
 #: src/pages/CreateCandidate/index.tsx
 #: src/components/VoteSignals/VoteSignals.tsx
-#: src/components/VoteModal/index.tsx
-#: src/components/VoteModal/index.tsx
-#: src/components/CampShell/CampCreateProposal.tsx
 #: src/components/Bid/index.tsx
 #: src/components/Bid/index.tsx
 msgid "Please try again."
@@ -1345,8 +1332,8 @@ msgid "m"
 msgstr "分钟"
 
 #: src/components/Banner/index.tsx
-msgid "ONE NOUN,"
-msgstr "一个 NOUN，"
+#~ msgid "ONE NOUN,"
+#~ msgstr "一个 NOUN，"
 
 #: src/components/VoteSignals/VoteSignals.tsx
 msgid "Submit"
@@ -1354,8 +1341,8 @@ msgstr "提交"
 
 #: src/components/Footer.tsx
 #: src/components/Footer.tsx
-msgid "Auction"
-msgstr "拍卖"
+#~ msgid "Auction"
+#~ msgstr "拍卖"
 
 #: src/pages/EditProposal/index.tsx
 #: src/pages/CreateCandidate/index.tsx
@@ -1378,10 +1365,9 @@ msgstr ""
 #~ msgid "Nouns DAO Fork{0}"
 #~ msgstr "Nouns DAO 分叉{0}"
 
-#. placeholder {0}: i18n.number(availableVotes)
 #: src/components/VoteModal/index.tsx
-msgid "Voting with <0>{0}</0> Noun"
-msgstr "使用 <0>{0}</0> 个 Noun 投票"
+#~ msgid "Voting with <0>{0}</0> Noun"
+#~ msgstr "使用 <0>{0}</0> 个 Noun 投票"
 
 #: src/components/Documentation/index.tsx
 msgid "By adopting the DUNA model, Nouns DAO sets a pioneering example for DAOs seeking to balance decentralized autonomy with legal certainty, further solidifying its position at the forefront of decentralized governance innovation."
@@ -1408,12 +1394,12 @@ msgstr "许可证"
 
 #: src/components/ClassicShell/index.tsx
 #: src/components/CatalogueShell/index.tsx
-msgid "Connect"
-msgstr ""
+#~ msgid "Connect"
+#~ msgstr ""
 
 #: src/components/VoteModal/index.tsx
-msgid "Transaction Failed"
-msgstr "交易失败"
+#~ msgid "Transaction Failed"
+#~ msgstr "交易失败"
 
 #: src/components/ProposalStatus/index.tsx
 msgid "Objection period"
@@ -1428,8 +1414,8 @@ msgid "Update Proposal Candidate"
 msgstr "更新提案候选"
 
 #: src/pages/Nounders/index.tsx
-msgid "The Nounders reward is intended as compensation for our pre and post-launch contributions to the project, and to help us participate meaningfully in governance as the project matures. Since there are 10 Nounders, after 5 years each Nounder could receive up to 1% of the Noun supply."
-msgstr "Nounders 奖励旨在补偿我们对项目的启动前后贡献，并帮助我们在项目成熟时有意义地参与治理。由于共有 10 位 Nounders，5 年后每位 Nounder 最多可获得 1% 的 Noun 供应量。"
+#~ msgid "The Nounders reward is intended as compensation for our pre and post-launch contributions to the project, and to help us participate meaningfully in governance as the project matures. Since there are 10 Nounders, after 5 years each Nounder could receive up to 1% of the Noun supply."
+#~ msgstr "Nounders 奖励旨在补偿我们对项目的启动前后贡献，并帮助我们在项目成熟时有意义地参与治理。由于共有 10 位 Nounders，5 年后每位 Nounder 最多可获得 1% 的 Noun 供应量。"
 
 #: src/components/Proposals/index.tsx
 msgid "Connect wallet to make a proposal."
@@ -1489,8 +1475,8 @@ msgid "You"
 msgstr "您"
 
 #: src/components/Footer.tsx
-msgid "Settlers"
-msgstr ""
+#~ msgid "Settlers"
+#~ msgstr ""
 
 #: src/components/DelegationCandidateInfo/index.tsx
 #~ msgid "Now has"
@@ -1499,6 +1485,10 @@ msgstr ""
 #: src/components/VoteSignals/VoteSignals.tsx
 msgid "Pre-proposal feedback"
 msgstr "提案前反馈"
+
+#: src/pages/Governance/index.tsx
+msgid "What it holds, where it came from and where it went →"
+msgstr ""
 
 #: src/components/Documentation/index.tsx
 msgid "Nouns are stored directly on Ethereum and do not utilize pointers to other networks such as IPFS. This is possible because Noun parts are compressed and stored on-chain using a custom run-length encoding (RLE), which is a form of lossless compression."
@@ -1536,8 +1526,8 @@ msgid "Bid history"
 msgstr "出价历史"
 
 #: src/pages/Nounders/index.tsx
-msgid "All Noun auction proceeds are sent to the Nouns DAO. For this reason, we, the project's founders (‘Nounders’) have chosen to compensate ourselves with Nouns. Every 10th noun for the first 5 years of the project will be sent to our multisig (5/10), where it will be vested and distributed to individual Nounders."
-msgstr "所有 Noun 拍卖收益均发送至 Nouns DAO。因此，我们的创始人（‘Nounders’）决定以 Noun 形式补偿自己。项目头 5 年的每第 10 个 Noun 都将发送至我们的多签钱包（5/10），在此归属并分配给各 Nounder。"
+#~ msgid "All Noun auction proceeds are sent to the Nouns DAO. For this reason, we, the project's founders (‘Nounders’) have chosen to compensate ourselves with Nouns. Every 10th noun for the first 5 years of the project will be sent to our multisig (5/10), where it will be vested and distributed to individual Nounders."
+#~ msgstr "所有 Noun 拍卖收益均发送至 Nouns DAO。因此，我们的创始人（‘Nounders’）决定以 Noun 形式补偿自己。项目头 5 年的每第 10 个 Noun 都将发送至我们的多签钱包（5/10），在此归属并分配给各 Nounder。"
 
 #: src/components/ProposalActionsModal/steps/FunctionCallReviewStep/index.tsx
 msgid "Review Function Call Action"
@@ -1553,19 +1543,17 @@ msgstr "正在添加您的反馈"
 msgid "Proposed Transactions"
 msgstr "提议的交易"
 
-#. placeholder {0}: i18n.date(new Date(proposalCreationTimestamp * 1000), { dateStyle: 'long', timeStyle: 'long', })
 #: src/components/ProposalHeader/index.tsx
-msgid "Only Nouns you owned or were delegated to you before {0} are eligible to vote."
-msgstr "只有您在 {0} 之前拥有或被委托的 Nouns 才可投票。"
+#~ msgid "Only Nouns you owned or were delegated to you before {0} are eligible to vote."
+#~ msgstr "只有您在 {0} 之前拥有或被委托的 Nouns 才可投票。"
 
 #: src/pages/Vote/index.tsx
 #~ msgid "Proposals cannot be executed during a forking period"
 #~ msgstr "在分叉期间无法执行提案"
 
-#. placeholder {0}: i18n.number(Number(proposalId || '0'))
 #: src/components/VoteModal/index.tsx
-msgid "Vote on Prop {0}"
-msgstr "在提案 {0} 上投票"
+#~ msgid "Vote on Prop {0}"
+#~ msgstr "在提案 {0} 上投票"
 
 #: src/components/NounInfoCard.tsx
 msgid "Etherscan"
@@ -1583,9 +1571,13 @@ msgstr "出价"
 msgid "Change"
 msgstr "更改"
 
+#: src/components/Documentation/index.tsx
+msgid "Because 100% of Noun auction proceeds are sent to Nouns DAO, Nounders have chosen to compensate themselves with Nouns. Every 10th Noun up to Noun 1820 (Noun ids #0, #10, #20, #30 and so on) was automatically sent to the Nounder's multisig to be vested and shared among the founding members of the project."
+msgstr ""
+
 #: src/components/ProposalHeader/index.tsx
-msgid "You <0>Abstained</0> from this proposal"
-msgstr "您对此提案<0>弃权</0>"
+#~ msgid "You <0>Abstained</0> from this proposal"
+#~ msgstr "您对此提案<0>弃权</0>"
 
 #. placeholder {0}: expiresDate.locale(SUPPORTED_LOCALE_TO_DAYSJS_LOCALE[locale] ?? en).fromNow()
 #: src/components/Proposals/index.tsx
@@ -1655,15 +1647,13 @@ msgid "One Noun, Every Day, Forever."
 msgstr "每天一个Noun，直至永远。"
 
 #: src/pages/TraitsPage.tsx
-#: src/components/Footer.tsx
 msgid "Traits"
 msgstr "特征"
 
 #: src/components/VoteModal/index.tsx
-msgid "User Already Voted"
-msgstr "用户已投票"
+#~ msgid "User Already Voted"
+#~ msgstr "用户已投票"
 
-#: src/components/ProposalHeader/index.tsx
 #: src/components/ProposalHeader/CandidateHeader.tsx
 msgid "Connect a wallet to vote."
 msgstr "连接钱包以进行投票。"
@@ -1678,11 +1668,10 @@ msgstr "您可以在 {playgroundLink} 上尝试链下生成 Nouns。"
 #~ msgid "Abstain"
 #~ msgstr "弃权"
 
-#. placeholder {0}: filteredDelegateGroupedVoteData.length
 #: src/components/VoteCard/index.tsx
 #: src/components/VoteCard/index.tsx
-msgid "{0, plural, one {voter} other {voters}}"
-msgstr "{0, plural, one {投票者} other {投票者}}"
+#~ msgid "{0, plural, one {voter} other {voters}}"
+#~ msgstr "{0, plural, one {投票者} other {投票者}}"
 
 #: src/components/Documentation/index.tsx
 msgid "100% of Noun auction proceeds are trustlessly sent to the treasury."
@@ -1698,7 +1687,6 @@ msgstr "开始于"
 msgid "View on Etherscan"
 msgstr "在 Etherscan 上查看"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Vetoed"
 msgstr "已否决"
@@ -1707,7 +1695,6 @@ msgstr "已否决"
 msgid "Preview"
 msgstr "预览"
 
-#: src/pages/NounsPage.tsx
 #: src/pages/Playground/index.tsx
 msgid "Head"
 msgstr "头部"
@@ -1734,10 +1721,9 @@ msgid "Submissions are free for Nouns voters. Non-voters can submit for a {0} ET
 msgstr "Nouns 投票者提交是免费的。非投票者可以支付 {0} ETH 的费用提交。"
 
 #: src/components/NounderNounContent/index.tsx
-msgid "For this reason, we, the project's founders (‘Nounders’) have chosen to compensate compensate ourselves with Nouns. Every 10th Noun for the first 5 years of the project will be sent to our multisig (5/10), where it will be vested and distributed Nounders."
-msgstr "因此，我们，项目的创始人（‘Nounders’），选择用 Nouns 来补偿自己。在项目的前五年中，每第十个 Noun 将被发送到我们的多签（5/10），在那里它将被归属并分配给 Nounders。"
+#~ msgid "For this reason, we, the project's founders (‘Nounders’) have chosen to compensate compensate ourselves with Nouns. Every 10th Noun for the first 5 years of the project will be sent to our multisig (5/10), where it will be vested and distributed Nounders."
+#~ msgstr "因此，我们，项目的创始人（‘Nounders’），选择用 Nouns 来补偿自己。在项目的前五年中，每第十个 Noun 将被发送到我们的多签（5/10），在那里它将被归属并分配给 Nounders。"
 
-#: src/pages/NounsPage.tsx
 #: src/pages/Governance/index.tsx
 msgid "Noun"
 msgstr "Noun"
@@ -1773,10 +1759,9 @@ msgid "Enter the Ethereum address or ENS name of the account you would like to d
 msgstr "输入您想要委托投票的账户的以太坊地址或 ENS 名称。"
 
 #: src/pages/NounsPage.tsx
-msgid "Go to auction"
-msgstr "前往拍卖"
+#~ msgid "Go to auction"
+#~ msgstr "前往拍卖"
 
-#: src/components/ProposalStatusCopy/index.tsx
 #: src/components/ProposalStatus/index.tsx
 msgid "Undetermined"
 msgstr "未确定"
@@ -1790,8 +1775,8 @@ msgid "Review Transfer Funds Action"
 msgstr "审查转账操作"
 
 #: src/components/NavLocaleSwitcher/index.tsx
-msgid "Language"
-msgstr "语言"
+#~ msgid "Language"
+#~ msgstr "语言"
 
 #: src/components/ProposalActionsModal/steps/FunctionCallReviewStep/index.tsx
 msgid "Value"
@@ -1814,7 +1799,11 @@ msgstr "Nouns 拍卖合约将作为一个自给自足的 Noun 生成和分发机
 #~ msgstr "该候选人目前有 {0} 个签名。"
 
 #: src/components/Footer.tsx
-msgid "Grants"
+#~ msgid "Grants"
+#~ msgstr ""
+
+#: src/components/Documentation/index.tsx
+msgid "Nounders received rewards in the form of Nouns (10% of supply up to Noun 1820)."
 msgstr ""
 
 #: src/components/Documentation/index.tsx
@@ -1863,8 +1852,8 @@ msgid "Bid placed."
 msgstr "出价已提交。"
 
 #: src/pages/NounsPage.tsx
-msgid "Noggles"
-msgstr "眼镜"
+#~ msgid "Noggles"
+#~ msgstr "眼镜"
 
 #: src/components/ProposalEditor/index.tsx
 msgid "Candidate"
@@ -1875,16 +1864,16 @@ msgid "Nouns DUNA is a legally recognized Decentralized Unincorporated Nonprofit
 msgstr "Nouns DUNA是一个在怀俄明州通过<0/>设立的法律认可的去中心化非注册非营利协会，旨在提供与Nouns DAO去中心化性质相符的强大法律框架。这种结构使Nouns DAO能够在有限责任保护和法律明确性下运营，而不损害其去中心化治理精神。"
 
 #: src/components/Footer.tsx
-msgid "Wallet explorer"
-msgstr ""
+#~ msgid "Wallet explorer"
+#~ msgstr ""
 
 #: src/pages/EditCandidate/index.tsx
 msgid "Candidate not found."
 msgstr ""
 
 #: src/components/Banner/index.tsx
-msgid "EVERY DAY,"
-msgstr "每一天，"
+#~ msgid "EVERY DAY,"
+#~ msgstr "每一天，"
 
 #: src/components/NounderNounContent/index.tsx
 msgid "Learn more"

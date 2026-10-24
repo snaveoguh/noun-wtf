@@ -1,544 +1,772 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+
 import { Link } from 'react-router';
 
+import { CATALOG } from '@/components/NounOS/catalog';
+import { NOGGLES } from '@/components/NounOS/home/introScene';
 import { DEFAULT_API_BASE as API } from '@/lib/api';
 
+import { API_GROUPS, ALL_ROUTES, type ApiRoute } from './apiRoutes';
 import styles from './Underground.module.css';
 
-const TREASURY = '0xBAc9233725440c595b19d975309CC98cb259253a';
+const SMALL_GRANTS = '0xBAc9233725440c595b19d975309CC98cb259253a';
+const PARTY_HOST = 'noun-wtf-party.hugoevans92.workers.dev';
+const etherscan = (a: string) => `https://etherscan.io/address/${a}`;
 
-// ── sections ────────────────────────────────────────────────────────────
+// ── the directory tree (nav + section order) ────────────────────────────
 
-const sections = [
-  'WHAT IS NOUNS',
-  'ARCHITECTURE',
-  'CONTRACTS',
-  'GRAPHQL',
-  'REST API',
-  'AGENT NOUNIRL',
-  'SMALL GRANTS',
-  'TERMINAL',
-  'LOCAL DEV',
-  'ENV VARS',
-  'BUILD IDEAS',
+const DIRS = [
+  ['surface', 'what nouns is'],
+  ['pipes', 'how it’s wired'],
+  ['contracts', 'addresses'],
+  ['graphql', 'query the index'],
+  ['api', `${ALL_ROUTES.length} rest routes`],
+  ['agent', 'nounirl.eth'],
+  ['grants', 'small grants'],
+  ['terminal', 'chat + drafts'],
+  ['functions', 'netlify'],
+  ['multiplayer', 'durable objects'],
+  ['dev', 'run it locally'],
+  ['build', 'ideas'],
+  ['apps', 'everything we made'],
 ] as const;
 
-type Section = (typeof sections)[number];
+type Dir = (typeof DIRS)[number][0];
 
-// ── component ───────────────────────────────────────────────────────────
+// ── page ────────────────────────────────────────────────────────────────
 
 export default function UndergroundPage() {
-  const [open, setOpen] = useState<Set<Section>>(new Set());
-
-  function toggle(s: Section) {
-    setOpen(prev => {
-      const next = new Set(prev);
-      next.has(s) ? next.delete(s) : next.add(s);
-      return next;
-    });
-  }
-
-  const isOpen = (s: Section) => open.has(s);
-
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-keep-font>
+      <div className={styles.crt} aria-hidden />
       <div className={styles.inner}>
-        {/* header */}
-        <pre className={styles.ascii}>{`
- _   _ _   _
-| \\ | | | | |
-|  \\| | | | |
-| . \` | |_| |
-|_|\\__|\\___/
-        `.trim()}</pre>
-        <h1 className={styles.title}>NOUNS UNDERGROUND</h1>
-        <p className={styles.sub}>
-          Everything you need to build on the noun.wtf stack.
-          <br />
-          Contracts, APIs, indexer, autonomous agent. Client ID 37.
-        </p>
-        <p className={styles.hint}>Click a section to expand.</p>
+        <Boot />
+        <StatusBar />
+        <Nav />
 
-        {/* ── WHAT IS NOUNS ────────────────────────────────────── */}
-        <Heading s="WHAT IS NOUNS" isOpen={isOpen} toggle={toggle} />
-        {isOpen('WHAT IS NOUNS') && (
-          <div className={styles.section}>
-            <p>One Noun is auctioned every 24 hours, forever. Proceeds go to the DAO treasury (~$50M+). Noun holders (1 NFT = 1 vote) govern the treasury through onchain proposals.</p>
+        <Sec dir="surface" n={1} title="SURFACE">
+          <p>
+            One Noun is auctioned every 24 hours, forever. The ETH goes to the treasury; holders
+            govern it, one Noun one vote, through onchain proposals. Everything is CC0. noun.wtf is
+            client <b>37</b>: votes and bids placed here earn the DAO’s client rewards.
+          </p>
+          <Table
+            headers={['Thing', 'What it is']}
+            rows={[
+              [
+                'Noun',
+                'ERC-721, 32×32 pixel art from 5 traits: background, body, accessory, head, glasses',
+              ],
+              [
+                'Auction',
+                '24h English auction. Winner gets the Noun and its vote. Settling starts the next one',
+              ],
+              [
+                'V4 auction house',
+                'Live since 2026-05-25 (Prop 968). No bid → the Noun goes to the treasury, not burned',
+              ],
+              ['Proposal', 'Executable onchain actions (send ETH, call contracts) passed by vote'],
+              ['Candidate', 'An offchain draft that becomes a proposal once enough holders sign'],
+              ['Stream', 'Treasury money paid out by the second over a period'],
+              [
+                'NounV2',
+                'The second DAO (launched 2026-04-24): its own token, auction and treasury at /v2',
+              ],
+            ]}
+          />
+          <p className={styles.dim}>
+            Where the money actually went: <Link to="/nonsense">/nonsense</Link> (holdings,
+            reconciliation, every payout).
+          </p>
+        </Sec>
 
-            <Table headers={['Concept', 'What It Means']} rows={[
-              ['Noun', 'ERC-721 NFT with procedurally generated pixel art (5 traits: background, body, accessory, head, glasses)'],
-              ['Auction', '24hr English auction for each new Noun. Winner gets the NFT + 1 governance vote'],
-              ['Proposal', 'Onchain executable code (send ETH, call contracts) requiring majority vote to pass'],
-              ['Candidate', 'Offchain proposal draft that needs sponsor signatures before going onchain'],
-              ['Delegation', 'Noun holders can delegate their votes to another address'],
-              ['Stream', 'Continuous payment stream from treasury to a recipient over time'],
-              ['Client Incentive', 'Protocol rewards for frontends that facilitate votes/bids (identified by client ID)'],
-            ]} />
+        <Sec dir="pipes" n={2} title="PIPES">
+          <Code>{`  browser ── noun.wtf SPA ──────────────── Netlify CDN
+     │       Vite · React 19 · wagmi/viem      └─ /.netlify/functions/*  (Blobs)
+     │
+     ├── reads/writes ──► Ethereum mainnet
+     │                    publicnode → 1rpc → merkle (wagmi fallback, no keys)
+     │
+     ├── history ──────► Ponder API ─── Postgres          Railway
+     │                    GraphQL + ${ALL_ROUTES.length} REST routes
+     │                    indexer RPC: Tenderly gateway + MEV Blocker
+     │                    syncWatchdog restarts it if the sync stalls
+     │
+     └── multiplayer ──► PartyServer on Cloudflare Durable Objects
+                          ${PARTY_HOST}`}</Code>
+          <Table
+            headers={['Layer', 'Stack']}
+            rows={[
+              ['Frontend', 'Vite 6, React 19, wagmi + viem, TanStack Query, Tailwind, Lingui'],
+              [
+                'Indexer / API',
+                'Ponder 0.16, Hono, Drizzle, Postgres. New schema per deploy, re-syncs from scratch',
+              ],
+              [
+                'Serverless',
+                'Netlify Functions + Netlify Blobs (uploads, Noun World saves, voice clips)',
+              ],
+              ['Agent', 'Claude via the Anthropic SDK, viem for settling, Neynar for Farcaster'],
+              ['Multiplayer', 'PartyServer (Cloudflare Workers + Durable Objects)'],
+              ['Contracts', 'Solidity, Foundry + Hardhat'],
+            ]}
+          />
+          <h4>Shipping</h4>
+          <Code>{`push staging   →  dev-noun-wtf.netlify.app      (GitHub Actions)
+push main      →  noun.wtf                      (GitHub Actions)
+railway up     →  the API   — by hand, from the REPO ROOT (root Dockerfile)
+wrangler deploy → multiplayer — by hand, from packages/nouns-party`}</Code>
+          <p className={styles.warn}>
+            Pushing never deploys the API. Run <code>railway up</code> from the repo root; a{' '}
+            <code>.railwayignore</code> keeps the upload to the API’s ~11 MB.
+          </p>
+        </Sec>
 
-            <h4>Key Addresses</h4>
-            <Code>{`NounsToken:          0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03
-NounsAuctionHouseV2: 0x830BD73E4184ceF73443C15111a1DF14e495C706
-NounsDAOV4:          0x6f3E6272A167e8AcCb32072d08E0957F9c79223d
-NounsDAOData:        0xf790A5f59678dd733fb3De93493A91f472ca1365
-StreamFactory:       0x0fd206FC7A7dBcD5661157eDCb1FFDD0D02A61ff
-SmallGrantsTreasury: ${TREASURY}`}</Code>
-          </div>
-        )}
+        <Sec dir="contracts" n={3} title="CONTRACTS">
+          <h4>Nouns DAO · mainnet</h4>
+          <Addrs
+            rows={[
+              ['NounsToken', '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03'],
+              ['Auction house (proxy, V4)', '0x830BD73E4184ceF73443C15111a1DF14e495C706'],
+              ['Governor (DAO V4)', '0x6f3E6272A167e8AcCb32072d08E0957F9c79223d'],
+              ['nouns.eth (Timelock V2)', '0xb1a32FC9F9D8b2cf86C068Cae13108809547ef71'],
+              ['Timelock V1 (legacy)', '0x0BC3807Ec262cB779b38D65b38158acC3bfedE10'],
+              ['NounsDAOData (candidates)', '0xf790A5f59678dd733fb3De93493A91f472ca1365'],
+              ['Descriptor', '0x33A9c445fb4FB21f2c030A6b2d3e2F12D017BFAC'],
+              ['Stream factory', '0x0fd206FC7A7dBcD5661157eDCb1FFDD0D02A61ff'],
+              ['USDC payer', '0xd97Bcd9f47cEe35c0a9ec1dc40C1269afc9E8E1D'],
+              ['Token buyer', '0x4f2aCdc74f6941390d9b1804faBc3E780388cfe5'],
+              ['Client rewards (proxy)', '0x883860178F95d0C82413eDc1D6De530cB4771d55'],
+              ['nounders.eth', '0x2573C60a6D127755aA2DC85e342F7da2378a0Cc5'],
+            ]}
+          />
+          <h4>NounV2 · mainnet</h4>
+          <Addrs
+            rows={[
+              ['NounV2Token', '0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9'],
+              ['NounV2 auction house', '0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc'],
+              ['NounV2 treasury + governor', '0x2cdeb0d251674710840d9fa990d1de138dfe7c00'],
+            ]}
+          />
+          <h4>Ours + friends</h4>
+          <Addrs
+            rows={[
+              ['SmallGrantsTreasury (noun.wtf)', SMALL_GRANTS],
+              ['Lil Nouns governor', '0x5d2C31ce16924C2a71D317e5BbFd5ce387854039'],
+            ]}
+          />
+          <h4>What the indexer watches</h4>
+          <Table
+            headers={['Source', 'Events']}
+            rows={[
+              ['NounsToken', 'NounCreated, Transfer, DelegateChanged, DelegateVotesChanged'],
+              [
+                'Auction house',
+                'AuctionCreated, AuctionBid, AuctionSettled (+ ownerOf after settle: burned vs treasury)',
+              ],
+              ['Governor', 'Proposals, votes, status changes, forks, config'],
+              ['NounsDAOData', 'Candidates, signatures, feedback'],
+              ['Stream factory + streams', 'StreamCreated, withdrawals, cancels'],
+              ['nouns.eth', 'ETHSent / ERC20Sent (fork payouts)'],
+              ['SmallGrantsTreasury', 'Grants, votes, status changes'],
+              ['NounV2 auction + treasury', 'Auctions, bids, proposals, votes'],
+              ['Punks, Toadz, ENS', 'Recent history only, for the homepage chain feed'],
+            ]}
+          />
+          <h4>Sepolia</h4>
+          <Code>{`NounsToken          0x4C4674bb72a096855496a7204962297bd7e12b85
+Auction house       0x488609b7113FCf3B761A05956300d605E8f6BcAf
+Governor            0x35d2670d7C8931AACdd37C89Ddcb0638c3c44A57
+NounsDAOData        0x9040f720AA8A693f950b9cF94764b4b06079D002
+Stream factory      0xb78ccF3BD015f209fb9B2d3d132FD8784Df78DF5`}</Code>
+        </Sec>
 
-        {/* ── ARCHITECTURE ─────────────────────────────────────── */}
-        <Heading s="ARCHITECTURE" isOpen={isOpen} toggle={toggle} />
-        {isOpen('ARCHITECTURE') && (
-          <div className={styles.section}>
-            <Code>{`                    +------------------+
-                    |   noun.wtf SPA   |  Vite + React + wagmi
-                    |   (Netlify CDN)  |
-                    +--------+---------+
-                             |
-                +------------+------------+
-                |                         |
-       +--------v--------+       +-------v----------+
-       | Ponder GraphQL  |       | Ethereum Mainnet |
-       | (Railway)        |       | (via Infura RPC) |
-       +--------+--------+       +------------------+
-                |
-       +--------v--------+
-       | PostgreSQL 5GB  |
-       | (Railway)        |
-       +-----------------+`}</Code>
-            <p>The frontend is a pure client-side SPA. It talks to:</p>
-            <ul>
-              <li><strong>Ponder API</strong> — indexed historical data (proposals, votes, auctions, etc.)</li>
-              <li><strong>Ethereum RPC</strong> — live reads + write transactions via wagmi/viem in the browser</li>
-            </ul>
-            <p>Ponder watches the chain via Infura, indexes events into Postgres, and exposes GraphQL automatically from the schema.</p>
-
-            <Table headers={['Layer', 'Stack']} rows={[
-              ['Frontend', 'Vite 6, React 19, wagmi v2, viem, RainbowKit, Jotai, Tailwind'],
-              ['Indexer', 'Ponder v0.16, Hono, Drizzle ORM, PostgreSQL'],
-              ['Agent', 'Anthropic SDK (Claude), ethers for settlement, Neynar for Farcaster'],
-              ['Contracts', 'Solidity 0.8.24, Foundry'],
-            ]} />
-          </div>
-        )}
-
-        {/* ── CONTRACTS ────────────────────────────────────────── */}
-        <Heading s="CONTRACTS" isOpen={isOpen} toggle={toggle} />
-        {isOpen('CONTRACTS') && (
-          <div className={styles.section}>
-            <h4>Mainnet — Indexed by Ponder</h4>
-            <Table headers={['Contract', 'Address', 'Start Block', 'Events']} rows={[
-              ['NounsAuctionHouseV2', '0x830BD73E...', '12,985,451', 'AuctionCreated, AuctionBid, AuctionSettled'],
-              ['NounsToken', '0x9C8fF314...', '12,985,438', 'NounCreated, Transfer, DelegateChanged, DelegateVotesChanged'],
-              ['NounsDAOV4', '0x6f3E6272...', '12,985,453', 'ProposalCreated, VoteCast, ProposalQueued/Executed/Canceled/Vetoed'],
-              ['NounsDAOData', '0xf790A5f5...', '17,812,145', 'CandidateCreated/Updated/Canceled, SignatureAdded, FeedbackSent'],
-              ['StreamFactory', '0x0fd206FC...', '16,576,500', 'StreamCreated'],
-              ['Stream', '(factory children)', '16,576,500', 'TokensWithdrawn, StreamCancelled, StreamConcluded'],
-              ['SmallGrantsTreasury', '0xBAc92337...', '24,650,190', 'ProposalCreated, VoteCast, Queued/Executed/Canceled'],
-            ]} />
-
-            <h4>Sepolia Testnet</h4>
-            <Code>{`NounsToken:          0x4C4674bb72a096855496a7204962297bd7e12b85
-NounsAuctionHouseV2: 0x488609b7113FCf3B761A05956300d605E8f6BcAf
-NounsDAOV4:          0x35d2670d7C8931AACdd37C89Ddcb0638c3c44A57
-NounsDAOData:        0x9040f720AA8A693f950b9cF94764b4b06079D002
-StreamFactory:       0xb78ccF3BD015f209fb9B2d3d132FD8784Df78DF5`}</Code>
-          </div>
-        )}
-
-        {/* ── GRAPHQL ──────────────────────────────────────────── */}
-        <Heading s="GRAPHQL" isOpen={isOpen} toggle={toggle} />
-        {isOpen('GRAPHQL') && (
-          <div className={styles.section}>
-            <p>
-              <strong>Endpoint:</strong>{' '}
-              <a href={`${API}/graphql`} target="_blank" rel="noreferrer" className={styles.link}>{API}/graphql</a>
-            </p>
-            <p>POST JSON <code>{`{ "query": "..." }`}</code>. Full Ponder GraphQL with filtering, ordering, pagination.</p>
-            <p className={styles.warn}>All plural queries return <code>{`{ items: [...] }`}</code> — this is Ponder v0.12+ convention.</p>
-
-            <h4>Nouns</h4>
-            <Code>{`{
-  nouns(orderBy: "id", orderDirection: "desc", limit: 10) {
-    items {
-      id owner head body accessory glasses background
-      createdAt createdAtBlock
-    }
-  }
-}`}</Code>
-
-            <h4>Proposals</h4>
-            <Code>{`{
-  proposals(orderBy: "id", orderDirection: "desc", limit: 20) {
-    items {
-      id proposer description
-      status           # PENDING | ACTIVE | CANCELLED | VETOED | QUEUED | EXECUTED
-      forVotes againstVotes abstainVotes
-      startBlock endBlock executionETA
-      clientId         # 37 = noun.wtf
-    }
-  }
-}`}</Code>
-
-            <h4>Votes</h4>
-            <Code>{`{
-  votes(where: { proposalId: "123" }, orderBy: "createdAtBlock", orderDirection: "desc") {
-    items {
-      voter proposalId
-      support          # 0=AGAINST, 1=FOR, 2=ABSTAIN
-      votes reason clientId
-    }
-  }
-}`}</Code>
-
-            <h4>Auctions + Bids</h4>
-            <Code>{`{
-  auctions(orderBy: "nounId", orderDirection: "desc", limit: 10) {
-    items { nounId startTime endTime settled winner amount clientId }
-  }
-  bids(where: { nounId: "1234" }, orderBy: "value", orderDirection: "desc") {
-    items { nounId bidder value clientId }
-  }
-}`}</Code>
-
-            <h4>Delegates</h4>
-            <Code>{`{
-  delegates(orderBy: "delegatedVotes", orderDirection: "desc", limit: 50) {
-    items { id delegatedVotes }
-  }
-}`}</Code>
-
-            <h4>Streams</h4>
-            <Code>{`{
-  streams(orderBy: "startTime", orderDirection: "desc") {
-    items {
-      streamAddress proposalId status
-      creator payer recipient
-      tokenAmount withdrawnAmount startTime stopTime
-    }
-  }
-}`}</Code>
-
-            <h4>Candidates + Signatures</h4>
-            <Code>{`{
-  candidates(orderBy: "createdAt", orderDirection: "desc", limit: 20) {
-    items { id slug proposer canceled versionsCount description createdAt }
-  }
-}`}</Code>
-
-            <h4>Grants + Grant Votes</h4>
-            <Code>{`{
-  grants(orderBy: "id", orderDirection: "desc") {
-    items {
-      id proposer description status
-      forVotes againstVotes abstainVotes
-      startBlock endBlock executionETA
-    }
-  }
-  grantVotes(where: { grantId: "1" }) {
-    items { voter grantId support votes reason }
-  }
-}`}</Code>
-
-            <h4>Single Item Lookup</h4>
-            <Code>{`{ proposal(id: "123") { id status description forVotes againstVotes } }
-{ grant(id: "1") { id proposer status forVotes } }
-{ noun(id: "500") { id owner head body accessory glasses } }`}</Code>
-
-            <h4>Filtering</h4>
-            <Code>{`{
-  votes(where: { voter: "0x1234...", support: 1 }) {
-    items { proposalId votes reason }
-  }
-}`}</Code>
-          </div>
-        )}
-
-        {/* ── REST API ─────────────────────────────────────────── */}
-        <Heading s="REST API" isOpen={isOpen} toggle={toggle} />
-        {isOpen('REST API') && (
-          <div className={styles.section}>
-            <p><strong>Base URL:</strong> <a href={API} target="_blank" rel="noreferrer" className={styles.link}>{API}</a></p>
-
-            <h4>Activity Feed</h4>
-            <Code>{`GET /api/activity?type=VOTE&limit=50&before=12345678`}</Code>
-            <p>Types: <code>VOTE</code>, <code>AUCTION_BID</code>, <code>AUCTION_SETTLED</code>, <code>PROPOSAL_CREATED</code>, <code>PROPOSAL_STATUS_CHANGE</code>, <code>DELEGATION</code>, <code>TRANSFER</code>, <code>STREAM_CREATED</code>, <code>CANDIDATE_CREATED</code>, <code>CANDIDATE_UPDATED</code>, <code>CANDIDATE_CANCELED</code>, <code>SIGNATURE_ADDED</code>, <code>FEEDBACK_SENT</code>, <code>GRANT_CREATED</code>, <code>GRANT_VOTE</code>, <code>GRANT_QUEUED</code>, <code>GRANT_EXECUTED</code>, <code>GRANT_CANCELED</code></p>
-            <p>Omit <code>type</code> for all events mixed.</p>
-            <Code>{`// Response
+        <Sec dir="graphql" n={4} title="GRAPHQL">
+          <p>
+            <b>POST</b>{' '}
+            <a href={`${API}/graphql`} target="_blank" rel="noreferrer">
+              {API}/graphql
+            </a>{' '}
+            with <code>{'{ "query": "…" }'}</code>. Open it in a browser for the GraphiQL explorer.
+          </p>
+          <p className={styles.warn}>
+            Plural queries return <code>{'{ items: [...] }'}</code>. Big integers come back as
+            strings.
+          </p>
+          <Code>{`# latest nouns + auctions
 {
-  "events": [
-    {
-      "type": "VOTE",
-      "blockNumber": 12345678,
-      "timestamp": "2026-03-13T...",
-      "txHash": "0x...",
-      "data": { "voter": "0x...", "proposalId": 123, "support": 1, "votes": 4 }
-    }
-  ],
-  "hasMore": true,
-  "oldestBlock": 12345000
+  nouns(orderBy: "id", orderDirection: "desc", limit: 5) {
+    items { id owner head body accessory glasses background }
+  }
+  auctions(orderBy: "nounId", orderDirection: "desc", limit: 5) {
+    items { nounId amount winner settled burned settler clientId }
+  }
+}
+
+# a proposal and how it went
+{
+  proposal(id: "1000") { id status description forVotes againstVotes clientId }
+  votes(where: { proposalId: "1000" }, orderBy: "votes", orderDirection: "desc") {
+    items { voter support votes reason clientId }
+  }
+}
+
+# NounV2
+{
+  nounV2Auctions(orderBy: "nounId", orderDirection: "desc", limit: 5) {
+    items { nounId amount winner settled }
+  }
+  nounV2Proposals(orderBy: "id", orderDirection: "desc", limit: 5) {
+    items { id status description }
+  }
+}
+
+# money out
+{
+  streams(orderBy: "startTime", orderDirection: "desc", limit: 5) {
+    items { streamAddress proposalId recipient tokenAmount startTime stopTime }
+  }
+  treasurySends(orderBy: "createdAtBlock", orderDirection: "desc", limit: 5) {
+    items { to token amount createdAt }
+  }
 }`}</Code>
+          <p className={styles.dim}>
+            Also: delegates, candidates, candidateSignatures, proposalFeedback, grants, grantVotes,
+            nounTransfers, delegationEvents, forkEvents, onchainEvents. The schema lives in{' '}
+            <code>packages/nouns-api/ponder.schema.ts</code>.
+          </p>
+        </Sec>
 
-            <h4>Other Endpoints</h4>
-            <Table headers={['Endpoint', 'Method', 'Description']} rows={[
-              ['/api/feed/:channel', 'GET', 'Farcaster feed (/nouns, /noc) via Neynar'],
-              ['/api/ens?address=0x...', 'GET', 'ENS name resolution (forward + reverse)'],
-              ['/api/noun-holders', 'GET', 'Noun holder leaderboard with ENS'],
-              ['/api/ascii-image?nounId=123', 'GET', 'ASCII art of a Noun'],
-              ['/api/og/proposal/:id', 'GET', 'Open Graph image for social sharing'],
-              ['/api/treasury/flows', 'GET', 'Treasury payment flow data'],
-              ['/api/sketch/latest', 'GET', 'User-created noun sketches'],
-              ['/api/health', 'GET', 'Health check'],
-            ]} />
-          </div>
-        )}
+        <Sec dir="api" n={5} title="REST API">
+          <p>
+            <b>Base</b>{' '}
+            <a href={API} target="_blank" rel="noreferrer">
+              {API}
+            </a>
+            . Plus Ponder’s own <code>/health</code>, <code>/ready</code> (503 while backfilling)
+            and <code>/status</code>.
+          </p>
+          <ApiBrowser />
+        </Sec>
 
-        {/* ── AGENT NOUNIRL ────────────────────────────────────── */}
-        <Heading s="AGENT NOUNIRL" isOpen={isOpen} toggle={toggle} />
-        {isOpen('AGENT NOUNIRL') && (
-          <div className={styles.section}>
-            <p><code>nounirl.eth</code> — an autonomous onchain agent that settles Nouns auctions when specific traits appear.</p>
+        <Sec dir="agent" n={6} title="AGENT NOUNIRL">
+          <p>
+            <code>nounirl.eth</code> watches every block, predicts the next Noun with the seeder’s
+            own algorithm and settles the auction when the Noun someone asked for is up next.
+          </p>
+          <ol>
+            <li>
+              Tip at least 0.002 ETH to nounirl.eth on Ethereum, Base, Optimism, Arbitrum or Zora.
+            </li>
+            <li>Say what you want: “shark head and blue noggles”.</li>
+            <li>When the predicted Noun matches and the auction has ended, it settles.</li>
+          </ol>
+          <p>
+            Same engine as the <Link to="/crystal-ball">CRYSTAL BALL</Link>. Its endpoints are under{' '}
+            <a href="#api">AGENT NOUNIRL</a> in the API list.
+          </p>
+        </Sec>
 
-            <h4>How It Works</h4>
-            <ol>
-              <li>Tip {'>'}= 0.002 ETH to nounirl.eth (Ethereum, Base, Optimism, Arbitrum, or Zora)</li>
-              <li>Specify desired traits: "shark head AND blue noggles"</li>
-              <li>Agent monitors every block, predicts next Noun traits via NounsSeeder algorithm</li>
-              <li>Automatically settles auction when match found + auction ended</li>
-            </ol>
+        <Sec dir="grants" n={7} title="SMALL GRANTS">
+          <p>
+            noun.wtf’s own micro-DAO: governor and treasury in one contract,{' '}
+            <a href={etherscan(SMALL_GRANTS)} target="_blank" rel="noreferrer">
+              {SMALL_GRANTS}
+            </a>
+            . Voting power is your Nouns (<code>getPriorVotes</code> at the snapshot). Fund it by
+            sending ETH.
+          </p>
+          <Table
+            headers={['Rule', 'Value']}
+            rows={[
+              ['Voting delay', '0 blocks'],
+              ['Voting period', '3,600 blocks (~12 h)'],
+              ['Timelock', '12 h'],
+              ['Grace period', '7 days'],
+              ['Max actions', '10 per proposal'],
+              ['Quorum', 'None. 1 FOR, 0 AGAINST passes'],
+            ]}
+          />
+          <Code>{`propose(targets[], values[], signatures[], calldatas[], description)
+castVote(id, support)            // 0 against · 1 for · 2 abstain
+castVoteWithReason(id, support, reason)
+queue(id)  →  12h  →  execute(id)        cancel(id)   state(id)`}</Code>
+          <p>
+            <Link to="/grants">/grants →</Link>
+          </p>
+        </Sec>
 
-            <h4>Trait Counts</h4>
-            <Code>{`background:  2  (cool, warm)
-body:       31
-accessory: 144
-head:      258
-glasses:    24`}</Code>
-
-            <h4>Agent Endpoints</h4>
-            <Table headers={['Endpoint', 'Method', 'Description']} rows={[
-              ['/api/agent/status', 'GET', 'Running state, block, predictions, balance'],
-              ['/api/agent/predict', 'GET', 'Predicted traits for next Noun'],
-              ['/api/agent/reserve', 'POST', 'Create trait reservation (tip tx hash required)'],
-              ['/api/agent/reservations', 'GET', 'List reservations (?wallet=0x...)'],
-              ['/api/agent/cancel/:id', 'POST', 'Cancel a reservation'],
-              ['/api/agent/check', 'POST', 'Force manual block check'],
-              ['/api/agent/traits/:category', 'GET', 'Trait names for category'],
-              ['/api/agent/parse-traits', 'POST', 'Natural language to structured traits'],
-              ['/api/agent/settlements', 'GET', 'Settlement history'],
-              ['/api/agent/deploys', 'GET', 'Autonomous deploy history'],
-              ['/api/agent/deploy', 'POST', 'Trigger code deploy (>= 4 Nouns required)'],
-            ]} />
-          </div>
-        )}
-
-        {/* ── SMALL GRANTS ─────────────────────────────────────── */}
-        <Heading s="SMALL GRANTS" isOpen={isOpen} toggle={toggle} />
-        {isOpen('SMALL GRANTS') && (
-          <div className={styles.section}>
-            <p>
-              <strong>Contract:</strong>{' '}
-              <a href={`https://etherscan.io/address/${TREASURY}`} target="_blank" rel="noreferrer" className={styles.link}>{TREASURY}</a>
-            </p>
-            <p>noun.wtf-exclusive micro-governance. Combined governor + treasury, single contract.</p>
-
-            <Table headers={['Parameter', 'Value']} rows={[
-              ['Voting delay', '0 blocks (immediate)'],
-              ['Voting period', '3,600 blocks (~12 hours)'],
-              ['Timelock', '43,200 seconds (12 hours)'],
-              ['Grace period', '604,800 seconds (7 days)'],
-              ['Max operations', '10 per proposal'],
-              ['Quorum', 'NONE. 1 FOR / 0 AGAINST passes.'],
-            ]} />
-
-            <h4>Lifecycle</h4>
-            <Code>{`propose() -> ACTIVE (12hr vote) -> SUCCEEDED -> queue() -> QUEUED (12hr) -> execute()
-                                 -> DEFEATED (for <= against)`}</Code>
-
-            <h4>Functions</h4>
-            <Code>{`propose(targets[], values[], signatures[], calldatas[], description) -> proposalId
-castVote(proposalId, support)        // 0=against, 1=for, 2=abstain
-castVoteWithReason(proposalId, support, reason)
-queue(proposalId)
-execute(proposalId)
-cancel(proposalId)
-state(proposalId) -> ProposalState`}</Code>
-
-            <p>Voting power reads from <code>NounsToken.getPriorVotes(account, snapshotBlock)</code>. Fund the treasury by sending ETH directly to the contract.</p>
-            <p><Link to="/grants" className={styles.link}>Go to Grants page &rarr;</Link></p>
-          </div>
-        )}
-
-        {/* ── TERMINAL ─────────────────────────────────────────── */}
-        <Heading s="TERMINAL" isOpen={isOpen} toggle={toggle} />
-        {isOpen('TERMINAL') && (
-          <div className={styles.section}>
-            <p>The terminal (now consolidated into the homepage feed at <Link to="/" className={styles.link}>noun.wtf</Link> in terminal mode) provides AI chat backed by Claude with governance tool access.</p>
-
-            <h4>POST /api/chat</h4>
-            <Code>{`{
-  "message": "vote for prop 948",
-  "wallet": "0xae4705dc...",
-  "history": [
-    { "role": "user", "content": "..." },
-    { "role": "assistant", "content": "..." }
+        <Sec dir="terminal" n={8} title="TERMINAL">
+          <p>
+            The homepage feed is a terminal. Type to Claude (<code>POST /api/chat</code>, wallet
+            connected, 10 a minute, 50 a day). When it wants to act it returns a{' '}
+            <code>pending_action</code> for your wallet to sign:
+          </p>
+          <Table
+            headers={['Action', 'Does']}
+            rows={[
+              ['VOTE', 'Vote on a proposal (gas refunded, client 37)'],
+              ['PROPOSAL_FEEDBACK / CANDIDATE_FEEDBACK', 'Signal without voting'],
+              ['CREATE_CANDIDATE · SPONSOR · PROMOTE', 'Draft, sign for and promote candidates'],
+              ['BID', 'Bid on the current auction'],
+              ['GRANT_VOTE · GRANT_PROPOSAL', 'Small Grants'],
+            ]}
+          />
+          <h4>Paste a proposal</h4>
+          <p>
+            Paste this JSON into the prompt and the draft window opens with the actions attached:
+          </p>
+          <Code>{`{
+  "title": "…",
+  "body": "…markdown…",
+  "transactions": [
+    { "address": "0x…", "value": "0", "signature": "transfer(address,uint256)", "calldata": "0x…" }
   ]
 }`}</Code>
+          <p className={styles.dim}>
+            ABIs resolve from <code>src/lib/knownAbis.ts</code> first, no Etherscan key needed. Prop
+            1000 went onchain this way. Add <code>{'"dao": "lil-nouns"'}</code> (or type{' '}
+            <code>/draft lil</code>) to submit to the Lil Nouns governor instead. Its calldata is
+            args only: the timelock adds the selector itself.
+          </p>
+        </Sec>
 
-            <p>When the agent wants to execute governance, it returns a <code>pending_action</code>:</p>
-            <Code>{`{
-  "message": "prepared your vote...",
-  "pending_action": {
-    "type": "GRANT_VOTE",
-    "grantId": 1,
-    "support": 1,
-    "reason": "testing"
-  }
-}`}</Code>
+        <Sec dir="functions" n={9} title="NETLIFY FUNCTIONS">
+          <p>
+            Served from noun.wtf at <code>/.netlify/functions/&lt;name&gt;</code>, stored in Netlify
+            Blobs. Admin actions need <code>X-World-Admin</code>.
+          </p>
+          <Table
+            headers={['Function', 'What it does']}
+            rows={[
+              [
+                'cc0-uploads · cc0-file',
+                'CC0 Library uploads (≤ 10 MB, checked, moderated) and serving them',
+              ],
+              ['community-submissions', 'Suggest a game / page / tool for the homescreen'],
+              ['world-voice', 'Voice Booth clips: share, report, moderate'],
+              ['world-stats', 'Noun World records + totals (ride-proof checked)'],
+              ['world-graffiti', 'Tags that stay up'],
+              ['world-decks · world-drops', 'Board shop decks per wallet · drop-party items'],
+              ['world-trade · -claim · -deposit', 'Noun Trade ledger, cash-out and deposit (Base)'],
+              ['world-exchange', 'The Grand Exchange order books (in-game coin)'],
+              [
+                'world-fm-library · fm-dj · fm-dj-update',
+                'NOUN FM: shared DJ sets and the 12-hourly DJ update',
+              ],
+              ['og-proposal', 'Share unfurls for /vote/:id and /candidates/:id'],
+              [
+                'noun-links · derivatives · noun-day-drafts',
+                'Link previews, IPFS pinning, studio drafts',
+              ],
+            ]}
+          />
+        </Sec>
 
-            <h4>Action Types</h4>
-            <Table headers={['Type', 'What It Does']} rows={[
-              ['VOTE', 'Vote on DAO proposal (gas refunded via client ID 37)'],
-              ['PROPOSAL_FEEDBACK', 'Signal on a proposal'],
-              ['CANDIDATE_FEEDBACK', 'Signal on a candidate'],
-              ['CREATE_CANDIDATE', 'Create proposal candidate'],
-              ['SPONSOR', 'EIP-712 sponsor signature for a candidate'],
-              ['PROMOTE', 'Promote candidate to onchain proposal'],
-              ['BID', 'Bid on current Noun auction'],
-              ['GRANT_VOTE', 'Vote on Small Grants proposal'],
-              ['GRANT_PROPOSAL', 'Create Small Grants proposal'],
-            ]} />
+        <Sec dir="multiplayer" n={10} title="MULTIPLAYER">
+          <p>
+            Noun World, the hoops relay and Noun Warfare share one PartyServer worker on Cloudflare
+            Durable Objects (hosted PartyKit shut down on 2026-10-23).
+          </p>
+          <Code>{`wss://${PARTY_HOST}/parties/main/<room>
 
-            <p>Rate limits: 10 msg/min, 50 msg/day per wallet.</p>
-          </div>
-        )}
+override:  VITE_PARTYKIT_HOST
+deploy:    cd packages/nouns-party && npx wrangler deploy`}</Code>
+          <p className={styles.dim}>
+            Pose blobs can carry voice refs (<code>vo</code>, <code>co</code>, <code>cv</code>);
+            older clients ignore them. Records are checked against ride traces before they’re saved.
+          </p>
+        </Sec>
 
-        {/* ── LOCAL DEV ────────────────────────────────────────── */}
-        <Heading s="LOCAL DEV" isOpen={isOpen} toggle={toggle} />
-        {isOpen('LOCAL DEV') && (
-          <div className={styles.section}>
-            <h4>Prerequisites</h4>
-            <ul>
-              <li>Node.js {'>'}= 18</li>
-              <li>pnpm 10.x</li>
-              <li>PostgreSQL (for Ponder) or use the production API</li>
-              <li>Infura API key (free tier works, just slow)</li>
-            </ul>
+        <Sec dir="dev" n={11} title="LOCAL DEV">
+          <Code>{`git clone https://github.com/snaveoguh/noun-wtf && cd noun-wtf
+pnpm install                     # pnpm 10, node 22
 
-            <h4>Frontend</h4>
-            <Code>{`git clone <repo>
-cd noun-wtf && pnpm install
+# webapp — no keys needed, it uses free public RPCs + the live API
 cd packages/nouns-webapp
+pnpm dev                         # http://localhost:5173
 
-cat > .env << 'EOF'
-VITE_CHAIN_ID=1
-VITE_MAINNET_JSONRPC=https://ethereum-rpc.publicnode.com
-VITE_MAINNET_SUBGRAPH=${API}
-EOF
+# your own indexer
+cd packages/nouns-api
+echo 'DATABASE_URL=postgresql://localhost:5432/nouns' > .env.local
+pnpm dev                         # GraphQL on http://localhost:42069`}</Code>
+          <p className={styles.warn}>
+            The indexer falls back to Tenderly + MEV Blocker; <code>PONDER_RPC_URL_1</code> is
+            optional. Most free RPCs can’t serve its historical <code>eth_getLogs</code> (publicnode
+            403s, 1rpc caps at 50 blocks). A full backfill takes hours; data is queryable while it
+            runs.
+          </p>
+          <h4>Env</h4>
+          <Table
+            headers={['Variable', 'Where', 'What']}
+            rows={[
+              ['VITE_CHAIN_ID', 'webapp', '1 mainnet · 11155111 sepolia'],
+              ['VITE_MAINNET_SUBGRAPH', 'webapp', 'API base (defaults to the live one)'],
+              ['VITE_MAINNET_JSONRPC', 'webapp', 'Optional RPC override'],
+              ['VITE_PARTYKIT_HOST', 'webapp', 'Optional multiplayer host'],
+              ['VITE_WALLET_CONNECT_V2_PROJECT_ID', 'webapp', 'WalletConnect'],
+              ['DATABASE_URL', 'api', 'Postgres'],
+              ['PONDER_RPC_URL_1', 'api', 'Optional primary RPC (comma-separated)'],
+              ['ANTHROPIC_API_KEY', 'api', 'Terminal chat + agent'],
+              ['NOUNIRL_PRIVATE_KEY', 'api', 'Lets the agent settle'],
+            ]}
+          />
+          <p className={styles.dim}>
+            Webapp <code>VITE_*</code> values for the real sites are baked in at build time in{' '}
+            <code>.github/workflows/netlify-deploy.yml</code>.
+          </p>
+        </Sec>
 
-CI=true pnpm dev    # runs at localhost:5173`}</Code>
+        <Sec dir="build" n={12} title="BUILD IDEAS">
+          <ul className={styles.todo}>
+            <Todo done to="/nonsense">
+              Treasury flow viz: where the money goes
+            </Todo>
+            <Todo done to="/explore/wallet">
+              Wallet explorer: who holds, who votes how
+            </Todo>
+            <Todo done to="/crystal-ball">
+              Next-noun predictor + settle-on-match
+            </Todo>
+            <Todo done to="/gas">
+              Settler gas leaderboard
+            </Todo>
+            <Todo done to="/predictions">
+              Prediction markets on governance
+            </Todo>
+            <Todo done to="/cc0">
+              Open CC0 asset library with uploads
+            </Todo>
+            <Todo>Client ID leaderboard: which frontends drive votes and bids</Todo>
+            <Todo>Voter influence graph from delegations + votes</Todo>
+            <Todo>Proposal diff viewer across candidate / proposal versions</Todo>
+            <Todo>Sponsorship market: candidates find signers</Todo>
+            <Todo>Small Grants v2: milestones, recurring grants</Todo>
+            <Todo>NounIRL for Lil Nouns</Todo>
+          </ul>
+          <p className={styles.dim}>
+            Got one? <Link to="/grants">Ask Small Grants for money</Link> or pitch it in the
+            terminal.
+          </p>
+        </Sec>
 
-            <h4>Ponder Indexer</h4>
-            <Code>{`cd packages/nouns-api
+        <Sec dir="apps" n={13} title="APPS">
+          <p className={styles.dim}>Everything on noun.wtf, straight from the NounOS catalog.</p>
+          {CATALOG.map(section => (
+            <div key={section.id} className={styles.ls}>
+              <div className={styles.lsHead}>
+                <span className={styles.prompt}>$</span> ls /apps/{section.id}{' '}
+                <span className={styles.dim}># {section.tag}</span>
+              </div>
+              {section.entries.map(e => (
+                <Link key={e.path} to={e.path} className={styles.lsRow}>
+                  <span className={styles.perm}>drwxr-xr-x</span>
+                  <span className={styles.lsName}>{e.name}</span>
+                  <span className={styles.lsBlurb}>{e.blurb}</span>
+                </Link>
+              ))}
+            </div>
+          ))}
+        </Sec>
 
-cat > .env.local << 'EOF'
-PONDER_RPC_URL_1=https://mainnet.infura.io/v3/YOUR_KEY
-DATABASE_URL=postgresql://user:pass@localhost:5432/nouns
-EOF
-
-pnpm dev    # GraphQL at localhost:42069/graphql`}</Code>
-
-            <p className={styles.warn}>Full sync from block 12,985,438 takes ~8-12 hours at 2 RPS. Data is queryable immediately during backfill.</p>
-            <p className={styles.warn}>Do NOT add free public RPCs to Ponder. Stream factory (38+ addresses) crashes free providers.</p>
-
-            <h4>Monorepo Structure</h4>
-            <Code>{`packages/
-  nouns-webapp/     Vite + React frontend
-  nouns-api/        Ponder indexer + API + Agent
-  nouns-sdk/        Shared SDK utilities
-  nouns-assets/     Trait image assets
-  nouns-contracts/  Solidity contracts`}</Code>
-          </div>
-        )}
-
-        {/* ── ENV VARS ─────────────────────────────────────────── */}
-        <Heading s="ENV VARS" isOpen={isOpen} toggle={toggle} />
-        {isOpen('ENV VARS') && (
-          <div className={styles.section}>
-            <h4>Frontend</h4>
-            <Table headers={['Variable', 'Required', 'Description']} rows={[
-              ['VITE_CHAIN_ID', 'Yes', '1 (mainnet) or 11155111 (Sepolia)'],
-              ['VITE_MAINNET_JSONRPC', 'Yes', 'Ethereum RPC URL'],
-              ['VITE_MAINNET_SUBGRAPH', 'Yes', 'Ponder API URL'],
-              ['VITE_WALLET_CONNECT_V2_PROJECT_ID', 'No', 'WalletConnect project ID'],
-              ['VITE_ETHERSCAN_API_KEY', 'No', 'For wagmi codegen (skipped in CI)'],
-            ]} />
-
-            <h4>Ponder API</h4>
-            <Table headers={['Variable', 'Required', 'Description']} rows={[
-              ['PONDER_RPC_URL_1', 'Yes', 'Infura mainnet RPC'],
-              ['DATABASE_URL', 'No', 'Postgres (defaults to SQLite)'],
-              ['PONDER_CHAIN', 'No', 'mainnet or sepolia'],
-              ['ANTHROPIC_API_KEY', 'No', 'Claude API key for terminal chat'],
-              ['NOUNIRL_ADDRESS', 'No', 'Agent wallet (enables agent endpoints)'],
-              ['NOUNIRL_PRIVATE_KEY', 'No', 'Agent signer (enables settlement)'],
-            ]} />
-          </div>
-        )}
-
-        {/* ── BUILD IDEAS ──────────────────────────────────────── */}
-        <Heading s="BUILD IDEAS" isOpen={isOpen} toggle={toggle} />
-        {isOpen('BUILD IDEAS') && (
-          <div className={styles.section}>
-            <h4>Data / Analytics</h4>
-            <ul>
-              <li><strong>Voter influence graph</strong> — map delegates + votes to visualize who influences what</li>
-              <li><strong>Client ID leaderboard</strong> — track which frontends drive the most governance activity</li>
-              <li><strong>Proposal outcome predictor</strong> — historical vote patterns to predict active proposals</li>
-              <li><strong>Treasury flow viz</strong> — streams + executions = where the money goes</li>
-            </ul>
-
-            <h4>Governance Tools</h4>
-            <ul>
-              <li><strong>Delegation marketplace</strong> — match holders with aligned delegates via vote history</li>
-              <li><strong>Proposal diff viewer</strong> — track ProposalUpdated events, show what changed</li>
-              <li><strong>Grant templates</strong> — pre-built SmallGrantsTreasury proposals for common requests</li>
-              <li><strong>Multi-sig voting</strong> — coordinated voting across multiple Noun holders</li>
-            </ul>
-
-            <h4>Agent Extensions</h4>
-            <ul>
-              <li><strong>Custom settlement strategies</strong> — fork the trait predictor for different goals</li>
-              <li><strong>Cross-DAO agent</strong> — extend nounirl to Lil Nouns, Purple, etc.</li>
-              <li><strong>Farcaster/Telegram bot</strong> — pipe terminal chat into social</li>
-            </ul>
-
-            <h4>Onchain</h4>
-            <ul>
-              <li><strong>Extend SmallGrantsTreasury</strong> — recurring grants, milestones, quadratic voting</li>
-              <li><strong>Sponsorship market</strong> — candidates need signatures; build a matching market</li>
-              <li><strong>Noun fractionalization</strong> — split voting power across wallets</li>
-            </ul>
-          </div>
-        )}
-
-        {/* footer */}
-        <div className={styles.footer}>
-          <span>noun.wtf — client 37</span>
-          <a href="https://etherscan.io/address/0xBAc9233725440c595b19d975309CC98cb259253a" target="_blank" rel="noreferrer" className={styles.link}>SmallGrantsTreasury</a>
-          <Link to="/" className={styles.link}>home</Link>
-        </div>
+        <footer className={styles.footer}>
+          <span>noun.wtf · client 37 · cc0</span>
+          <a href="https://github.com/snaveoguh/noun-wtf" target="_blank" rel="noreferrer">
+            source
+          </a>
+          <Link to="/">exit</Link>
+        </footer>
       </div>
     </div>
   );
 }
 
-// ── sub-components ──────────────────────────────────────────────────────
+// ── boot ────────────────────────────────────────────────────────────────
 
-function Heading({ s, isOpen, toggle }: { s: Section; isOpen: (s: Section) => boolean; toggle: (s: Section) => void }) {
+const BOOT_LINES = [
+  'mounting /dev/nouns ............ ok',
+  'loading 1 auction/day .......... forever',
+  'checking cc0 license ........... public domain',
+  'opening the basement ........... ok',
+];
+
+function prefersReducedMotion() {
   return (
-    <button className={styles.heading} onClick={() => toggle(s)}>
-      <span className={styles.caret}>{isOpen(s) ? '[-]' : '[+]'}</span>
-      {s}
-    </button>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function Boot() {
+  const [shown, setShown] = useState(() => (prefersReducedMotion() ? BOOT_LINES.length : 0));
+
+  useEffect(() => {
+    if (shown >= BOOT_LINES.length) return;
+    const t = setTimeout(() => setShown(s => s + 1), 140);
+    return () => clearTimeout(t);
+  }, [shown]);
+
+  return (
+    <header className={styles.boot}>
+      <pre className={styles.bootLog} aria-hidden>
+        {BOOT_LINES.slice(0, shown).join('\n')}
+        {shown < BOOT_LINES.length && <span className={styles.cursor}>█</span>}
+      </pre>
+      <Noggles />
+      <h1 className={styles.title}>
+        NOUNS<span className={styles.titleCut}>UNDERGROUND</span>
+      </h1>
+      <p className={styles.sub}>
+        The noun.wtf stack, all of it: contracts, indexer, {ALL_ROUTES.length} public API routes,
+        the agent, the functions, the multiplayer worker, and every app built on top. Take what you
+        need. It’s CC0.
+      </p>
+    </header>
+  );
+}
+
+/** The canonical noggles (NOGGLES, checked against the trait PNG) as square pixels. */
+function Noggles() {
+  const colour = { R: styles.nogR, W: styles.nogW, B: styles.nogB } as const;
+  return (
+    <div className={styles.noggles} role="img" aria-label="Noggles">
+      {NOGGLES.flatMap((row, y) =>
+        [...row].map((k, x) => (
+          <span
+            key={`${x}-${y}`}
+            className={k === '.' ? undefined : colour[k as keyof typeof colour]}
+          />
+        )),
+      )}
+    </div>
+  );
+}
+
+// ── live status ─────────────────────────────────────────────────────────
+
+interface Status {
+  online: boolean;
+  block?: number;
+  synced: boolean;
+}
+
+function StatusBar() {
+  const [status, setStatus] = useState<Status | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function check() {
+      try {
+        const [s, ready] = await Promise.all([
+          fetch(`${API}/status`).then(r => r.json()),
+          fetch(`${API}/ready`).then(r => r.ok),
+        ]);
+        if (alive) setStatus({ online: true, block: s?.mainnet?.block?.number, synced: ready });
+      } catch {
+        if (alive) setStatus({ online: false, synced: false });
+      }
+    }
+    check();
+    const id = setInterval(check, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  const dot = !status
+    ? styles.dotWait
+    : status.online
+      ? status.synced
+        ? styles.dotOk
+        : styles.dotWarn
+      : styles.dotBad;
+  return (
+    <div className={styles.status} role="status">
+      <span className={`${styles.dot} ${dot}`} />
+      {!status && 'pinging api…'}
+      {status && !status.online && 'api unreachable'}
+      {status?.online === true && (
+        <>
+          api online
+          {status.block != null && <> · indexed to block {status.block.toLocaleString('en-US')}</>}
+          {' · '}
+          {status.synced ? 'synced' : 'backfilling'}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── nav ─────────────────────────────────────────────────────────────────
+
+function Nav() {
+  return (
+    <nav className={styles.nav} aria-label="Sections">
+      <div className={styles.navPrompt}>
+        <span className={styles.prompt}>anon@noun.wtf:~/underground$</span> ls
+      </div>
+      <div className={styles.navDirs}>
+        {DIRS.map(([dir, note]) => (
+          <a key={dir} href={`#${dir}`} className={styles.navDir} title={note}>
+            {dir}/
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+// ── API browser ─────────────────────────────────────────────────────────
+
+function ApiBrowser() {
+  const [q, setQ] = useState('');
+  const needle = q.trim().toLowerCase();
+  const groups = useMemo(
+    () =>
+      API_GROUPS.map(g => ({
+        ...g,
+        routes: needle
+          ? g.routes.filter(r =>
+              `${r.method} ${r.path} ${r.desc} ${g.title}`.toLowerCase().includes(needle),
+            )
+          : g.routes,
+      })).filter(g => g.routes.length > 0),
+    [needle],
+  );
+  const count = groups.reduce((n, g) => n + g.routes.length, 0);
+
+  return (
+    <div>
+      <label className={styles.grep}>
+        <span className={styles.prompt}>$ grep -i</span>
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="wallet, treasury, agent…"
+          spellCheck={false}
+          aria-label="Filter API routes"
+        />
+        <span className={styles.dim}>
+          {count}/{ALL_ROUTES.length}
+        </span>
+      </label>
+      {groups.map(g => (
+        <div key={g.id} className={styles.group}>
+          <div className={styles.groupTitle}>## {g.title}</div>
+          {g.routes.map(r => (
+            <RouteRow key={`${r.method} ${r.path}`} route={r} />
+          ))}
+        </div>
+      ))}
+      {count === 0 && <p className={styles.dim}>grep: no match</p>}
+    </div>
+  );
+}
+
+const PREVIEW_LINES = 40;
+
+function RouteRow({ route }: { route: ApiRoute }) {
+  const [out, setOut] = useState<{ text: string; meta: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const abort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abort.current?.abort(), []);
+
+  async function run() {
+    if (!route.try) return;
+    abort.current?.abort();
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    setBusy(true);
+    const t0 = performance.now();
+    try {
+      const res = await fetch(`${API}${route.try}`, { signal: ctrl.signal });
+      const raw = await res.text();
+      let text = raw;
+      try {
+        text = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        // not JSON (ASCII art, say): show as is
+      }
+      const lines = text.split('\n');
+      const cut = lines.length > PREVIEW_LINES;
+      setOut({
+        text:
+          lines.slice(0, PREVIEW_LINES).join('\n') +
+          (cut ? `\n… ${lines.length - PREVIEW_LINES} more lines` : ''),
+        meta: `HTTP ${res.status} · ${fmtBytes(raw.length)} · ${Math.round(performance.now() - t0)} ms`,
+      });
+    } catch (e) {
+      if (!ctrl.signal.aborted) setOut({ text: String(e), meta: 'failed' });
+    } finally {
+      if (!ctrl.signal.aborted) setBusy(false);
+    }
+  }
+
+  return (
+    <div className={styles.route}>
+      <div className={styles.routeLine}>
+        <span className={route.method === 'GET' ? styles.get : styles.post}>{route.method}</span>
+        <code className={styles.path}>{route.path}</code>
+        <span className={styles.desc}>
+          {route.desc}
+          {route.auth && <span className={styles.auth}>[{route.auth}]</span>}
+        </span>
+        {route.try && (
+          <button
+            type="button"
+            className={styles.run}
+            onClick={out && !busy ? () => setOut(null) : run}
+            disabled={busy}
+          >
+            {busy ? '…' : out ? 'close' : '▶ run'}
+          </button>
+        )}
+      </div>
+      {out && (
+        <div className={styles.out}>
+          <div className={styles.outHead}>
+            $ curl {API.replace(/^https:\/\//, '')}
+            {route.try} <span className={styles.dim}># {out.meta}</span>
+          </div>
+          <pre>{out.text}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function fmtBytes(n: number) {
+  return n < 1024
+    ? `${n} B`
+    : n < 1024 * 1024
+      ? `${(n / 1024).toFixed(1)} KB`
+      : `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+// ── building blocks ─────────────────────────────────────────────────────
+
+function Sec({
+  dir,
+  n,
+  title,
+  children,
+}: {
+  dir: Dir;
+  n: number;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={dir} className={styles.section}>
+      <h2 className={styles.secHead}>
+        <span className={styles.secNum}>{String(n).padStart(2, '0')}</span>
+        <span className={styles.secTitle}>{title}</span>
+        <span className={styles.secRule} aria-hidden />
+        <span className={styles.secCd}>cd {dir}/</span>
+      </h2>
+      <div className={styles.secBody}>{children}</div>
+    </section>
   );
 }
 
@@ -551,14 +779,59 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
-          <tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr>
+          <tr>
+            {headers.map(h => (
+              <th key={h}>{h}</th>
+            ))}
+          </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
-            <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+          {rows.map(row => (
+            <tr key={row[0]}>
+              {row.map((cell, j) => (
+                <td key={j}>{cell}</td>
+              ))}
+            </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function Addrs({ rows }: { rows: [string, string][] }) {
+  return (
+    <div className={styles.addrs}>
+      {rows.map(([name, addr]) => (
+        <div key={addr} className={styles.addr}>
+          <span className={styles.addrName}>{name}</span>
+          <a href={etherscan(addr)} target="_blank" rel="noreferrer" className={styles.addrHex}>
+            {addr}
+          </a>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Todo({
+  done = false,
+  to,
+  children,
+}: {
+  done?: boolean;
+  to?: string;
+  children: ReactNode;
+}) {
+  return (
+    <li className={done ? styles.done : undefined}>
+      <span className={styles.box}>{done ? '[x]' : '[ ]'}</span> {children}
+      {to && (
+        <>
+          {' '}
+          <Link to={to}>→ {to}</Link>
+        </>
+      )}
+    </li>
   );
 }

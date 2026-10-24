@@ -154,7 +154,6 @@ V2:
 
 Shared:
 - `/playground` - Noun trait playground (2D editor; has a "Save as Dream" backlog item)
-- `/fork/:id` - Fork-specific pages
 - `/explore/wallet`, `/explore/wallet/:identity` - Wallet explorer (Nouns held + delegated, governance activity, transfer history)
 
 ### AuctionHouse + Indexer Notes
@@ -235,6 +234,10 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
 - **Reconciliation (`reconciliation`, pure `reconcile()` in `holdings.ts`).** auction proceeds − paid out (ETH/WETH/stETH, `outEth` minus forks) − ETH sold for USDC (`ethToUsdc`) − fork payouts (`byKind.fork.eth`) − staked tokens paid out (`otherTokens` wstETH/rETH/mETH at TODAY's rate, an estimate) + **staking yield & other (derived)** = treasury now (`holdings.totalEth`). The residual is the balancing item, not counted: mostly staking yield, plus refunds, other income and unpriced bits. USDC held is outside the ETH total. On 2026-10-24: 55,486 − 20,026 − 13,352 − 20,228 − 443 = 1,437; now 4,117 ETH + $574k USDC, so +2,680 derived.
 - **Page:** TREASURY NOW (holdings per holder) → WHERE IT CAME FROM / WHERE IT WENT (the reconciliation as a waterfall, `waterfallSteps` in `model.ts`) → WHAT WAS SPENT (IN / OUT / SOLD FOR USDC tiles, by-kind Sankey, years, recipients). The vote page's Treasury card and the `/stats` corridor HUD link here.
 - The 3D view (`Explore3D.tsx`) is an optional explore mode; `Scene.tsx` is the wallet explorer's renderer, not this page's.
+
+### Underground (developer docs)
+
+`/underground` (`src/pages/Underground/`) is the stack reference in a terminal look. Its REST list is `apiRoutes.ts`; `apiRoutes.test.ts` reads `packages/nouns-api/src/api` and fails when a route is added or removed without being listed (operator-only routes go in `UNLISTED`). "▶ run" calls the live API for the cheap GETs. The apps shelf is the NounOS `CATALOG`, so it stays current by itself. Update the prose sections (contracts, pipes, functions, multiplayer) when those change.
 
 ### Security headers
 

@@ -115,16 +115,15 @@ const NoundersPage = () => {
         <Trans>
           All Noun auction proceeds are sent to the Nouns DAO. For this reason, we, the
           project&apos;s founders (‘Nounders’) have chosen to compensate ourselves with Nouns. Every
-          10th noun for the first 5 years of the project will be sent to our multisig (5/10), where
-          it will be vested and distributed to individual Nounders.
+          10th Noun up to Noun 1820 (the first five years) was sent to our multisig (5/10), to be
+          vested and distributed to individual Nounders.
         </Trans>
       </p>
       <p className="text-justify">
         <Trans>
           The Nounders reward is intended as compensation for our pre and post-launch contributions
           to the project, and to help us participate meaningfully in governance as the project
-          matures. Since there are 10 Nounders, after 5 years each Nounder could receive up to 1% of
-          the Noun supply.
+          matures. Since there are 10 Nounders, each Nounder received up to 1% of the Noun supply.
         </Trans>
       </p>
     </div>

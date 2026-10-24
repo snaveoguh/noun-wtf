@@ -58,7 +58,7 @@ export const CATALOG: Section[] = [
         name: 'MEME VALUE',
         blurb: 'the book by lil 67. memes, nouns, daos and value. read it as a flipbook.',
       },
-      { path: '/playground', name: 'PLAYGROUND', blurb: 'mix traits, make a noun, dream one up.' },
+      { path: '/playground', name: 'PLAYGROUND', blurb: 'mix traits, make a noun.' },
       { path: '/studio', name: 'STUDIO', blurb: 'make things with noun parts.' },
       { path: '/traits', name: 'TRAITS', blurb: 'every head, body, accessory, glasses.' },
       {
@@ -93,7 +93,11 @@ export const CATALOG: Section[] = [
       },
       { path: '/v2', name: 'V2 AUCTION', blurb: 'one v2 noun a day. bid.' },
       { path: '/grants', name: 'GRANTS', blurb: 'anyone can propose. 24h, no quorum.' },
-      { path: '/hackathons', name: 'HACKATHONS', blurb: 'build weekends.' },
+      {
+        path: '/hackathons',
+        name: 'HACKATHONS',
+        blurb: 'build something physical, get paid from the grants treasury.',
+      },
     ],
   },
   {
