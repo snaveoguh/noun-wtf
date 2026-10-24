@@ -24,7 +24,7 @@ import type { CollisionWorld } from '../physics/Collision';
 import * as THREE from 'three';
 
 import { type DrawItem, SprayHistory, WallLog, type Outgoing } from './history';
-import { postTag, StoreQueue } from './storeQueue';
+import { postTag, type QueuedTag, StoreQueue } from './storeQueue';
 import {
   CELL_H_MM,
   CELL_W_MM,
@@ -97,8 +97,24 @@ const PREFS_KEY = 'w2-spray-v1';
 const OFFLINE_KEY = 'w2-graffiti-offline';
 const OFFLINE_MAX_CHARS = 1_500_000;
 
-/** Tags on their way to the permanent store (one at a time, retried). */
-const storeQueue = new StoreQueue(t => postTag(STORE_URL, t));
+const OUTBOX_KEY = 'w2-graffiti-outbox';
+
+/**
+ * Tags on their way to the permanent store (one at a time, retried). Each is
+ * saved in localStorage until the store has it, so a closed tab or an outage
+ * never loses paint: the next visit sends whatever is left.
+ */
+const storeQueue = new StoreQueue(t => postTag(STORE_URL, t), undefined, undefined, {
+  load: () => {
+    const v = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? (v as QueuedTag[]) : [];
+  },
+  save: tags => {
+    if (tags.length === 0) localStorage.removeItem(OUTBOX_KEY);
+    else localStorage.setItem(OUTBOX_KEY, JSON.stringify(tags));
+  },
+});
+if (typeof window !== 'undefined') storeQueue.restore();
 const storeTag = (wallId: string, data: string) => storeQueue.push(wallId, data);
 
 interface Cell {

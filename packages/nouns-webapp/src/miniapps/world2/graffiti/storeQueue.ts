@@ -14,23 +14,77 @@ export interface QueuedTag {
   data: string;
 }
 
+/**
+ * Where tags wait until the store has them (localStorage in the game), so
+ * paint isn't lost to a closed tab or a long outage: a tag leaves the outbox
+ * only once the store took it ('ok') or refused it for good ('drop').
+ */
+export interface Outbox {
+  load(): QueuedTag[];
+  save(tags: QueuedTag[]): void;
+}
+
+const sameTag = (a: QueuedTag, b: QueuedTag) => a.wallId === b.wallId && a.data === b.data;
+
 export class StoreQueue {
   private queue: (QueuedTag & { tries: number })[] = [];
   private busy = false;
+  /** Everything not yet stored, including tags parked after too many tries. */
+  private unsent: QueuedTag[] = [];
 
   constructor(
     private post: (t: QueuedTag) => Promise<PostResult>,
     private wait: (ms: number) => Promise<void> = ms => new Promise(r => setTimeout(r, ms)),
     private maxTries = 5,
+    private outbox: Outbox | null = null,
   ) {}
+
+  /** Re-send whatever an earlier visit couldn't store. */
+  restore() {
+    if (this.outbox === null) return;
+    let saved: QueuedTag[] = [];
+    try {
+      saved = this.outbox.load();
+    } catch {
+      // unreadable: nothing to restore
+    }
+    for (const t of saved)
+      if (typeof t?.wallId === 'string' && typeof t?.data === 'string') this.push(t.wallId, t.data);
+  }
+
+  /** Tags not yet in the store (queued, in flight or parked for next visit). */
+  get unsentCount() {
+    return this.unsent.length;
+  }
+
+  private persist() {
+    try {
+      this.outbox?.save(this.unsent);
+    } catch {
+      // storage blocked or full: the in-memory queue still has them
+    }
+  }
+
+  private settle(t: QueuedTag) {
+    const i = this.unsent.findIndex(u => sameTag(u, t));
+    if (i >= 0) {
+      this.unsent.splice(i, 1);
+      this.persist();
+    }
+  }
 
   get pending() {
     return this.queue.length;
   }
 
   push(wallId: string, data: string) {
-    if (this.queue.some(q => q.wallId === wallId && q.data === data)) return;
-    this.queue.push({ wallId, data, tries: 0 });
+    const t = { wallId, data };
+    if (this.queue.some(q => sameTag(q, t))) return;
+    if (!this.unsent.some(u => sameTag(u, t))) {
+      this.unsent.push(t);
+      this.persist();
+    }
+    this.queue.push({ ...t, tries: 0 });
     void this.pump();
   }
 
@@ -51,6 +105,9 @@ export class StoreQueue {
           continue;
         }
         this.queue.shift();
+        // Stored or refused for good: done. Still failing: it stays in the
+        // outbox and goes again on the next visit (restore()).
+        if (res !== 'retry') this.settle(job);
       }
     } finally {
       this.busy = false;

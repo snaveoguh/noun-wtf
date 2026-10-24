@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type PostResult, type QueuedTag, StoreQueue } from './storeQueue';
+import { type Outbox, type PostResult, type QueuedTag, StoreQueue } from './storeQueue';
 
 const tick = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -94,5 +94,102 @@ describe('StoreQueue', () => {
     }
     await tick();
     expect(tries).toEqual(['g3:1', 'g3:2']);
+  });
+
+  describe('outbox (paint survives a closed tab or an outage)', () => {
+    const memOutbox = (start: QueuedTag[] = []) => {
+      let saved = JSON.stringify(start);
+      const box: Outbox & { now: () => QueuedTag[] } = {
+        load: () => JSON.parse(saved) as QueuedTag[],
+        save: t => {
+          saved = JSON.stringify(t);
+        },
+        now: () => JSON.parse(saved) as QueuedTag[],
+      };
+      return box;
+    };
+
+    it('saves a tag before sending and clears it once stored', async () => {
+      const box = memOutbox();
+      const gate: { release: (() => void) | null } = { release: null };
+      const q = new StoreQueue(
+        () =>
+          new Promise<PostResult>(r => {
+            gate.release = () => r('ok');
+          }),
+        async () => undefined,
+        5,
+        box,
+      );
+      q.push('a', 'g3:1');
+      await tick();
+      expect(box.now()).toEqual([{ wallId: 'a', data: 'g3:1' }]);
+      gate.release!();
+      await tick();
+      expect(box.now()).toEqual([]);
+    });
+
+    it('keeps a tag that kept failing for the next visit, and that visit sends it', async () => {
+      const box = memOutbox();
+      const first = new StoreQueue(
+        async () => 'retry',
+        async () => undefined,
+        3,
+        box,
+      );
+      first.push('a', 'g3:lost?');
+      await tick();
+      expect(first.pending).toBe(0);
+      expect(box.now()).toEqual([{ wallId: 'a', data: 'g3:lost?' }]);
+
+      const sent: string[] = [];
+      const next = new StoreQueue(
+        async t => {
+          sent.push(t.data);
+          return 'ok';
+        },
+        async () => undefined,
+        3,
+        box,
+      );
+      next.restore();
+      await tick();
+      expect(sent).toEqual(['g3:lost?']);
+      expect(box.now()).toEqual([]);
+    });
+
+    it('forgets a tag the store refused for good', async () => {
+      const box = memOutbox();
+      const q = new StoreQueue(
+        async () => 'drop',
+        async () => undefined,
+        3,
+        box,
+      );
+      q.push('a', 'bad');
+      await tick();
+      expect(box.now()).toEqual([]);
+    });
+
+    it('ignores junk in a saved outbox', async () => {
+      const box = memOutbox([
+        { wallId: 'a', data: 'g3:1' },
+        null as unknown as QueuedTag,
+        { wallId: 3 } as unknown as QueuedTag,
+      ]);
+      const sent: string[] = [];
+      const q = new StoreQueue(
+        async t => {
+          sent.push(t.data);
+          return 'ok';
+        },
+        async () => undefined,
+        3,
+        box,
+      );
+      q.restore();
+      await tick();
+      expect(sent).toEqual(['g3:1']);
+    });
   });
 });
