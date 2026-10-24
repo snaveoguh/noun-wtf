@@ -91,7 +91,9 @@ export const HOME_CSS = `
 @media (max-width:760px){
   .nh{--hh:60px;--cw:clamp(118px,33vw,150px)}
   .nh-head{padding:0 12px 0 72px;gap:10px}
-  .nh-wordmark{font-size:12px}
+  /* phones: the dark-grey lockup disappears on small screens; quiet white instead */
+  .nh-wordmark{font-size:12px;background:none;-webkit-text-fill-color:rgba(255,255,255,.5);color:rgba(255,255,255,.5)}
+  .nh-brand:hover .nh-wordmark{animation:none}
   .nh-ask{width:auto;position:static}
   .nh-ask-toggle{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;border:0;background:rgba(12,12,16,.6);
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);cursor:pointer}
