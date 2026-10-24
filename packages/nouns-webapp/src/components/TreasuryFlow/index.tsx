@@ -57,6 +57,10 @@ function useTreasuryFlows() {
       return d;
     },
     staleTime: 5 * 60_000,
+    // While the API is still backfilling, check again every minute so an
+    // open tab moves on from "catching up" by itself once indexing is done
+    // (the app never refetches on focus).
+    refetchInterval: q => (q.state.data?.indexing.complete === false ? 60_000 : false),
     retry: 1,
   });
 }
