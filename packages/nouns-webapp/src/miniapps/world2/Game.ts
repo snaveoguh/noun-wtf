@@ -9,7 +9,9 @@ import * as THREE from 'three';
 
 import { claimAudio } from '@/lib/nounFmBus';
 
+import { isNativeApp } from './audio/beatsPicker';
 import { GameRadio, type RadioMode } from './audio/GameRadio';
+import { NounBeats } from './audio/NounBeats';
 import { Sfx } from './audio/sfx/Sfx';
 import { SkateAudio } from './audio/SkateAudio';
 import { resolveCallout } from './audio/voice/booth/clips';
@@ -400,6 +402,11 @@ export class Game {
       fmDecks: false,
     };
     this.fm = new NounFm(opts.offline === true ? localTransport() : netTransport(this.net));
+    this.beats = new NounBeats({
+      offline: opts.offline === true,
+      native: typeof window !== 'undefined' && isNativeApp(window.location.search, window),
+    });
+    this.radio.setBeats(this.beats);
     this.spots = new FmSpots(this.fm, {
       duck: on => this.duckRadio(on),
       volume: () => this.mixer.gain('radio') * this.radio.volume,
@@ -650,6 +657,7 @@ export class Game {
     const ctx = this.audio.ctx;
     if (g === null || ctx === null) return;
     g.gain.setTargetAtTime(on ? 0.12 : 1, ctx.currentTime, on ? 0.15 : 0.4);
+    this.radio.setDucked(on);
   }
 
   private onTownTheme(ev: 'enter' | 'leave', town: string) {
@@ -674,6 +682,8 @@ export class Game {
   }
 
   radio = new GameRadio();
+  /** NOUN BEATS' real hip-hop tracks (per player; the worklet is its offline fallback). */
+  readonly beats: NounBeats;
   private radioAttached = false;
   /** NOUN FM, the shared station in the ice cream van (radio/). */
   readonly fm: NounFm;
@@ -753,6 +763,7 @@ export class Game {
     this.paused = p;
     this.input.setEnabled(!p);
     this.fm.setHidden(p);
+    this.beats.setHidden(p);
     if (p) claimAudio('noun-world-radio', false);
   }
 
@@ -2072,6 +2083,7 @@ export class Game {
     this.nature?.dispose();
     this.billboards.dispose();
     this.radio.dispose();
+    this.beats.dispose();
     this.fm.dispose();
     this.disposed = true;
     this.running = false;

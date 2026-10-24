@@ -6,6 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 
 import { useAppSelector } from '@/hooks';
 
+import { BeatsScreen } from './audio/BeatsScreen';
 import { bindUiSounds } from './audio/sfx/uiSounds';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
@@ -357,6 +358,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       )}
       {/* NOUN FM from PRESS START: its screen and the intro's skip chip show over character select too */}
       {game && phase !== 'title' && <FmScreen fm={game.fm} touch={touchPage} />}
+      {game && phase !== 'title' && <BeatsScreen game={game} touch={touchPage} />}
       {game && phase !== 'title' && <FmSpotsUi spots={game.spots} />}
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && !driving && <TouchControls game={game} />}
@@ -684,7 +686,7 @@ function Hud({
                 type="button"
                 className="w2-chip text-xs"
                 onClick={() => game.nextRadioTrack()}
-                title={hud.radio.mode === 'beats' ? 'Fresh beat (.)' : 'Next track (.)'}
+                title={hud.radio.mode === 'beats' ? 'Next beat (.)' : 'Next track (.)'}
               >
                 ⏭
               </button>
