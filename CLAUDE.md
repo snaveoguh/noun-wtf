@@ -225,6 +225,14 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
   - Both need `X-World-Admin: $WORLD_ADMIN_TOKEN`; the same header lets an admin preview a pending file from `cc0-file`.
   - Anyone can POST `report {id, reason}` on an approved upload (the detail panel's report button).
 
+### Nonsense (treasury flows)
+
+`/nonsense` (`src/components/TreasuryFlow/`) shows where Nouns DAO money comes from and goes, from `GET /api/treasury/flows` (version 2). The route (`nouns-api/src/api/routes/treasury.ts`) only reads tables; the logic is the pure builder `src/api/treasury/buildFlows.ts` and decoder `decode.ts` (tests: `cd packages/nouns-api && npx tsx --test src/api/treasury/*.test.ts`, real proposal calldata in `fixtures.ts`).
+- **Data.** In = winning auction bids (`nounsAuctionHouseV2` table). Out = executed proposals' actions decoded from the `transaction` table (ETH, ERC-20 `transfer`, USDC Payer `sendOrRegisterDebt`, Stream Factory `createStream`, Nouns transfers, ETH sent with a call) plus fork payouts from the `treasury_send` table (nouns.eth `ETHSent`/`ERC20Sent`; only the fork paths can call them). Streams count once (createStream minus what a cancel returned; the funding transfer is skipped). Timelock V1 ↔ nouns.eth moves, wraps/stakes/Token Buyer swaps (`convertedEth`), Payer top-ups and zero-value calls are not "out". USDC is never added to ETH; net = in − ETH out − ETH sent to the Token Buyer.
+- **Types (by rule, never from proposal text):** `treasury` (both timelocks), `nounders`, `subdao` (fork treasuries from `ExecuteFork`, known sub-DAOs, or a forward-verified `*.nouns.eth` primary name), `contract` (DAO contracts, or recipient code that isn't a Safe), `multisig` (Safe proxy code), `person` (no code; EIP-7702 counts as no code), `bidder` (auction winners who never got paid). `eth_getCode` is cached a day; ENS via `ReverseRecords.getNames`.
+- **Known addresses** live in one sourced table: `nouns-api/src/api/treasury/knownAddresses.ts`. nouns.eth is Timelock V2 `0xb1a3…ef71`; `0x0bc3…de10` is the legacy Timelock V1. Nounder rewards are counted with NounsToken's rule (id ≤ 1820, id % 10 == 0): `noun.mintedTo` always holds a treasury because the ERC721 mint goes 0x0 → owner → recipient.
+- The 3D view (`Explore3D.tsx`) is an optional explore mode; `Scene.tsx` is the wallet explorer's renderer, not this page's.
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.
