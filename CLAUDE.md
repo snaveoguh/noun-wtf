@@ -236,6 +236,10 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
 - **Page:** TREASURY NOW (holdings per holder) → WHERE IT CAME FROM / WHERE IT WENT (the reconciliation as a waterfall, `waterfallSteps` in `model.ts`) → WHAT WAS SPENT (IN / OUT / SOLD FOR USDC tiles, by-kind Sankey, years, recipients). The vote page's Treasury card and the `/stats` corridor HUD link here.
 - The 3D view (`Explore3D.tsx`) is an optional explore mode; `Scene.tsx` is the wallet explorer's renderer, not this page's.
 
+### Admin-gated API routes
+
+`packages/nouns-api/src/api/lib/adminAuth.ts` gates the privileged routes. `requireAdmin` needs `x-agent-secret: $AGENT_ADMIN_SECRET` and fails closed when the env var is unset (403; no localhost fallback). It covers `POST /api/agent/{learn,self-learn,people/build,backfill-tip-amounts,check}`, `/api/agent/autopilot/sweep` and `/api/dream-nouns/import`; the chat's `deploy_code`, `learn_url` and `self_learn` tools are admin-only too (the chat's `wallet` is an unsigned body field). `POST /api/agent/deploy` takes the admin header, or an EIP-191 signature from `wallet` over `deployMessage({wallet, description, reason, nonce, expires})` (single-use nonce, expiry ≤ 10 min); the signer is proven before the ≥ 4 Nouns check. `POST /api/agent/settle` stays public (the crystal ball's button) but repeats within 60 s share one tx.
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.

@@ -430,12 +430,12 @@ GET /api/health
 | `/api/agent/reserve` | POST | Create trait reservation (requires tip tx hash) |
 | `/api/agent/reservations` | GET | List reservations (`?wallet=0x...` to filter) |
 | `/api/agent/cancel/:id` | POST | Cancel a reservation |
-| `/api/agent/check` | POST | Force a manual block check |
+| `/api/agent/check` | POST | Force a manual block check (admin: `x-agent-secret`) |
 | `/api/agent/traits/:category` | GET | List trait names (`head`, `body`, `accessory`, `glasses`, `background`) |
 | `/api/agent/parse-traits` | POST | Parse natural language to structured trait filters |
 | `/api/agent/settlements` | GET | History of successful settlements |
 | `/api/agent/deploys` | GET | Autonomous deploy history |
-| `/api/agent/deploy` | POST | Trigger autonomous code deploy (requires >= 4 Nouns) |
+| `/api/agent/deploy` | POST | Trigger autonomous code deploy (admin, or an EIP-191 signature from a wallet holding >= 4 Nouns) |
 
 ### Trait Categories
 

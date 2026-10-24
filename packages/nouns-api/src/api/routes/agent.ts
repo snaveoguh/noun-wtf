@@ -27,7 +27,22 @@ import {
   settleAuction,
   verifyTip,
 } from '../../agent/index.js';
-import { getNounBalance } from '../lib/chain.js';
+import {
+  checkDeploySignature,
+  isAdminRequest,
+  makeSignatureVerifier,
+  requireAdmin,
+} from '../lib/adminAuth.js';
+import { getNounBalance, nounCheckClient } from '../lib/chain.js';
+
+const verifyWalletSignature = makeSignatureVerifier(nounCheckClient);
+
+/** One public settle per DAO per window: a repeat while one is in flight (or just
+ *  landed) gets the same result instead of broadcasting another, reverting tx. */
+const SETTLE_DEDUPE_MS = 60_000;
+const recentSettles: Partial<
+  Record<WatchedDao, { at: number; run: Promise<{ txHash: string } | null> }>
+> = {};
 
 export function registerAgentRoutes(app: Hono) {
   // ============================================================
@@ -243,7 +258,7 @@ export function registerAgentRoutes(app: Hono) {
   // One-shot: walks every reservation with tipAmountEth === 0, fetches the
   // underlying tx on the correct chain, reads tx.value, and persists. Safe to
   // re-run — no-ops on rows that already have a positive amount.
-  app.post('/api/agent/backfill-tip-amounts', async c => {
+  app.post('/api/agent/backfill-tip-amounts', requireAdmin, async c => {
     try {
       const { createPublicClient, http, formatEther } = await import('viem');
       const viemChains = await import('viem/chains');
@@ -327,7 +342,7 @@ export function registerAgentRoutes(app: Hono) {
   });
 
   // ── Manual Check ────────────────────────────────────────────────────────
-  app.post('/api/agent/check', async c => {
+  app.post('/api/agent/check', requireAdmin, async c => {
     try {
       const result = await checkNow();
       return c.json(result);
@@ -392,7 +407,25 @@ export function registerAgentRoutes(app: Hono) {
       return c.json({ error: `${dao} auction not ended yet` }, 400);
     }
     try {
-      const result = await settleAuction(dao);
+      // Public (the crystal ball's settle button), so repeats share one tx.
+      const prev = recentSettles[dao];
+      let run: Promise<{ txHash: string } | null>;
+      if (prev && Date.now() - prev.at < SETTLE_DEDUPE_MS) {
+        run = prev.run;
+      } else {
+        run = settleAuction(dao);
+        recentSettles[dao] = { at: Date.now(), run };
+        // A failed attempt shouldn't block a retry for the whole window.
+        run.then(
+          r => {
+            if (!r && recentSettles[dao]?.run === run) delete recentSettles[dao];
+          },
+          () => {
+            if (recentSettles[dao]?.run === run) delete recentSettles[dao];
+          },
+        );
+      }
+      const result = await run;
       if (!result) {
         return c.json({ error: 'Settlement failed — wallet not configured or tx error' }, 500);
       }
@@ -418,38 +451,47 @@ export function registerAgentRoutes(app: Hono) {
   });
 
   // ── Trigger Deploy (manual, Noun-gated) ─────────────────────────────────
+  // Either the admin secret, or an EIP-191 signature from `wallet` over
+  // `deployMessage({wallet, description, reason, nonce, expires})` (see
+  // lib/adminAuth.ts). The signer is proven BEFORE the Noun balance is read —
+  // a bare `wallet` field proves nothing.
   app.post('/api/agent/deploy', async c => {
     try {
-      const body = await c.req.json();
-      const {
-        description,
-        reason,
-        wallet: deployWallet,
-      } = body as { description: string; reason?: string; wallet?: string };
-      if (!description) return c.json({ error: 'description is required' }, 400);
-
-      // Noun-gated: require connected wallet with 4+ Nouns
-      if (!deployWallet) {
-        return c.json(
-          { error: `Deploy requires a connected wallet holding ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns.` },
-          403,
-        );
+      let body: Record<string, unknown>;
+      try {
+        body = (await c.req.json()) as Record<string, unknown>;
+      } catch {
+        return c.json({ error: 'JSON body required' }, 400);
       }
-      const nounBalance = await getNounBalance(deployWallet);
-      if (nounBalance < MIN_NOUNS_FOR_DEPLOY) {
-        return c.json(
-          {
-            error: `Deploy requires ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Wallet holds ${nounBalance}.`,
-          },
-          403,
-        );
+      const { description, reason } = body as { description?: unknown; reason?: unknown };
+      if (typeof description !== 'string' || !description) {
+        return c.json({ error: 'description is required' }, 400);
+      }
+
+      let authorizedBy: string;
+      if (isAdminRequest(c)) {
+        authorizedBy = 'admin';
+      } else {
+        const auth = await checkDeploySignature(body, verifyWalletSignature);
+        if ('error' in auth) return c.json({ error: auth.error }, auth.status);
+        const deployWallet = auth.wallet;
+        const nounBalance = await getNounBalance(deployWallet);
+        if (nounBalance < MIN_NOUNS_FOR_DEPLOY) {
+          return c.json(
+            {
+              error: `Deploy requires ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Wallet holds ${nounBalance}.`,
+            },
+            403,
+          );
+        }
+        authorizedBy = `${deployWallet.slice(0, 6)}...${deployWallet.slice(-4)}, ${nounBalance} Nouns`;
       }
 
       if (!canDeploy()) {
         return c.json({ error: 'Rate limited — max 1 deploy per hour' }, 429);
       }
 
-      console.log(`[NounIRL] Deploy authorized by ${deployWallet} (${nounBalance} Nouns)`);
+      console.log(`[NounIRL] Deploy authorized by ${authorizedBy}`);
 
       // Generate patches via Claude
       const patches = await generatePatch(description);
@@ -458,8 +500,8 @@ export function registerAgentRoutes(app: Hono) {
       const result = await applyAndDeploy(
         patches,
         description,
-        reason ||
-          `manual deploy via API (authorized by ${deployWallet.slice(0, 6)}...${deployWallet.slice(-4)}, ${nounBalance} Nouns)`,
+        (typeof reason === 'string' && reason) ||
+          `manual deploy via API (authorized by ${authorizedBy})`,
         'terminal',
       );
 
@@ -471,7 +513,7 @@ export function registerAgentRoutes(app: Hono) {
   });
 
   // ── Knowledge Ingestion ──────────────────────────────────────────────────
-  app.post('/api/agent/learn', async c => {
+  app.post('/api/agent/learn', requireAdmin, async c => {
     try {
       const body = await c.req.json();
       const { urls } = body as { urls?: string[] };
@@ -518,7 +560,7 @@ export function registerAgentRoutes(app: Hono) {
 
   // ─── Self-Learning: Read our own Ponder data ─────────────────────────────────
 
-  app.post('/api/agent/self-learn', async c => {
+  app.post('/api/agent/self-learn', requireAdmin, async c => {
     try {
       // This is a long-running operation — run it in background and return immediately
       const startTime = Date.now();
@@ -600,7 +642,7 @@ export function registerAgentRoutes(app: Hono) {
     }
   });
 
-  app.post('/api/agent/people/build', async c => {
+  app.post('/api/agent/people/build', requireAdmin, async c => {
     try {
       const status = getBuildStatus();
       if (status.running) {

@@ -18,6 +18,8 @@ import type { Hono } from 'hono';
 
 import pg from 'pg';
 
+import { requireAdmin } from './lib/adminAuth.js';
+
 const DATABASE_URL = process.env.DATABASE_URL;
 const PUBLIC_API_BASE =
   process.env.PUBLIC_API_BASE ?? 'https://spirited-flexibility-production-3c30.up.railway.app';
@@ -165,10 +167,10 @@ export function registerDreamRoutes(app: Hono) {
 
     const [countRes, rowsRes] = await Promise.all([
       pool.query('SELECT COUNT(*)::int AS n FROM dream_nouns'),
-      pool.query(
-        `SELECT ${SELECT_COLS} FROM dream_nouns ORDER BY id DESC LIMIT $1 OFFSET $2`,
-        [perPage, offset],
-      ),
+      pool.query(`SELECT ${SELECT_COLS} FROM dream_nouns ORDER BY id DESC LIMIT $1 OFFSET $2`, [
+        perPage,
+        offset,
+      ]),
     ]);
     const total: number = countRes.rows[0].n;
     const lastPage = Math.max(Math.ceil(total / perPage), 1);
@@ -220,7 +222,7 @@ export function registerDreamRoutes(app: Hono) {
 
     const body = await c.req.parseBody();
     const dreamer = String(body.dreamer ?? '');
-    if (!/^0x[a-fA-F0-9]{40}$/.test(dreamer)) return c.json({ error: 'invalid dreamer' }, 422);
+    if (!/^0x[\dA-Fa-f]{40}$/.test(dreamer)) return c.json({ error: 'invalid dreamer' }, 422);
 
     const background = parseSeed(body.background_seed_id) ?? 0;
     const seeds = {
@@ -243,7 +245,7 @@ export function registerDreamRoutes(app: Hono) {
       if (file.size > MAX_IMAGE_BYTES) return c.json({ error: 'image too large' }, 422);
       imageData = Buffer.from(await file.arrayBuffer());
       imageMime = file.type;
-      const safeName = (file.name || 'upload.png').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+      const safeName = (file.name || 'upload.png').replace(/[^\w.-]/g, '_').slice(0, 80);
       imagePath = `uploads/${layer}/${safeName}`;
     }
 
@@ -272,7 +274,7 @@ export function registerDreamRoutes(app: Hono) {
   });
 
   // ── One-time import of the probe.wtf dump (only into an empty table) ─
-  app.post('/api/dream-nouns/import', async c => {
+  app.post('/api/dream-nouns/import', requireAdmin, async c => {
     if (!pool) return c.json({ error: 'storage unavailable' }, 503);
     await ensureInit();
 
@@ -309,9 +311,7 @@ export function registerDreamRoutes(app: Hono) {
           ],
         );
       }
-      await client.query(
-        `SELECT setval('dream_nouns_id_seq', (SELECT MAX(id) FROM dream_nouns))`,
-      );
+      await client.query(`SELECT setval('dream_nouns_id_seq', (SELECT MAX(id) FROM dream_nouns))`);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');

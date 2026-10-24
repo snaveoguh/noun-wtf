@@ -50,6 +50,7 @@ import {
   type TraitDao,
 } from '../../../agent/traitProposal.js';
 import { getDreamTraitImage } from '../../dreams.js';
+import { isAdminRequest } from '../../lib/adminAuth.js';
 import { formatBlocksRemaining, getCurrentBlock, getNounBalance } from '../../lib/chain.js';
 import { resolveEnsBatch } from '../../lib/ens.js';
 import { computeDerivedStatus } from '../../lib/proposalStatus.js';
@@ -283,11 +284,11 @@ You have the following tools. USE THEM. Don't just describe what you would do �
 8. get_settlements(limit?) — The agent's OWN settlements only (nounirl.eth, 2026 onward). Never treat this as the full history.
 8b. get_noun_settler(nounId, dao?) — Who settled and who curated ANY noun back to Noun 0, from the noun.wtf indexer, with ENS + settle tx. ALWAYS call this for "who settled/curated #N" — never say records only go back to a certain noun, and never send people to Etherscan for it.
 9. get_agent_balance() — ETH balance of nounirl.eth.
-10. deploy_code(description, reason) — Ship a code change to the non-production "dev-noun" branch (Netlify branch-deploys it to a fixed preview URL). NOUN-GATED: caller must hold ≥ 4 Nouns. Rate limited: 1/hour. Only packages/nouns-webapp/src/. CANNOT delete files (rejected by safety filter). After a successful deploy the result includes a previewUrl — quote it back to the user and tell them to DM @pip on Warpcast for review before any push to main/prod. Production isolation is structural — you have no path to write to main. If user doesn't hold enough Nouns, tell them politely — this is governance-weighted access control.
+10. deploy_code(description, reason) — Ship a code change to the non-production "dev-noun" branch (Netlify branch-deploys it to a fixed preview URL). ADMIN-ONLY from chat (the tool returns an error otherwise; Nouners with ≥ 4 Nouns deploy via a signed request to POST /api/agent/deploy). Rate limited: 1/hour. Only packages/nouns-webapp/src/. CANNOT delete files (rejected by safety filter). After a successful deploy the result includes a previewUrl — quote it back to the user and tell them to DM @pip on Warpcast for review before any push to main/prod. Production isolation is structural — you have no path to write to main. If the tool refuses, relay its error politely.
 11. remember_fact(key, content, scope) — Store a fact in persistent memory. scope="wallet" for user-specific, scope="global" for shared knowledge. USE THIS PROACTIVELY. When a user tells you their name, ENS, preferences, anything personal — remember it. When you learn something important — remember it globally.
 12. recall_facts(scope, key?) — Look up remembered facts. You don't usually need to call this explicitly because your memory is auto-injected into context. But use it to check what you know.
-13. learn_url(url) — Fetch a web page, extract key facts, and store them in your knowledge base. Use when someone shares a URL and wants you to learn from it. The knowledge persists and is available to both you and the homepage chat.
-14. self_learn() — Trigger the self-learning pipeline. Reads ALL proposals, auctions, and delegate data from noun.wtf's own Ponder index and distills key facts into your knowledge base. Use when someone asks you to learn about Nouns governance, refresh your knowledge, or "eat your own dog food." Takes a few minutes to process all ~950 proposals.
+13. learn_url(url) — Fetch a web page, extract key facts, and store them in your knowledge base. Use when someone shares a URL and wants you to learn from it. The knowledge persists and is available to both you and the homepage chat. ADMIN-ONLY: for anyone else the tool returns an error; relay it.
+14. self_learn() — Trigger the self-learning pipeline. Reads ALL proposals, auctions, and delegate data from noun.wtf's own Ponder index and distills key facts into your knowledge base. Use when someone asks you to learn about Nouns governance, refresh your knowledge, or "eat your own dog food." Takes a few minutes to process all ~950 proposals. ADMIN-ONLY: for anyone else the tool returns an error; relay it.
 
 MEMORY — YOU HAVE PERSISTENT MEMORY:
 You remember things across sessions. Your memory is stored in Postgres. When you learn a user's name, ENS, favorite trait, or anything meaningful, call remember_fact to persist it. Next time they talk to you, their memories are auto-loaded into your context. This is how you build relationships.
@@ -569,8 +570,15 @@ CRITICAL RULES:
               case 'deploy_code': {
                 const input = args as { description: string; reason?: string };
 
-                // ── Noun-gated: require 4+ Nouns to deploy ──
-                if (!wallet) {
+                // ── Admin only from chat. The chat's `wallet` is just a body field
+                // (never signed), so it can't gate a repo write; Nouners deploy
+                // through the signed POST /api/agent/deploy instead.
+                if (!isAdminRequest(c)) {
+                  result = {
+                    success: false,
+                    error: `Deploying from chat is disabled: chat can't prove wallet ownership. A wallet holding ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns can deploy with a signed request to POST /api/agent/deploy.`,
+                  };
+                } else if (!wallet) {
                   result = {
                     success: false,
                     error: `Deploy requires a connected wallet holding ≥ ${MIN_NOUNS_FOR_DEPLOY} Nouns. Connect your wallet first.`,
@@ -648,6 +656,12 @@ CRITICAL RULES:
 
               case 'learn_url': {
                 const input = args as { url: string };
+                // Admin only: an arbitrary fetch from the server (SSRF) whose
+                // text lands in the shared knowledge base every chat reads.
+                if (!isAdminRequest(c)) {
+                  result = { error: 'learn_url is admin-only.' };
+                  break;
+                }
                 try {
                   new URL(input.url); // validate URL
                   result = await learnFromUrl(input.url);
@@ -658,6 +672,11 @@ CRITICAL RULES:
               }
 
               case 'self_learn': {
+                // Admin only: minutes of Ponder reads + Claude spend per call.
+                if (!isAdminRequest(c)) {
+                  result = { error: 'self_learn is admin-only.' };
+                  break;
+                }
                 // Fire and forget — this takes minutes
                 runSelfLearn()
                   .then(r => {

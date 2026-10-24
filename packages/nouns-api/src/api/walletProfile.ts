@@ -116,6 +116,7 @@ import {
   titleFromDescription,
   toUnixSeconds,
 } from './activityFeed.js';
+import { isAdminRequest } from './lib/adminAuth.js';
 import { getSettlerMaps, walletSettlerStats } from './settlerMaps.js';
 import { getFarcasterIdentity, resolveEnsToAddress } from './walletMap.js';
 
@@ -2267,15 +2268,6 @@ async function relayerSummary() {
     enabled: isRelayerEnabled() && canSend(),
     balanceEth: await getRelayerBalanceEth(),
   };
-}
-
-/** Admin gate for the sweep trigger: shared secret when configured, else localhost only. */
-function isAdminRequest(c: { req: { header: (k: string) => string | undefined } }): boolean {
-  const secret = process.env.AGENT_ADMIN_SECRET;
-  if (secret) return c.req.header('x-agent-secret') === secret;
-  const host = (c.req.header('host') ?? '').toLowerCase();
-  const forwarded = c.req.header('x-forwarded-for');
-  return !forwarded && (host.startsWith('localhost') || host.startsWith('127.0.0.1'));
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
