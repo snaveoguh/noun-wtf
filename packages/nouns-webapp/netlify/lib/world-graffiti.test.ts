@@ -10,6 +10,13 @@ import { encodeStrokes, type Stroke } from '../../src/miniapps/world2/graffiti/s
 // onlyIfMatch / onlyIfNew conditions are checked at the origin. A key that
 // was never read comes straight from the origin (new blobs are visible at
 // once), and a listing shows what the origin had when it last settled.
+//
+// Keys go into the request path unescaped, so the real store keeps a key
+// percent-decoded (`t/plaza%7C…` is stored and listed as `t/plaza|…`); the
+// listing prefix is matched against that. `literalKeys` turns the decoding
+// off, for a store that keeps keys exactly as written.
+let literalKeys = false;
+const K = (k: string) => (literalKeys ? k : decodeURIComponent(k));
 const origin = new Map<string, { v: string; etag: string }>();
 const edge = new Map<string, { v: string; etag: string } | null>();
 let listed = new Set<string>();
@@ -30,16 +37,17 @@ function settle() {
 
 const store = {
   async get(k: string, o?: { type?: string }) {
-    const b = read(k);
+    const b = read(K(k));
     if (b === null) return null;
     return o?.type === 'json' ? JSON.parse(b.v) : b.v;
   },
   async getWithMetadata(k: string, o?: { type?: string }) {
-    const b = read(k);
+    const b = read(K(k));
     if (b === null) return null;
     return { data: o?.type === 'json' ? JSON.parse(b.v) : b.v, etag: b.etag };
   },
-  async setJSON(k: string, v: unknown, o: { onlyIfMatch?: string; onlyIfNew?: boolean } = {}) {
+  async setJSON(key: string, v: unknown, o: { onlyIfMatch?: string; onlyIfNew?: boolean } = {}) {
+    const k = K(key);
     const b = origin.get(k);
     if (o.onlyIfNew === true && b !== undefined) return { modified: false };
     if (o.onlyIfMatch !== undefined && b?.etag !== o.onlyIfMatch) return { modified: false };
@@ -47,7 +55,7 @@ const store = {
     return { modified: true };
   },
   async delete(k: string) {
-    origin.delete(k);
+    origin.delete(K(k));
   },
   async list(o: { prefix?: string } = {}) {
     const p = o.prefix ?? '';
@@ -104,6 +112,7 @@ beforeEach(() => {
   edge.clear();
   listed.clear();
   etags = 0;
+  literalKeys = false;
 });
 
 describe('world-graffiti store', () => {
@@ -171,7 +180,7 @@ describe('world-graffiti store', () => {
   });
 
   it('still serves walls saved in the old one-blob format', async () => {
-    origin.set(`wall/${encodeURIComponent(OTHER)}`, {
+    origin.set(`wall/${OTHER}`, {
       v: JSON.stringify({ wallId: OTHER, tags: [{ d: tag(7), at: 1 }] }),
       etag: 'old',
     });
@@ -181,5 +190,22 @@ describe('world-graffiti store', () => {
     settle();
     expect((await walls([OTHER]))[OTHER]).toEqual([tag(7), tag(8)]);
     expect(await index()).toEqual([OTHER]);
+  });
+
+  it('finds walls and layers whichever way the store keeps its keys', async () => {
+    for (const literal of [false, true]) {
+      origin.clear();
+      edge.clear();
+      listed.clear();
+      literalKeys = literal;
+      // Two painters on one new wall inside a minute: the second write to
+      // the wall's cache reads a stale copy, so only the tag listing has it
+      await post(OTHER, tag(1));
+      await walls([OTHER]);
+      await post(OTHER, tag(2));
+      settle();
+      expect(await index()).toEqual([OTHER]);
+      expect(new Set((await walls([OTHER]))[OTHER])).toEqual(new Set([tag(1), tag(2)]));
+    }
   });
 });
