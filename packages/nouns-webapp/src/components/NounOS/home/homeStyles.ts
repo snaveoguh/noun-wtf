@@ -107,9 +107,7 @@ export const HOME_CSS = `
 
 /* ── hero ───────────────────────────────────────────── */
 .nh-hero{position:relative;z-index:1}
-.nh-hero-frame{position:relative;height:clamp(480px,72vh,700px);overflow:hidden;background:#000;transform-origin:50% 0;
-  transition:transform .7s cubic-bezier(.2,.8,.2,1),box-shadow .7s}
-.nh-hero:hover .nh-hero-frame{transform:scale(1.012)}
+.nh-hero-frame{position:relative;height:clamp(480px,72vh,700px);overflow:hidden;background:#000}
 .nh-hero-slide{position:absolute;inset:0;opacity:0;transition:opacity 1s ease}
 .nh-hero-slide.is-on{opacity:1}
 .nh-hero-slide img,.nh-hero-slide video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.05);filter:saturate(1.08);
@@ -382,7 +380,6 @@ body .nh-intro-skip{position:absolute;bottom:28px;left:0;right:0;text-align:cent
   .nh *,.nh *::before,.nh *::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
   .nh-hero-slide.is-on img{animation:none !important;transform:scale(1.05)}
   .nh-card:hover,.nh-card:focus-visible{transform:none}
-  .nh-hero:hover .nh-hero-frame{transform:none}
   body .nh-modal,body .nh-sheet{animation:none !important}
 }
 `;
