@@ -16,7 +16,7 @@ import { cx } from '../osStore';
 
 import { shouldPlayBed } from './bed';
 import { audioRunning, courtBed, motif, playFile, unlockAudio, type Playback } from './sound';
-import { DUCKED, shouldStartVo, shouldStopVo, stretches, syncRate, VO_CREDIT } from './voiceOver';
+import { DUCKED, shouldStartVo, shouldStopVo, stretches, syncRate } from './voiceOver';
 
 export const GAME_ACCENT: Record<GameId, string> = {
   world: '#ffd400',
@@ -372,7 +372,7 @@ export default function Hero({
             onClick={onToggleSound}
             aria-pressed={sound}
             aria-label={sound ? 'Turn sound off' : 'Turn sound on'}
-            title={`${sound ? 'sound on' : 'sound off'}\n${VO_CREDIT}`}
+            title={sound ? 'sound on' : 'sound off'}
           >
             {sound ? (
               <svg viewBox="0 0 24 24" aria-hidden>
