@@ -32,6 +32,12 @@ import { MAX_TAG_CHARS, validTag } from '../../src/miniapps/world2/graffiti/stro
 // effort; a read lists the wall's tag blobs and folds in any the cache is
 // missing. A wall keeps every tag until it holds ~400 KB of paint (or 1500
 // tags), then sheds its oldest (long since painted over).
+//
+// Keys are written with the wall id URL-encoded, but the Blobs client puts a
+// key into the request path as is, so Netlify decodes it and stores
+// `t/plaza|0.00,…/<hash>`. Listings therefore have to ask for the decoded
+// prefix (`listKeys`); asking only for the encoded one found nothing, so
+// walls painted since the per-tag layout never showed up on arrival.
 
 interface HandlerEvent {
   body: string | null;
@@ -116,23 +122,28 @@ async function saveCache(store: Store, wallId: string, tags: Tag[], etag: string
   return res.modified;
 }
 
+/** Keys under a wall-id prefix, as stored (decoded) or as written (encoded). */
+async function listKeys(store: Store, dir: string, id: string): Promise<string[]> {
+  const prefixes = [...new Set([dir + id, dir + encodeURIComponent(id)])];
+  const lists = await Promise.all(prefixes.map(prefix => store.list({ prefix })));
+  return [...new Set(lists.flatMap(l => l.blobs.map(b => b.key)))];
+}
+
+const keyHash = (key: string) => key.slice(key.lastIndexOf('/') + 1);
+
 async function dropTags(store: Store, wallId: string, gone: Tag[]) {
   await Promise.all(gone.map(t => store.delete(tagKey(wallId, t.d)).catch(() => undefined)));
 }
 
 /** A wall's tags, oldest first: its cached copy plus any tag blob it's missing. */
 async function readWall(store: Store, wallId: string): Promise<Tag[]> {
-  const prefix = tagDir(wallId);
-  const [cur, listing] = await Promise.all([
+  const [cur, keys] = await Promise.all([
     store.getWithMetadata(wallKey(wallId), { type: 'json' }),
-    store.list({ prefix }),
+    listKeys(store, 't/', `${wallId}/`),
   ]);
   const cached = ((cur?.data as Wall | null)?.tags ?? []).filter(isTag);
   const have = new Set(cached.map(t => tagHash(t.d)));
-  const missing = listing.blobs
-    .map(b => b.key)
-    .filter(k => !have.has(k.slice(prefix.length)))
-    .slice(0, MAX_FETCH);
+  const missing = [...new Set(keys.filter(k => !have.has(keyHash(k))))].slice(0, MAX_FETCH);
   if (missing.length === 0) return cached;
   const got = await Promise.all(
     missing.map(k => store.get(k, { type: 'json' }) as Promise<unknown>),
@@ -157,11 +168,10 @@ async function readWall(store: Store, wallId: string): Promise<Tag[]> {
 
 /** Every wall with paint on a level: tag blobs, cached walls, the old index. */
 async function readIndex(store: Store, level: string): Promise<string[]> {
-  const pre = encodeURIComponent(`${level}|`);
-  const [old, tagList, wallList] = await Promise.all([
+  const [old, tagKeys, wallKeys] = await Promise.all([
     store.get(indexKey(level), { type: 'json' }) as Promise<string[] | null>,
-    store.list({ prefix: `t/${pre}` }),
-    store.list({ prefix: `wall/${pre}` }),
+    listKeys(store, 't/', `${level}|`),
+    listKeys(store, 'wall/', `${level}|`),
   ]);
   const walls = new Set<string>(Array.isArray(old) ? old : []);
   const add = (enc: string) => {
@@ -171,8 +181,8 @@ async function readIndex(store: Store, level: string): Promise<string[]> {
       // not ours
     }
   };
-  for (const { key } of tagList.blobs) add(key.slice(2, key.indexOf('/', 2)));
-  for (const { key } of wallList.blobs) add(key.slice(5));
+  for (const key of tagKeys) add(key.slice(2, key.indexOf('/', 2)));
+  for (const key of wallKeys) add(key.slice(5));
   return [...walls].filter(id => WALL_RE.test(id));
 }
 
