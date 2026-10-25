@@ -33,7 +33,7 @@ export interface AlleyDef {
   width: number;
   /** Local a-range of the baked building block removed for it. */
   cut: [number, number];
-  /** Roof height of the removed block (the new alley walls match it). */
+  /** Visible roof height of the removed block (the new alley walls match it). */
   roof: number;
   label: string;
   tint: number;
@@ -41,14 +41,14 @@ export interface AlleyDef {
 
 export const ALLEYS: AlleyDef[] = [
   // +Z side, straight out from the fountain across the street crossing
-  { angle: 0, a: -0.4, width: 9, cut: [-7.8, 7.0], roof: 11.1, label: 'DOWNHILL', tint: 0xf0b8a4 },
+  { angle: 0, a: -0.4, width: 9, cut: [-7.8, 7.0], roof: 10.2, label: 'DOWNHILL', tint: 0xf0b8a4 },
   // +X side, world z ≈ −24 (between the street lamps, clear of the lawn)
   {
     angle: Math.PI / 2,
     a: 24,
     width: 8,
     cut: [18.9, 31.6],
-    roof: 11.1,
+    roof: 10.2,
     label: 'MOUNTAIN',
     tint: 0x9fd8cf,
   },
@@ -58,7 +58,7 @@ export const ALLEYS: AlleyDef[] = [
     a: 24,
     width: 8,
     cut: [14.5, 33.2],
-    roof: 11.1,
+    roof: 10.2,
     label: 'GO DOWN',
     tint: 0xf3c25b,
   },
