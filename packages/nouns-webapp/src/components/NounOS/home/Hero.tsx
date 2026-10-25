@@ -10,7 +10,7 @@
 import type { Clip, GameId, Slide } from './rows';
 
 import type { CSSProperties } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cx } from '../osStore';
 
@@ -56,6 +56,8 @@ export function ClipVideo({
   onPlaying,
   duck = false,
   synced = false,
+  once = false,
+  onEnded,
 }: {
   clip: Clip;
   onPlaying?: () => void;
@@ -65,6 +67,9 @@ export function ClipVideo({
   duck?: boolean;
   /** The voice-over just started: restart and stretch to end with it. */
   synced?: boolean;
+  /** Play through once (the carousel moves on when it ends) instead of looping. */
+  once?: boolean;
+  onEnded?: () => void;
   focus?: string;
   className?: string;
 }) {
@@ -77,8 +82,9 @@ export function ClipVideo({
     const v = ref.current;
     if (!v) return;
     // While synced it plays once and holds its last frame (no loop back to
-    // scenes already seen) until the carousel moves on
-    v.loop = !synced;
+    // scenes already seen) until the carousel moves on; `once` plays it
+    // through a single time and lets `onEnded` move the carousel on
+    v.loop = !synced && !once;
     if (!synced) {
       v.playbackRate = 1;
       return;
@@ -96,7 +102,7 @@ export function ClipVideo({
     }
     v.addEventListener('loadedmetadata', sync, { once: true });
     return () => v.removeEventListener('loadedmetadata', sync);
-  }, [synced]);
+  }, [synced, once]);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -115,12 +121,12 @@ export function ClipVideo({
       className={className}
       poster={clip.poster}
       muted
-      loop
       playsInline
       autoPlay
       preload="metadata"
       disablePictureInPicture
       onPlaying={onPlaying}
+      onEnded={onEnded}
       style={{ objectPosition: focus }}
       aria-hidden
     >
@@ -265,16 +271,20 @@ export default function Hero({
     };
   }, [sound, bedTrack, live, voOn]);
 
+  // A clip slide moves on when its clip ends (one clean play-through, from
+  // whenever it actually started); the timer only backs that up
+  const clipDrives = s.clip !== undefined && motion;
+  const next = useCallback(() => {
+    setVoTail(-1);
+    setIdx(i => (i + 1) % slides.length);
+  }, [slides.length]);
   useEffect(() => {
     if (paused || voOn) return;
     // Just finished the voice-over: a beat, then move on
-    const ms = voTail === idx ? 300 : s.ms;
-    const t = window.setTimeout(() => {
-      setVoTail(-1);
-      setIdx(i => (i + 1) % slides.length);
-    }, ms);
+    const ms = voTail === idx ? 300 : clipDrives ? s.ms + 8000 : s.ms;
+    const t = window.setTimeout(next, ms);
     return () => window.clearTimeout(t);
-  }, [idx, paused, voOn, voTail, slides.length, s.ms]);
+  }, [idx, paused, voOn, voTail, next, s.ms, clipDrives]);
 
   const onEnter = () => {
     setHeld(true);
@@ -320,6 +330,10 @@ export default function Hero({
                   withSound={sound}
                   duck={voOn}
                   synced={voOn}
+                  once={!paused}
+                  onEnded={() => {
+                    if (!voOn && !paused) next();
+                  }}
                   focus={x.focus}
                 />
               ) : (

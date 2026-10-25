@@ -134,7 +134,10 @@ export interface Slide {
    * music file plus synthesised ambience, faded in and out with the slide.
    */
   bed?: Bed;
-  /** How long it stays up, ms */
+  /**
+   * How long it stays up, ms. A clip slide moves on when its clip ends, so
+   * this is the clip's length (the progress pip and a fallback timer use it).
+   */
   ms: number;
 }
 
@@ -159,7 +162,7 @@ export const HERO_SLIDES: Slide[] = [
     cta: 'PLAY NOUN WORLD',
     browse: true,
     vo: '/home/vo-intro.mp3',
-    ms: 16900,
+    ms: 26300,
   },
   {
     key: 'world-vhs',
@@ -184,7 +187,7 @@ export const HERO_SLIDES: Slide[] = [
     focus: '50% 50%',
     game: 'hoops',
     bed: { track: '/home/hoops-track.mp3', ambience: 'court' },
-    ms: 12000,
+    ms: 7500,
   },
   {
     key: 'warfare',
