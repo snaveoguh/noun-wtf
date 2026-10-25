@@ -16,6 +16,7 @@ import {
   seatBackdrop,
 } from './mountain/Alleys';
 import { MOUNTAIN } from './mountain/config';
+import { seatRoofs } from './roofs';
 import { buildSkyline } from './Skyline';
 
 export interface LevelData {
@@ -200,6 +201,25 @@ export async function loadLevel(
     let skylineTop = 0;
     if (collisionMeshes.some(m => m.name === 'COL_Buildings')) {
       const roofs = collisionMeshes.find(m => m.name === 'COL_Buildings') ?? null;
+      // Its block tops sit at parapet height: put them on the visible roofs
+      // first (the towers below sit on them too). The ring backs still go
+      // up to the parapets, so they're built from a copy as baked.
+      let asBaked: THREE.Mesh | null = null;
+      if (roofs !== null) {
+        roofs.updateWorldMatrix(true, false);
+        asBaked = new THREE.Mesh(roofs.geometry.clone().applyMatrix4(roofs.matrixWorld));
+        const blocks: THREE.Mesh[] = [];
+        scene.traverse(o => {
+          const mesh = o as THREE.Mesh;
+          if (
+            mesh.isMesh &&
+            (/^buildings/i.test(mesh.name) || /^buildings/i.test(mesh.parent?.name ?? ''))
+          )
+            blocks.push(mesh);
+        });
+        const parapets = seatRoofs(roofs, blocks);
+        if (parapets !== null) collisionMeshes.push(parapets);
+      }
       const skyline = buildSkyline(roofs);
       scene.add(skyline.group);
       skylineTop = skyline.maxY;
@@ -225,7 +245,8 @@ export async function loadLevel(
         for (const b of backdrop) collisionMeshes.push(...seatBackdrop(b as THREE.Mesh));
         for (const m of collisionMeshes)
           if (/^col_(buildings|props)/i.test(m.name)) cutTriangles(m, cuts);
-        const backs = buildRingBacks(collisionMeshes.find(m => m.name === 'COL_Buildings') ?? null);
+        if (asBaked !== null) cutTriangles(asBaked, cuts);
+        const backs = buildRingBacks(asBaked);
         if (backs !== null) scene.add(backs);
         const alleys = buildAlleys();
         scene.add(alleys.group);
