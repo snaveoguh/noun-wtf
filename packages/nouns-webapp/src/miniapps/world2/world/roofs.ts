@@ -60,15 +60,14 @@ function heightsAt(bvh: MeshBVH, x: number, z: number): number[] {
 
 /**
  * New collision roof height for a vertex at `y`, or `y` to leave it. Lowered
- * only when render roof floor lies MIN_DROP..MAX_DROP under it nearby and
- * nothing visible stands just above it (a block whose collision already
- * matches, or sits below its render roof, is left alone).
+ * only when a render roof floor lies MIN_DROP..MAX_DROP under it nearby; a
+ * block whose collision already matches its roof has none there. Thin
+ * render pieces above the vertex (signs, ledges) don't hold the slab up.
  */
 export function seatHeight(y: number, samples: number[][]): number {
   if (y < MIN_Y) return y;
   let best = -Infinity;
   for (const hs of samples) {
-    if (hs.some(h => h > y + EPS && h < y + MAX_DROP)) return y;
     let top = -Infinity;
     for (const h of hs) if (h <= y + EPS && h > top) top = h;
     const drop = y - top;

@@ -77,10 +77,13 @@ describe('seatHeight', () => {
     expect(seatHeight(14.5, [[13.6, 0], [], [14.5, 13.6]])).toBeCloseTo(13.6);
   });
 
-  it('leaves street level, matching roofs and anything with render just above', () => {
+  it('ignores a sign or ledge floating over the roof', () => {
+    expect(seatHeight(11.1, [[10.2, 11.6], [10.2]])).toBeCloseTo(10.2);
+  });
+
+  it('leaves street level and roofs that already match', () => {
     expect(seatHeight(1, [[0.2]])).toBe(1);
     expect(seatHeight(10, [[10, 0]])).toBe(10);
-    expect(seatHeight(11.1, [[10.2, 11.6]])).toBe(11.1);
     // A roof far below (a different, lower building) is not this one's floor
     expect(seatHeight(18.8, [[13.6]])).toBe(18.8);
   });
