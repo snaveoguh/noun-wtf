@@ -16,7 +16,7 @@ import { cx } from '../osStore';
 
 import { shouldPlayBed } from './bed';
 import { audioRunning, courtBed, motif, playFile, unlockAudio, type Playback } from './sound';
-import { DUCKED, shouldStartVo, shouldStopVo, syncRate, VO_CREDIT } from './voiceOver';
+import { DUCKED, shouldStartVo, shouldStopVo, stretches, syncRate, VO_CREDIT } from './voiceOver';
 
 export const GAME_ACCENT: Record<GameId, string> = {
   world: '#ffd400',
@@ -83,10 +83,12 @@ export function ClipVideo({
       v.playbackRate = 1;
       return;
     }
-    // The voice-over can start before the clip knows its length
+    // The voice-over can start before the clip knows its length. A clip too
+    // short to stretch over it keeps looping instead of freezing.
     const sync = () => {
       v.currentTime = 0;
-      v.playbackRate = syncRate(v.duration);
+      v.loop = !stretches(v.duration);
+      v.playbackRate = v.loop ? 1 : syncRate(v.duration);
     };
     if (Number.isFinite(v.duration)) {
       sync();

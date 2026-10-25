@@ -25,10 +25,22 @@ export const VO_SPEAKER = 499; // LibriTTS-R speaker "2427" in the model's speak
  * together instead of the clip looping back to scenes already seen. */
 export const VO_SECONDS = 16.8;
 
+/** Slowest the clip may play to last as long as the voice-over. */
+const MIN_RATE = 0.75;
+
 /** Playback rate that stretches a clip of `clipSeconds` over the voice-over (never faster, at most 25% slower). */
 export function syncRate(clipSeconds: number): number {
   if (!Number.isFinite(clipSeconds) || clipSeconds <= 0) return 1;
-  return Math.min(1, Math.max(0.75, clipSeconds / VO_SECONDS));
+  return Math.min(1, Math.max(MIN_RATE, clipSeconds / VO_SECONDS));
+}
+
+/**
+ * Can a clip of `clipSeconds` be slowed to last the whole voice-over? A
+ * shorter one keeps looping at normal speed instead of playing out and
+ * sitting on its last frame for the rest of a longer read.
+ */
+export function stretches(clipSeconds: number): boolean {
+  return Number.isFinite(clipSeconds) && clipSeconds >= VO_SECONDS * MIN_RATE;
 }
 
 export const VO_CREDIT =

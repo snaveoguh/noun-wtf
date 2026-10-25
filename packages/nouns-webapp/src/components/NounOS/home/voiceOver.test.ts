@@ -36,4 +36,12 @@ describe('clip sync under the voice-over', () => {
     expect(syncRate(5)).toBe(0.75);
     expect(syncRate(Number.NaN)).toBe(1);
   });
+
+  it('only stretches a clip that can last the whole voice-over', async () => {
+    const { stretches, VO_SECONDS } = await import('./voiceOver');
+    expect(stretches(VO_SECONDS)).toBe(true);
+    expect(stretches(VO_SECONDS * 0.75)).toBe(true);
+    expect(stretches(VO_SECONDS * 0.7)).toBe(false);
+    expect(stretches(Number.NaN)).toBe(false);
+  });
 });
