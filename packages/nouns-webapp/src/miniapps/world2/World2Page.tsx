@@ -573,7 +573,8 @@ function Hud({
         </div>
         {hud.mountain !== null && (
           <div className="w2-chip text-xs opacity-80">
-            ⛰ {(hud.mountain.down / 1000).toFixed(2)} km out, {hud.mountain.surface}, streak{' '}
+            {hud.mountain.surface === 'snow' ? '❄' : '⛰'} {(hud.mountain.down / 1000).toFixed(2)}{' '}
+            km {hud.mountain.surface === 'snow' ? 'down' : 'out'}, {hud.mountain.surface}, streak{' '}
             {hud.mountain.streak}s
           </div>
         )}

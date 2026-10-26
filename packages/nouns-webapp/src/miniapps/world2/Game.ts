@@ -300,7 +300,7 @@ export class Game {
   towns: TownSystem | null = null;
   /** Nounish landmarks (world/landmarks/): discoveries, compass, map pins. */
   landmarks: LandmarkSystem | null = null;
-  /** Missions: the Oracle and the cast, progress, the Upside Down (missions/). */
+  /** Missions: the Oracle and the cast, progress, the Big Drop (missions/). */
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
@@ -884,18 +884,23 @@ export class Game {
     this.updateNetwork(dt);
     this.van2.update(dt);
     this.dragon.update(dt);
+    // On the Big Drop the world you left waits: nothing down there streams
+    // or triggers round a rider who's somewhere else entirely
+    const away = this.missions.ud.active;
     // A van ride can't touch a drop (its proof would be a 140 km/h walk)
-    if (!driving) this.drops?.update(dt, this.player);
-    this.crew?.update(dt, this.player.pos);
+    if (!driving && !away) this.drops?.update(dt, this.player);
+    if (!away) this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
-    this.towns?.update(dt);
-    this.landmarks?.update(dt);
+    if (!away) {
+      this.towns?.update(dt);
+      this.landmarks?.update(dt);
+    }
     this.particles.update(dt, p => {
       const hit = this.world.raycast(_v.set(p.x, p.y + 0.5, p.z), DOWN, 1);
       return hit ? hit.point.y : null;
     });
     this.gfx.followShadow(this.player.pos);
-    if (this.mountain !== null) {
+    if (this.mountain !== null && !away) {
       this.mountain.update(this.player.pos, this.player.vel);
       // Out on the slopes (or way up a tower) the sky dome below the horizon
       // turns to haze, since the world falls away below eye level. Down in
@@ -904,18 +909,20 @@ export class Game {
       const out = edgeDistance(c.x, c.z) + Math.max(0, c.y - 30);
       setSkyGroundFog(THREE.MathUtils.smoothstep(out, 4, 90));
     }
-    if (this.wild !== null) {
+    if (this.wild !== null && !away) {
       // Local rider first (the creature name tag follows them), then remotes
       this.riders.length = 0;
       this.riders.push(this.player.pos);
       for (const r of this.remotes.values()) this.riders.push(r.character.root.position);
       this.wild.update(dt, this.gfx.camera, this.riders);
     }
-    this.nature?.update(dt, this.player.pos);
-    this.billboards.update(dt);
+    if (!away) {
+      this.nature?.update(dt, this.player.pos);
+      this.billboards.update(dt);
+    }
     this.gfx.render(dt);
     this.updateHud(dt, input);
-    this.hoops.idle(dt);
+    if (!away) this.hoops.idle(dt);
   }
 
   /**
@@ -931,15 +938,18 @@ export class Game {
     this.updateFm(dt);
     this.updateNetwork(dt);
     this.van2.update(wdt);
-    this.crew?.update(wdt, this.player.pos);
+    const away = this.missions.ud.active;
+    if (!away) this.crew?.update(wdt, this.player.pos);
     this.missions.update(wdt);
-    this.towns?.update(wdt);
+    if (!away) this.towns?.update(wdt);
     this.particles.update(wdt, () => null);
-    this.sfx.update(dt, { upsideDown: this.missions.ud.active });
+    this.sfx.update(dt);
     this.gfx.followShadow(this.player.pos);
-    this.mountain?.update(this.player.pos, this.player.vel);
-    this.nature?.update(wdt, this.player.pos);
-    this.billboards.update(wdt);
+    if (!away) {
+      this.mountain?.update(this.player.pos, this.player.vel);
+      this.nature?.update(wdt, this.player.pos);
+      this.billboards.update(wdt);
+    }
     this.gfx.render(dt);
     // Stats see the scene like the Upside Down: suspended (only time played counts)
     this.updateHud(dt, input);
@@ -1346,8 +1356,10 @@ export class Game {
     const g = this.graffiti;
     if (g === null) return;
     const p = this.player;
-    // Gamepad: right trigger sprays only on foot (it's a grab on the board)
-    const active = input.spray && (p.mode === 'foot' || input.mode !== 'gamepad');
+    // Gamepad: right trigger sprays only on foot (it's a grab on the board).
+    // Never on the Big Drop: its snow isn't anywhere the shared walls know.
+    const active =
+      input.spray && (p.mode === 'foot' || input.mode !== 'gamepad') && !this.missions.ud.active;
     const cam = this.gfx.camera;
     const dirs: THREE.Vector3[] = [];
     const trail = this.input.cursorTrail.splice(0);
@@ -1597,7 +1609,7 @@ export class Game {
       this.boardType === 'hover' && p.mode === 'board' && p.state !== 'bail',
       this.boardType === 'scooter' ? 1.45 : this.boardType === 'blades' ? 1.2 : 1,
     );
-    this.sfx.update(dt, { upsideDown: this.missions.ud.active });
+    this.sfx.update(dt);
   }
 
   private ensureRemote(id: string, seedK: string): RemoteAvatar | null {
@@ -1985,8 +1997,13 @@ export class Game {
       inputMode: input.mode,
       landmarks: lm,
       camMode: this.cam.mode,
-      mountain:
-        this.mountain !== null && edgeDistance(p.pos.x, p.pos.z) > 0
+      mountain: this.missions.ud.active
+        ? {
+            down: Math.round(this.missions.ud.depth),
+            surface: 'snow',
+            streak: Math.round(p.runTime),
+          }
+        : this.mountain !== null && edgeDistance(p.pos.x, p.pos.z) > 0
           ? {
               down: Math.round(edgeDistance(p.pos.x, p.pos.z)),
               surface: p.surface ?? 'grass',

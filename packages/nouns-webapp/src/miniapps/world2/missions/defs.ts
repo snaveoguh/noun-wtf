@@ -108,7 +108,7 @@ export type RecordKey = 'kmh' | 'airM' | 'airS';
 export type Objective =
   /** Land (bank, no bail) a trick whose name matches `re`. */
   | { k: 'trick'; re: string }
-  /** Land a combo of `n`+ tricks (in Noun Jersey / in the Upside Down). */
+  /** Land a combo of `n`+ tricks (in Noun Jersey / on the Big Drop). */
   | { k: 'combo'; n: number; where?: 'nj' | 'ud' }
   /** Spray a tag (in a given colour). */
   | { k: 'tag'; color?: string }
@@ -132,9 +132,9 @@ export type Objective =
   | { k: 'deliver'; to: NpcId; s: number }
   /** Beat the Twins `m` metres down the mountain. */
   | { k: 'race'; m: number }
-  /** In the Upside Down: hang time of `s` seconds in one air. */
+  /** On the Big Drop: hang time of `s` seconds in one air. */
   | { k: 'udHang'; s: number }
-  /** In the Upside Down: ride `m` metres. */
+  /** On the Big Drop: ride `m` metres. */
   | { k: 'udRide'; m: number }
   /** A record the server holds (accepted with its run proof). */
   | { k: 'record'; key: RecordKey; min: number; surface?: 'grass' };
@@ -369,7 +369,7 @@ export const MISSIONS: MissionDef[] = [
     reward: 'Ghost',
   },
 
-  // ── The Keymaker, and the Upside Down ──
+  // ── The Keymaker, and the Big Drop ──
   {
     id: 'unbroken',
     npc: 'keymaker',
@@ -412,7 +412,7 @@ export const MISSIONS: MissionDef[] = [
     title: 'Weightless',
     flavour:
       'In there the ground lets go of you. Stay up fifteen seconds. It doesn’t count. Do it anyway.',
-    goal: 'In the Upside Down: one air of 15 s.',
+    goal: 'On the Big Drop: one air of 15 s.',
     obj: { k: 'udHang', s: 15 },
     after: ['deepest-door'],
     reward: 'Weightless',
@@ -421,12 +421,12 @@ export const MISSIONS: MissionDef[] = [
     id: 'spore-trail',
     npc: 'keymaker',
     tier: 3,
-    title: 'Spore trail',
-    flavour: 'Ride its dark for three kilometres and come back to tell me.',
-    goal: 'In the Upside Down: ride 3 km.',
+    title: 'First tracks',
+    flavour: 'Lay the first three kilometres of tracks down its snow and come back to tell me.',
+    goal: 'On the Big Drop: ride 3 km.',
     obj: { k: 'udRide', m: 3000 },
     after: ['deepest-door'],
-    reward: 'Upside Down',
+    reward: 'Big Drop',
   },
 ];
 

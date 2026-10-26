@@ -214,6 +214,14 @@ export class SkateCamera {
     }
   }
 
+  /** Move the camera and its smoothing state by `d` (a floating-origin shift). */
+  shift(d: THREE.Vector3) {
+    this.pos.add(d);
+    this.look.add(d);
+    this.lastRider.add(d);
+    this.camera.position.add(d);
+  }
+
   snap(p: Player) {
     this.yaw = Math.atan2(p.fwd.x, p.fwd.z);
     this.initialized = false;
