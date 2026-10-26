@@ -4,6 +4,8 @@
 // (double-tap) to put it back. The block keeps its usual placement classes;
 // a drag only adds an offset, stored per device as a share of the screen so
 // it survives resizes and rotations. A drag never fires the buttons inside.
+// A panel full of controls (sliders, swatches) passes `handle`: it then only
+// moves when grabbed by an element marked `data-w2drag` (its title bar).
 
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -46,6 +48,7 @@ export function HudDrag({
   id,
   className,
   style,
+  handle = false,
   children,
 }: {
   /** Storage key: one saved position per id. */
@@ -53,6 +56,8 @@ export function HudDrag({
   /** Default placement (absolute positioning classes). */
   className: string;
   style?: CSSProperties;
+  /** Only move when grabbed by a `[data-w2drag]` element inside. */
+  handle?: boolean;
   children: ReactNode;
 }) {
   const [off, setOff] = useState(() => load()[id] ?? { x: 0, y: 0 });
@@ -110,9 +115,13 @@ export function HudDrag({
       data-w2hud={id}
       className={`${className} pointer-events-auto`}
       style={{ ...style, translate: `${off.x * W}px ${off.y * H}px`, touchAction: 'none' }}
-      title="Drag to move (hold Alt to free the mouse) · double-click to reset"
-      onPointerDown={e => {
+      title={
+        handle ? undefined : 'Drag to move (hold Alt to free the mouse) · double-click to reset'
+      }
+      // Capture: panels inside stop pointerdown from reaching the game
+      onPointerDownCapture={e => {
         if (e.button !== 0) return;
+        if (handle && (e.target as Element).closest('[data-w2drag]') === null) return;
         drag.current = { sx: e.clientX, sy: e.clientY, ox: off.x, oy: off.y, moved: false };
       }}
       onPointerMove={e => {
@@ -158,7 +167,8 @@ export function HudDrag({
           e.preventDefault();
         }
       }}
-      onDoubleClick={() => {
+      onDoubleClick={e => {
+        if (handle && (e.target as Element).closest('[data-w2drag]') === null) return;
         setOff({ x: 0, y: 0 });
         commit({ x: 0, y: 0 });
       }}
