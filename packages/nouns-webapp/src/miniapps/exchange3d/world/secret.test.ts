@@ -100,5 +100,10 @@ describe('the descent and the way back up', () => {
     expect(darkness('down', DESCENT_S)).toBe(1);
     expect(darkness('up', 0)).toBe(1);
     expect(darkness('up', 1)).toBe(0);
+    // Dark whenever the camera is under the plaza
+    for (let t = 0; t <= DESCENT_S; t += 0.05)
+      if (descentPose(t, start).pos.y < 0.2) expect(darkness('down', t)).toBe(1);
+    for (let t = 0; t <= ASCENT_S; t += 0.05)
+      if (ascentPose(t, start).pos.y < 0.2) expect(darkness('up', t)).toBe(1);
   });
 });

@@ -98,8 +98,15 @@ export interface Pose {
 
 export const DESCENT_S = 2.8;
 export const ASCENT_S = 1.8;
-/** The screen goes dark over the last part of the descent / first of the ascent. */
-export const DARK_FROM = 2.15;
+/**
+ * The screen is fully dark before the camera goes below the plaza (it
+ * crosses y = 0 at about 2.27 s down, and 0.45 s into the way up), so
+ * nobody sees the underside of the world.
+ */
+export const DARK_FROM = 1.75;
+export const DARK_FULL = 2.25;
+const UP_DARK_HOLD = 0.45;
+const UP_DARK_FADE = 0.35;
 
 const ease = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 const lerp3 = (a: V3, b: V3, k: number): V3 => ({
@@ -152,6 +159,6 @@ export function ascentPose(t: number, live: Pose): Pose {
 
 /** Screen darkness (0 … 1) during the descent / ascent. */
 export function darkness(phase: 'down' | 'up', t: number): number {
-  if (phase === 'down') return ease((t - DARK_FROM) / (DESCENT_S - DARK_FROM));
-  return 1 - ease(t / 0.6);
+  if (phase === 'down') return ease((t - DARK_FROM) / (DARK_FULL - DARK_FROM));
+  return 1 - ease((t - UP_DARK_HOLD) / UP_DARK_FADE);
 }

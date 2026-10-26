@@ -12,6 +12,7 @@ import type { Game } from '../../world2/Game';
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
+import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 
 import ExchangeFloor from '../../exchange/ui/ExchangeFloor';
@@ -263,7 +264,8 @@ export default function UnderFountain({ game, touch }: { game: Game; touch: bool
   );
 
   void touch; // knocks are taps on touch, clicks on desktop: same handler
-  return (
+  // On <body>: the world sits in its own stacking context under the NounOS dock
+  return createPortal(
     <>
       <div ref={dark} className="gx3d-dark" />
       {stage === 'below' && (
@@ -287,6 +289,7 @@ export default function UnderFountain({ game, touch }: { game: Game; touch: bool
           </Suspense>
         </div>
       )}
-    </>
+    </>,
+    document.body,
   );
 }

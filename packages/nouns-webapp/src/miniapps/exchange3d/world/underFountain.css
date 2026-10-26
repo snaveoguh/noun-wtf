@@ -6,7 +6,8 @@
 .gx3d-under {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  /* Over the game HUD and the NounOS dock */
+  z-index: 9000;
   animation: gx3d-under-in 0.7s ease-out;
 }
 @keyframes gx3d-under-in {
@@ -22,7 +23,7 @@
   inset: 0;
   background: #000;
   pointer-events: none;
-  z-index: 65;
+  z-index: 8999;
   opacity: 0;
 }
 .gx3d-sign {
