@@ -26,12 +26,13 @@ import type { PeakCtx, PeakSystem } from './bigdrop/contract';
 
 import * as THREE from 'three';
 
-import { toonify } from '../render/Toon';
+import { toToon } from '../render/Toon';
 import { createCombo } from '../skate/Tricks';
 
 import { ALT } from './bigdrop/contract';
 import { snowColor } from './bigdrop/surface';
 import { PEAK_SYSTEMS } from './bigdrop/systems';
+import { type GridSampler, GridMesh } from './peakGrid';
 import { PEAK_LIPSCHITZ, peakHeight, peakNormal, raycastHeight } from './peakTerrain';
 
 /** Gravity scale inside (of the player's own tuning). */
@@ -44,11 +45,23 @@ const REBASE = 3000;
 const REBASE_FORCE = 8000;
 /** Recentring steps (m), so the summit always lands on round numbers. */
 const STEP = 1000;
-/** Terrain grid: vertices per side by quality, and its spacing. */
-const GRID_N = { low: 101, medium: 141, high: 141 } as const;
-/** First ring spacing (m) and the far edge (m) the geometric spacing reaches. */
-const GRID_S0 = 1.5;
+/**
+ * Terrain: a fine NEAR grid rebuilt every frame and a coarse FAR grid out to
+ * the fog, rebuilt a few rows a frame into a spare mesh (peakGrid.ts).
+ * Vertices per side by quality, centre spacing (m) and reach (m).
+ */
+const NEAR_N = { low: 49, medium: 61, high: 61 } as const;
+const NEAR_S0 = 1.5;
+const NEAR_EDGE = 400;
+const FAR_N = { low: 81, medium: 101, high: 101 } as const;
+const FAR_S0 = 10;
 const GRID_EDGE = 7000;
+/** Far grid rows per frame (a rebuild takes ~n·1.5 / this frames). */
+const FAR_ROWS = 18;
+/** Under the near grid the far one sinks out of sight. */
+const FAR_HOLE = { half: NEAR_EDGE * 0.82, depth: 12 };
+/** Re-centre the far grid once the camera is this far from its centre (m). */
+const FAR_MOVE = 30;
 
 interface Saved {
   fog: THREE.Scene['fog'];
@@ -74,27 +87,6 @@ interface Saved {
   far: number;
 }
 
-/** Grid offsets for one axis: dense at the centre, geometric out to GRID_EDGE. */
-function gridOffsets(n: number): Float64Array {
-  const k = (n - 1) / 2;
-  // Solve (1+q)^k − 1 = GRID_EDGE·q / s0 for q (bisection; it's monotone)
-  let lo = 1e-4;
-  let hi = 1;
-  for (let i = 0; i < 60; i++) {
-    const q = (lo + hi) / 2;
-    if ((Math.pow(1 + q, k) - 1) * (GRID_S0 / q) > GRID_EDGE) hi = q;
-    else lo = q;
-  }
-  const q = (lo + hi) / 2;
-  const out = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    const j = i - k;
-    const d = (GRID_S0 * (Math.pow(1 + q, Math.abs(j)) - 1)) / q;
-    out[i] = Math.sign(j) * d;
-  }
-  return out;
-}
-
 export class Peak {
   active = false;
   /** The canvas filter inside (the door's cutscene eases into it): none. */
@@ -105,10 +97,12 @@ export class Peak {
   /** Peak coordinates of the local point (0, ALT, 0). */
   private origin = new THREE.Vector3();
   private group = new THREE.Group();
-  private terrain: THREE.Mesh | null = null;
-  private offsets: Float64Array | null = null;
-  private heights: Float64Array | null = null;
-  private builtAt = new THREE.Vector3(Infinity, 0, 0);
+  private near: GridMesh | null = null;
+  /** The far grid on show, and the spare being rebuilt behind it. */
+  private far: GridMesh | null = null;
+  private farNext: GridMesh | null = null;
+  private snowMat: THREE.Material | null = null;
+  private readonly sampler: GridSampler = { height: peakHeight, color: snowColor };
   private lastRespawns = 0;
   /** The track, scenery, riders… (bigdrop/systems.ts), while inside. */
   private systems: PeakSystem[] = [];
@@ -231,7 +225,6 @@ export class Peak {
     // Sky, sun + fill lights, fog, snowfall and wind: the atmosphere system
     this.buildTerrain();
     gfx.scene.add(this.group);
-    this.builtAt.set(Infinity, 0, 0);
     this.riderPeak.set(
       p.pos.x + this.origin.x,
       p.pos.y + this.origin.y - ALT,
@@ -345,115 +338,82 @@ export class Peak {
     p.shift(d);
     g.cam.shift(d);
     if (g.me !== null) g.me.root.position.add(d);
-    this.builtAt.set(Infinity, 0, 0);
     g.world.shiftDynamic('peak:', d);
     for (const sys of this.systems) sys.rebase?.(d);
   }
 
-  // ── Terrain: one camera-centred grid, dense near and sparse far ───────
+  // ── Terrain: camera-centred grids, a fine near one and a coarse far one ─
 
   private buildTerrain() {
-    const n = GRID_N[this.game.gfx.quality];
-    this.offsets = gridOffsets(n);
-    this.heights = new Float64Array(n * n);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * n * 3), 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n * n * 3), 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * n * 3), 3));
-    const idx = new Uint32Array((n - 1) * (n - 1) * 6);
-    let o = 0;
-    for (let j = 0; j < n - 1; j++)
-      for (let i = 0; i < n - 1; i++) {
-        const a = j * n + i;
-        idx[o++] = a;
-        idx[o++] = a + n;
-        idx[o++] = a + 1;
-        idx[o++] = a + 1;
-        idx[o++] = a + n;
-        idx[o++] = a + n + 1;
-      }
-    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    const q = this.game.gfx.quality;
     // A cool self-glow keeps the shaded side snow, not grey concrete
-    const mat = new THREE.MeshStandardMaterial({
+    const src = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.9,
       metalness: 0,
       emissive: 0x8492a8,
     });
-    mat.name = 'BigDropSnow';
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = 'BigDropTerrain';
-    mesh.frustumCulled = false;
-    mesh.receiveShadow = true;
-    if (this.game.gfx.toon) toonify(mesh);
-    this.terrain = mesh;
-    this.group.add(mesh);
+    src.name = 'BigDropSnow';
+    const mat = this.game.gfx.toon ? toToon(src) : src;
+    this.snowMat = mat;
+    this.near = new GridMesh(NEAR_N[q], NEAR_S0, NEAR_EDGE, mat);
+    this.far = new GridMesh(FAR_N[q], FAR_S0, GRID_EDGE, mat, FAR_HOLE);
+    this.farNext = new GridMesh(FAR_N[q], FAR_S0, GRID_EDGE, mat, FAR_HOLE);
+    this.near.mesh.name = 'BigDropTerrainNear';
+    this.far.mesh.name = 'BigDropTerrainFar';
+    this.farNext.mesh.name = 'BigDropTerrainFar';
+    this.farNext.mesh.visible = false;
+    this.group.add(this.near.mesh, this.far.mesh, this.farNext.mesh);
   }
 
   private updateTerrain() {
-    const mesh = this.terrain;
-    const off = this.offsets;
-    const hs = this.heights;
-    if (mesh === null || off === null || hs === null) return;
+    const near = this.near;
+    const far = this.far;
+    const next = this.farNext;
+    if (near === null || far === null || next === null) return;
     const cam = this.game.gfx.camera.position;
-    // Snap the centre to the finest spacing, in peak coordinates (so the
-    // near vertices never swim as you move)
-    const cx = Math.round((cam.x + this.origin.x) / GRID_S0) * GRID_S0 - this.origin.x;
-    const cz = Math.round((cam.z + this.origin.z) / GRID_S0) * GRID_S0 - this.origin.z;
-    if (Math.abs(cx - this.builtAt.x) < 1e-6 && Math.abs(cz - this.builtAt.z) < 1e-6) return;
-    this.builtAt.set(cx, 0, cz);
-    const n = off.length;
-    const base = cam.y;
-    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
-    const nor = mesh.geometry.getAttribute('normal') as THREE.BufferAttribute;
-    const col = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
-    const P = pos.array as Float32Array;
-    const N = nor.array as Float32Array;
-    const C = col.array as Float32Array;
-    for (let j = 0; j < n; j++)
-      for (let i = 0; i < n; i++) hs[j * n + i] = this.heightAt(cx + off[i]!, cz + off[j]!);
-    const c = new THREE.Color();
-    for (let j = 0; j < n; j++) {
-      const j0 = j > 0 ? j - 1 : j;
-      const j1 = j < n - 1 ? j + 1 : j;
-      for (let i = 0; i < n; i++) {
-        const i0 = i > 0 ? i - 1 : i;
-        const i1 = i < n - 1 ? i + 1 : i;
-        const v = j * n + i;
-        const gx = (hs[j * n + i1]! - hs[j * n + i0]!) / (off[i1]! - off[i0]!);
-        const gz = (hs[j1 * n + i]! - hs[j0 * n + i]!) / (off[j1]! - off[j0]!);
-        const l = Math.hypot(gx, 1, gz);
-        const ny = 1 / l;
-        P[v * 3] = off[i]!;
-        P[v * 3 + 1] = hs[v]! - base;
-        P[v * 3 + 2] = off[j]!;
-        N[v * 3] = -gx / l;
-        N[v * 3 + 1] = ny;
-        N[v * 3 + 2] = -gz / l;
-        snowColor(cx + off[i]! + this.origin.x, cz + off[j]! + this.origin.z, ny, c);
-        C[v * 3] = c.r;
-        C[v * 3 + 1] = c.g;
-        C[v * 3 + 2] = c.b;
+    const o = this.origin;
+    // Camera in peak coordinates
+    const px = cam.x + o.x;
+    const py = cam.y + o.y - ALT;
+    const pz = cam.z + o.z;
+    // Near: snapped to its finest spacing (in peak coordinates, so its
+    // vertices never swim), rebuilt whenever that moves
+    const nx = Math.round(px / NEAR_S0) * NEAR_S0;
+    const nz = Math.round(pz / NEAR_S0) * NEAR_S0;
+    if (nx !== near.at.x || nz !== near.at.z) near.buildNow(nx, py, nz, this.sampler);
+    // Far: the first time at once, then a slice a frame into the spare
+    const fx = Math.round(px / FAR_S0) * FAR_S0;
+    const fz = Math.round(pz / FAR_S0) * FAR_S0;
+    if (!Number.isFinite(far.at.x)) far.buildNow(fx, py, fz, this.sampler);
+    else if (next.building) {
+      if (next.step(FAR_ROWS, this.sampler)) {
+        next.mesh.visible = true;
+        far.mesh.visible = false;
+        this.far = next;
+        this.farNext = far;
       }
+    } else if (Math.hypot(fx - far.at.x, fz - far.at.z) > FAR_MOVE) next.begin(fx, py, fz);
+    // Placed from peak coordinates every frame: rebases need nothing else
+    for (const g of [near, this.far!]) {
+      g.mesh.position.set(g.at.x - o.x, g.at.y - o.y + ALT, g.at.z - o.z);
     }
-    mesh.position.set(cx, base, cz);
-    pos.needsUpdate = true;
-    nor.needsUpdate = true;
-    col.needsUpdate = true;
   }
 
   private disposeGroup() {
-    if (this.terrain !== null) {
-      this.group.remove(this.terrain);
-      this.terrain.geometry.dispose();
-      const mat = this.terrain.material as THREE.Material;
-      // toonify swaps in a converted copy: free the original as well
+    for (const g of [this.near, this.far, this.farNext]) {
+      if (g === null) continue;
+      this.group.remove(g.mesh);
+      g.dispose();
+    }
+    this.near = this.far = this.farNext = null;
+    const mat = this.snowMat;
+    if (mat !== null) {
+      // toToon swaps in a converted copy: free the original as well
       (mat.userData.toonSrc as THREE.Material | undefined)?.dispose();
       mat.dispose();
-      this.terrain = null;
+      this.snowMat = null;
     }
-    this.offsets = null;
-    this.heights = null;
   }
 
   dispose() {
