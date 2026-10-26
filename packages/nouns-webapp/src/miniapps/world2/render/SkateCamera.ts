@@ -57,6 +57,13 @@ export class SkateCamera {
    */
   leadVertical = false;
 
+  /**
+   * A set piece's camera (the Big Drop's loops): while set, the camera sits
+   * at `pos` looking at `look` (local coordinates) with this vertical FOV,
+   * and the chase waits; it picks up behind the rider once it's cleared.
+   */
+  rig: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null = null;
+
   /** 0 turns camera shake off (reduce motion). */
   shakeScale = 1;
 
@@ -76,6 +83,18 @@ export class SkateCamera {
   update(dt: number, p: Player, lookX: number, lookY: number, now: number) {
     const onBoard = p.mode === 'board';
     if (Math.abs(lookX) + Math.abs(lookY) > 1e-4) this.lastInputAt = now;
+    const rig = this.rig;
+    if (rig !== null) {
+      this.camera.position.copy(rig.pos);
+      this.camera.lookAt(rig.look);
+      if (Math.abs(this.camera.fov - rig.fov) > 0.01) {
+        this.camera.fov = rig.fov;
+        this.camera.updateProjectionMatrix();
+      }
+      this.lastRider.copy(p.pos);
+      this.initialized = false;
+      return;
+    }
 
     if (onBoard) {
       this.orbitYaw -= lookX * 1.0;
