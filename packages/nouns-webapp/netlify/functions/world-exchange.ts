@@ -13,6 +13,7 @@ import {
   type ExchangeState,
   type GoodId,
 } from '../../src/miniapps/exchange/engine';
+import { maskOwner, publicFloor } from '../../src/miniapps/exchange3d/sim/feed';
 
 // Noun Trade's Grand Exchange: one order book per good, NPC bot traders and
 // riders' limit / market orders, all in-game COIN (never real money, nothing
@@ -27,6 +28,8 @@ import {
 //      → ExchangeSnapshot (book ladder, candles, tape, floor, bots, you).
 //        Read-mostly: it saves the ticked state only when the clock lagged
 //        SAVE_LAG_MS, and never creates an account.
+//      &floor=1 adds `floor3d` (the 3D trading floor's feed): every good's
+//        recent fills and the resting orders near the touch, rider ids masked.
 // POST { rider, action }
 //      action = { t: 'join' }                       starter grant (once per rider)
 //             | { t: 'order', side, good, qty, price, kind?: 'limit' | 'market' }
@@ -153,7 +156,8 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     } else if (now - s.now >= STEP_MS) {
       tick(s, now); // in-memory only; the next write persists its own tick
     }
-    return json(200, snapshot(s, { good, tf, owner: rider }));
+    const snap = redact(snapshot(s, { good, tf, owner: rider }), rider);
+    return json(200, q.floor === '1' ? { ...snap, floor3d: publicFloor(s, rider) } : snap);
   }
   if (method !== 'POST') return json(405, { error: 'Method not allowed' });
   if ((event.body ?? '').length > MAX_BODY) return json(413, { error: 'Body too big' });
@@ -204,9 +208,33 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     return json(200, {
       ok: r.ok,
       ...(r.reason ? { reason: r.reason } : {}),
-      fills: r.fills,
-      snapshot: snapshot(s, { good, tf, owner: rider }),
+      fills: r.fills.map(f => redactFill(f, rider)),
+      snapshot: redact(snapshot(s, { good, tf, owner: rider }), rider),
     });
   }
   return json(409, { error: 'Busy, try again' });
+}
+
+// ── Never hand out other riders' ids ────────────────────────────────────
+// A rider id is all it takes to trade as that rider, so the tape and the
+// floor feed only ever show the viewer's own id; everyone else gets a
+// stable anonymous tag (bots and the exchange keep their names).
+
+const tag = (who: string, viewer: string | null) =>
+  viewer !== null && who === viewer ? who : maskOwner(who, null);
+
+function redactFill<F extends { buyer: string; seller: string }>(f: F, viewer: string | null): F {
+  return { ...f, buyer: tag(f.buyer, viewer), seller: tag(f.seller, viewer) };
+}
+
+function redact(snap: ReturnType<typeof snapshot>, viewer: string | null) {
+  return {
+    ...snap,
+    tape: snap.tape.map(f => redactFill(f, viewer)),
+    floor: snap.floor.map(e => ({ ...e, who: tag(e.who, viewer) })),
+    you:
+      snap.you === null
+        ? null
+        : { ...snap.you, fills: snap.you.fills.map(f => redactFill(f, viewer)) },
+  };
 }

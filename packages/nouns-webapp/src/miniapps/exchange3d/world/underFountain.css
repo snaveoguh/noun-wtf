@@ -1,0 +1,46 @@
+/* The Grand Exchange under the Noggles Fountain (Noun World) */
+.gx3d-exit {
+  background: #d22209 !important;
+  color: #fff !important;
+}
+.gx3d-under {
+  position: fixed;
+  inset: 0;
+  /* Over the game HUD and the NounOS dock */
+  z-index: 9000;
+  animation: gx3d-under-in 0.7s ease-out;
+}
+@keyframes gx3d-under-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.gx3d-dark {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+  z-index: 8999;
+  opacity: 0;
+}
+.gx3d-sign {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font:
+    900 11px 'Arial Black',
+    Impact,
+    sans-serif;
+  letter-spacing: 0.06em;
+  color: #ffd400;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #ffd400;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}

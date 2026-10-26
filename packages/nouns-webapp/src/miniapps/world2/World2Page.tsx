@@ -1,6 +1,6 @@
 // ── Noun World v2 — skate the plaza as your Noun ───────────────────────
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router';
 
@@ -49,6 +49,9 @@ import { WorldMap } from './ui/WorldMap';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
 import { worldPause } from './worldPause';
+
+/** The Grand Exchange, hidden under the Noggles Fountain (a lazy chunk). */
+const UnderFountain = lazy(() => import('../exchange3d/world/UnderFountain'));
 
 /** The radio stations in M-cycle order, for the HUD's station strip. */
 const RADIO_STATIONS: { mode: 'fm' | 'beats'; name: string }[] = [
@@ -403,6 +406,11 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && !replaying && <DragonHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && (
+        <Suspense fallback={null}>
+          <UnderFountain game={game} touch={touchPage} />
+        </Suspense>
+      )}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && (
