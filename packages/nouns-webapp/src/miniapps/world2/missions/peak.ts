@@ -8,8 +8,8 @@
 //   - gravity at 40% with no ceiling (huge, floaty airs) and a fraction of
 //     the air drag, so the 49° fall line builds speed fast and keeps going;
 //   - a camera-centred terrain mesh, rebuilt as you move (no chunks to keep
-//     up with at thousands of km/h), white sky, snowfall that thins out
-//     below the first few km, fog that clears further down;
+//     up with at thousands of km/h); the sky, sun, fog, snowfall and wind are
+//     the atmosphere system's (bigdrop/scenery/atmosphere.ts);
 //   - a floating origin: every few km the world is recentred under you, so
 //     nothing on the GPU ever sees numbers that big (a skinned rider 1,000 km
 //     out would shake by 6 cm otherwise). The peak sits ALT m above the
@@ -26,7 +26,7 @@ import type { PeakCtx, PeakSystem } from './bigdrop/contract';
 
 import * as THREE from 'three';
 
-import { inkExcluded, toonify } from '../render/Toon';
+import { toonify } from '../render/Toon';
 import { createCombo } from '../skate/Tricks';
 
 import { ALT } from './bigdrop/contract';
@@ -49,11 +49,6 @@ const GRID_N = { low: 101, medium: 141, high: 141 } as const;
 /** First ring spacing (m) and the far edge (m) the geometric spacing reaches. */
 const GRID_S0 = 1.5;
 const GRID_EDGE = 7000;
-const SNOW = 900;
-const SNOW_BOX = 70;
-
-const SKY_TOP = new THREE.Color(0xdfe6ee);
-const SKY_LOW = new THREE.Color(0xa9cdee);
 
 interface Saved {
   fog: THREE.Scene['fog'];
@@ -109,16 +104,11 @@ export class Peak {
   private saved: Saved | null = null;
   /** Peak coordinates of the local point (0, ALT, 0). */
   private origin = new THREE.Vector3();
-  private fog = new THREE.FogExp2(SKY_TOP.getHex(), 0.0035);
-  private bg = SKY_TOP.clone();
   private group = new THREE.Group();
   private terrain: THREE.Mesh | null = null;
   private offsets: Float64Array | null = null;
   private heights: Float64Array | null = null;
   private builtAt = new THREE.Vector3(Infinity, 0, 0);
-  private snow: THREE.Points | null = null;
-  private snowVel: Float32Array | null = null;
-  private wind: { gain: GainNode; nodes: AudioScheduledSourceNode[] } | null = null;
   private lastRespawns = 0;
   /** The track, scenery, riders… (bigdrop/systems.ts), while inside. */
   private systems: PeakSystem[] = [];
@@ -233,20 +223,15 @@ export class Peak {
     this.lastRespawns = p.respawns;
     g.cam.snap(p);
     gfx.renderer.domElement.style.filter = '';
-    // See all the way down to the fog (the terrain mesh reaches GRID_EDGE)
-    gfx.camera.far = GRID_EDGE + 1000;
+    // Never clip the terrain: its downhill corners are GRID_EDGE·√2 across
+    // and ~1.15× that further down (~15 km away). It fogs out long before;
+    // a clipped edge would show the sky through the fog
+    gfx.camera.far = GRID_EDGE * 2.3;
     gfx.camera.updateProjectionMatrix();
-    gfx.sun.color.set(0xfff6ea);
-    gfx.sun.intensity = this.saved.sunIntensity * 1.15;
-    gfx.hemi.color.set(0xcfe2ff);
-    gfx.hemi.groundColor.set(0xeef3ff);
-    gfx.hemi.intensity = this.saved.hemiIntensity * 1.3;
+    // Sky, sun + fill lights, fog, snowfall and wind: the atmosphere system
     this.buildTerrain();
-    this.makeSnow();
     gfx.scene.add(this.group);
     this.builtAt.set(Infinity, 0, 0);
-    this.applySky();
-    this.startWind();
     this.riderPeak.set(
       p.pos.x + this.origin.x,
       p.pos.y + this.origin.y - ALT,
@@ -307,7 +292,6 @@ export class Peak {
     g.cam.snap(p);
     g.stats.suspended = false;
     for (const r of g.remotes.values()) r.character.root.visible = true;
-    this.stopWind();
     this.active = false;
     this.saved = null;
     this.depth = 0;
@@ -324,9 +308,7 @@ export class Peak {
       this.rebase(true);
     } else this.rebase(false);
     this.depth = Math.max(0, ALT - p.pos.y - this.origin.y);
-    this.applySky();
     this.updateTerrain();
-    this.updateSnow(dt);
     this.riderPeak.set(
       p.pos.x + this.origin.x,
       p.pos.y + this.origin.y - ALT,
@@ -363,33 +345,9 @@ export class Peak {
     p.shift(d);
     g.cam.shift(d);
     if (g.me !== null) g.me.root.position.add(d);
-    if (this.snow !== null) {
-      const a = this.snow.geometry.getAttribute('position') as THREE.BufferAttribute;
-      const arr = a.array as Float32Array;
-      for (let i = 0; i < arr.length; i += 3) {
-        arr[i] += d.x;
-        arr[i + 1] += d.y;
-        arr[i + 2] += d.z;
-      }
-      a.needsUpdate = true;
-    }
     this.builtAt.set(Infinity, 0, 0);
     g.world.shiftDynamic('peak:', d);
     for (const sys of this.systems) sys.rebase?.(d);
-  }
-
-  private applySky() {
-    const gfx = this.game.gfx;
-    const scene = gfx.scene;
-    // A snowstorm round the summit, clearing to blue sky a few km down
-    const k = Math.min(1, this.depth / 25_000);
-    const e = 1 - Math.pow(1 - k, 2);
-    this.bg.copy(SKY_TOP).lerp(SKY_LOW, e);
-    this.fog.color.copy(this.bg);
-    this.fog.density = 0.0035 + (0.00034 - 0.0035) * e;
-    if (scene.fog !== this.fog) scene.fog = this.fog;
-    if (scene.background !== this.bg) scene.background = this.bg;
-    if (gfx.sky.visible) gfx.sky.visible = false;
   }
 
   // ── Terrain: one camera-centred grid, dense near and sparse far ───────
@@ -484,115 +442,6 @@ export class Peak {
     col.needsUpdate = true;
   }
 
-  // ── Snow: falling round the camera, only up top ───────────────────────
-
-  private makeSnow() {
-    const pos = new Float32Array(SNOW * 3);
-    const vel = new Float32Array(SNOW * 3);
-    const c = this.game.gfx.camera.position;
-    for (let i = 0; i < SNOW; i++) {
-      pos[i * 3] = c.x + (Math.random() - 0.5) * SNOW_BOX;
-      pos[i * 3 + 1] = c.y + (Math.random() - 0.5) * SNOW_BOX * 0.6;
-      pos[i * 3 + 2] = c.z + (Math.random() - 0.5) * SNOW_BOX;
-      vel[i * 3] = 0.6 + Math.random() * 0.8;
-      vel[i * 3 + 1] = -(0.8 + Math.random() * 1.2);
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 0.6;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const m = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.12,
-      transparent: true,
-      opacity: 0.9,
-      depthWrite: false,
-    });
-    this.snow = new THREE.Points(geo, m);
-    this.snow.frustumCulled = false;
-    this.snowVel = vel;
-    inkExcluded.add(this.snow);
-    this.group.add(this.snow);
-  }
-
-  private updateSnow(dt: number) {
-    const sn = this.snow;
-    const vel = this.snowVel;
-    if (sn === null || vel === null) return;
-    // Snowing round the summit, easing off by 12 km down
-    const amount = 1 - Math.min(1, Math.max(0, (this.depth - 2000) / 10_000));
-    sn.visible = amount > 0.01;
-    (sn.material as THREE.PointsMaterial).opacity = 0.9 * amount;
-    if (!sn.visible) return;
-    const attr = sn.geometry.getAttribute('position') as THREE.BufferAttribute;
-    const a = attr.array as Float32Array;
-    const c = this.game.gfx.camera.position;
-    const half = SNOW_BOX / 2;
-    const t = performance.now() / 1000;
-    for (let i = 0; i < SNOW; i++) {
-      const o = i * 3;
-      a[o] += (vel[o]! + Math.sin(t * 0.9 + i) * 0.4) * dt;
-      a[o + 1] += vel[o + 1]! * dt;
-      a[o + 2] += (vel[o + 2]! + Math.cos(t * 0.7 + i * 1.3) * 0.4) * dt;
-      // Wrap round the camera: riding fast streams the flakes past you
-      for (const k of [0, 2] as const) {
-        const d = a[o + k]! - (k === 0 ? c.x : c.z);
-        if (d > half || d < -half) a[o + k] -= Math.round(d / SNOW_BOX) * SNOW_BOX;
-      }
-      const dy = a[o + 1]! - c.y;
-      const hy = half * 0.6;
-      if (dy > hy || dy < -hy) a[o + 1] -= Math.round(dy / (SNOW_BOX * 0.6)) * SNOW_BOX * 0.6;
-    }
-    attr.needsUpdate = true;
-  }
-
-  // ── Wind: a cold hiss that thins as the snow does ─────────────────────
-
-  private startWind() {
-    const au = this.game.audio;
-    const ctx = au.ctx;
-    const out = au.master;
-    if (ctx === null || out === null || this.wind !== null) return;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    gain.gain.setTargetAtTime(0.09, ctx.currentTime, 1.5);
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = 520;
-    bp.Q.value = 0.7;
-    bp.connect(gain);
-    gain.connect(out);
-    // Noise from a looping buffer, with a slow gust on the filter
-    const len = ctx.sampleRate * 2;
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    src.connect(bp);
-    src.start();
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.11;
-    const depth = ctx.createGain();
-    depth.gain.value = 260;
-    lfo.connect(depth);
-    depth.connect(bp.frequency);
-    lfo.start();
-    this.wind = { gain, nodes: [src, lfo] };
-  }
-
-  private stopWind() {
-    const w = this.wind;
-    const ctx = this.game.audio.ctx;
-    if (w === null) return;
-    this.wind = null;
-    if (ctx === null) return;
-    w.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
-    const stopAt = ctx.currentTime + 1.5;
-    for (const n of w.nodes) n.stop(stopAt);
-    setTimeout(() => w.gain.disconnect(), 1800);
-  }
-
   private disposeGroup() {
     if (this.terrain !== null) {
       this.group.remove(this.terrain);
@@ -603,19 +452,11 @@ export class Peak {
       mat.dispose();
       this.terrain = null;
     }
-    if (this.snow !== null) {
-      this.group.remove(this.snow);
-      inkExcluded.delete(this.snow);
-      this.snow.geometry.dispose();
-      (this.snow.material as THREE.Material).dispose();
-      this.snow = null;
-    }
     this.offsets = null;
     this.heights = null;
   }
 
   dispose() {
     if (this.active) this.exit();
-    this.stopWind();
   }
 }
