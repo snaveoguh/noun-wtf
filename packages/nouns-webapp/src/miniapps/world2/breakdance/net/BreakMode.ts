@@ -419,8 +419,7 @@ export class BreakMode {
 
   /** Host: announce the battle and go. */
   private begin(config: BattleConfig) {
-    const remote = config.dancers.some(d => d.human && d.id !== this.myId);
-    const lag = remote ? JUDGE_DELAY : 0;
+    const lag = JUDGE_DELAY;
     this.transport.send({ type: 'break:start', host: this.myId, config, at: -COUNTDOWN, lag });
     this.enter(config, 'host', this.myId, -COUNTDOWN, lag);
   }

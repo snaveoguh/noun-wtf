@@ -31,9 +31,13 @@ export function keyFor(code: string): BreakKey | null {
   return MAP[code] ?? null;
 }
 
-/** A DOM event time → performance.now() time (they share an origin; guard odd ones). */
+/**
+ * A DOM event time → performance.now() time (they share an origin). A key
+ * event can sit queued behind a long frame (a GC, a chunk loading) for
+ * seconds and its timeStamp is still the truth; only nonsense falls back.
+ */
 export function eventMs(ts: number | undefined, now = performance.now()): number {
-  return typeof ts === 'number' && ts > 0 && Math.abs(ts - now) < 1000 ? ts : now;
+  return typeof ts === 'number' && ts > 0 && ts <= now + 50 && now - ts < 5000 ? ts : now;
 }
 
 export class BreakInputReader {

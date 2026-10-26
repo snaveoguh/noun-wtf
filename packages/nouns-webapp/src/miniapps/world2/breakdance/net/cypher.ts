@@ -178,15 +178,17 @@ export function buildCypherMarker(c: CypherSpot) {
   );
   post.position.set(back.x, 1.2, back.z);
   g.add(post);
-  const board = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.6, 1),
-    new THREE.MeshBasicMaterial({
-      map: labelTexture(['NOUN BREAKS', 'BREAK BATTLE · E'], 512, 200, '#ffd400', '#000'),
-      side: THREE.DoubleSide,
-    }),
-  );
-  board.position.set(back.x, 2.55, back.z);
-  g.add(board);
+  // Two boards back to back, so it reads the right way round from either side
+  const signMat = new THREE.MeshBasicMaterial({
+    map: labelTexture(['NOUN BREAKS', 'BREAK BATTLE · E'], 512, 200, '#ffd400', '#000'),
+  });
+  const signGeo = new THREE.PlaneGeometry(2.6, 1);
+  for (const face of [0, Math.PI]) {
+    const board = new THREE.Mesh(signGeo, signMat);
+    board.position.set(back.x, 2.55, back.z);
+    board.rotation.y = face;
+    g.add(board);
+  }
   let t = 0;
   return {
     group: g,

@@ -461,7 +461,7 @@ const PAD: [BreakKey, string][] = [
 function TouchPad({ b }: { b: BreakMode }) {
   const [hot, setHot] = useState<BreakKey | null>(null);
   return (
-    <div className="bk-pad pointer-events-none absolute inset-x-0 bottom-0">
+    <div className="bk-pad pointer-events-none absolute inset-x-0">
       {PAD.map(([k, cls]) => (
         <button
           key={k}
@@ -551,7 +551,8 @@ const CSS = `
 .bk-bar{width:100%;height:4px;background:rgba(0,0,0,.15)}.bk-bar i{display:block;height:100%;background:#d22209;transition:width .25s linear}
 .bk-count b{font-size:min(30vw,180px);font-weight:900;font-style:italic;color:#ffd400;text-shadow:0 8px 0 #d22209;animation:bkpop .9s ease-out both}
 @keyframes bkpop{0%{transform:scale(1.6);opacity:0}30%{transform:scale(1);opacity:1}100%{opacity:.2}}
-.bk-pad{height:200px;padding-bottom:env(safe-area-inset-bottom)}
+/* Clear of the site's NOUN FM / hoops chips in the bottom corner */
+.bk-pad{bottom:calc(84px + env(safe-area-inset-bottom));height:210px}
 .bk-padkey{position:absolute;width:64px;height:64px;border-radius:16px;background:rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.35);color:#fff;font-size:26px;font-weight:900;touch-action:none;user-select:none;-webkit-user-select:none}
 .bk-hot{background:#ffd400;color:#000}
 .bk-l{left:16px;bottom:72px}.bk-u{left:84px;bottom:136px}.bk-d{left:84px;bottom:16px}.bk-r{left:152px;bottom:72px}

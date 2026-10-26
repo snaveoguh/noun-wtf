@@ -222,4 +222,5 @@ const STUB_CSS = `
 .bk-line{position:absolute;left:12%;top:4px;bottom:4px;width:3px;background:#ffd400}
 .bk-key{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:24px;font-weight:900;opacity:.55}
 .bk-key.bk-mine{opacity:1;color:#ffd400}
+@media (max-width:600px){.bk-stubhud [data-k=top]{top:58px}.bk-stubhud [data-k=turn]{top:96px;font-size:15px}.bk-stubhud [data-k=track]{bottom:310px}}
 `;

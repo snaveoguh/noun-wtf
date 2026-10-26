@@ -15,8 +15,9 @@
 //   rtt wins (the least queueing, so the most symmetric), and the local
 //   clock slews to it (≤ 10%) instead of jumping, so the music never skips.
 //
-//   The host's sim runs LAG behind A (S = A − LAG; LAG = 0.15 s with remote
-//   humans, 0 vs the CPU). Every input, the host's own included, waits in a
+//   The host's sim runs LAG behind A (S = A − LAG; LAG = 0.15 s, vs the CPU
+//   too: on a slow device a key event can wait behind a 100 ms+ frame, and
+//   the sim mustn't call the beat a miss before it's seen it). Every input, the host's own included, waits in a
 //   time-ordered queue and is fed to the sim when S passes its stamp, so the
 //   sim judges everyone's presses in order and on time even though remote
 //   ones arrive one-way latency late. The host accepts a remote stamp t only
@@ -67,7 +68,8 @@ export const INTERP_BACK = 0.1;
 /** At most this far forward when bringing a snapshot to the live clock. */
 export const MAX_AHEAD = 0.35;
 const SIM_STEP = 1 / 60;
-const MAX_SUBSTEPS = 30;
+// A slow frame (a phone, a hidden tab) catches up to 4 s at once
+const MAX_SUBSTEPS = 240;
 const PING_FAST = 6;
 const PING_FAST_DT = 0.25;
 const PING_DT = 2;
@@ -317,8 +319,7 @@ export class BreakSession {
     this.send = o.send;
     this.nowMs = o.now ?? (() => performance.now());
     this.humans = new Set(o.config.dancers.filter(d => d.human).map(d => d.id));
-    const remote = o.config.dancers.some(d => d.human && d.id !== o.me);
-    this.lag = o.lag ?? (o.role === 'host' && remote ? JUDGE_DELAY : 0);
+    this.lag = o.lag ?? (o.role === 'host' ? JUDGE_DELAY : 0);
     const now = this.nowMs();
     if (o.role === 'host') {
       this.zeroMs = now - o.at * 1000;
