@@ -49,6 +49,8 @@ export class GameRadio {
   private out: GainNode | null = null;
   private node: AudioWorkletNode | null = null;
   private songName = 'tuning in';
+  /** The generated beats' song: its bpm and when (performance.now ms) its first beat played. */
+  beatsSong: { bpm: number; at: number } | null = null;
   mode: RadioMode = 'off';
   volume = 0.6;
   /** Mixer gain for the stream <audio> element (it bypasses the WebAudio graph). */
@@ -107,9 +109,12 @@ export class GameRadio {
           outputChannelCount: [2],
         });
         node.port.onmessage = (e: MessageEvent) => {
-          const m = e.data as { type: string; name?: string };
+          const m = e.data as { type: string; name?: string; bpm?: number };
           if (m.type === 'song' && m.name !== undefined) {
             this.songName = m.name;
+            // the worklet starts the song 50 ms after it says so (radioWorklet startSong)
+            if (typeof m.bpm === 'number')
+              this.beatsSong = { bpm: m.bpm, at: performance.now() + 50 };
             if (this.mode === 'beats' && this.beatsOffline) this.onNowPlaying?.(this.label);
           }
         };
