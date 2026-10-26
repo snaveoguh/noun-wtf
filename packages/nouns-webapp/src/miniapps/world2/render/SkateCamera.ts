@@ -64,6 +64,12 @@ export class SkateCamera {
    */
   rig: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null = null;
 
+  /**
+   * Pulls the board camera back and up (distance and height × zoom). The Big
+   * Drop rides at 2.4: at its speeds the rider has to be small in the frame.
+   */
+  zoom = 1;
+
   /** 0 turns camera shake off (reduce motion). */
   shakeScale = 1;
 
@@ -152,7 +158,7 @@ export class SkateCamera {
           ? { d: 5.6, h: 2.0, la: 1.0 }
           : { d: 3.3, h: 1.05, la: 0.95 };
     const speedPull = onBoard ? Math.min(1.2, p.speed * 0.045) : 0;
-    const dist = (onBoard ? preset.d : THREE.MathUtils.lerp(3.6, 6.8, ck)) + speedPull;
+    const dist = (onBoard ? preset.d * this.zoom : THREE.MathUtils.lerp(3.6, 6.8, ck)) + speedPull;
     // Climbing pulls the camera below the climber, looking up the facade
     const pitch = onBoard ? 0.1 + this.orbitPitch : THREE.MathUtils.lerp(this.pitch, -0.3, ck);
 
@@ -165,7 +171,10 @@ export class SkateCamera {
     const desired = _desired
       .copy(target)
       .addScaledVector(back, dist * Math.cos(pitch))
-      .addScaledVector(UP, (onBoard ? preset.h - preset.la + 0.35 : 0.2) + dist * Math.sin(pitch));
+      .addScaledVector(
+        UP,
+        (onBoard ? (preset.h - preset.la + 0.35) * this.zoom : 0.2) + dist * Math.sin(pitch),
+      );
 
     // Collision: pull in toward the target
     const blocked = this.world.obstruction(target, desired);
