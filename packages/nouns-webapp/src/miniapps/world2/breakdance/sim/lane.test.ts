@@ -143,4 +143,21 @@ describe('rhythm lane', () => {
     expect(moves.length).toBeGreaterThanOrEqual(2);
     expect(eventsOf(mine, 'freeze').pop()?.onBeat).toBe(true);
   });
+
+  it('a bail mid-turn: what was left of the old plan goes dead, and pressing it is harmless', () => {
+    const ref = playTurn(n => n.key, { until: 0.05 });
+    const lane0 = ref.snaps[ref.snaps.length - 1].lane ?? [];
+    const power = lane0.find(n => MOVES[n.move].family === 'power' && n.i === 0)!;
+    expect(power).toBeDefined();
+    const last = power.beat + keyBeat(MOVES[power.move], MOVES[power.move].pattern.length - 1);
+    // Follow everything (dead notes too), but drop the power move's last key: a bail
+    const run = playTurn(n => (n.beat === last ? 'skip' : n.key));
+    const mine = run.events.filter(e => 'id' in e && e.id === 'h0');
+    expect(eventsOf(mine, 'crash')).toHaveLength(1);
+    const after = run.snaps.find(s => s.beat > last + 0.6 && s.beat < last + 0.8)!;
+    const left = (after.lane ?? []).filter(n => n.beat > after.beat && n.beat < last + REPLAN_LEAD);
+    expect(left.every(n => n.dead === true)).toBe(true);
+    // The redrawn plan still ends the turn on a freeze, landed on the beat
+    expect(eventsOf(mine, 'freeze').pop()?.onBeat).toBe(true);
+  });
 });

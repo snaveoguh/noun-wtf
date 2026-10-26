@@ -573,15 +573,20 @@ export class BreakBattle implements BattleSim {
 
   // ── The rhythm lane ───────────────────────────────────────────────────
 
-  /** A human's key on a note of a planned move that has already broken (it's dead on the lane). */
+  /**
+   * A human's key on a note that's dead on the lane: the rest of a planned
+   * move that already broke, or what was left of a plan a crash redrew.
+   */
   private deadNote(rt: TurnRt, i: BreakInput): boolean {
     if (!rt.human || rt.att) return false;
     const ok = this.windows.ok;
     for (const pm of rt.plan) {
-      if (pm.cut !== undefined || timeOf(this.clock, pm.start) + ok >= i.t) continue;
+      const cut = pm.cut !== undefined;
+      if (!cut && timeOf(this.clock, pm.start) + ok >= i.t) continue;
       const m = MOVES[pm.move];
-      for (let k = 1; k < m.pattern.length; k++) {
+      for (let k = cut ? 0 : 1; k < m.pattern.length; k++) {
         const b = pm.start + keyBeat(m, k);
+        if (b >= (pm.cut ?? Infinity) - 1e-9) break;
         if (m.pattern[k] !== i.key || Math.abs(timeOf(this.clock, b) - i.t) > ok) continue;
         if (!rt.marks.has(b)) return true;
       }
@@ -862,7 +867,7 @@ export class BreakBattle implements BattleSim {
           n.grade = mk.g;
           if (mk.off !== undefined) n.off = mk.off;
         } else if (timeOf(this.clock, b) + this.windows.ok < now) n.grade = 'miss';
-        else if (begun && !alive) n.dead = true;
+        else if (pm.cut !== undefined || (begun && !alive)) n.dead = true;
         else if (b >= beat - okB && prompts.length < PROMPT_COUNT) prompts.push({ key, beat: b });
         if (b >= lo && b <= hi && lane.length < LANE_MAX) lane.push(n);
       }

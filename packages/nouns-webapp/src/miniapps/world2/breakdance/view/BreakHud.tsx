@@ -239,11 +239,13 @@ function Track({ hud, s, coarse }: { hud: BreakHudStore; s: BreakHudState; coars
     const fire = (grade: HitGrade, timing: string | undefined, key: BreakKey, x: number) => {
       const b = bursts.current[nextBurst];
       nextBurst = (nextBurst + 1) % BURSTS;
+      // Only the newest burst keeps its words (they overlap on quick notes)
+      for (const o of bursts.current) o?.classList.add('w2-brk-burst-old');
       if (b === null || b === undefined) return;
       b.style.setProperty('--gc', GRADE_COLOR[grade]);
       b.style.setProperty('--bx', `${x.toFixed(1)}px`);
       b.innerHTML = `<i>${KEY_GLYPH[key]}</i><b>${GRADE_LABEL[grade]}</b>${timing !== undefined ? `<span>${timing}</span>` : ''}`;
-      b.classList.remove('w2-brk-burst-go');
+      b.classList.remove('w2-brk-burst-go', 'w2-brk-burst-old');
       void b.offsetWidth; // restart the animation
       b.classList.add('w2-brk-burst-go');
     };
@@ -252,7 +254,8 @@ function Track({ hud, s, coarse }: { hud: BreakHudStore; s: BreakHudState; coars
       const el = lane.current;
       if (el === null) return;
       const w = el.clientWidth;
-      const hitX = w < 420 ? 40 : 46;
+      // The hit line sits a fifth of the way in, so a miss is seen scrolling past it
+      const hitX = Math.max(52, Math.round(w * 0.2));
       const span = w - hitX - 18;
       const l = hud.live;
       const now = performance.now();
@@ -566,7 +569,11 @@ function Pad({
     'aria-label': k,
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      try {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        /* a synthetic pointer: nothing to capture, the press still counts */
+      }
       onGesture?.();
       onKey(k);
       setDown(d => ({ ...d, [k]: true }));
@@ -637,7 +644,7 @@ const CSS = `
 .w2-brk-press{font-size:30px;line-height:1;color:#fff;opacity:0;text-shadow:0 0 10px var(--cc),0 2px 0 #000}
 .w2-brk-n-dead{background:#555 !important;color:#999 !important;border-color:#333 !important;box-shadow:none !important}
 .w2-brk-n-miss{background:#2a1010 !important;color:#ff4a3d !important;border-color:#ff4a3d !important}
-.w2-brk-nmiss{position:absolute;top:100%;left:50%;transform:translateX(-50%);font-style:normal;font-size:10px;letter-spacing:.1em;color:#ff4a3d;background:#000;padding:0 3px;line-height:1.2}
+.w2-brk-nmiss{position:absolute;top:-7px;right:-14px;font-style:normal;font-size:11px;letter-spacing:.08em;color:#fff;background:#ff4a3d;border:2px solid #000;padding:0 4px;line-height:1.15;transform:rotate(8deg)}
 .w2-brk-nlabel{position:absolute;bottom:100%;left:0;font-style:normal;font-size:9px;letter-spacing:.08em;color:#fff;white-space:nowrap;text-shadow:0 1px 0 #000;margin-bottom:1px}
 .w2-brk-burst{position:absolute;left:0;top:50%;width:0;height:0;pointer-events:none;opacity:0;z-index:3;transform:translateX(var(--bx,46px))}
 .w2-brk-burst i{position:absolute;left:-27px;top:-27px;width:54px;height:54px;border-radius:50%;border:5px solid var(--gc);font-style:normal;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--gc);box-shadow:0 0 18px var(--gc)}
@@ -645,6 +652,7 @@ const CSS = `
 .w2-brk-burst span{position:absolute;left:32px;top:2px;font-size:12px;letter-spacing:.12em;background:#000;color:#fff;padding:0 5px;white-space:nowrap}
 .w2-brk-burst-go{animation:w2bburst .62s ease-out forwards}
 .w2-brk-burst-go i{animation:w2bring .62s ease-out forwards}
+.w2-brk-burst-old b,.w2-brk-burst-old span{display:none}
 @keyframes w2bburst{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
 @keyframes w2bring{0%{transform:scale(.7);background:var(--gc);color:#000}40%{transform:scale(1.45);background:transparent}100%{transform:scale(1.9);opacity:0}}
 .w2-brk-forming{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);font-size:clamp(16px,2.4vw,22px);font-style:italic;color:#fff;background:rgba(0,0,0,.7);padding:0 12px;letter-spacing:.06em;white-space:nowrap;min-height:0}
@@ -654,10 +662,11 @@ const CSS = `
 .w2-brk-legend b{font-weight:400;color:#ffd400}
 .w2-brk-legend b.w2-brk-lk-a{color:#ff6a5d}
 .w2-brk-legend b.w2-brk-lk-b{color:#5aa2ff}
-.w2-brk-mini{transform:scale(.6);transform-origin:bottom left;opacity:.8}
+/* Desktop: small, above the site's bottom bar and NOUN FM chip */
+.w2-brk-mini{transform:scale(.6);transform-origin:bottom left;opacity:.85;bottom:120px !important}
 .w2-brk-mini-r{transform-origin:bottom right}
 .w2-brk-mini .w2-brk-pbtn{cursor:pointer}
-.w2-brk-padtoggle{position:absolute;right:14px;bottom:110px;font-size:11px;letter-spacing:.06em;color:#fff;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
+.w2-brk-padtoggle{position:absolute;right:14px;bottom:218px;font-size:11px;letter-spacing:.06em;color:#fff;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .w2-brk-tick{position:absolute;top:10px;bottom:10px;left:0;width:2px;background:rgba(255,255,255,.18)}
 .w2-brk-tick-down{background:rgba(255,212,0,.5);width:3px}
 .w2-brk-note{position:absolute;left:0;top:50%;width:46px;height:46px;margin-left:-23px;border-radius:50%;align-items:center;justify-content:center;font-size:28px;line-height:1;color:#000;background:#fff;border:3px solid #000;box-shadow:0 3px 0 rgba(0,0,0,.6)}
