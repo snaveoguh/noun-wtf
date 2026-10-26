@@ -4,6 +4,7 @@ import {
   checkInvariants,
   genesis,
   isGood,
+  maskFill,
   playerAct,
   riderAccount,
   snapshot,
@@ -204,7 +205,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     return json(200, {
       ok: r.ok,
       ...(r.reason ? { reason: r.reason } : {}),
-      fills: r.fills,
+      fills: r.fills.map(f => maskFill(f, rider)),
       snapshot: snapshot(s, { good, tf, owner: rider }),
     });
   }

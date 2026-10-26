@@ -313,6 +313,26 @@ export function playerAct(
 
 // ── Views ──
 
+/**
+ * A rider id is their only credential (the POST trusts `{ rider }`), so views
+ * never show another rider's raw id. Bots, 'gx' and the viewer's own id pass
+ * through; anyone else becomes a stable one-way tag ('rider:' + 8 hex, FNV-1a)
+ * so avatars and list keys still tell riders apart.
+ */
+export function maskOwner(owner: string, viewer: string | null): string {
+  if (owner === viewer || owner === 'gx' || isBot(owner)) return owner;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < owner.length; i++) h = Math.imul(h ^ owner.charCodeAt(i), 0x01000193);
+  return `rider:${(h >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+/** A fill as `viewer` may see it: counterparties masked with maskOwner. */
+export const maskFill = (f: GeFill, viewer: string | null): GeFill => ({
+  ...f,
+  buyer: maskOwner(f.buyer, viewer),
+  seller: maskOwner(f.seller, viewer),
+});
+
 function levels(list: ExchangeState['books'][GoodId]['bids'], owner: string | null, n: number) {
   const out: Level[] = [];
   for (const o of list) {
@@ -406,8 +426,12 @@ export function snapshot(
     tape: s.fills
       .filter(f => f.good === q.good)
       .slice(-30)
-      .reverse(),
-    floor: s.floor.slice(-40).reverse(),
+      .reverse()
+      .map(f => maskFill(f, owner)),
+    floor: s.floor
+      .slice(-40)
+      .reverse()
+      .map(e => ({ ...e, who: maskOwner(e.who, owner) })),
     bots: botsPublic(s),
     treasury: s.treasury,
     you:
@@ -422,7 +446,8 @@ export function snapshot(
             fills: s.fills
               .filter(f => f.buyer === owner || f.seller === owner)
               .slice(-20)
-              .reverse(),
+              .reverse()
+              .map(f => maskFill(f, owner)),
             equity: equity(s, a),
           }
         : null,
