@@ -5,4 +5,7 @@
 
 import type { PeakSystemFactory } from './contract';
 
-export const PEAK_SYSTEMS: PeakSystemFactory[] = [];
+import { createRiders } from './riders';
+import { createSpray } from './spray';
+
+export const PEAK_SYSTEMS: PeakSystemFactory[] = [createRiders, createSpray];
