@@ -23,6 +23,7 @@ import { TtsEngine } from './audio/voice/TtsEngine';
 import { HOUSE_VOICE, hyped, RIDER_VOICE, ttsVoiceOf } from './audio/voice/ttsVoice';
 import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
+import { BreakMode } from './breakdance/net/BreakMode';
 import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
@@ -72,6 +73,10 @@ import { SkateCamera } from './render/SkateCamera';
 import { inkExcluded, toonify } from './render/Toon';
 import { RecordsHub } from './replay/Records';
 import { ReplayView } from './replay/ReplayView';
+import { LEGEND_BADGE } from './respect/effects';
+import { RespectHooks } from './respect/hooks';
+import { RespectSystem } from './respect/RespectSystem';
+import { httpSync } from './respect/sync';
 import { AudioMixer } from './settings/mixer';
 import { settings } from './settings/store';
 import { Player } from './skate/Player';
@@ -305,12 +310,17 @@ export class Game {
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
+  /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
+  readonly breaks: BreakMode = new BreakMode(this);
   /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
   readonly trade: TradeClient;
   /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
   readonly van2: VanDrive;
   /** The Noun dragon (dragon/): bought at the Dragon Roost, called with Z, flown. */
   readonly dragon: DragonRide;
+  /** RESPECT (respect/): the score, tiers, persistence; the hooks report the street's events. */
+  readonly respect: RespectSystem;
+  readonly respectHooks: RespectHooks;
   hud: HudState;
   private raf = 0;
   private last = 0;
@@ -424,6 +434,8 @@ export class Game {
       else if (a.t === 'buy') this.sfx.play('chips', { gain: 0.8 });
       else if (a.t === 'upgrade') this.sfx.play('mission-accept', { gain: 0.6 });
     };
+    this.respect = new RespectSystem({ sync: tradeOffline ? null : httpSync(riderId()) });
+    this.respectHooks = new RespectHooks(this);
     this.wireFm();
   }
 
@@ -481,6 +493,7 @@ export class Game {
           },
     );
     this.gfx.scene.add(this.graffiti.group);
+    this.graffiti.onStroke = (plane, at) => this.respectHooks.stroke(plane, at);
     if (this.drops !== null) this.gfx.scene.add(this.drops.group);
     // Paint is decals on walls: the normals pass would draw each canvas as a
     // solid panel and ink its edges as floating black frames
@@ -503,6 +516,7 @@ export class Game {
         labelLayer: this.labelLayer,
         camera: this.gfx.camera,
         canvas: this.opts.canvas,
+        onWave: (name, seed, at) => this.respectHooks.wave(name, seed, at),
       });
     if (this.mountain !== null)
       this.towns = new TownSystem({
@@ -781,6 +795,10 @@ export class Game {
     this.step(dt, now);
   };
 
+  /** Dev: Noun Breaks' battle view on its mock battle, in front of the skater (breakdance/view/dev.ts). */
+  breakDev = (o?: import('./breakdance/view/dev').BreakDevOptions) =>
+    import('./breakdance/view/dev').then(m => m.breakDemo(this, o));
+
   /** One simulation + render step (exposed for tests/automation). */
   /** Character-select mode: physics paused, camera orbits the rider. */
   showroom = false;
@@ -827,6 +845,20 @@ export class Game {
       this.mountain?.update(this.hoops.focus, this.hoops.focusVel);
       this.nature?.update(dt, this.hoops.focus);
       this.gfx.followShadow(this.hoops.focus);
+      this.gfx.render(dt);
+      return;
+    }
+    // ── Noun Breaks: a battle at the plaza cypher; skater parked on the circle's edge ──
+    if (this.breaks.active) {
+      this.input.poll(now);
+      this.breaks.step(dt);
+      this.updateFm(dt);
+      this.animTime += dt;
+      this.updateNetwork(dt);
+      this.missions.update(dt);
+      this.mountain?.update(this.breaks.focus, this.breaks.focusVel);
+      this.nature?.update(dt, this.breaks.focus);
+      this.gfx.followShadow(this.breaks.focus);
       this.gfx.render(dt);
       return;
     }
@@ -924,6 +956,7 @@ export class Game {
     this.gfx.render(dt);
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);
+    if (!away) this.breaks.idle(dt);
   }
 
   /**
@@ -1392,6 +1425,7 @@ export class Game {
 
   private handlePlayerEvents() {
     const p = this.player;
+    this.respectHooks.frame();
     for (const e of p.events) {
       switch (e.type) {
         case 'pop':
@@ -1417,6 +1451,7 @@ export class Game {
         case 'bail':
           this.audio.bail(e.impact);
           this.rider.bail();
+          this.respectHooks.bail();
           this.cam.addShake(0.7);
           this.particles.dustAt(p.pos, 1);
           break;
@@ -1766,7 +1801,7 @@ export class Game {
               ? `<div class="w2-said">${escapeHtml(rp.transcript)}</div>`
               : '';
           const trick = c.trick ? `<div class="w2-trick">${escapeHtml(c.trick)}</div>` : '';
-          r.label.innerHTML = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${talk}</span>`;
+          r.label.innerHTML = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${rp.respectBadge === 'L' ? LEGEND_BADGE : ''}${talk}</span>`;
         }
         if (r.pointer) {
           const close = visible && dist < 60;
@@ -2095,6 +2130,7 @@ export class Game {
     this.sfx.dispose();
     this.missions.dispose();
     this.hoops.dispose();
+    this.breaks.dispose();
     this.van2.dispose();
     this.dragon.dispose();
     this.stats.dispose();
@@ -2116,6 +2152,7 @@ export class Game {
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
     this.crew?.dispose();
     this.towns?.dispose();
+    this.respect.dispose();
     this.gfx.dispose();
     this.world.dispose();
   }

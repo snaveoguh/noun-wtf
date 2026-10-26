@@ -20,6 +20,7 @@
 // the game object if present, so this works before they're merged.
 
 import type { CharacterAssets } from '../character/NounCharacter';
+import type { RespectApi } from '../interiors/contract';
 import type { Quality } from '../render/Graphics';
 import type {
   GoodId,
@@ -34,6 +35,7 @@ import * as THREE from 'three';
 
 import { NounCharacter } from '../character/NounCharacter';
 import { inkExcluded, toonify } from '../render/Toon';
+import { tipBonus } from '../respect/effects';
 import { NJ, njFrame, njInCore, njToWorld } from '../world/mountain/nounJersey';
 
 import { townAnimators } from './build';
@@ -447,7 +449,12 @@ export class TownSystem implements TownsApi {
     this.host.sound?.('chips', 0.4);
     const lines = THANKS[lt.id];
     this.speak(c, lines[Math.floor(Math.random() * lines.length)]!);
-    this.popText(c.pos, `+${ev.tip.total} ${ev.tip.grade}`, ev.tip.grade !== 'SERVED');
+    // Respect (respect/): serving counts, and better-known riders get tipped a bit more
+    const respect = (this.host.game as { respect?: RespectApi }).respect;
+    respect?.add({ kind: 'served', town: lt.id, tip: ev.tip.tip });
+    const total =
+      trade === null ? ev.tip.price + tipBonus(ev.tip.tip, respect?.state().tier) : ev.tip.total;
+    this.popText(c.pos, `+${total} ${ev.tip.grade}`, ev.tip.grade !== 'SERVED');
     if (trade !== null) {
       trade
         .act({ t: 'serve', town: lt.id, good: o.good, customer: c.def.id })
@@ -456,7 +463,7 @@ export class TownSystem implements TownsApi {
         })
         .catch(() => this.note('OFFLINE: SALE NOT SAVED'));
     } else {
-      this.localCoin += ev.tip.total;
+      this.localCoin += total;
       try {
         localStorage.setItem(LOCAL_KEY, String(this.localCoin));
       } catch {
@@ -723,6 +730,7 @@ export class TownSystem implements TownsApi {
   customersOf(id: GrownTown): { id: string; pos: THREE.Vector3; vp: number; u: number }[] {
     return (this.live.get(id)?.customers ?? []).map(c => ({
       id: c.def.id,
+      name: c.def.name,
       pos: c.pos,
       vp: c.def.vp,
       u: c.def.u,

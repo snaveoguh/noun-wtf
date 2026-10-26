@@ -15,9 +15,12 @@
 //       only, never audio; listeners play that rider's clip or their TTS
 //   cv  [tag, id, seq] their last chat line spoken in their own voice (an
 //       ephemeral clip on the world-voice function)
+// Respect (respect/): `rs: 'L'` only while the rider is a legend (the
+// noggles badge on their name tag; cosmetic, not checked by the server).
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
+import type { BreakMsg } from '../breakdance/contract';
 import type { HoopsMsg } from '../hoops/contract';
 
 import PartySocket from 'partysocket';
@@ -108,6 +111,8 @@ export interface RemotePlayer {
   lastSeen: number;
   /** Custom deck shared as `address:slot:savedAt` (board shop), '' = stock. */
   deck?: string;
+  /** Respect badge ('L' = legend), '' = none. */
+  respectBadge?: string;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -154,6 +159,8 @@ export class Net {
   onOpen?: () => void;
   /** Noun Hoops (hoops/net): every `hoops:*` message goes here. */
   onHoops?: (m: HoopsMsg) => void;
+  /** Noun Breaks (breakdance/net): every `break:*` message, raw (its codec checks it). */
+  onBreak?: (m: Record<string, unknown>) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
   onFm?: (m: Record<string, unknown>) => void;
   /** Voice Booth: a remote rider's callout fired. */
@@ -166,6 +173,8 @@ export class Net {
   callout: [number, number, number, number] | null = null;
   /** My last voiced chat line, relayed in the blob. */
   chatVoice: [string, string, number] | null = null;
+  /** My respect badge ('L' while a legend), relayed in the blob. */
+  respectBadge = '';
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
@@ -199,6 +208,10 @@ export class Net {
     if (typeof type !== 'string') return;
     if (type.startsWith('hoops:')) {
       this.onHoops?.(d as unknown as HoopsMsg);
+      return;
+    }
+    if (type.startsWith('break:')) {
+      this.onBreak?.(d);
       return;
     }
     if (type.startsWith('fm:')) {
@@ -324,6 +337,7 @@ export class Net {
     if (rp.samples.length > 8) rp.samples.shift();
     rp.deck = typeof blob.dk === 'string' && SHARE_RE.test(blob.dk) ? blob.dk : '';
     rp.voiceTag = typeof blob.vo === 'string' && TAG_RE.test(blob.vo) ? blob.vo : '';
+    rp.respectBadge = blob.rs === 'L' ? 'L' : '';
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -406,6 +420,7 @@ export class Net {
       ...(this.voiceTag !== '' ? { vo: this.voiceTag } : {}),
       ...(this.callout !== null ? { co: this.callout } : {}),
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
+      ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',
@@ -462,6 +477,10 @@ export class Net {
   }
 
   sendHoops(m: HoopsMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendBreak(m: BreakMsg) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 

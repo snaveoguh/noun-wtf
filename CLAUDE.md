@@ -201,6 +201,22 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
   - **Train my voice.** 100 original sentences, local only. The booth exports an LJSpeech zip (22050 Hz mono 16-bit WAVs + `metadata.csv` + a free Piper/Colab README) via a store-only zip writer (`booth/zip.ts`).
   - **My voice model.** Load `.onnx` + `.onnx.json` (validated in `booth/piperConfig.ts`, kept in IndexedDB, never uploaded). A second `TtsEngine` runs it (`init-bytes`). Two switches, both off by default: `modelVoice` (callouts without a recording, and typed chat, in the player's voice) and `modelShare`. With `modelShare` on, chat lines become ephemeral clips: 8 s max, 1 per 5 s, 60/h, served for 10 min.
 
+### Noun Breaks (breakdance battles, plaza)
+
+A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews (CPU fill), WATCH. Contract `world2/breakdance/contract.ts`; three parts like hoops/:
+- `sim/` pure + deterministic: 24 moves (`moves.ts`, key patterns on the beat), freestyle recognition (`recognise.ts`), 3 judges (technique / musicality / originality / power, `scoring.ts`), CPU dancers that answer back (`planner.ts`). Prompts lead a beginner to a full set ending on a last-beat freeze.
+- `view/` procedural breaking on the Noun rig (`pose.ts` → `rig.ts`, no clips: the rig has none), the cypher + crowd + DJ + judges, battle camera, HUD (`BreakHud.tsx`), break beat locked to the battle clock. The crowd builds one Noun a frame (a build is a hitch). Dev: `window.__w2.breakDev()`.
+- `net/` cypher spot, menus, lobby, `BreakMode` (Game hook), host-authoritative sync (`sync.ts`: host clock, ping/pong offset, sim judged 0.15 s behind, ~10 Hz snapshots), `break:*` messages relayed by `packages/nouns-party/src/breakRelay.ts` (online battles need the worker redeployed). `factory.ts` picks the real sim/view (stubs stand in until the view chunk loads).
+- Results report `break_win` / `break_loss` to respect.
+
+### Respect
+
+One score for how you act (`world2/respect/`, contract in `interiors/contract.ts` `RespectApi`, on `game.respect`). Rules in `respect/rules.ts` (pure, shared with `netlify/functions/world-respect.ts`): gifts, eating/thanks, buying local, helping, clean big combos, graffiti pieces, serving, hoops/break wins up; stealing, bailing into people, tagging homes, refusing food, overstaying down. Per-kind rate limits + ±minute caps; tiers outcast / stranger / local (50) / regular (200) / legend (600) with hysteresis; slow drift above the tier floor. The client sends events only; the server re-scores them (Blobs store `noun-world-respect`). HUD meter top-right, tier banners, legend noggles badge on name labels.
+
+### House voice
+
+Every rider's default voice is the owner's own trained Piper model, `public/world2/voices/house.onnx` (+ `.onnx.json`, 63.5 MB), loaded by `PlayerVoices.house()`; recordings and a player's own model still win, and the LibriTTS-R `RIDER_VOICE` covers while it loads. Replacing the files means bumping `HOUSE_REV` in `ttsVoice.ts` (the TTS worker caches by URL).
+
 ### The Big Drop (snow peak behind the deepest door)
 
 The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,000 km snow peak, a per-player dimension. Nothing done there counts: stats are suspended. The homepage card (`BIG_DROP_CARD` / `BIG_DROP_COVER` in `home/rows.ts`) is locked until `doorUnlocked()` (`missions/unlocks.ts`). Unlocked, `/world?drop=1` launches straight onto the summit.

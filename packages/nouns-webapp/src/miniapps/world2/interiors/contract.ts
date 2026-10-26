@@ -120,4 +120,10 @@ export interface InteriorsApi {
   current(): { door: BuildingDoor; kind: InteriorKind } | null;
   /** All the doors known so far (for the minimap / debug). */
   doors(): readonly BuildingDoor[];
+  /**
+   * (Optional, added by respect/.) The kind a door opens onto: its forced
+   * `kind`, else the seeded pick; null if unknown. respect/ uses it to tell
+   * someone's home (tagging it costs respect) from a shop or a plain wall.
+   */
+  kindOf?(doorId: string): InteriorKind | null;
 }

@@ -1,5 +1,6 @@
 import type { Connection, Party } from './room';
 
+import { BreakRelay } from './breakRelay';
 import { FmRelay } from './fmRelay';
 import { HoopsRelay } from './hoopsRelay';
 import { WarfareRelay } from './warfareRelay';
@@ -29,6 +30,9 @@ import { WarfareRelay } from './warfareRelay';
  * 5. NOUN FM (world v2 room only, fm: prefix): the ice cream van's radio
  *    station, queue + today's DJ sets (see fmRelay.ts). Persisted under
  *    storage key `fm`; optional admin token in env FM_ADMIN_TOKEN.
+ *
+ * 6. Noun Breaks (break: prefix, world v2): breakdance battles, relayed only
+ *    to the players a message is for (see breakRelay.ts), nothing persisted.
  */
 
 const WARFARE_ROOM = 'noun-warfare';
@@ -84,6 +88,7 @@ interface RoomState {
   _worldPlayers?: Record<string, WorldPlayerState>;
   _leaderboard: LeaderboardEntry[];
   _hoops?: HoopsRelay;
+  _break?: BreakRelay;
   _warfare?: WarfareRelay;
 }
 
@@ -201,6 +206,14 @@ export const handlers = {
         if (message.length > 8192) return;
         rs._hoops ??= new HoopsRelay();
         rs._hoops.handle(data, connection, room.getConnections());
+        return;
+      }
+
+      // ── Noun Breaks (break: prefix) ─────────────────────────────────
+      if (typeof data.type === 'string' && data.type.startsWith('break:')) {
+        if (message.length > 16384) return;
+        rs._break ??= new BreakRelay();
+        rs._break.handle(data, connection, room.getConnections());
         return;
       }
 
@@ -555,6 +568,7 @@ export const handlers = {
     }
 
     rs._hoops?.close(connection.id, room.getConnections());
+    rs._break?.close(connection.id, room.getConnections());
     void fmRelays.get(room.id)?.then(fm => fm.close(connection.id));
 
     const count = [...room.getConnections()].length;

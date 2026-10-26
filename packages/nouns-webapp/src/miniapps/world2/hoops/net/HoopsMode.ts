@@ -12,6 +12,7 @@
 
 import type { HoopsViewLike } from './stubView';
 import type { Game } from '../../Game';
+import type { RespectApi } from '../../interiors/contract';
 
 import * as THREE from 'three';
 
@@ -759,6 +760,9 @@ export class HoopsMode {
   private showResults() {
     const s = this.session!;
     const myTeam = s.config.players.find(p => p.id === s.me)?.team ?? null;
+    const respect = (this.game as { respect?: RespectApi }).respect; // respect/: a win counts
+    if (myTeam !== null)
+      respect?.add({ kind: myTeam === s.ended!.winner ? 'hoops_win' : 'hoops_loss' });
     const mvp = s.mvp();
     if (s.role === 'host') this.announce(false, false);
     this.set({

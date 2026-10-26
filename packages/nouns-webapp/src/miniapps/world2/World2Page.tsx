@@ -8,6 +8,7 @@ import { useAppSelector } from '@/hooks';
 
 import { BeatsScreen } from './audio/BeatsScreen';
 import { bindUiSounds } from './audio/sfx/uiSounds';
+import { BreakUi, useBreakActive } from './breakdance/net/BreakUi';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
@@ -32,6 +33,7 @@ import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
 import { introAllowed, introEnabled } from './radio/FmSpots';
 import { FmSpotsUi } from './radio/FmSpotsUi';
 import { RecordsUi, useReplayActive } from './replay/RecordsUi';
+import { RespectBanner, RespectMeter } from './respect/RespectHud';
 import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
 import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
@@ -222,7 +224,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const hoopsOn = useHoopsActive(game);
+  // A Noun Breaks battle hides the skate HUD the same way hoops does
+  const breakOn = useBreakActive(game);
+  const hoopsOn = useHoopsActive(game) || breakOn;
   // (flying the dragon keeps the skate stick: it turns and sets the speed)
   const driving = useVanDriving(game);
   const replaying = useReplayActive(game);
@@ -384,6 +388,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
+      {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && (
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
       )}
@@ -596,6 +601,7 @@ function Hud({
           </div>
         )}
       </HudDrag>
+      <RespectBanner respect={game.respect} sfx={game.sfx} />
 
       {/* Top-centre: landmarks compass (no room for it on phones) */}
       <div
@@ -631,6 +637,7 @@ function Hud({
           </button>
           <SettingsCog game={game} />
         </div>
+        <RespectMeter respect={game.respect} />
         {!touch && (
           <div data-w2hud="fps" className="w2-chip text-[10px] opacity-60">
             {hud.fps} fps, {hud.quality}
