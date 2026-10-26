@@ -140,7 +140,7 @@ describe('LOD', () => {
   it('hall copies appear only as the camera pulls out', () => {
     expect(copyRings(20, false)).toBe(0);
     expect(copyRings(200, false)).toBe(1);
-    expect(copyRings(900, false)).toBe(3);
+    expect(copyRings(900, false)).toBe(4);
     expect(copyRings(900, true)).toBe(2);
   });
 });

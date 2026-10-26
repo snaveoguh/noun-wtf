@@ -66,6 +66,6 @@ export function pickRigs(
 export function copyRings(camDist: number, phone: boolean): number {
   if (camDist < 150) return 0;
   if (camDist < 320) return 1;
-  if (phone || camDist < 650) return 2;
-  return 3;
+  if (phone || camDist < 520) return 2;
+  return 4;
 }

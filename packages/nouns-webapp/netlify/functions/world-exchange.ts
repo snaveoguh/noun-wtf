@@ -13,6 +13,7 @@ import {
   type ExchangeState,
   type GoodId,
 } from '../../src/miniapps/exchange/engine';
+import { publicFloor } from '../../src/miniapps/exchange3d/sim/feed';
 
 // Noun Trade's Grand Exchange: one order book per good, NPC bot traders and
 // riders' limit / market orders, all in-game COIN (never real money, nothing
@@ -27,6 +28,8 @@ import {
 //      → ExchangeSnapshot (book ladder, candles, tape, floor, bots, you).
 //        Read-mostly: it saves the ticked state only when the clock lagged
 //        SAVE_LAG_MS, and never creates an account.
+//      &floor=1 adds `floor3d` (the 3D trading floor's feed): every good's
+//        recent fills and the resting orders near the touch, rider ids masked.
 // POST { rider, action }
 //      action = { t: 'join' }                       starter grant (once per rider)
 //             | { t: 'order', side, good, qty, price, kind?: 'limit' | 'market' }
@@ -153,7 +156,8 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     } else if (now - s.now >= STEP_MS) {
       tick(s, now); // in-memory only; the next write persists its own tick
     }
-    return json(200, snapshot(s, { good, tf, owner: rider }));
+    const snap = snapshot(s, { good, tf, owner: rider });
+    return json(200, q.floor === '1' ? { ...snap, floor3d: publicFloor(s, rider) } : snap);
   }
   if (method !== 'POST') return json(405, { error: 'Method not allowed' });
   if ((event.body ?? '').length > MAX_BODY) return json(413, { error: 'Body too big' });

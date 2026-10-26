@@ -21,8 +21,10 @@ import {
   floorHeight,
   HALL_D,
   HALL_W,
+  PIT_OUTER_RINGS,
   PIT_STEPS,
   pitSpot,
+  TOWER_CLEAR,
   PITS,
 } from './layout';
 
@@ -199,16 +201,28 @@ export class Crowd {
     return t;
   }
 
-  /** A trader's mill spot: a random tier of its home pit. */
+  /**
+   * A trader's mill spot: a random tier of its home pit, or the floor just
+   * outside its rim. Every ninth sim trader is a board-watcher instead: it
+   * stands round the central tower, looking up at the prices.
+   */
   private pickSpot(t: Trader) {
-    const p = PITS[t.home % PITS.length]!;
-    const s = 1 + Math.floor(this.rng() * PIT_STEPS);
-    const at = pitSpot(p, this.rng() * Math.PI * 2, s);
-    t.tx = at.x;
-    t.tz = at.z;
     t.face = null;
     t.arrived = false;
     t.hurry = false;
+    if (t.kind === 'sim' && !t.floater && t.i % 9 === 4) {
+      const a = this.rng() * Math.PI * 2;
+      const r = TOWER_CLEAR + 1 + this.rng() * 9;
+      t.tx = Math.cos(a) * r;
+      t.tz = Math.sin(a) * r;
+      t.face = Math.atan2(-t.tx, -t.tz);
+      return;
+    }
+    const p = PITS[t.home % PITS.length]!;
+    const s = 1 + Math.floor(this.rng() * (PIT_STEPS + PIT_OUTER_RINGS));
+    const at = pitSpot(p, this.rng() * Math.PI * 2, s);
+    t.tx = at.x;
+    t.tz = at.z;
   }
 
   /** Send a free trader to a pit (a bot moving to where its orders are). */

@@ -103,16 +103,25 @@ export function clampToFloor(x: number, z: number, margin = 1.2): { x: number; z
   return { x: cx, z: cz };
 }
 
-/** A spot on a pit's tiers at angle `a` (rad) and step `s` (1..PIT_STEPS). */
+/**
+ * A spot on a pit's tiers at angle `a` (rad) and step `s` (1..PIT_STEPS);
+ * steps past the rim are rings of floor round the outside of the pit.
+ */
 export function pitSpot(p: Pit, a: number, s: number): { x: number; z: number } {
   const w = (PIT_R_OUT - PIT_R_IN) / PIT_STEPS;
-  const r = PIT_R_IN + (Math.min(PIT_STEPS, Math.max(0, s)) - 0.5) * w;
+  const r =
+    s > PIT_STEPS
+      ? PIT_R_OUT + 0.8 + (s - PIT_STEPS - 1) * 1.3
+      : PIT_R_IN + (Math.min(PIT_STEPS, Math.max(0, s)) - 0.5) * w;
   // Octagon radius r along angle a: scale the unit direction onto the octagon
   const dx = Math.cos(a);
   const dz = Math.sin(a);
   const k = r / octR(dx, dz);
   return { x: p.x + dx * k, z: p.z + dz * k };
 }
+
+/** Rings of floor outside a pit's rim that its crowd also stands on. */
+export const PIT_OUTER_RINGS = 3;
 
 // ── The balcony: a rectangle loop just inside the walls ──
 
