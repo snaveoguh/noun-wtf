@@ -3,9 +3,11 @@
 // One analytic surface, in the peak's own coordinates: the summit pad is at
 // the origin, y = 0, and the mountain falls away in every direction at a
 // steady ~49° until it's 1,000 km down, then eases out onto a flat snowfield.
-// On the way down: moguls, and kicker ridges across the fall line that throw
-// you into long airs. No three.js here, so it's tested on its own and the
-// dimension (peak.ts) only has to shift it into world space.
+// On the way down: moguls and ridges across the fall line, and the race
+// track (bigdrop/track.ts) carved into it by bigdrop/terrainCarve.ts: a
+// groomed lane, powder pillows, gullies, berms, kickers, loop pads. No
+// three.js here, so it's tested on its own and the dimension (peak.ts) only
+// has to shift it into world space.
 
 import { smoothstep, vnoise } from '../world/mountain/config';
 
