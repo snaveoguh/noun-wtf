@@ -45,9 +45,8 @@ const SPRAY_DIST = 380;
 /** Ribbon points per rider. */
 const SEG = 22;
 const RIBBON_W = 0.13;
-/** Seconds between character builds (spreads the cost), and between new faces. */
+/** Seconds between character builds (spreads the cost). */
 const BUILD_EVERY = 0.3;
-const RESEED_EVERY = 6;
 const TINTS = [0x7ff4ff, 0xff5ce1, 0xb6ff4a, 0xffb347, 0xa98bff, 0xff5a5a, 0x5affc8, 0xfff36b];
 
 interface Slot {
@@ -69,7 +68,6 @@ interface Slot {
   /** s − player s last frame (whoosh on a pass). */
   rel: number;
   /** This slot's character should be swapped for a new face when out of sight. */
-  reseed: boolean;
 }
 
 const _v = new THREE.Vector3();
@@ -114,6 +112,10 @@ const DOT_FRAG = /* glsl */ `
     gl_FragColor = vec4(mix(vC, vec3(1.0), 0.45 * (1.0 - d)) * a, a);
   }`;
 
+/** Riders built on an earlier visit, ready to ride again. */
+const kept: NounCharacter[] = [];
+const KEEP = 8;
+
 /** Free a character's own GPU bits (geometry and textures are shared caches). */
 function riderFree(ch: NounCharacter) {
   ch.dispose();
@@ -137,7 +139,6 @@ class Riders implements PeakSystem {
   private featAt = -Infinity;
   private started = false;
   private buildIn = 0;
-  private reseedIn = RESEED_EVERY;
   private whooshIn = 0;
   // Ribbons (one mesh for all) and far glow dots (one point cloud)
   private ribbon: THREE.Mesh;
@@ -169,7 +170,6 @@ class Riders implements PeakSystem {
         fwd: new THREE.Vector3(0, 0, 1),
         grow: 0,
         rel: 0,
-        reseed: false,
       });
     // Ribbons: a strip of SEG points (2 vertices each) per rider
     this.rP = new Float32Array(n * SEG * 2 * 3);
@@ -236,15 +236,19 @@ class Riders implements PeakSystem {
   private build(slot: Slot) {
     const assets = this.ctx.game.assets;
     if (assets === null) return;
-    const ch = new NounCharacter(randomSeed(), assets);
-    if (this.ctx.toon) toonify(ch.root);
-    ch.setBoardType('hover');
-    ch.setCastShadows(false);
-    ch.root.traverse(o => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) m.receiveShadow = false;
-    });
-    if (Math.random() < 0.4) ch.setWeight(-0.6 + Math.random() * 1.3);
+    // Building a Noun is a hitch, so riders from an earlier visit come back
+    let ch = kept.pop();
+    if (ch === undefined) {
+      ch = new NounCharacter(randomSeed(), assets);
+      if (this.ctx.toon) toonify(ch.root);
+      ch.setBoardType('hover');
+      ch.setCastShadows(false);
+      ch.root.traverse(o => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) m.receiveShadow = false;
+      });
+      if (Math.random() < 0.4) ch.setWeight(-0.6 + Math.random() * 1.3);
+    }
     // Each board glows its own colour
     ch.board.traverse(o => {
       const m = o as THREE.Mesh;
@@ -257,7 +261,6 @@ class Riders implements PeakSystem {
     ch.play({ clip: 'skate_idle', fade: 0 });
     this.ctx.group.add(ch.root);
     slot.ch = ch;
-    slot.reseed = false;
   }
 
   private spawn(slot: Slot, initial: boolean) {
@@ -265,11 +268,6 @@ class Riders implements PeakSystem {
     slot.count = 0;
     slot.grow = 0;
     slot.rel = slot.st.s - this.env.riderS;
-    // Now and then a new face, swapped while it's out of sight
-    if (!initial && this.reseedIn <= 0 && slot.ch !== null && Math.random() < 0.4) {
-      slot.reseed = true;
-      this.reseedIn = RESEED_EVERY;
-    }
   }
 
   update(dt: number) {
@@ -297,7 +295,6 @@ class Riders implements PeakSystem {
       for (const s of this.slots) this.spawn(s, true);
     }
     this.buildIn -= dt;
-    this.reseedIn -= dt;
     this.whooshIn -= dt;
     const h = g.gfx.renderer.domElement.height;
     this.dotMat.uniforms.scale!.value = h / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
@@ -314,12 +311,7 @@ class Riders implements PeakSystem {
       ctx.toLocal(st.x, st.y, st.s, _p);
       const dist = _p.distanceTo(cam.position);
       const fogK = Math.exp(-Math.pow(density * dist, 2));
-      // Characters: built a few at a time, swapped for a new face out of sight
-      if (slot.ch !== null && slot.reseed && (dist > 500 || st.s < env.riderS - 30)) {
-        riderFree(slot.ch);
-        slot.ch = null;
-        slot.pool = null;
-      }
+      // Characters: built a few at a time (a build is a hitch: 50–500 ms)
       if (slot.ch === null && this.buildIn <= 0) {
         this.buildIn = BUILD_EVERY;
         this.build(slot);
@@ -514,8 +506,12 @@ class Riders implements PeakSystem {
   }
 
   dispose() {
+    // Keep the built riders for the next visit (a handful; the rest are freed)
     for (const s of this.slots) {
-      if (s.ch !== null) riderFree(s.ch);
+      if (s.ch === null) continue;
+      s.ch.root.removeFromParent();
+      if (kept.length < KEEP) kept.push(s.ch);
+      else riderFree(s.ch);
       s.ch = null;
     }
     inkExcluded.delete(this.fx);
