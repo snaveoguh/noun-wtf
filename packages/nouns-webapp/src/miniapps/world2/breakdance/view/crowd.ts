@@ -64,10 +64,22 @@ export class Crowd {
   readonly group = new THREE.Group();
   private fans: Fan[] = [];
 
-  constructor(assets: CharacterAssets, n: number, shadows: boolean) {
+  /** Spots still to fill: a Noun build is a hitch, so the crowd arrives one a frame. */
+  private pending: { x: number; z: number; yaw: number; i: number }[];
+
+  constructor(
+    private assets: CharacterAssets,
+    n: number,
+    private shadows: boolean,
+  ) {
     this.group.name = 'BreakCrowd';
-    const spots = crowdSpots(n);
-    spots.forEach((s, i) => {
+    this.pending = crowdSpots(n).map((s, i) => ({ ...s, i }));
+  }
+
+  private buildFan(s: { x: number; z: number; yaw: number; i: number }) {
+    const { assets, shadows } = this;
+    {
+      const i = s.i;
       const id = `crowd:${i}`;
       const ch = new NounCharacter(seedOf(null, id), assets);
       ch.board.visible = false;
@@ -106,7 +118,7 @@ export class Crowd {
         delay: (((h >>> 9) % 100) / 100) * 0.35,
         hop: 0,
       });
-    });
+    }
   }
 
   /** Everyone reacts (with a little ripple). */
@@ -119,6 +131,8 @@ export class Crowd {
   }
 
   update(dt: number, beat: number, hype: number) {
+    const next = this.pending.shift();
+    if (next !== undefined) this.buildFan(next);
     for (const f of this.fans) {
       const ph = f.half ? beat / 8 : beat / 4;
       const t = ((((ph + f.off / 4) % 1) + 1) % 1) * 2;
@@ -186,6 +200,7 @@ export class Crowd {
   dispose() {
     for (const f of this.fans) f.ch.dispose();
     this.fans = [];
+    this.pending = [];
     this.group.removeFromParent();
   }
 }
