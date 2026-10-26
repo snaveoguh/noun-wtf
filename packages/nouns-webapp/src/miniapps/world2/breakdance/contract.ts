@@ -225,6 +225,11 @@ export interface BattleSim {
   /** Advance the clock; returns the events that fired. */
   step(dt: number): SimEvent[];
   state(): SimState;
+  /**
+   * (net/, optional) A human dropped mid-battle: a CPU dancer of this skill
+   * takes over their id from now on. Without it net/ plays their prompts.
+   */
+  setCpu?(id: string, skill: number): void;
 }
 
 export type BattleSimFactory = (config: BattleConfig) => BattleSim;
@@ -243,12 +248,52 @@ export interface BattleView {
 // ── Net messages (relayed by packages/nouns-party, `break:` prefix) ─────
 
 export type BreakMsg =
-  | { type: 'break:lobby'; from?: string; at: boolean; crew?: string }
-  | { type: 'break:challenge'; to: string; from?: string; crewSize: CrewSize }
-  | { type: 'break:reply'; to: string; from?: string; ok: boolean }
-  | { type: 'break:start'; host?: string; config: BattleConfig; to?: string }
+  | {
+      type: 'break:lobby';
+      from?: string;
+      at: boolean;
+      crew?: string;
+      /** (net/) Name + look of the player at the cypher. */
+      name?: string;
+      seedKey?: string;
+      /** (net/) Set by a host while its battle runs (for WATCH). */
+      live?: { gid: string; crewSize: CrewSize; names: string[] };
+    }
+  | {
+      type: 'break:challenge';
+      to: string;
+      from?: string;
+      crewSize: CrewSize;
+      /** (net/) The battle being formed, the host's name, the crew offered. */
+      gid?: string;
+      name?: string;
+      crew?: CrewId;
+    }
+  | { type: 'break:reply'; to: string; from?: string; ok: boolean; gid?: string }
+  | {
+      type: 'break:start';
+      host?: string;
+      config: BattleConfig;
+      to?: string;
+      /** (net/) The host's battle clock when sent (negative = countdown left). */
+      at?: number;
+      /** (net/) Judge delay (s): the host's sim runs this far behind the battle clock. */
+      lag?: number;
+    }
   | { type: 'break:input'; gid: string; i: BreakInput }
-  | { type: 'break:s'; gid: string; state: SimState }
-  | { type: 'break:end'; gid: string; winner: CrewId | 'tie' }
-  | { type: 'break:watch'; gid: string }
-  | { type: 'break:leave'; gid: string };
+  | {
+      type: 'break:s';
+      gid: string;
+      state: SimState;
+      /** (net/) Events since the last snapshot (beats left out: clients make their own). */
+      e?: SimEvent[];
+      /** (net/) The host's battle clock when sent. */
+      a?: number;
+    }
+  | { type: 'break:end'; gid: string; winner: CrewId | 'tie'; totals?: [number, number] }
+  | { type: 'break:watch'; gid: string; from?: string }
+  | { type: 'break:leave'; gid: string; id?: string }
+  /** (net/) Clock sync: a member / spectator asks the host the battle time… */
+  | { type: 'break:ping'; gid: string; c: number; from?: string }
+  /** (net/) …and the host answers with its battle clock `a` (s) for that `c`. */
+  | { type: 'break:pong'; gid: string; to: string; c: number; a: number };
