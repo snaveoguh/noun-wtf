@@ -153,6 +153,12 @@ export interface DancerPose {
   /** Current move and how far through it (0..1); null = vibing on the side. */
   move: MoveId | null;
   moveT: number;
+  /**
+   * Length of the current move on the beat grid (beats; MoveSpec.beats).
+   * Optional: lets the view lock spins and steps to the beat exactly (it
+   * estimates it from moveT's rate otherwise).
+   */
+  moveBeats?: number;
   /** In the middle of the circle (their turn) or on the edge. */
   centre: boolean;
   /** Last input's grade (for flashes), and when (battle clock). */
