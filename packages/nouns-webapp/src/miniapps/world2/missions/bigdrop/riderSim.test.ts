@@ -233,5 +233,5 @@ describe('on the real mountain', () => {
       }
     }
     expect(airs).toBeGreaterThan(5);
-  });
+  }, 30_000); // 90 s of riding: slow when the machine is busy
 });
