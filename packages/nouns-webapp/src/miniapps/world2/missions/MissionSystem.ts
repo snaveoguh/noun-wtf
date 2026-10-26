@@ -23,7 +23,7 @@ import { bowlCentre, bowlFrame, inBowl } from '../world/mountain/noggleBowl';
 import { njFrame, njInCore, njToWorld } from '../world/mountain/nounJersey';
 import { terrainHeight, terrainInDomain } from '../world/mountain/terrain';
 
-import { MISSION_BY_ID, NPCS, NPC_IDS, type MissionDef, type NpcId } from './defs';
+import { NPCS, NPC_IDS, type MissionDef, type NpcId } from './defs';
 import {
   doorProp,
   keymakerProps,
@@ -46,8 +46,8 @@ import {
   type MissionState,
   type Signal,
 } from './progress';
+import { DROP_LOCKED_MSG, doorUnlocked, STORE_PREFIX } from './unlocks';
 
-const STORE_PREFIX = 'noun-world-missions:';
 const _down = new THREE.Vector3(0, -1, 0);
 const _o = new THREE.Vector3();
 
@@ -800,12 +800,26 @@ export class MissionSystem {
   /** Can the door be opened (the Keymaker sent you, or you've been through)? */
   doorOpen() {
     const s = this.state;
-    return (
-      s.done['deepest-door'] !== undefined ||
-      (this.placesOk &&
-        s.met.keymaker !== undefined &&
-        MISSION_BY_ID['deepest-door']!.after.every(a => s.done[a] !== undefined))
-    );
+    return s.done['deepest-door'] !== undefined || (this.placesOk && doorUnlocked(s));
+  }
+
+  /**
+   * The homepage's THE BIG DROP card (`/world?drop=1`): once the rider is
+   * in, straight onto the mountain if the door is open to them (no scene,
+   * and it doesn't count as finding the door), else a word on how to open
+   * it. Leaving puts you back where you started, in the plaza.
+   */
+  launchBigDrop(): boolean {
+    if (this.ud.active) return true;
+    if (!doorUnlocked(this.state)) {
+      this.toast = { at: performance.now(), title: DROP_LOCKED_MSG, kind: 'info' };
+      this.emit();
+      return false;
+    }
+    this.openPanel(null);
+    this.game.sfx.play('cut-boom', { gain: 0.5 });
+    this.enterUpsideDown(false);
+    return true;
   }
 
   /** Step through: onto the Big Drop, or back out. */
@@ -825,10 +839,10 @@ export class MissionSystem {
   }
 
   /** Onto the Big Drop (the door's scene calls this at its flash). */
-  enterUpsideDown() {
+  enterUpsideDown(throughTheDoor = true) {
     if (this.ud.active) return;
     this.ud.enter();
-    this.signal({ t: 'door' });
+    if (throughTheDoor) this.signal({ t: 'door' });
     this.toast = { at: performance.now(), title: 'The Big Drop: 1,000 km down', kind: 'info' };
     this.emit();
   }

@@ -3,9 +3,23 @@
 
 import type { Entry, Section } from '../catalog';
 
+import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
+
 import { hostOf, KIND_LABEL, type CommunityEntry } from './community';
 
-export type GameId = 'world' | 'hoops' | 'warfare';
+export type GameId = 'world' | 'hoops' | 'warfare' | 'drop';
+
+/**
+ * THE BIG DROP's art: placeholders until there are real in-game shots of
+ * the mountain. Swap these two paths (2:3 card, 5:4 sheet cover) for the
+ * proper posters.
+ */
+export const BIG_DROP_CARD = '/home/covers/big-drop.webp';
+export const BIG_DROP_COVER = '/home/big-drop-cover.webp';
+/** Where an unlocked BIG DROP card goes. */
+export { BIG_DROP_URL };
+/** The hint on a locked BIG DROP card. */
+export const BIG_DROP_HINT = 'Unlock the deepest door in Noun World';
 
 /** A pre-rendered clip: webm first, mp4 fallback, poster still. */
 export interface Clip {
@@ -101,6 +115,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'LOCK & LOAD',
     loading: 'loading noun warfare. paint up',
+  },
+  {
+    id: 'drop',
+    name: 'The Big Drop',
+    cover: BIG_DROP_COVER,
+    card: BIG_DROP_CARD,
+    focus: '50% 50%',
+    teaser:
+      'A 1,000 km snow mountain behind the deepest door in Noun World. Low gravity, a 49° fall line and no top speed: point your board down and hold on.',
+    tagline: 'DROP · CARVE · SEND',
+    facts: [
+      '1,000 km of snow, top to bottom',
+      'Floaty 40% gravity, huge airs',
+      'Unlocked in Noun World: find the Keymaker',
+    ],
+    cta: 'DROP IN',
+    loading: 'off to the summit. wrap up warm',
   },
 ];
 
@@ -324,6 +355,8 @@ export interface Item {
   action: Action;
   /** Opens off-site */
   external?: boolean;
+  /** Not open to this visitor yet: dimmed, a lock badge and how to open it */
+  locked?: { hint: string };
 }
 
 export interface Row {
@@ -339,7 +372,14 @@ const SHORT_LABEL: Record<string, string> = { gov: 'CAPTURED DAO', art: 'ART / C
 
 const GAME_BY_PATH: Partial<Record<string, GameId>> = { '/world': 'world', '/warfare': 'warfare' };
 
-function gameItem(g: Game, group: string, label: string): Item {
+/** Things the homepage knows about the visitor (read from this browser). */
+export interface RowOpts {
+  /** The deepest door in Noun World is open to them (missions/unlocks.ts) */
+  dropUnlocked?: boolean;
+}
+
+function gameItem(g: Game, group: string, label: string, opts: RowOpts = {}): Item {
+  const locked = g.id === 'drop' && opts.dropUnlocked !== true;
   return {
     key: `game:${g.id}`,
     title: g.name.toUpperCase(),
@@ -351,6 +391,7 @@ function gameItem(g: Game, group: string, label: string): Item {
     coverFocus: '50% 50%',
     preview: g.preview,
     action: { t: 'game', id: g.id },
+    ...(locked ? { hot: false, locked: { hint: BIG_DROP_HINT } } : {}),
   };
 }
 
@@ -371,11 +412,15 @@ function entryItem(e: Entry, s: Section, group = s.id): Item {
   };
 }
 
-export function buildRows(catalog: Section[], community: CommunityEntry[] = []): Row[] {
+export function buildRows(
+  catalog: Section[],
+  community: CommunityEntry[] = [],
+  opts: RowOpts = {},
+): Row[] {
   const byPath = new Map<string, { e: Entry; s: Section }>();
   for (const s of catalog) for (const e of s.entries) byPath.set(e.path, { e, s });
 
-  const play: Item[] = GAMES.map(g => gameItem(g, 'play', 'GAME'));
+  const play: Item[] = GAMES.map(g => gameItem(g, 'play', 'GAME', opts));
   for (const p of PLAY_PATHS) {
     const hit = byPath.get(p);
     if (hit) play.push({ ...entryItem(hit.e, hit.s, 'play'), key: `play:${p}`, label: 'PLAY' });
