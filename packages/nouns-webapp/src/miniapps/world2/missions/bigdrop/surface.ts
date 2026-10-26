@@ -16,7 +16,9 @@ import * as THREE from 'three';
 
 import { smoothstep } from '../../world/mountain/config';
 
+import { basinKickerPaint, basinWeight } from './terrainBasin';
 import { pillowAt } from './terrainCarve';
+import { PEAK } from './terrainPeak';
 import { CARVE, kickerShape, lineAt, lineNear, TRACK, X_BAND } from './track';
 
 const SNOW_LIT = new THREE.Color(0xf7fbff);
@@ -44,6 +46,26 @@ export function snowColor(x: number, z: number, ny: number, out: THREE.Color): T
   out.copy(SNOW_SHADE).lerp(SNOW_LIT, Math.min(1, Math.max(0, (ny - 0.6) / 0.25)));
   const onTrack = x < X_BAND && x > -X_BAND && z > TRACK.start && z < TRACK.end && lineNear(x, z);
   if (!onTrack) {
+    if (
+      z > TRACK.end - 4000 ||
+      z < -TRACK.end + 4000 ||
+      x > TRACK.end - 4000 ||
+      x < -TRACK.end + 4000
+    ) {
+      const s = Math.hypot(x, z) - PEAK.pad;
+      const w = basinWeight(s);
+      if (w > 0) {
+        // The basin: shade the swells and canyon walls so the valleys read,
+        // and paint the kickers like the track's (icy ramp, red lip)
+        out.lerp(SNOW_SHADE, Math.min(1, (1 - ny) * 9) * w);
+        if (w > 0.3) {
+          const k = basinKickerPaint(x, z);
+          if (k > 1) return out.lerp(DYE_RED, 0.9);
+          if (k > 0) out.lerp(ICE, 0.25 + 0.45 * k);
+        }
+        return out;
+      }
+    }
     // Rock where it's steepest, powder everywhere else
     if (ny < 0.62) return out.lerp(ROCK, Math.min(1, (0.62 - ny) / 0.05) * 0.6);
     return out.lerp(POWDER, 0.55 * smoothstep(0.55, 0.8, ny));

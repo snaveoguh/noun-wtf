@@ -79,6 +79,20 @@ export interface RiderState {
   /** One-frame events. */
   launched: boolean;
   landed: boolean;
+  /**
+   * Free-riding the basin (basinStep) instead of the line: heading (rad,
+   * atan2(dx, dz)), speed over the snow (m/s), and the kicker it's lining
+   * up for (its ramp foot and facing), re-picked every `aimT` s.
+   */
+  free: boolean;
+  hd: number;
+  sp: number;
+  aiming: boolean;
+  aimX: number;
+  aimZ: number;
+  aimDx: number;
+  aimDz: number;
+  aimT: number;
 }
 
 export interface RiderEnv {
@@ -123,6 +137,15 @@ export function riderCreate(): RiderState {
     age: 0,
     launched: false,
     landed: false,
+    free: false,
+    hd: 0,
+    sp: RIDER.minSpeed,
+    aiming: false,
+    aimX: 0,
+    aimZ: 0,
+    aimDx: 0,
+    aimDz: 1,
+    aimT: 0,
   };
 }
 
@@ -175,6 +198,7 @@ export function riderSpawn(
   rng: Rng,
   initial = false,
 ): RiderState {
+  r.free = false;
   r.pace = riderPickPace(rng);
   const off = initial ? 30 + rng() * 700 : riderSpawnOffset(r.pace, env.riderV, rng);
   r.s = Math.min(TRACK.end - 10, Math.max(TRACK.start + 30, env.riderS + off));
@@ -283,7 +307,8 @@ export function riderTrickK(r: RiderState): number {
 /** Vertical take-off speed relative to the slope for an air of `dur` s. */
 export const riderPopFor = (dur: number) => (RIDER.g * dur) / 2;
 
-function launch(r: RiderState, relVy: number, slopeVy: number, rng: Rng) {
+/** Take off: `relVy` m/s up off a slope falling at `slopeVy`, with a trick to fit the air. */
+export function riderLaunch(r: RiderState, relVy: number, slopeVy: number, rng: Rng) {
   const rel = Math.min(riderPopFor(RIDER.maxAir), Math.max(0.5, relVy));
   r.air = true;
   r.airT = 0;
@@ -351,7 +376,7 @@ export function riderStep(r: RiderState, dt: number, env: RiderEnv, rng: Rng): v
     const lip = f.s + f.len;
     if (s0 < lip && r.s >= lip && Math.abs(r.lat) < half + 3) {
       const dur = Math.min(RIDER.maxAir, Math.max(2.4, 1.6 + f.size * 0.36) * (0.85 + rng() * 0.3));
-      launch(r, Math.max(riderPopFor(dur), prevVy - slopeVy), slopeVy, rng);
+      riderLaunch(r, Math.max(riderPopFor(dur), prevVy - slopeVy), slopeVy, rng);
       r.y = Math.max(r.y, h);
       return;
     }
@@ -360,7 +385,7 @@ export function riderStep(r: RiderState, dt: number, env: RiderEnv, rng: Rng): v
   const snap = 0.08 + Math.min(0.35, speed3 * 0.03);
   const ballistic = r.y + prevVy * dt - 0.5 * RIDER.g * dt * dt;
   if (h < ballistic - snap && prevVy - slopeVy > 0.5) {
-    launch(r, prevVy - slopeVy, slopeVy, rng);
+    riderLaunch(r, prevVy - slopeVy, slopeVy, rng);
     r.y = ballistic;
     return;
   }
@@ -368,7 +393,7 @@ export function riderStep(r: RiderState, dt: number, env: RiderEnv, rng: Rng): v
   r.hopIn -= dt;
   if (r.hopIn <= 0 && r.sinceLand > 1.5) {
     r.hopIn = 6 + rng() * 14;
-    launch(r, riderPopFor(1.1 + rng() * 0.6), slopeVy, rng);
+    riderLaunch(r, riderPopFor(1.1 + rng() * 0.6), slopeVy, rng);
     r.y = h;
     return;
   }
