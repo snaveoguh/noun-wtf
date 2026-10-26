@@ -1,8 +1,8 @@
-// ── The Big Drop: NPC Nouns on hoverboards, racing down the track ───────
+// ── The Big Drop: NPC Nouns on snowboards, racing down the track ────────
 //
 // A PeakSystem. A handful of Nouns (random traits, the game's own rigged
-// characters) on glowing hoverboards: no wheels, floating ~0.4 m over the
-// snow, a coloured underglow and a light ribbon behind. The riding is pure
+// characters) on snowboards (the Big Drop is snowboards only), each with a
+// coloured light ribbon behind. The riding is pure
 // (riderSim.ts): they hold a pace that's a multiple of yours, carve across
 // the lane, fly off the kickers with grabs, spins and flips, and respawn
 // round you down the line (never more than RIDER.window m away, so their
@@ -49,8 +49,8 @@ import { featuresIn, nearestTrack } from './track';
 const COUNT = { low: 3, medium: 5, high: 8 } as const;
 /** …and out on the basin, where there's room for a pack. */
 const BASIN_COUNT = { low: 5, medium: 8, high: 12 } as const;
-/** Extra float on top of the character's own hover (m): the board rides ~0.4 m up. */
-const HOVER_EXTRA = 0.22;
+/** Extra float over the snow (m): none, snowboards ride on it. */
+const HOVER_EXTRA = 0;
 /** Draw the character within this (m); beyond, only its glow dot. */
 const CHAR_DIST = 900;
 /** Snow spray within this (m). */
@@ -267,7 +267,7 @@ class Riders implements PeakSystem {
     if (ch === undefined) {
       ch = new NounCharacter(randomSeed(), assets);
       if (this.ctx.toon) toonify(ch.root);
-      ch.setBoardType('hover');
+      ch.setBoardType('snowboard');
       ch.setCastShadows(false);
       ch.root.traverse(o => {
         const m = o as THREE.Mesh;

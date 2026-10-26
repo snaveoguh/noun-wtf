@@ -88,7 +88,7 @@ export class Graphics {
         ? THREE.PCFShadowMap
         : THREE.BasicShadowMap;
 
-    this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 3000);
+    this.camera = new THREE.PerspectiveCamera(70, 1, 0.15, 3000);
 
     // Sun + sky fill
     this.sun = new THREE.DirectionalLight(0xfff1dc, 3.2);

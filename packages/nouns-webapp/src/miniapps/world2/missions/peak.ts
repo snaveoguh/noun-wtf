@@ -19,6 +19,7 @@
 // Everything it changes is saved on the way in and put back on the way out,
 // and you come back out where you went in, by the door.
 
+import type { BoardType } from '../character/NounCharacter';
 import type { Game } from '../Game';
 import type { TerrainCollider } from '../physics/Collision';
 import type { PlayerTerrain } from '../skate/Player';
@@ -65,6 +66,8 @@ const FAR_HOLE = { half: NEAR_EDGE * 0.82, depth: 12 };
 const FAR_MOVE = 30;
 
 interface Saved {
+  /** The ride the player came in on (snowboard while inside). */
+  boardType: BoardType;
   fog: THREE.Scene['fog'];
   background: THREE.Scene['background'];
   skyVisible: boolean;
@@ -201,6 +204,7 @@ export class Peak {
       fwd: p.fwd.clone(),
       hidden,
       far: gfx.camera.far,
+      boardType: g.boardType,
     };
     this.active = true;
     this.origin.set(0, 0, 0);
@@ -212,7 +216,9 @@ export class Peak {
     p.mountain = null;
     g.world.terrain = this.collider;
     g.cam.leadVertical = true;
-    g.cam.zoom = 2.4;
+    g.cam.zoom = 3.4;
+    // Snowboards only up here (Game.setBoardType refuses anything else while inside)
+    g.setBoardType('snowboard');
     // R (and falling out) bring you back to the summit pad, facing +Z
     p.homeSpots = [{ pos: new THREE.Vector3(0, ALT + 0.05, 0), yaw: 0 }];
     p.respawnHome();
@@ -272,6 +278,8 @@ export class Peak {
     gfx.camera.updateProjectionMatrix();
     p.tuning.gravity = s.gravity;
     p.tuning.drag = s.drag;
+    g.boardType = s.boardType;
+    g.me?.setBoardType(s.boardType);
     p.terrain = s.playerTerrain;
     p.softBounds = s.softBounds;
     p.mountain = s.mountain;

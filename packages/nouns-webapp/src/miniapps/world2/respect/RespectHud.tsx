@@ -99,6 +99,7 @@ export function RespectMeter({ respect }: { respect: RespectSystem }) {
         {s.tier === 'legend' && (
           <img src={NOGGLES_SRC} alt="" width={18} height={7} className="w2-respect-nog" />
         )}
+        <span className="w2-respect-label">RESPECT</span>
         <span className="w2-respect-tier" style={{ color }}>
           {TIER_NAME[s.tier]}
         </span>

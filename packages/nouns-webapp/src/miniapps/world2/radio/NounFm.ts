@@ -167,6 +167,12 @@ export class NounFm {
    * programme at its current position.
    */
   hold = false;
+  /**
+   * Walking near the van pops the YouTube deck screen up on its own, unless
+   * the rider already has their own station on (Game clears this while NOUN
+   * BEATS plays): one music player on screen at a time.
+   */
+  nearScreen = true;
 
   private key: string;
   private transport: FmTransport;
@@ -261,7 +267,7 @@ export class NounFm {
       notice: this.notice,
       screen:
         yt &&
-        (this.tuned || this.near) &&
+        (this.tuned || (this.near && this.nearScreen)) &&
         !this.hidden &&
         !this.hold &&
         this.screenDismissedFor !== air.key,

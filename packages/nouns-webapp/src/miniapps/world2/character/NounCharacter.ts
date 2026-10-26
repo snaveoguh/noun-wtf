@@ -245,14 +245,21 @@ export function rideTrickLabel(label: string, t: BoardType): string {
   return out;
 }
 
-export type BoardType = 'skate' | 'hover' | 'scooter' | 'blades';
+/**
+ * Ride modes. 'snowboard' is the Big Drop's only board (missions/peak.ts puts
+ * you on one on the way in): never offered on the select screen, never stored.
+ */
+export type BoardType = 'skate' | 'hover' | 'scooter' | 'blades' | 'snowboard';
 /** Ride modes in select-screen order (all cosmetic — the physics is shared). */
 export const BOARD_TYPES: readonly BoardType[] = ['skate', 'hover', 'scooter', 'blades'];
+/** Snowboard topsheets (one per Noun, from the seed). */
+const SNOWBOARD_COLORS = [0xff2f8e, 0x20d6ff, 0xffe23a, 0x7b3cff, 0x3dff8a, 0xff8a1f, 0xf3322c];
 export const BOARD_LABELS: Record<BoardType, string> = {
   skate: 'SKATEBOARD',
   hover: 'HOVERBOARD ⚡',
   scooter: 'SCOOTER 🛴',
   blades: 'BLADES',
+  snowboard: 'SNOWBOARD ❄',
 };
 /** Untrusted input (URL, storage, network) → a ride mode; unknown = skate. */
 export function parseBoardType(v: unknown): BoardType {
@@ -581,6 +588,7 @@ export class NounCharacter {
   private restAnkles: THREE.Vector3[] = [];
   private scooter: ScooterRig | null = null;
   private blades: THREE.Group[] = [];
+  private snowboard: THREE.Group | null = null;
   private bladeWheels: THREE.Object3D[] = [];
   /** Clip the game asked for (before the ride-mode remap). */
   private requested = '';
@@ -861,7 +869,9 @@ export class NounCharacter {
     }
     if (this.hoverFx !== null) this.hoverFx.visible = t === 'hover';
     if (t !== 'hover') this.lift.position.y = 0;
-    // Scooter / blades swap the skateboard out entirely
+    if (t === 'snowboard' && this.snowboard === null) this.buildSnowboard();
+    if (this.snowboard !== null) this.snowboard.visible = t === 'snowboard';
+    // Scooter / blades / snowboard swap the skateboard out entirely
     if (this.boardModel !== null) this.boardModel.visible = t === 'skate' || t === 'hover';
     if (this.scooter !== null) this.scooter.root.visible = t === 'scooter';
     for (const b of this.blades) b.visible = t === 'blades';
@@ -871,6 +881,58 @@ export class NounCharacter {
       this.stance.quaternion.identity();
       this.ride.lift = 0;
     }
+  }
+
+  /**
+   * A snowboard under the skate stance: a 1.5 m plank with upturned tips,
+   * two bindings with highbacks, its top at the deck height the rider
+   * stands on, topsheet colour from the seed.
+   */
+  private buildSnowboard() {
+    const g = new THREE.Group();
+    g.name = 'snowboard';
+    const h =
+      (this.seed.body * 7 + this.seed.head * 13 + this.seed.glasses) % SNOWBOARD_COLORS.length;
+    const top = new THREE.MeshStandardMaterial({ color: SNOWBOARD_COLORS[h], roughness: 0.55 });
+    const base = new THREE.MeshStandardMaterial({ color: 0xf4f7fc, roughness: 0.4 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x15151c, roughness: 0.8 });
+    const y = this.deckTop - 0.0125;
+    const add = (
+      geo: THREE.BufferGeometry,
+      mat: THREE.Material,
+      x: number,
+      yy: number,
+      z: number,
+      rx = 0,
+    ) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, yy, z);
+      m.rotation.x = rx;
+      m.castShadow = true;
+      g.add(m);
+      return m;
+    };
+    add(new THREE.BoxGeometry(0.3, 0.025, 1.12), top, 0, y, 0);
+    add(new THREE.BoxGeometry(0.31, 0.008, 1.12), base, 0, y - 0.016, 0);
+    // A white stripe down the middle of the topsheet
+    add(new THREE.BoxGeometry(0.06, 0.004, 1.0), base, 0, y + 0.014, 0);
+    for (const s of [1, -1]) {
+      // Tip / tail: angled up
+      const tip = add(
+        new THREE.BoxGeometry(0.28, 0.025, 0.24),
+        top,
+        0,
+        y + 0.03,
+        s * 0.67,
+        -s * 0.38,
+      );
+      tip.scale.x = 0.92;
+      // Bindings: a base plate and a highback toward the heel edge
+      add(new THREE.BoxGeometry(0.22, 0.03, 0.12), dark, 0, y + 0.027, s * 0.24);
+      add(new THREE.BoxGeometry(0.03, 0.13, 0.12), dark, -0.1, y + 0.09, s * 0.24);
+    }
+    this.board.add(g);
+    this.snowboard = g;
   }
 
   /** Scooter or inline skates (rider stands forward, posed procedurally). */

@@ -53,6 +53,9 @@ export interface RiderVoiceHost {
   onSay?: (pick: CalloutPick) => void;
 }
 
+/** Seconds between house-voice warm-up lines. */
+const HOUSE_WARM_EVERY = 2.5;
+
 export class RiderVoice {
   readonly brain = new CalloutBrain();
   /** Settings: callouts on. */
@@ -75,6 +78,9 @@ export class RiderVoice {
   private warmed = '';
   private warmedModel = '';
   private warmedHouse = '';
+  /** House-voice warm-up: the lines still to synthesize, one every HOUSE_WARM_EVERY s. */
+  private houseQueue: string[] = [];
+  private houseWarmIn = 0;
 
   constructor(private host: RiderVoiceHost) {}
 
@@ -177,9 +183,14 @@ export class RiderVoice {
     const house = this.host.house?.() ?? null;
     if (house !== null && this.warmedHouse !== mode) {
       this.warmedHouse = mode;
-      for (const ev of ['bail', 'record', 'speed'] as const)
-        for (const text of bank(ev, this.brain.clean))
-          void house.synth(ctx, text, HOUSE_VOICE, 'bg');
+      this.houseQueue = (['bail', 'record', 'speed'] as const).flatMap(ev =>
+        bank(ev, this.brain.clean),
+      );
+    }
+    // A line at a time, spaced out: a whole bank at once kept a core busy for a minute
+    if (house !== null && this.houseQueue.length > 0 && this.t >= this.houseWarmIn) {
+      this.houseWarmIn = this.t + HOUSE_WARM_EVERY;
+      void house.synth(ctx, this.houseQueue.shift()!, HOUSE_VOICE, 'bg');
     }
     const tts = this.host.tts;
     if (!tts.ready || house !== null) return;

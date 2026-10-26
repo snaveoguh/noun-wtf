@@ -734,6 +734,8 @@ export class Game {
   private updateFm(dt: number) {
     const cam = this.gfx.camera;
     cam.getWorldDirection(this.fmFwd);
+    // One music player at a time: NOUN BEATS on keeps the van's screen down
+    this.fm.nearScreen = this.radio.mode !== 'beats';
     this.fm.update(dt, cam.position, this.fmFwd);
     // our radio on, or the van audible nearby: the site-wide NOUN FM holds
     claimAudio(
@@ -811,6 +813,8 @@ export class Game {
   }
 
   setBoardType(t: BoardType) {
+    // The Big Drop is snowboards only (peak.ts sets it and restores yours after)
+    if (this.missions.ud.active && t !== 'snowboard') return;
     this.boardType = t;
     this.me?.setBoardType(t);
   }

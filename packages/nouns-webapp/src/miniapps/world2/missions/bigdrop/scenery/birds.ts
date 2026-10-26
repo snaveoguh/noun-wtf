@@ -31,6 +31,9 @@ import { rng } from './placement';
 
 type Mode = 'cross' | 'pace' | 'soar' | 'drift';
 
+/** Closest any creature is drawn to the camera (m). */
+const NEAR = 35;
+
 interface Member {
   ox: number;
   oy: number;
@@ -53,6 +56,8 @@ interface Flock {
   /** pace: offset in the rider's frame (right, up, along velocity). */
   off: THREE.Vector3;
   offFrom: THREE.Vector3;
+  /** pace: the offset as actually flown (world axes), easing after the target. */
+  woff: THREE.Vector3;
   /** soar: pivot, radius, angular speed, angle. */
   pivot: THREE.Vector3;
   radius: number;
@@ -92,6 +97,8 @@ interface KindMesh {
 }
 
 export class Birds implements PeakSystem {
+  /** The rider's direction of travel, smoothed (pace flocks fly in its frame). */
+  private sFwd = new THREE.Vector3();
   private readonly flocks: Flock[] = [];
   private readonly kinds = new Map<CreatureKind, KindMesh>();
   private readonly rand = rng(0xb1d5 ^ (Date.now() & 0xffff));
@@ -221,6 +228,7 @@ export class Birds implements PeakSystem {
       members,
       off: new THREE.Vector3(),
       offFrom: new THREE.Vector3(),
+      woff: new THREE.Vector3(NaN, 0, 0),
       pivot: new THREE.Vector3(),
       radius: 0,
       w: 0,
@@ -255,7 +263,7 @@ export class Birds implements PeakSystem {
         const side = r() < 0.5 ? -1 : 1;
         const v = ptero ? 22 + r() * 10 : 16 + r() * 12;
         const lat = Math.min(1600, v * eta * (0.75 + r() * 0.4)) + 30;
-        this.overSlope(ahead, side * lat, 18 + r() * 90, f.centre);
+        this.overSlope(ahead, side * lat, 70 + r() * 150, f.centre);
         f.vel.set(-side * v, (r() - 0.6) * 3, (r() - 0.3) * 8);
         f.life = eta * 2.5 + 20;
       }
@@ -272,8 +280,8 @@ export class Birds implements PeakSystem {
       if (f !== null) {
         const side = r() < 0.5 ? -1 : 1;
         f.off.set(
-          side * (nog ? 16 + r() * 14 : 30 + r() * 20),
-          nog ? 6 + r() * 8 : 12 + r() * 12,
+          side * (nog ? 45 + r() * 25 : 70 + r() * 30),
+          nog ? 22 + r() * 14 : 30 + r() * 20,
           nog ? 6 + r() * 14 : 10 + r() * 20,
         );
         f.offFrom.set(f.off.x * 3, f.off.y + 40, f.off.z + 140);
@@ -309,7 +317,7 @@ export class Birds implements PeakSystem {
       if (f !== null) {
         const ahead = Math.min(3000, Math.max(400, speed * (6 + r() * 8)));
         const side = r() < 0.5 ? -1 : 1;
-        this.overSlope(ahead, side * (60 + r() * 500), 30 + r() * 160, f.centre);
+        this.overSlope(ahead, side * (140 + r() * 500), 60 + r() * 160, f.centre);
         f.vel.set((r() - 0.5) * 5, (r() - 0.5) * 1.5, (r() - 0.5) * 5);
         f.life = 120;
       }
@@ -317,10 +325,14 @@ export class Birds implements PeakSystem {
   }
 
   /** The rider's frame: along the velocity (dives with you), right, up. */
-  private paceFrame() {
+  private paceFrame(dt = 0) {
     const p = this.rider;
     if (p.vel.lengthSq() > 4) _fwd.copy(p.vel).normalize();
     else _fwd.copy(p.fwd).normalize();
+    // Smoothed: the rider's direction jolts on every bump and landing
+    if (dt > 0 && this.sFwd.lengthSq() > 0.5)
+      _fwd.copy(this.sFwd.lerp(_fwd, 1 - Math.exp(-2 * dt)).normalize());
+    else this.sFwd.copy(_fwd);
     _right.crossVectors(_fwd, _up);
     if (_right.lengthSq() < 1e-6) _right.set(1, 0, 0);
     _right.normalize();
@@ -334,7 +346,7 @@ export class Birds implements PeakSystem {
     this.spawn(dt);
     const p = this.rider;
     const rp = p.pos;
-    this.paceFrame();
+    this.paceFrame(dt);
     for (let i = this.flocks.length - 1; i >= 0; i--) {
       const f = this.flocks[i]!;
       f.t += dt;
@@ -354,7 +366,11 @@ export class Birds implements PeakSystem {
           const prevX = f.centre.x;
           const prevY = f.centre.y;
           const prevZ = f.centre.z;
-          f.centre.copy(rp).add(_o);
+          // Ease after it (a landing or a kicker turns the rider's frame in a
+          // frame; the flock glides round instead of jumping)
+          if (f.woff.x !== f.woff.x) f.woff.copy(_o);
+          else f.woff.lerp(_o, 1 - Math.exp(-2.5 * dt));
+          f.centre.copy(rp).add(f.woff);
           if (dt > 0)
             f.vel.set(
               (f.centre.x - prevX) / dt,
@@ -412,6 +428,9 @@ export class Birds implements PeakSystem {
         _o.y += Math.sin(t * 1.3 + m.phase * 1.7) * wob * 0.6;
         _o.z += Math.cos(t * 0.7 + m.phase) * wob;
         _p.copy(f.centre).add(_o).sub(cam);
+        // Never in your face: nothing flies closer than NEAR m to the camera
+        const d = _p.length();
+        if (d < NEAR && d > 1e-3) _p.multiplyScalar(NEAR / d);
         if (f.kind === 'jelly')
           _e.set(
             Math.sin(t * 0.4 + m.phase) * 0.15,

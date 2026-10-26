@@ -13,6 +13,7 @@ export const TIER_COLOR: Record<RespectTier, string> = {
 export const RESPECT_CSS = `
 .w2-respect{display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer}
 .w2-respect-tier{font-weight:900;font-style:italic;letter-spacing:.06em}
+.w2-respect-label{font-size:.62em;font-weight:800;letter-spacing:.14em;opacity:.55}
 .w2-respect-nog{image-rendering:pixelated}
 .w2-respect-bar{position:relative;display:inline-block;width:54px;height:5px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}
 .w2-respect-bar>i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .5s}
