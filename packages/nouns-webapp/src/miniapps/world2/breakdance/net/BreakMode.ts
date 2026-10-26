@@ -294,6 +294,19 @@ export class BreakMode {
 
   // ── Menu actions ──
 
+  /**
+   * `?play=breaks` (the homepage's NOUN BREAKS card): stand at the cypher's
+   * edge facing in and open the battle menu. False until the cypher's found.
+   */
+  arrive(): boolean {
+    const c = this.ensureCypher();
+    if (c === null || this.ui.phase !== 'idle') return c !== null;
+    this.game.player.spawn(new THREE.Vector3(c.x, c.y + 0.05, c.z + 7), Math.PI);
+    this.game.cam.snap(this.game.player);
+    this.promptAction();
+    return true;
+  }
+
   /** E / tap on the prompt: open the battle menu. */
   promptAction() {
     if (this.ui.phase !== 'idle' || this.ensureCypher() === null) return;

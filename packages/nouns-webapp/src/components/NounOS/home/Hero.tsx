@@ -21,6 +21,7 @@ import { DUCKED, shouldStartVo, shouldStopVo, stretches, syncRate } from './voic
 export const GAME_ACCENT: Record<GameId, string> = {
   world: '#ffd400',
   hoops: '#ff9a1f',
+  breaks: '#ff2f8e',
   warfare: '#3dff8a',
   drop: '#9fe8ff',
 };
