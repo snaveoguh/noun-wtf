@@ -22,20 +22,22 @@
 import type { Game } from '../Game';
 import type { TerrainCollider } from '../physics/Collision';
 import type { PlayerTerrain } from '../skate/Player';
+import type { PeakCtx, PeakSystem } from './bigdrop/contract';
 
 import * as THREE from 'three';
 
 import { inkExcluded, toonify } from '../render/Toon';
 import { createCombo } from '../skate/Tricks';
 
+import { ALT } from './bigdrop/contract';
+import { snowColor } from './bigdrop/surface';
+import { PEAK_SYSTEMS } from './bigdrop/systems';
 import { PEAK_LIPSCHITZ, peakHeight, peakNormal, raycastHeight } from './peakTerrain';
 
 /** Gravity scale inside (of the player's own tuning). */
 export const PEAK_GRAVITY = 0.4;
 /** Air drag scale inside: the fall line has to feel like one. */
 const PEAK_DRAG = 0.15;
-/** Local y of the summit: far above anything in the city's coordinates. */
-const ALT = 20_000;
 /** Recentre once the rider is this far from the origin (m)… */
 const REBASE = 3000;
 /** …on the ground, or anywhere past this. */
@@ -52,9 +54,6 @@ const SNOW_BOX = 70;
 
 const SKY_TOP = new THREE.Color(0xdfe6ee);
 const SKY_LOW = new THREE.Color(0xa9cdee);
-const SNOW_LIT = new THREE.Color(0xf7fbff);
-const SNOW_SHADE = new THREE.Color(0xd6e2f0);
-const ROCK = new THREE.Color(0x8d97a6);
 
 interface Saved {
   fog: THREE.Scene['fog'];
@@ -121,6 +120,12 @@ export class Peak {
   private snowVel: Float32Array | null = null;
   private wind: { gain: GainNode; nodes: AudioScheduledSourceNode[] } | null = null;
   private lastRespawns = 0;
+  /** The track, scenery, riders… (bigdrop/systems.ts), while inside. */
+  private systems: PeakSystem[] = [];
+  /** Colliders the systems added: id → geometry + its offset (peak coordinates). */
+  private colliders = new Map<string, THREE.Vector3>();
+  private riderPeak = new THREE.Vector3();
+  private readonly ctx: PeakCtx;
   private readonly local: PlayerTerrain = {
     height: (x, z) => this.heightAt(x, z),
     inDomain: () => true,
@@ -134,6 +139,43 @@ export class Peak {
 
   constructor(private game: Game) {
     this.group.name = 'BigDrop';
+    // The context's getters (quality, depth) read live values off the dimension
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    this.ctx = {
+      game,
+      group: this.group,
+      get quality() {
+        return game.gfx.quality;
+      },
+      get toon() {
+        return game.gfx.toon;
+      },
+      origin: this.origin,
+      toLocal: (x, y, z, out) =>
+        out.set(x - self.origin.x, y - self.origin.y + ALT, z - self.origin.z),
+      toPeak: (x, y, z, out) =>
+        out.set(x + self.origin.x, y + self.origin.y - ALT, z + self.origin.z),
+      riderPeak: this.riderPeak,
+      get depth() {
+        return self.depth;
+      },
+      setCollider: (id, geometry, peakOffset) => {
+        const key = `peak:${id}`;
+        if (geometry === null) {
+          game.world.setDynamic(key, null);
+          self.colliders.delete(key);
+          return;
+        }
+        const off = (peakOffset ?? new THREE.Vector3()).clone();
+        self.colliders.set(key, off);
+        game.world.setDynamic(
+          key,
+          geometry,
+          self.ctx.toLocal(off.x, off.y, off.z, new THREE.Vector3()),
+        );
+      },
+    };
   }
 
   /** Surface height at a local (x, z). */
@@ -205,6 +247,17 @@ export class Peak {
     this.builtAt.set(Infinity, 0, 0);
     this.applySky();
     this.startWind();
+    this.riderPeak.set(
+      p.pos.x + this.origin.x,
+      p.pos.y + this.origin.y - ALT,
+      p.pos.z + this.origin.z,
+    );
+    for (const make of PEAK_SYSTEMS)
+      try {
+        this.systems.push(make(this.ctx));
+      } catch (err) {
+        console.warn('[bigdrop] a system failed to start', err);
+      }
   }
 
   exit() {
@@ -213,8 +266,18 @@ export class Peak {
     const gfx = g.gfx;
     const s = this.saved;
     const p = g.player;
+    for (const sys of this.systems)
+      try {
+        sys.dispose();
+      } catch (err) {
+        console.warn('[bigdrop] a system failed to dispose', err);
+      }
+    this.systems = [];
+    for (const key of this.colliders.keys()) g.world.setDynamic(key, null);
+    this.colliders.clear();
     gfx.scene.remove(this.group);
     this.disposeGroup();
+    this.group.clear();
     for (const o of s.hidden) o.visible = true;
     gfx.scene.fog = s.fog;
     gfx.scene.background = s.background;
@@ -264,6 +327,17 @@ export class Peak {
     this.applySky();
     this.updateTerrain();
     this.updateSnow(dt);
+    this.riderPeak.set(
+      p.pos.x + this.origin.x,
+      p.pos.y + this.origin.y - ALT,
+      p.pos.z + this.origin.z,
+    );
+    for (const sys of this.systems)
+      try {
+        sys.update(dt);
+      } catch (err) {
+        console.warn('[bigdrop] a system failed', err);
+      }
     // The others are in the right-side-up world
     for (const r of g.remotes.values()) {
       r.character.root.visible = false;
@@ -300,6 +374,8 @@ export class Peak {
       a.needsUpdate = true;
     }
     this.builtAt.set(Infinity, 0, 0);
+    g.world.shiftDynamic('peak:', d);
+    for (const sys of this.systems) sys.rebase?.(d);
   }
 
   private applySky() {
@@ -396,10 +472,7 @@ export class Peak {
         N[v * 3] = -gx / l;
         N[v * 3 + 1] = ny;
         N[v * 3 + 2] = -gz / l;
-        // Fresh snow on the gentler bits, bluer on the steep, rock where
-        // it's steepest (the faces of the kickers)
-        c.copy(SNOW_SHADE).lerp(SNOW_LIT, Math.min(1, Math.max(0, (ny - 0.6) / 0.25)));
-        if (ny < 0.62) c.lerp(ROCK, Math.min(1, (0.62 - ny) / 0.05) * 0.6);
+        snowColor(cx + off[i]! + this.origin.x, cz + off[j]! + this.origin.z, ny, c);
         C[v * 3] = c.r;
         C[v * 3 + 1] = c.g;
         C[v * 3 + 2] = c.b;

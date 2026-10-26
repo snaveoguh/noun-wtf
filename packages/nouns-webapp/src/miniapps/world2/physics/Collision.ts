@@ -82,6 +82,18 @@ export class CollisionWorld {
     this.dynamic.set(id, { bvh, geometry, offset: off, box });
   }
 
+  /**
+   * Move every streamed collider whose id starts with `prefix` by `d`, in
+   * place (a floating-origin shift: no BVH rebuild).
+   */
+  shiftDynamic(prefix: string, d: THREE.Vector3) {
+    for (const [id, b] of this.dynamic)
+      if (id.startsWith(prefix)) {
+        b.offset.add(d);
+        b.box.translate(d);
+      }
+  }
+
   get dynamicCount() {
     return this.dynamic.size;
   }
