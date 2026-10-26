@@ -152,6 +152,32 @@ export class PlayerVoices {
     return e.ready ? e : null;
   }
 
+  /**
+   * The house voice, waiting up to `ms` for it to finish loading (it's
+   * 63 MB; the rider warms it up from the moment the game starts).
+   */
+  async houseWithin(ms: number): Promise<TtsEngine | null> {
+    const now = this.house();
+    if (now !== null || this.houseEngine === null) return now;
+    await Promise.race([this.houseEngine.whenReady(), new Promise(r => setTimeout(r, ms))]);
+    return this.house();
+  }
+
+  /** Typed chat speaks in the player's own model (on and loaded), not the house voice. */
+  ownChatOn(): boolean {
+    return settings.get().modelVoice && myVoice.get().model !== null;
+  }
+
+  /** Others receive my chat as my own voice clips (they then don't speak the text). */
+  sharesOwnChat(): boolean {
+    return this.ownChatOn() && settings.get().modelShare && voiceNet.enabled;
+  }
+
+  /** Whether a remote rider's chat may be spoken here (not muted / reported). */
+  canSpeakFor(tag: string): boolean {
+    return tag === '' || !voiceMutes.has(tag);
+  }
+
   /** Status of the own-model engine (booth / settings show it). */
   modelState(): 'off' | 'idle' | 'loading' | 'ready' | 'failed' {
     if (!settings.get().modelVoice || myVoice.get().model === null) return 'off';

@@ -47,7 +47,7 @@ describe('buildRows', () => {
     );
     expect(play.items.slice(0, n).every(i => i.cover !== undefined)).toBe(true);
     const paths = play.items.flatMap(i => (i.action.t === 'entry' ? [i.action.entry.path] : []));
-    expect(paths).toEqual(['/world/voice', '/playground', '/crystal-ball']);
+    expect(paths).toEqual(['/exchange', '/world/voice', '/playground', '/crystal-ball']);
     const booth = play.items.find(i => i.key === 'play:/world/voice')!;
     expect(booth.cover).toBe('/home/covers/voice-booth.webp');
     expect(booth.action).toMatchObject({ t: 'entry', entry: { path: '/world/voice' } });

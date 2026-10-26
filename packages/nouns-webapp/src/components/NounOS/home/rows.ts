@@ -352,7 +352,7 @@ export function coverForPath(path: string): string | undefined {
 }
 
 /** Extra things to play, from the catalog, after the three games. */
-const PLAY_PATHS = ['/world/voice', '/playground', '/crystal-ball'];
+const PLAY_PATHS = ['/exchange', '/world/voice', '/playground', '/crystal-ball'];
 
 export type Action =
   | { t: 'game'; id: GameId }
