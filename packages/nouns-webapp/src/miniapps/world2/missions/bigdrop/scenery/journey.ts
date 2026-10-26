@@ -195,8 +195,9 @@ export function snowfallAt(depth: number): number {
  * Fog density (FogExp2): thick in the storm, then light enough that the
  * near slope stays crisp and the terrain's 7 km edge is ~all haze.
  */
-export function fogDensityAt(depth: number, edge = 7000): number {
-  // exp2 fog reaches 95% at (density · d)² = 3
+export function fogDensityAt(depth: number, edge = 6200): number {
+  // exp2 fog reaches 95% at (density · d)² = 3: past `edge`, and ~99.5% by
+  // the camera's 8 km far plane, so the terrain's clip never shows
   const clear = Math.sqrt(3) / edge;
   const s = stormAt(depth);
   return clear + (0.0035 - clear) * s * s;

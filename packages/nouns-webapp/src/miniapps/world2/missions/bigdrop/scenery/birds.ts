@@ -183,7 +183,7 @@ export class Birds implements PeakSystem {
       let ox = 0;
       let oy = 0;
       let oz = 0;
-      const sp = kind === 'ptero' ? 14 : kind === 'jelly' ? 22 : 5;
+      const sp = kind === 'ptero' ? 16 : kind === 'jelly' ? 24 : 7;
       if (formation === 'v') {
         const row = Math.ceil(i / 2);
         const side = i % 2 === 0 ? 1 : -1;
@@ -205,7 +205,8 @@ export class Birds implements PeakSystem {
         phase: r() * Math.PI * 2,
         rate: kind === 'nogbird' ? 9 + r() * 4 : kind === 'ptero' ? 2.6 + r() : 1.4 + r() * 1.2,
         amp: kind === 'nogbird' ? 0.65 : kind === 'ptero' ? 0.55 : 0,
-        scale: kind === 'jelly' ? 0.9 + r() * 1.2 : 0.9 + r() * 0.6,
+        scale:
+          kind === 'jelly' ? 1.2 + r() * 1.4 : kind === 'ptero' ? 1.2 + r() * 0.6 : 1.4 + r() * 0.8,
         tint,
       });
     }

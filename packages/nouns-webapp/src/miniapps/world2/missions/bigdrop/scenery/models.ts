@@ -14,7 +14,7 @@ import { hash2 } from '../../../world/mountain/config';
 import { Kind } from './placement';
 
 const BARK = 0x5a3b2a;
-const NEEDLES = [0x24584a, 0x2e6a50, 0x3a7a55];
+const NEEDLES = [0x2c6a52, 0x3a845e, 0x4f9c6a];
 const SNOW = 0xf2f7ff;
 const SNOW_SHADE = 0xcfdcf0;
 const SNAG = 0x9a8f88;
@@ -198,7 +198,7 @@ export function sceneryMaterial(name: string): THREE.MeshStandardMaterial {
     roughness: 0.95,
     metalness: 0,
     // A little cool self-light so the shaded side reads as snow and pine, not mud
-    emissive: 0x1c2638,
+    emissive: 0x24324a,
   });
   m.name = name;
   return m;

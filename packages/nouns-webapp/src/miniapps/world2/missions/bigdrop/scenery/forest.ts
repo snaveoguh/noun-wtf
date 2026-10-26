@@ -4,8 +4,10 @@
 // per chunk, matrices relative to the chunk's own origin (so float32 never
 // sees peak coordinates), the chunk group placed with ctx.toLocal and
 // shifted on a rebase. Streamed by track distance ahead of the rider (up to
-// 600 m/s), recycled from a pool; at most one chunk built per frame once
-// the first window is up. Trees and rocks near the line get trunk colliders
+// 600 m/s), recycled from a pool. Building is sliced (placement, heights,
+// meshes) under a per-frame time budget; only the chunks under the rider
+// (on the way in, after a respawn) skip the queue. Trees and rocks near the
+// line get trunk colliders
 // (one merged collider per chunk, only round the rider) so riding into a
 // tree is a crash. Far chunks scatter one-cone pines over the whole
 // mountainside out to the terrain's edge.
@@ -41,6 +43,8 @@ interface Chunk {
   solids: Placed[];
   heights: number[];
   collider: THREE.BufferGeometry | null;
+  /** Every model built (colliders wait for this). */
+  ready: boolean;
 }
 
 /** Instance capacity per chunk mesh, by kind (near), and for the far pines. */
@@ -48,8 +52,10 @@ const CAP = [900, 900, 160, 260];
 const FAR_CAP = 1100;
 /** Most solids per chunk collider. */
 const MAX_SOLIDS = 260;
-/** JS time per frame for building chunks once the first window is up (ms). */
+/** JS time per frame for building chunks (ms; the chunks under the rider ignore it). */
 const BUILD_MS = { low: 0.5, medium: 0.6, high: 0.7 } as const;
+/** Most a catch-up (after a respawn or a jump down the mountain) may take in one frame (ms). */
+const CATCH_UP_MS = 60;
 /** Heights sampled between time checks. */
 const BATCH = 24;
 
@@ -75,7 +81,6 @@ export class Forest implements PeakSystem {
   private readonly mat: THREE.Material;
   /** Free InstancedMeshes per kind (near 0..3, far 4..5). */
   private readonly pool: THREE.InstancedMesh[][] = [[], [], [], [], [], []];
-  private first = true;
   private job: Job | null = null;
   /** For the perf readout (?bigdrop debug): chunks built, colliders live. */
   stats = { built: 0, colliders: 0, instances: 0 };
@@ -117,11 +122,14 @@ export class Forest implements PeakSystem {
     // No budget on the way in, or after a respawn / jump: the ground under
     // the rider (and just ahead) must never be bare
     const here = Math.floor(s / FOREST.chunk);
-    const catchUp = !this.near.has(here) || (here + 1 <= nl && !this.near.has(here + 1));
-    const limit = this.first ? Infinity : BUILD_MS[q];
+    const ready = (i: number) => this.near.get(i)?.ready === true;
+    const catchUp = !ready(here) || (here + 1 <= nl && !ready(here + 1));
+    const limit = BUILD_MS[q];
     while (
       performance.now() - t0 < limit ||
-      (catchUp && !(this.near.has(here) && (here + 1 > nl || this.near.has(here + 1))))
+      (catchUp &&
+        performance.now() - t0 < CATCH_UP_MS &&
+        !(ready(here) && (here + 1 > nl || ready(here + 1))))
     ) {
       if (this.job === null) {
         const at = Math.floor(s / FOREST.chunk);
@@ -144,12 +152,11 @@ export class Forest implements PeakSystem {
     for (const c of this.near.values()) {
       const a = c.index * FOREST.chunk;
       const want = a + FOREST.chunk >= c0 && a <= c1;
-      if (want && c.collider === null) this.addCollider(c);
+      if (want && c.ready && c.collider === null) this.addCollider(c);
       else if (!want && c.collider !== null) this.removeCollider(c);
       if (c.collider !== null) live++;
     }
     this.stats.colliders = live;
-    this.first = false;
   }
 
   private take(kind: number, far: boolean): THREE.InstancedMesh {
@@ -180,10 +187,19 @@ export class Forest implements PeakSystem {
       heights[i] = peakHeight(placed[i]!.x, placed[i]!.z);
       if (i % BATCH === BATCH - 1) yield;
     }
-    this.finish(index, far, placed, heights);
+    yield* this.finish(index, far, placed, heights);
   }
 
-  private finish(index: number, far: boolean, placed: Placed[], heights: Float64Array) {
+  /**
+   * The meshes, one model a step. The chunk is live (and droppable) from
+   * the first step; colliders wait for `ready`.
+   */
+  private *finish(
+    index: number,
+    far: boolean,
+    placed: Placed[],
+    heights: Float64Array,
+  ): Generator<void, void> {
     const ctx = this.ctx;
     const len = far ? FOREST.farChunk : FOREST.chunk;
     const s0 = Math.max(TRACK.start, index * len);
@@ -201,7 +217,11 @@ export class Forest implements PeakSystem {
       solids: [],
       heights: [],
       collider: null,
+      ready: false,
     };
+    ctx.toLocal(origin.x, origin.y, origin.z, group.position);
+    this.root.add(group);
+    (far ? this.far : this.near).set(index, chunk);
     // Bucket by kind (far: 4 = pine, 5 = snowy)
     const kinds = far ? 2 : KIND_COUNT;
     for (let k = 0; k < kinds; k++) {
@@ -241,10 +261,9 @@ export class Forest implements PeakSystem {
       chunk.meshes.push(mesh);
       chunk.kinds.push(poolKind);
       this.stats.instances += n;
+      if (k < kinds - 1) yield;
     }
-    ctx.toLocal(origin.x, origin.y, origin.z, group.position);
-    this.root.add(group);
-    (far ? this.far : this.near).set(index, chunk);
+    chunk.ready = true;
     this.stats.built++;
   }
 

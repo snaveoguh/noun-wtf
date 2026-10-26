@@ -69,7 +69,11 @@ vec3 cloudSea(vec3 d, float depthM, vec2 off) {
   float n2 = fbm(p - uToSun.xz * 0.11);
   float lit = smoothstep(-0.02 - fw, -0.02 + fw, n - n2);
   float dist = depthM / dn;
-  return vec3(cov, lit, 1.0 - exp(-dist / 70000.0));
+  // Haze toward the horizon (distance) and toward the steep (the fogged far
+  // edge of the slope sits there: it melts into haze, not into cloud)
+  float far = 1.0 - exp(-dist / 110000.0);
+  float steep = smoothstep(0.45, 0.8, dn);
+  return vec3(cov, lit, max(far, steep));
 }
 
 void main() {
@@ -100,8 +104,8 @@ void main() {
   if (h > 0.0) {
     vec2 q = d.xz / (h + 0.08);
     float c = fbm(vec2(q.x * 0.45 + uTime * 0.002, q.y * 2.2) + 3.0);
-    float ci = smoothstep(0.58, 0.72, c) * smoothstep(0.02, 0.2, h) * (1.0 - uStars);
-    col = mix(col, mix(uCloudLit, uBand, 0.25 * uBandK), ci * 0.45);
+    float ci = smoothstep(0.62, 0.76, c) * smoothstep(0.02, 0.2, h) * (1.0 - uStars);
+    col = mix(col, mix(uCloudLit, uBand, 0.25 * uBandK), ci * 0.32);
   }
   // Stars
   if (uStars > 0.001 && h > 0.0) {
@@ -131,7 +135,7 @@ void main() {
   vec3 low = uHaze;
   if (h < 0.012) {
     vec3 cs = cloudSea(d, uCloudDepth, uCloudOff);
-    vec3 gap = mix(uCloudShade, uZenith, 0.35) * 0.82;
+    vec3 gap = mix(mix(uCloudShade, uZenith, 0.3), uHaze, 0.35);
     vec3 cc = mix(gap, mix(uCloudShade, uCloudLit, cs.y), cs.x);
     low = mix(cc, uHaze, smoothstep(0.15, 0.85, cs.z));
   }
@@ -139,7 +143,9 @@ void main() {
   // The sun: glow, a big disc, the 22° halo and sun dogs
   float above = smoothstep(-0.012, 0.004, h);
   float glow = pow(max(cosS, 0.0), 6.0) * 0.28 + pow(max(cosS, 0.0), 90.0) * 0.55;
-  col += uSunColor * glow * (1.0 - 0.55 * uStorm) * mix(0.55, 1.0, above);
+  // Above the horizon only: below it the sky must match the fog exactly
+  // (the terrain's far clip shows sky there)
+  col += uSunColor * glow * (1.0 - 0.55 * uStorm) * above;
   float fw = fwidth(cosS) + 1e-5;
   float disc = smoothstep(0.99955 - fw, 0.99955 + fw, cosS) * above;
   float ang = acos(clamp(cosS, -1.0, 1.0));

@@ -27,7 +27,8 @@ describe('the Big Drop sky over the descent', () => {
     // Thick fog in the storm, light after: the 7 km grid edge is ~95% haze
     expect(fogDensityAt(0)).toBeGreaterThan(0.003);
     const d = fogDensityAt(5000);
-    expect(1 - Math.exp(-((d * 7000) ** 2))).toBeCloseTo(0.95, 2);
+    expect(1 - Math.exp(-((d * 6200) ** 2))).toBeCloseTo(0.95, 2);
+    expect(1 - Math.exp(-((d * 8000) ** 2))).toBeGreaterThan(0.99);
     expect(1 - Math.exp(-((d * 1000) ** 2))).toBeLessThan(0.1);
   });
 

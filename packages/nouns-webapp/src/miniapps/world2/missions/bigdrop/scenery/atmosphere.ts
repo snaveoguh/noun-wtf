@@ -90,7 +90,7 @@ export class Atmosphere implements PeakSystem {
     });
     {
       const near = LAYERS[LAYERS.length - 1]!;
-      const u = rangeUniforms(0.3);
+      const u = rangeUniforms(0.12);
       const mesh = makeFarMesh(
         nounGeometry(NOUN_AZ * DEG, (near.base + near.amp * 0.55) * DEG),
         u,
@@ -181,7 +181,7 @@ export class Atmosphere implements PeakSystem {
       r.u.uLift.value = L.lift * DEG * lift;
       r.u.uRot.value = depth * L.drift;
       r.u.uHaze.value.copy(s.haze);
-      r.u.uHazeK.value = Math.min(1, (r.layer?.haze ?? 0.3) + 0.6 * s.storm);
+      r.u.uHazeK.value = Math.min(1, (r.layer?.haze ?? 0.12) + 0.6 * s.storm);
       r.u.uToLight.value.copy(s.toSun);
       r.u.uLight.value.copy(this.lightCol);
       r.u.uShade.value.copy(this.shadeCol);

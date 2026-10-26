@@ -40,7 +40,7 @@ export const LAYERS: readonly RangeLayer[] = [
     base: -1.5,
     amp: 4.5,
     freq: 5,
-    haze: 0.62,
+    haze: 0.48,
     lift: 7,
     drift: 1 / 1_400_000,
   },
@@ -50,7 +50,7 @@ export const LAYERS: readonly RangeLayer[] = [
     base: -6,
     amp: 7,
     freq: 3.4,
-    haze: 0.42,
+    haze: 0.3,
     lift: 12,
     drift: -1 / 700_000,
   },
@@ -60,7 +60,7 @@ export const LAYERS: readonly RangeLayer[] = [
     base: -12,
     amp: 10,
     freq: 2.3,
-    haze: 0.22,
+    haze: 0.14,
     lift: 19,
     drift: 1 / 320_000,
   },
@@ -115,7 +115,9 @@ void main() {
   vEl = el;
   vTop = top;
   vec4 q = projectionMatrix * modelViewMatrix * vec4(d, 1.0);
-  gl_Position = q.xyww;
+  // Just in front of the front cloud layer (skyDome.ts), behind everything
+  // real: the ranges hide those clouds, their feet fade into them here
+  gl_Position = vec4(q.xy, q.w * 0.999999, q.w);
 }
 `;
 
@@ -165,8 +167,8 @@ export interface RangeUniforms {
 
 const SNOW = new THREE.Color(0xf4f8ff);
 const SNOW_BLUE = new THREE.Color(0xd5e2f6);
-const ROCK = new THREE.Color(0x5d6a82);
-const ROCK_WARM = new THREE.Color(0x7a6f78);
+const ROCK = new THREE.Color(0x46526c);
+const ROCK_WARM = new THREE.Color(0x645462);
 
 /** Unit-radius geometry of one ring: base, a shoulder row and the ridge. */
 export function ringGeometry(layer: RangeLayer, columns = layer.columns): THREE.BufferGeometry {
@@ -175,7 +177,12 @@ export function ringGeometry(layer: RangeLayer, columns = layer.columns): THREE.
   const BASE = -32 * deg;
   // Rows: base, shoulder, ridge (radius pulled in on the shoulders so the
   // faces facet like real spurs)
-  const rows = 3;
+  // Rows: base, two shoulders, the ridge. The base sits nearer the viewer
+  // than the ridge, so the faces lean back and up like real slopes (their
+  // normals face you and the sky); the radius only shapes the shading, the
+  // silhouette is all direction.
+  const rows = 4;
+  const SHOULDER = [0, 0.42, 0.74, 1];
   const P: number[][] = [];
   const T: number[] = [];
   for (let i = 0; i <= N; i++) {
@@ -183,10 +190,11 @@ export function ringGeometry(layer: RangeLayer, columns = layer.columns): THREE.
     const top = ridgeAt(layer, a) * deg;
     for (let r = 0; r < rows; r++) {
       const f = r / (rows - 1);
-      const jit = hash2(i, r, layer.seed);
+      // Smooth along the ring (spurs and gullies), not per column
+      const spur = vnoise((a * layer.columns) / 14, r * 3.7, layer.seed + 9);
       const el =
-        r === 0 ? BASE : r === rows - 1 ? top : BASE + (top - BASE) * (0.72 + 0.12 * (jit - 0.5));
-      const rad = r === rows - 1 ? 1 : 1 - 0.035 * jit - (r === 0 ? 0 : 0.01);
+        r === 0 ? BASE : r === rows - 1 ? top : BASE + (top - BASE) * (SHOULDER[r]! + 0.1 * spur);
+      const rad = r === rows - 1 ? 1 : 0.8 + 0.2 * SHOULDER[r]! + 0.035 * spur;
       P.push([
         Math.sin(a) * rad * Math.cos(el),
         Math.sin(el) * rad,
@@ -215,9 +223,10 @@ export function ringGeometry(layer: RangeLayer, columns = layer.columns): THREE.
     const centre = va.clone().add(vb).add(vc);
     if (n.dot(centre) > 0) n.negate();
     const tf = (T[ia]! + T[ib]! + T[ic]!) / 3;
-    const snowLine = 0.45 + 0.3 * hash2(k, 7, layer.seed);
-    const steep = 1 - Math.abs(n.y);
-    if (tf > snowLine && steep < 0.985) c.copy(hash2(k, 3, layer.seed) > 0.4 ? SNOW : SNOW_BLUE);
+    // A ragged snowline; the steepest faces stay bare rock
+    const snowLine = 0.5 + 0.22 * hash2(k >> 2, 7, layer.seed);
+    const cliff = n.y < 0.12 && hash2(k, 9, layer.seed) < 0.55;
+    if (tf > snowLine && !cliff) c.copy(hash2(k, 3, layer.seed) > 0.35 ? SNOW : SNOW_BLUE);
     else c.copy(ROCK).lerp(ROCK_WARM, hash2(k, 5, layer.seed));
     for (const [v, t] of [
       [va, T[ia]!],
@@ -234,8 +243,8 @@ export function ringGeometry(layer: RangeLayer, columns = layer.columns): THREE.
     for (let r = 0; r < rows - 1; r++) {
       const a = i * rows + r;
       const b = (i + 1) * rows + r;
-      tri(a, b, a + 1, i * 4 + r * 2);
-      tri(a + 1, b, b + 1, i * 4 + r * 2 + 1);
+      tri(a, b, a + 1, i * 8 + r * 2);
+      tri(a + 1, b, b + 1, i * 8 + r * 2 + 1);
     }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -247,7 +256,7 @@ export function ringGeometry(layer: RangeLayer, columns = layer.columns): THREE.
 
 /**
  * A giant Noun head carved out of a far peak: a snow-capped square head on a
- * rock plinth, wearing red noggles. Unit scale: about 0.1 rad wide, at
+ * rock plinth, wearing red noggles. About 0.19 rad (11°) wide, at
  * azimuth `az` (radians), standing on elevation `el`.
  */
 export function nounGeometry(az: number, el: number): THREE.BufferGeometry {
@@ -258,9 +267,10 @@ export function nounGeometry(az: number, el: number): THREE.BufferGeometry {
   plinth.translate(0, -0.08, 0);
   add(plinth, 0x6a7088);
   // The head
+  // Carved stone, snow on its crown
   const head = new THREE.BoxGeometry(0.11, 0.09, 0.08);
   head.translate(0, 0.045, 0);
-  add(head, 0xe9eef8);
+  add(head, 0x7d87a0);
   const cap = new THREE.BoxGeometry(0.114, 0.012, 0.084);
   cap.translate(0, 0.094, 0);
   add(cap, 0xffffff);
@@ -292,7 +302,7 @@ export function nounGeometry(az: number, el: number): THREE.BufferGeometry {
   const tops: number[] = [];
   const m = new THREE.Matrix4();
   // Face the centre: local −z points back toward the viewer
-  m.makeRotationY(az);
+  m.makeRotationY(az).multiply(new THREE.Matrix4().makeScale(1.7, 1.7, 1.7));
   const at = new THREE.Vector3(
     Math.sin(az) * Math.cos(el),
     Math.sin(el),
@@ -348,8 +358,8 @@ export function makeFarMesh(
     vertexShader: VERT,
     fragmentShader: FRAG,
     uniforms,
-    depthWrite: false,
-    depthTest: false,
+    depthWrite: true,
+    depthTest: true,
     fog: false,
     side,
   });
