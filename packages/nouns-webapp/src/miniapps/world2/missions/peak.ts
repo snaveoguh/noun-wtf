@@ -337,10 +337,12 @@ export class Peak {
         idx[o++] = a + n + 1;
       }
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    // A cool self-glow keeps the shaded side snow, not grey concrete
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.9,
       metalness: 0,
+      emissive: 0x5d6b80,
     });
     mat.name = 'BigDropSnow';
     const mesh = new THREE.Mesh(geo, mat);
@@ -520,7 +522,10 @@ export class Peak {
     if (this.terrain !== null) {
       this.group.remove(this.terrain);
       this.terrain.geometry.dispose();
-      (this.terrain.material as THREE.Material).dispose();
+      const mat = this.terrain.material as THREE.Material;
+      // toonify swaps in a converted copy: free the original as well
+      (mat.userData.toonSrc as THREE.Material | undefined)?.dispose();
+      mat.dispose();
       this.terrain = null;
     }
     if (this.snow !== null) {
