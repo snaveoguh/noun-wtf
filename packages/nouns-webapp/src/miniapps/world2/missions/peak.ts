@@ -344,7 +344,7 @@ export class Peak {
       vertexColors: true,
       roughness: 0.9,
       metalness: 0,
-      emissive: 0x5d6b80,
+      emissive: 0x8492a8,
     });
     mat.name = 'BigDropSnow';
     const mesh = new THREE.Mesh(geo, mat);
