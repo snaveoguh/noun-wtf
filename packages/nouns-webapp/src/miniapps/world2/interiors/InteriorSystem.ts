@@ -28,6 +28,7 @@ import type { LevelData } from '../world/Level';
 import * as THREE from 'three';
 
 import { seedVoice } from '../audio/voice/cast';
+import { prefetchGlbHead } from '../character/GlbHead';
 import { NounCharacter } from '../character/NounCharacter';
 import { inkExcluded, toonify } from '../render/Toon';
 import { GROWN_TOWNS, placementOf, townFrame, type GrownTown } from '../towns/site';
@@ -510,6 +511,9 @@ export class InteriorSystem implements InteriorsApi {
     // Residents
     const rnd = mulberry32(hash32(`${door.id}:${Date.now()}`));
     const defs = residentsFor(door.id, layout, tier);
+    // Their 3D head models load over the network (the head stays hidden
+    // until then): start now, so they're there by the time they're built
+    for (const d of defs) prefetchGlbHead(d.seed[3], d.seed[4]);
     const tFolk0 = performance.now();
     const folk: Folk[] = defs.map(def => this.makeFolk(def, layout));
     const tFolk = performance.now();
@@ -729,6 +733,9 @@ export class InteriorSystem implements InteriorsApi {
     if (f.ch === null) return;
     f.ch.dispose();
     disposeMaterials(f.ch.body, true);
+    // Each cloned skinned mesh has its own skeleton, and its bone texture
+    // lives on the GPU until the skeleton itself is freed
+    f.ch.root.traverse(o => (o as THREE.SkinnedMesh).skeleton?.dispose());
   }
 
   // ── Inside ──
