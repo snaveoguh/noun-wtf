@@ -761,8 +761,9 @@ function Hud({
         </button>
       )}
 
-      {/* GTA-style map: minimap bottom-left, opens the full map */}
-      <WorldMap game={game} touch={touch} />
+      {/* GTA-style map: minimap bottom-left, opens the full map (not on the
+          Big Drop: the map's world is the one you left) */}
+      {!game.missions.ud.active && <WorldMap game={game} touch={touch} />}
 
       {/* Chat feed (above the minimap on desktop) */}
       <div

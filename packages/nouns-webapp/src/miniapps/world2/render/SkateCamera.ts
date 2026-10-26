@@ -51,6 +51,12 @@ export class SkateCamera {
     private world: CollisionWorld,
   ) {}
 
+  /**
+   * Lead the look target down (and up) with the rider's vertical speed too,
+   * so a 49° fall line fills the view instead of the sky (the Big Drop).
+   */
+  leadVertical = false;
+
   /** 0 turns camera shake off (reduce motion). */
   shakeScale = 1;
 
@@ -177,6 +183,7 @@ export class SkateCamera {
     const lookTarget = _lookTarget.copy(target);
     if (onBoard) lookTarget.x += p.vel.x * 0.12;
     if (onBoard) lookTarget.z += p.vel.z * 0.12;
+    if (onBoard && this.leadVertical) lookTarget.y += p.vel.y * 0.12;
     this.look.lerp(lookTarget, 1 - Math.exp(-14 * dt));
 
     this.camera.position.copy(this.pos);

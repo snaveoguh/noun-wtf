@@ -184,6 +184,7 @@ export class Peak {
     p.softBounds = Infinity;
     p.mountain = null;
     g.world.terrain = this.collider;
+    g.cam.leadVertical = true;
     // R (and falling out) bring you back to the summit pad, facing +Z
     p.homeSpots = [{ pos: new THREE.Vector3(0, ALT + 0.05, 0), yaw: 0 }];
     p.respawnHome();
@@ -233,6 +234,7 @@ export class Peak {
     p.mountain = s.mountain;
     p.homeSpots = s.homeSpots;
     g.world.terrain = s.worldTerrain;
+    g.cam.leadVertical = false;
     // Back out where you went in, by the door, with nothing carried over:
     // no session score or half-done combo, no speed and no streak
     p.safePos.copy(s.pos);
