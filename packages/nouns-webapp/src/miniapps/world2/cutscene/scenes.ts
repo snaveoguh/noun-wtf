@@ -245,7 +245,7 @@ function twins(): Script {
   };
 }
 
-// ── The deepest door: into the Upside Down ──
+// ── The deepest door: onto the Big Drop ──
 
 function door(): Script {
   const behind = pose([0.6, 2.2, 6.0], [0, 1.4, 0], 50);
@@ -265,12 +265,18 @@ function door(): Script {
       { k: 'sfx', at: 0.55, id: 'door-creak', gain: 0.9 },
       { k: 'shot', at: 1.4, dur: 1.0, from: behind, to: through, ease: 'in' },
       { k: 'sfx', at: 1.75, id: 'whoosh', gain: 0.7, rate: 0.8 },
-      { k: 'flash', at: 2.3, dur: 0.7, color: '#c81d25', peak: 0.95 },
+      { k: 'flash', at: 2.3, dur: 0.7, color: '#ffffff', peak: 0.95 },
       { k: 'sfx', at: 2.27, id: 'cut-boom', gain: 0.9 },
       { k: 'cue', at: 2.32, name: 'enterUD', must: true },
       { k: 'sfx', at: 2.5, id: 'ud-accent', gain: 0.8 },
       { k: 'shot', at: 2.4, dur: 2.2, from: far0, to: far1, ease: 'out' },
-      { k: 'title', at: 2.8, dur: 1.9, text: 'THE UPSIDE DOWN', sub: 'nothing here counts' },
+      {
+        k: 'title',
+        at: 2.8,
+        dur: 1.9,
+        text: 'THE BIG DROP',
+        sub: '1,000 km down · nothing here counts',
+      },
       { k: 'shake', at: 1.4, dur: 1.2, amp: 0.03 },
       { k: 'shake', at: 2.4, dur: end - 2.4, amp: 0.015 },
       ...outro(end, 0.9),

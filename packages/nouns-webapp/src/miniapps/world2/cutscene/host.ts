@@ -6,7 +6,7 @@ import type { CutsceneHost } from './CutscenePlayer';
 import { isSfxId } from '../audio/sfx/Sfx';
 import { settings } from '../settings/store';
 
-/** The Upside Down's colour drain, eased in rather than switched on. */
+/** The door's colour change (now none: the Big Drop keeps its colours), eased in. */
 const DRAIN_S = 1.6;
 
 export function gameHost(game: Game): CutsceneHost {
@@ -80,6 +80,14 @@ export function gameHost(game: Game): CutsceneHost {
         // The real thing: through the door, the colour draining out
         c.style.transition = `filter ${DRAIN_S}s ease-in`;
         g.missions.enterUpsideDown();
+        // You're on the summit now: the rest of the scene frames you there
+        const p = g.player;
+        g.cutscene.anchor = {
+          x: p.pos.x,
+          y: p.pos.y,
+          z: p.pos.z,
+          yaw: Math.atan2(p.fwd.x, p.fwd.z),
+        };
         window.clearTimeout(drainTimer);
         drainTimer = window.setTimeout(
           () => {

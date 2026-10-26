@@ -89,7 +89,6 @@ export class Sfx {
   private loading = new Map<SampleId, Promise<AudioBuffer | null>>();
   private loops = new Map<SampleId, { src: AudioBufferSourceNode; gain: GainNode; want: number }>();
   private bed: { name: Bed; timers: number[] } | null = null;
-  private udT = 0;
 
   constructor(
     private ctx: () => AudioContext | null,
@@ -276,8 +275,8 @@ export class Sfx {
     if (name !== null) this.preload(BEDS[name].flatMap(l => l.id));
   }
 
-  /** Per frame: ambience timing, the Upside Down's occasional accent. */
-  update(dt: number, opts: { upsideDown: boolean }) {
+  /** Per frame: ambience timing. */
+  update(dt: number) {
     const bed = this.bed;
     if (bed !== null) {
       const layers = BEDS[bed.name];
@@ -293,13 +292,6 @@ export class Sfx {
         });
       });
     }
-    if (opts.upsideDown) {
-      this.udT -= dt;
-      if (this.udT <= 0) {
-        if (this.udT > -1) this.play('ud-accent', { gain: 0.35, rate: 0.7 + Math.random() * 0.25 });
-        this.udT = 22 + Math.random() * 25;
-      }
-    } else this.udT = 12;
   }
 
   /**

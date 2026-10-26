@@ -34,6 +34,7 @@ import {
   twinsProps,
   type NpcHost,
 } from './npcs';
+import { Peak } from './peak';
 import {
   activeMissions,
   apply,
@@ -45,7 +46,6 @@ import {
   type MissionState,
   type Signal,
 } from './progress';
-import { UpsideDown } from './upside';
 
 const STORE_PREFIX = 'noun-world-missions:';
 const _down = new THREE.Vector3(0, -1, 0);
@@ -131,7 +131,8 @@ export class MissionSystem {
   quietLine = false;
   /** Seconds the door glows brighter (its cutscene). */
   doorBoost = 0;
-  readonly ud: UpsideDown;
+  /** The Big Drop behind the deepest door (it replaced the Upside Down). */
+  readonly ud: Peak;
   private npcs = new Map<NpcId, StandingNpc>();
   private door: { group: THREE.Group; glow: THREE.MeshBasicMaterial; pos: THREE.Vector3 } | null =
     null;
@@ -165,7 +166,7 @@ export class MissionSystem {
   private respawns = 0;
 
   constructor(private game: Game) {
-    this.ud = new UpsideDown(game);
+    this.ud = new Peak(game);
   }
 
   subscribe = (fn: () => void) => {
@@ -807,7 +808,7 @@ export class MissionSystem {
     );
   }
 
-  /** Step through: into the Upside Down, or back out. */
+  /** Step through: onto the Big Drop, or back out. */
   throughDoor() {
     if (this.ud.active) {
       this.leaveUpsideDown();
@@ -823,12 +824,12 @@ export class MissionSystem {
     this.enterUpsideDown();
   }
 
-  /** Into the Upside Down (the door's scene calls this at its flash). */
+  /** Onto the Big Drop (the door's scene calls this at its flash). */
   enterUpsideDown() {
     if (this.ud.active) return;
     this.ud.enter();
     this.signal({ t: 'door' });
-    this.toast = { at: performance.now(), title: 'The Upside Down', kind: 'info' };
+    this.toast = { at: performance.now(), title: 'The Big Drop: 1,000 km down', kind: 'info' };
     this.emit();
   }
 

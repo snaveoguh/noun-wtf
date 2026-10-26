@@ -103,7 +103,7 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
         {!hidden && (
           <div className="w2-mlist">
             {title && <div className="w2-mtitle">“{title}”</div>}
-            {sys.ud.active && <div className="w2-mud">⌀ the Upside Down — nothing here counts</div>}
+            {sys.ud.active && <div className="w2-mud">❄ the Big Drop — nothing here counts</div>}
             {sys.parcel !== null && (
               <div className="w2-mrow w2-mhot">
                 📦 Parcel for Cap · {mmss((sys.parcel.until - now) / 1000)}
@@ -125,10 +125,10 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
         )}
       </div>
 
-      {/* The Upside Down note (also when the tracker's hidden) */}
+      {/* The Big Drop note (also when the tracker's hidden) */}
       {sys.ud.active && (
         <div className="w2-udnote pointer-events-auto absolute left-1/2 top-[84px] -translate-x-1/2">
-          ⌀ the Upside Down — nothing here counts
+          ❄ the Big Drop — nothing here counts
           <button type="button" onClick={() => sys.leaveUpsideDown()}>
             leave
           </button>
@@ -422,11 +422,11 @@ function Door({ sys }: { sys: MissionSystem }) {
   return (
     <>
       <div className="w2-mline">
-        The key fits. Beyond the door, the same bowl, the same hill, wrong. The ground barely holds
-        you there, and nothing you do there counts.
+        The key fits. Beyond the door, a mountain of snow a thousand kilometres high. The ground
+        barely holds you there, and nothing you do there counts.
       </div>
       <button type="button" className="w2-maccept w2-mud" onClick={() => sys.throughDoor()}>
-        Step through into the Upside Down
+        Step through onto the Big Drop
       </button>
     </>
   );

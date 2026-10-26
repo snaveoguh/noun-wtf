@@ -490,6 +490,19 @@ export class Player {
     }
   }
 
+  /**
+   * Move the rider, and everything it keeps in world space, by `d`: a
+   * floating-origin shift (the Big Drop recentres the world every few km).
+   */
+  shift(d: THREE.Vector3) {
+    this.pos.add(d);
+    this.safePos.add(d);
+    this.wedgePos.add(d);
+    this.looseBoard.pos.add(d);
+    this.vertLipY += d.y;
+    for (const h of this.homeSpots) h.pos.add(d);
+  }
+
   /** Landmarks R takes you back to (noggles fountain, ice cream van). */
   homeSpots: { pos: THREE.Vector3; yaw: number }[] = [];
 

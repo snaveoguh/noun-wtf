@@ -10,6 +10,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { useFm } from '../radio/FmPanel';
 import { YT_MIN_PX } from '../radio/YouTubeDeck';
+import { HudDrag } from '../ui/HudDrag';
 
 export function useBeats(b: NounBeats): BeatsView {
   return useSyncExternalStore(b.subscribe, b.getView, b.getView);
@@ -50,31 +51,37 @@ function BeatsScreenInner({
       ? 'bottom-24 right-[260px]'
       : 'bottom-24 right-4';
   return (
-    <div
-      className={`w2-panel pointer-events-auto absolute z-30 flex flex-col gap-1 !p-1.5 ${pos}`}
-      data-beats="screen"
-      onPointerDown={e => e.stopPropagation()}
-    >
-      <div className="flex items-center gap-1.5 text-[10px]">
-        <span className="w2-fm-dot w2-fm-live" />
-        <span className="max-w-[170px] truncate font-bold">NOUN BEATS: {label}</span>
-        <button
-          type="button"
-          className="ml-auto px-1 text-sm"
-          title="close: NOUN BEATS goes off"
-          onClick={() => {
-            game.radio.setMode('off');
-            game.saveRadioMode();
-          }}
-        >
-          ✕
-        </button>
-      </div>
+    <HudDrag id="beats" className={`absolute z-30 ${pos}`} handle>
       <div
-        ref={ref}
-        className="overflow-hidden rounded bg-black"
-        style={{ width: Math.max(YT_MIN_PX, 220), height: Math.max(YT_MIN_PX, 220) }}
-      />
-    </div>
+        className="w2-panel flex flex-col gap-1 !p-1.5"
+        data-beats="screen"
+        onPointerDown={e => e.stopPropagation()}
+      >
+        <div
+          className="flex cursor-grab items-center gap-1.5 text-[10px]"
+          data-w2drag
+          title="drag to move · double-click to reset"
+        >
+          <span className="w2-fm-dot w2-fm-live" />
+          <span className="max-w-[170px] truncate font-bold">NOUN BEATS: {label}</span>
+          <button
+            type="button"
+            className="ml-auto px-1 text-sm"
+            title="close: NOUN BEATS goes off"
+            onClick={() => {
+              game.radio.setMode('off');
+              game.saveRadioMode();
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        <div
+          ref={ref}
+          className="overflow-hidden rounded bg-black"
+          style={{ width: Math.max(YT_MIN_PX, 220), height: Math.max(YT_MIN_PX, 220) }}
+        />
+      </div>
+    </HudDrag>
   );
 }

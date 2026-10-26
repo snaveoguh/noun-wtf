@@ -11,7 +11,9 @@ import type { Graffiti, SprayTools } from './Graffiti';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
+import { useBeats } from '../audio/BeatsScreen';
 import { useFm } from '../radio/FmPanel';
+import { HudDrag } from '../ui/HudDrag';
 
 import { NOZZLES, SPRAY_PALETTE } from './Graffiti';
 import { intToHex } from './strokes';
@@ -173,72 +175,73 @@ export function SprayPanel({ game }: { game: Game }) {
   const hud = useHudSpray(game);
   const g = game.graffiti;
   const t = useTools(g);
-  // The NOUN FM deck screen owns bottom-right on desktop: sit left of it
+  // The COMMUNITY RADIO and NOUN BEATS screens own bottom-right on desktop:
+  // sit left of whichever are up (drag it anywhere from its header)
   const fmScreen = useFm(game.fm).screen;
+  const beatsScreen = useBeats(game.beats).screen;
+  const right = 16 + 248 * (Number(fmScreen) + Number(beatsScreen));
   if (g === null || t === null) return null;
   if (hud.mode !== 'foot' && !hud.spray.active) return null;
   return (
-    <div
-      className="sp-panel pointer-events-auto absolute bottom-24"
-      style={{ right: fmScreen ? 264 : 16 }}
-      data-spray="panel"
-    >
-      <style>{CSS}</style>
-      <div className="sp-head">
-        <CustomColour g={g} t={t} big={46} />
-        <div className="sp-meta">
-          <b>{t.hex.toUpperCase()}</b>
-          <small>
-            {NOZZLES[t.size].label} {(NOZZLES[t.size].r * 2) / 10} cm · {t.hard ? 'hard' : 'soft'} ·{' '}
-            {Math.round((t.opacity / 16) * 100)}%
-          </small>
+    <HudDrag id="spray" className="absolute bottom-24" style={{ right }} handle>
+      <div className="sp-panel" data-spray="panel">
+        <style>{CSS}</style>
+        <div className="sp-head">
+          <CustomColour g={g} t={t} big={46} />
+          <div className="sp-meta" data-w2drag title="drag to move · double-click to reset">
+            <b>{t.hex.toUpperCase()}</b>
+            <small>
+              {NOZZLES[t.size].label} {(NOZZLES[t.size].r * 2) / 10} cm · {t.hard ? 'hard' : 'soft'}{' '}
+              · {Math.round((t.opacity / 16) * 100)}%
+            </small>
+          </div>
+        </div>
+        <div className="sp-grid">
+          {SPRAY_PALETTE.map((hex, i) => (
+            <Swatch
+              key={hex}
+              hex={hex}
+              size={18}
+              on={intToHex(t.color) === hex}
+              label={i < 10 ? String((i + 1) % 10) : undefined}
+              onPick={() => g.pickSwatch(i)}
+            />
+          ))}
+        </div>
+        <Recent g={g} t={t} size={16} />
+        <Nozzles g={g} t={t} dot={30} />
+        <CapAndOpacity g={g} t={t} />
+        <div className="sp-row">
+          <button
+            type="button"
+            {...noFocus}
+            className="sp-chip"
+            disabled={!t.canUndo}
+            onClick={() => g.undo()}
+            title="Ctrl/Cmd+Z"
+          >
+            ↶ UNDO
+          </button>
+          <button
+            type="button"
+            {...noFocus}
+            className={`sp-chip ${t.picking ? 'sp-chip-on' : ''}`}
+            onClick={() => g.setPicking(!t.picking)}
+            title="Alt+click a wall"
+          >
+            ⌖ PICK
+          </button>
+        </div>
+        <Note t={t} />
+        <div className="sp-hint">
+          {t.picking
+            ? 'click painted wall to pick its colour'
+            : hud.spray.aiming
+              ? 'drag to spray · 1–0 swatch · T/⇧T cycle · [ ] or wheel nozzle · ⇧click line · ⌘/Ctrl+Z undo · Alt+click pick'
+              : 'point at a wall to tag it, right-drag to look'}
         </div>
       </div>
-      <div className="sp-grid">
-        {SPRAY_PALETTE.map((hex, i) => (
-          <Swatch
-            key={hex}
-            hex={hex}
-            size={18}
-            on={intToHex(t.color) === hex}
-            label={i < 10 ? String((i + 1) % 10) : undefined}
-            onPick={() => g.pickSwatch(i)}
-          />
-        ))}
-      </div>
-      <Recent g={g} t={t} size={16} />
-      <Nozzles g={g} t={t} dot={30} />
-      <CapAndOpacity g={g} t={t} />
-      <div className="sp-row">
-        <button
-          type="button"
-          {...noFocus}
-          className="sp-chip"
-          disabled={!t.canUndo}
-          onClick={() => g.undo()}
-          title="Ctrl/Cmd+Z"
-        >
-          ↶ UNDO
-        </button>
-        <button
-          type="button"
-          {...noFocus}
-          className={`sp-chip ${t.picking ? 'sp-chip-on' : ''}`}
-          onClick={() => g.setPicking(!t.picking)}
-          title="Alt+click a wall"
-        >
-          ⌖ PICK
-        </button>
-      </div>
-      <Note t={t} />
-      <div className="sp-hint">
-        {t.picking
-          ? 'click painted wall to pick its colour'
-          : hud.spray.aiming
-            ? 'drag to spray · 1–0 swatch · T/⇧T cycle · [ ] or wheel nozzle · ⇧click line · ⌘/Ctrl+Z undo · Alt+click pick'
-            : 'point at a wall to tag it, right-drag to look'}
-      </div>
-    </div>
+    </HudDrag>
   );
 }
 
@@ -393,6 +396,7 @@ export function SprayTouch({ game }: { game: Game }) {
 }
 
 const CSS = `
+.sp-meta{cursor:grab}
 .sp-panel{width:262px;padding:10px;border-radius:16px;background:rgba(10,12,20,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);font-family:system-ui,sans-serif;color:#fff;display:flex;flex-direction:column;gap:8px;font-size:11px}
 .sp-head{display:flex;align-items:center;gap:10px}
 .sp-meta{display:flex;flex-direction:column;min-width:0;flex:1}

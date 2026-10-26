@@ -83,7 +83,8 @@ export function ClipVideo({
     if (!v) return;
     // While synced it plays once and holds its last frame (no loop back to
     // scenes already seen) until the carousel moves on; `once` plays it
-    // through a single time and lets `onEnded` move the carousel on
+    // through a single time, holds the last frame and lets `onEnded` move
+    // the carousel on
     v.loop = !synced && !once;
     if (!synced) {
       v.playbackRate = 1;
@@ -274,10 +275,16 @@ export default function Hero({
   // A clip slide moves on when its clip ends (one clean play-through, from
   // whenever it actually started); the timer only backs that up
   const clipDrives = s.clip !== undefined && motion;
+  // The slide whose clip ended while the carousel was held (hover)
+  const [endedIdx, setEndedIdx] = useState(-1);
   const next = useCallback(() => {
     setVoTail(-1);
+    setEndedIdx(-1);
     setIdx(i => (i + 1) % slides.length);
   }, [slides.length]);
+  useEffect(() => {
+    if (!paused && !voOn && endedIdx === idx) next();
+  }, [paused, voOn, endedIdx, idx, next]);
   useEffect(() => {
     if (paused || voOn) return;
     // Just finished the voice-over: a beat, then move on
@@ -330,9 +337,12 @@ export default function Hero({
                   withSound={sound}
                   duck={voOn}
                   synced={voOn}
-                  once={!paused}
+                  once
                   onEnded={() => {
-                    if (!voOn && !paused) next();
+                    if (voOn) return;
+                    // Hovered: hold the last frame, move on when let go
+                    if (paused) setEndedIdx(idx);
+                    else next();
                   }}
                   focus={x.focus}
                 />
