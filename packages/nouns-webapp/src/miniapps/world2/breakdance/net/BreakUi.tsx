@@ -77,6 +77,14 @@ export function BreakUi({ game }: { game: Game }) {
   }, [b, ui.near, ui.phase]);
 
   const fighting = ui.phase === 'countdown' || ui.phase === 'battle';
+  // The site's NOUN FM chip sits right where the A button is on phones: hide it mid-battle
+  useEffect(() => {
+    if (!fighting) return;
+    document.body.dataset.breaks = '1';
+    return () => {
+      delete document.body.dataset.breaks;
+    };
+  }, [fighting]);
   // The real view's HUD (beat track, prompts, judges' cards, its own touch
   // pad); its store appears when the view chunk lands, so poll while fighting
   useTick(fighting || ui.phase === 'results', 500);
@@ -800,6 +808,7 @@ function Results({ b, ui }: { b: BreakMode; ui: BreakUiState }) {
 }
 
 const CSS = `
+body[data-breaks] [data-nounfm="off"]{display:none!important}
 .bk-root{font-family:system-ui,sans-serif}
 .bk-prompt{background:#ffd400;color:#000;padding:12px 20px;font-size:18px;font-weight:900;font-style:italic;box-shadow:6px 6px 0 #d22209;white-space:nowrap;max-width:calc(100vw - 32px)}
 .bk-menu{width:400px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow-y:auto}
