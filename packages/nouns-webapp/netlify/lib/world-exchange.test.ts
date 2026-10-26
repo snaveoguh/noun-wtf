@@ -242,3 +242,23 @@ describe('world-exchange: concurrency', () => {
     expect(checkInvariants(s)).toEqual([]);
   });
 });
+
+describe('world-exchange: privacy', () => {
+  it("never shows another rider's id (it would let anyone trade as them)", async () => {
+    await get();
+    const ask = saved().books.FISH.asks[0]!;
+    await post({ rider: R1, action: { t: 'join' } });
+    await post({
+      rider: R1,
+      action: { t: 'order', side: 'buy', good: 'FISH', qty: 1, price: ask.price },
+    });
+    // Someone else looking: R1 appears only as an anonymous tag
+    const other = JSON.stringify((await get(`?good=FISH&rider=${R2}&floor=1`)).out);
+    expect(other).not.toContain(R1);
+    const anon = JSON.stringify((await get('?good=FISH&floor=1')).out);
+    expect(anon).not.toContain(R1);
+    // R1 still recognises their own trades
+    const mine = (await get(`?good=FISH&rider=${R1}`)).out;
+    expect(mine.tape.some((f: { buyer: string }) => f.buyer === R1)).toBe(true);
+  });
+});
