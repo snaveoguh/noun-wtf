@@ -131,6 +131,8 @@ export class BreakMode {
     moved: boolean;
   } | null = null;
   private seenDropped = new Set<string>();
+  /** Other dancers' skaters, hidden while the view dances them. */
+  private hiddenRemotes = new Set<string>();
 
   constructor(
     private game: Game,
@@ -502,6 +504,7 @@ export class BreakMode {
   step(dt: number) {
     const s = this.session;
     if (s === null) return;
+    this.hideDancers(s.config);
     s.update(dt);
     const st = s.render();
     if (st !== null) this.view?.update(dt, st, s.drainEvents());
@@ -620,9 +623,28 @@ export class BreakMode {
     this.exit();
   }
 
+  /** The other human dancers' skaters (parked on the circle) would double up with the view's dancers. */
+  private hideDancers(config: BattleConfig) {
+    for (const d of config.dancers) {
+      if (!d.human || d.id === this.myId) continue;
+      const r = this.game.remotes.get(d.id);
+      if (r === undefined) continue;
+      r.character.root.visible = false;
+      if (r.label) r.label.style.visibility = 'hidden';
+      this.hiddenRemotes.add(d.id);
+    }
+  }
+
   /** Back to skating, exactly as before: player, camera, rider. */
   exit() {
     const g = this.game;
+    for (const id of this.hiddenRemotes) {
+      const r = g.remotes.get(id);
+      if (r === undefined) continue;
+      r.character.root.visible = true;
+      if (r.label) r.label.style.visibility = '';
+    }
+    this.hiddenRemotes.clear();
     const s = this.session;
     if (s?.role === 'host' && this.transport.online) this.lobby.announce(this.announcedAt);
     this.view?.unmount();
