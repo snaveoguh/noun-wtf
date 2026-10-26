@@ -59,6 +59,8 @@ export const RULES = {
   SERVE_GAP_MS: 2000,
   CUSTOMER_COOLDOWN_MS: 10 * 60_000,
   SERVE_PREMIUM: 1.1,
+  /** Largest single spend inside a building (a gift, a meal, a service). */
+  MAX_SPEND: 100,
   /** Bookkeeping caps. */
   SERVED_KEEP: 200,
   IDS_KEEP: 32,
@@ -289,6 +291,8 @@ export function travelCheck(row: TradeRow, town: TownId, now: number): string | 
 }
 
 const CUSTOMER_RE = /^[\w.:-]{1,48}$/;
+/** A spend's recipient: an interior door or resident id (interiors/). */
+const SPEND_TO_RE = /^[\w#,.:-]{1,80}$/;
 const ID_RE = /^[\w-]{1,40}$/;
 
 /** Parse an untrusted action (null + why when it's malformed). */
@@ -312,6 +316,13 @@ export function parseAction(raw: unknown): { a: TradeAction } | { error: string 
       if (!isTown(r.town)) return { error: 'unknown town' };
       if (!isUpgrade(r.up)) return { error: 'unknown upgrade' };
       return { a: { t: 'upgrade', town: r.town, up: r.up } };
+    case 'spend':
+      if (!isTown(r.town)) return { error: 'unknown town' };
+      if (typeof r.to !== 'string' || !SPEND_TO_RE.test(r.to)) return { error: 'bad recipient' };
+      if (!int(r.coin, 1, RULES.MAX_SPEND)) return { error: `coin must be 1–${RULES.MAX_SPEND}` };
+      if (r.what !== 'gift' && r.what !== 'meal' && r.what !== 'service')
+        return { error: 'bad spend' };
+      return { a: { t: 'spend', town: r.town, to: r.to, coin: r.coin as number, what: r.what } };
     case 'order':
     case 'cancel':
       return { error: 'unsupported' };
@@ -427,6 +438,14 @@ export function applyAction(
         .slice(-RULES.SERVED_KEEP);
       served = Object.fromEntries(next);
       serveAt = now;
+      break;
+    }
+    case 'spend': {
+      // A coin sink: never more than you have, nothing carried away
+      if (action.coin > row.coin)
+        return reject('funds', `costs ${action.coin}, you have ${row.coin}`);
+      coin = -action.coin;
+      book.spent += action.coin;
       break;
     }
     case 'upgrade': {

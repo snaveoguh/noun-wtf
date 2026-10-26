@@ -127,7 +127,10 @@ export type TradeAction =
   | { t: 'serve'; town: TownId; good: GoodId; customer: string } // street sale to a customer
   | { t: 'upgrade'; town: TownId; up: VanUpgrade }
   | { t: 'order'; side: 'buy' | 'sell'; good: GoodId; qty: number; price: number } // Grand Exchange
-  | { t: 'cancel'; order: string };
+  | { t: 'cancel'; order: string }
+  // Inside a building (interiors/): COIN spent on the spot, nothing to carry:
+  // a gift to a resident, a meal eaten in, a service (a haircut, a day pass)
+  | { t: 'spend'; town: TownId; to: string; coin: number; what: 'gift' | 'meal' | 'service' };
 
 export interface TradeResult {
   ok: boolean;
