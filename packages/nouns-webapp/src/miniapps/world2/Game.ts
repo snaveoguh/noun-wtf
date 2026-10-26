@@ -23,6 +23,7 @@ import { TtsEngine } from './audio/voice/TtsEngine';
 import { hyped, RIDER_VOICE, ttsVoiceOf } from './audio/voice/ttsVoice';
 import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
+import { BreakMode } from './breakdance/net/BreakMode';
 import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
@@ -304,6 +305,8 @@ export class Game {
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
+  /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
+  readonly breaks: BreakMode = new BreakMode(this);
   /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
   readonly trade: TradeClient;
   /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
@@ -829,6 +832,20 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    // ── Noun Breaks: a battle at the plaza cypher; skater parked on the circle's edge ──
+    if (this.breaks.active) {
+      this.input.poll(now);
+      this.breaks.step(dt);
+      this.updateFm(dt);
+      this.animTime += dt;
+      this.updateNetwork(dt);
+      this.missions.update(dt);
+      this.mountain?.update(this.breaks.focus, this.breaks.focusVel);
+      this.nature?.update(dt, this.breaks.focus);
+      this.gfx.followShadow(this.breaks.focus);
+      this.gfx.render(dt);
+      return;
+    }
     if (this.cutscene.active) return this.stepCutscene(dt, now);
     this.cutscene.tick();
     const input = this.input.poll(now);
@@ -923,6 +940,7 @@ export class Game {
     this.gfx.render(dt);
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);
+    if (!away) this.breaks.idle(dt);
   }
 
   /**
@@ -2091,6 +2109,7 @@ export class Game {
     this.sfx.dispose();
     this.missions.dispose();
     this.hoops.dispose();
+    this.breaks.dispose();
     this.van2.dispose();
     this.dragon.dispose();
     this.stats.dispose();

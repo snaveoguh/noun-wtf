@@ -18,6 +18,7 @@
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
+import type { BreakMsg } from '../breakdance/contract';
 import type { HoopsMsg } from '../hoops/contract';
 
 import PartySocket from 'partysocket';
@@ -154,6 +155,8 @@ export class Net {
   onOpen?: () => void;
   /** Noun Hoops (hoops/net): every `hoops:*` message goes here. */
   onHoops?: (m: HoopsMsg) => void;
+  /** Noun Breaks (breakdance/net): every `break:*` message, raw (its codec checks it). */
+  onBreak?: (m: Record<string, unknown>) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
   onFm?: (m: Record<string, unknown>) => void;
   /** Voice Booth: a remote rider's callout fired. */
@@ -199,6 +202,10 @@ export class Net {
     if (typeof type !== 'string') return;
     if (type.startsWith('hoops:')) {
       this.onHoops?.(d as unknown as HoopsMsg);
+      return;
+    }
+    if (type.startsWith('break:')) {
+      this.onBreak?.(d);
       return;
     }
     if (type.startsWith('fm:')) {
@@ -462,6 +469,10 @@ export class Net {
   }
 
   sendHoops(m: HoopsMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendBreak(m: BreakMsg) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
