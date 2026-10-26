@@ -361,7 +361,11 @@ export function makeFarMesh(
     vertexShader: VERT,
     fragmentShader: FRAG,
     uniforms,
-    depthWrite: true,
+    // Everything out here sits at the same depth (on the far plane): writing
+    // it made the rings and their facets z-fight into a torn, flickering
+    // mess. They're painted far → near (renderOrder) instead; the terrain,
+    // drawn later, still covers them.
+    depthWrite: false,
     depthTest: true,
     fog: false,
     side,
