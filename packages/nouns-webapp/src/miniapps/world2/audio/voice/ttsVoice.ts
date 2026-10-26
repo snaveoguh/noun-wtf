@@ -122,7 +122,8 @@ const HOUSE_REV = 1;
 export const HOUSE_MODEL_URL = `/world2/voices/house.onnx?v=${HOUSE_REV}`;
 export const HOUSE_CONFIG_URL = `/world2/voices/house.onnx.json?v=${HOUSE_REV}`;
 export const HOUSE_MODEL_BYTES = 63_516_051;
-export const HOUSE_VOICE: TtsVoice = MODEL_VOICE;
+/** Pitched up ~3 semitones: a cartoon Noun, not a narrator (shifted at playback, pace kept). */
+export const HOUSE_VOICE: TtsVoice = { ...MODEL_VOICE, pitch: 300 };
 
 /** The same voice, revved up (the rider shouting a callout). */
 export function hyped(t: TtsVoice, k = 1.06): TtsVoice {

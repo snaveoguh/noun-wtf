@@ -811,6 +811,8 @@ export class Game {
   }
 
   setBoardType(t: BoardType) {
+    // The Big Drop is snowboards only (peak.ts sets it and restores yours after)
+    if (this.missions.ud.active && t !== 'snowboard') return;
     this.boardType = t;
     this.me?.setBoardType(t);
   }

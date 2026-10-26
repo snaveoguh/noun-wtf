@@ -44,6 +44,14 @@ export class SkateCamera {
   private climbK = 0;
   /** Rider position last frame (camera feed-forward at speed). */
   private lastRider = new THREE.Vector3();
+  /**
+   * Smoothed vertical look-ahead (leadVertical) and spring stiffness: a
+   * landing flips the rider's vertical speed in one frame (ballistic → the
+   * slope's), and following it raw snapped the view (the floor jumped near /
+   * far); both ease over ~0.4 s instead.
+   */
+  private leadY = 0;
+  private stiff = 11;
   private hasLastRider = false;
 
   constructor(
@@ -206,12 +214,16 @@ export class SkateCamera {
       this.initialized = true;
     }
     // Critically damped spring for position, tighter for look target
-    const stiffness = onBoard ? (p.state === 'air' ? 7 : 11) : 10;
-    springTo(this.pos, this.vel, desired, stiffness, dt);
+    const stiffWant = onBoard ? (p.state === 'air' ? 7 : 11) : 10;
+    this.stiff += (stiffWant - this.stiff) * (1 - Math.exp(-3 * dt));
+    springTo(this.pos, this.vel, desired, this.stiff, dt);
     const lookTarget = _lookTarget.copy(target);
     if (onBoard) lookTarget.x += p.vel.x * 0.12;
     if (onBoard) lookTarget.z += p.vel.z * 0.12;
-    if (onBoard && this.leadVertical) lookTarget.y += p.vel.y * 0.12;
+    if (onBoard && this.leadVertical) {
+      this.leadY += (p.vel.y * 0.12 - this.leadY) * (1 - Math.exp(-2.5 * dt));
+      lookTarget.y += this.leadY;
+    } else this.leadY = 0;
     this.look.lerp(lookTarget, 1 - Math.exp(-14 * dt));
 
     this.camera.position.copy(this.pos);
@@ -260,6 +272,7 @@ export class SkateCamera {
   snap(p: Player) {
     this.yaw = Math.atan2(p.fwd.x, p.fwd.z);
     this.initialized = false;
+    this.leadY = this.leadVertical ? p.vel.y * 0.12 : 0;
   }
 }
 
