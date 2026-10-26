@@ -6,10 +6,11 @@
 // at any speed, and the loop takes the rider over through Player.ride: the
 // pure ride (loopPath.ts) carries them round the circle with energy
 // conserved and their up turned to the deck (upside down over the top),
-// while the camera cuts to a wide shot from the side. Out the bottom it
-// hands back on the pad at the speed the energy gives, a trick in the
-// combo. Too slow over the top they fall off (and usually bail on the
-// landing); slower still they roll back out the way they came.
+// while the camera cuts to a loop cam off the side of the lane. Out the
+// bottom it hands back on the pad at the speed the energy gives, a trick
+// in the combo. Too slow over the top they fall off into the air (the
+// camera holds on the drop); slower still they roll back out the way
+// they came.
 //
 // The pad: until the terrain carves a flat pad under each loop, the frame
 // is fitted to the bare snow (peakHeight). Switching to the terrain's own
@@ -54,7 +55,10 @@ const CATCH_Y = 5;
 const CATCH_SPEED = 1;
 /** The catch zone: the first this fraction of the approach (the funnel's wide end). */
 const CATCH_ZONE = 0.4;
-/** Camera after falling off: how long the wide shot holds (s). */
+/** The loop cam: this far out past the near tower, and up the line (m). */
+const RIG_SIDE = 4;
+const RIG_BACK = 10;
+/** Camera after falling off: how long the loop cam holds (s). */
 const FALL_HOLD = 2.2;
 const TRICK = {
   1: { name: 'Loop-de-loop', points: 1500 },
@@ -102,7 +106,7 @@ export const createLoops: PeakSystemFactory = (ctx: PeakCtx): PeakSystem => {
     roughness: 0.45,
     metalness: 0.05,
     // A little self-light keeps the red red on the shaded side
-    emissive: 0x2a2a30,
+    emissive: 0x3a3a40,
   });
   solidMat.name = 'BigDropLoop';
   const neonMat = new THREE.MeshBasicMaterial({ vertexColors: true });
@@ -110,7 +114,7 @@ export const createLoops: PeakSystemFactory = (ctx: PeakCtx): PeakSystem => {
 
   /** Every material the loops drew with (toonify swaps in converted copies). */
   const mats = new Set<THREE.Material>([solidMat, neonMat]);
-  const segs = ctx.quality === 'low' ? 64 : 112;
+  const segs = ctx.quality === 'low' ? 56 : 96;
 
   function build(f: Feature): Live {
     const shape = loopShape(f);
@@ -189,18 +193,21 @@ export const createLoops: PeakSystemFactory = (ctx: PeakCtx): PeakSystem => {
   }
 
   /**
-   * The loop cam: up the line and off to the side of the circle, looking
-   * across it at the rider (three-quarters on, so the noggles face it too).
+   * The loop cam: off the side of the lane, tracking the rider round the
+   * circle from a little inside it and looking across at them, so the
+   * whole loop turns behind them (and they're upside down over the top).
    */
-  function aimRig(l: Live, look: number) {
+  function aimRig(l: Live) {
     const sh = l.shape;
-    const R = sh.R;
-    localOf(l, l.towerX[0] - 0.7 * R, 1.15 * R, -1.35 * R, rig.pos);
-    // Look between the circle's centre and the rider
-    const phi = Math.max(0, Math.min(Math.PI * 2 * sh.turns, sample.phi));
-    localOf(l, laneAt(sh, phi), R, 0, rig.look);
-    rig.look.lerp(player.pos, look);
-    rig.fov = 64;
+    ctx.toPeak(player.pos.x, player.pos.y, player.pos.z, _v);
+    toFrame(l.frame, _v.x, _v.y, _v.z, _q);
+    // Beside the near tower, a third of the way in toward the circle's middle
+    const x = l.towerX[0] - RIG_SIDE;
+    const y = _q.y + (sh.R - _q.y) * 0.3;
+    const z = _q.z * 0.7 - RIG_BACK;
+    localOf(l, x, Math.max(3, y), z, rig.pos);
+    rig.look.copy(player.pos);
+    rig.fov = 60;
     game.cam.rig = rig;
     rigOn = true;
   }
@@ -312,7 +319,7 @@ export const createLoops: PeakSystemFactory = (ctx: PeakCtx): PeakSystem => {
     }
     place(r);
     // Cut to the wide shot as the circle comes up
-    if (r.ride.u > r.live.shape.approach * 0.55) aimRig(r.live, 0.55);
+    if (r.ride.u > r.live.shape.approach * 0.55) aimRig(r.live);
     return true;
   };
 
@@ -348,7 +355,7 @@ export const createLoops: PeakSystemFactory = (ctx: PeakCtx): PeakSystem => {
           fallHold = 0;
           fallLoop = null;
           releaseRig();
-        } else aimRig(l, 0.85);
+        } else aimRig(l);
       }
     },
     rebase() {

@@ -42,11 +42,31 @@ export const BEAM_D = 1.4;
 const TOWER_HALF = 1.1;
 const TOWER_GAP = 2.4;
 
-/** Growable float buffers for one mesh. */
+/** A growable Float32Array. */
+class F32 {
+  a = new Float32Array(4096);
+  n = 0;
+  push3(x: number, y: number, z: number) {
+    if (this.n + 3 > this.a.length) {
+      const b = new Float32Array(this.a.length * 2);
+      b.set(this.a);
+      this.a = b;
+    }
+    this.a[this.n++] = x;
+    this.a[this.n++] = y;
+    this.a[this.n++] = z;
+  }
+  get array() {
+    return this.a.slice(0, this.n);
+  }
+}
+
+/** One mesh's buffers: indexed quads, four vertices each (flat-shaded faces). */
 class Buf {
-  pos: number[] = [];
-  nor: number[] = [];
-  col: number[] = [];
+  pos = new F32();
+  nor = new F32();
+  col = new F32();
+  idx: number[] = [];
 
   /** Quad a-b-c-d (any winding; it's turned to face n). */
   quad(
@@ -60,19 +80,22 @@ class Buf {
     _e1.subVectors(b, a);
     _e2.subVectors(c, a);
     const flip = _e1.cross(_e2).dot(n) < 0;
-    const order = flip ? [a, d, c, a, c, b] : [a, b, c, a, c, d];
-    for (const v of order) {
-      this.pos.push(v.x, v.y, v.z);
-      this.nor.push(n.x, n.y, n.z);
-      this.col.push(col.r, col.g, col.b);
+    const i = this.pos.n / 3;
+    for (const v of [a, b, c, d]) {
+      this.pos.push3(v.x, v.y, v.z);
+      this.nor.push3(n.x, n.y, n.z);
+      this.col.push3(col.r, col.g, col.b);
     }
+    if (flip) this.idx.push(i, i + 3, i + 2, i, i + 2, i + 1);
+    else this.idx.push(i, i + 1, i + 2, i, i + 2, i + 3);
   }
 
   geometry(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos.array, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(this.nor.array, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(this.col.array, 3));
+    g.setIndex(new THREE.BufferAttribute(Uint32Array.from(this.idx), 1));
     g.computeBoundingSphere();
     return g;
   }
@@ -80,13 +103,13 @@ class Buf {
 
 /** Collider triangles (positions only). */
 class Tris {
-  pos: number[] = [];
+  pos = new F32();
   quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) {
-    for (const v of [a, b, c, a, c, d]) this.pos.push(v.x, v.y, v.z);
+    for (const v of [a, b, c, a, c, d]) this.pos.push3(v.x, v.y, v.z);
   }
   geometry(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos.array, 3));
     return g;
   }
 }
