@@ -4,7 +4,15 @@
 // `live` changes every frame (the beat track reads it in its own rAF, no
 // React renders), like hoops/view/hudStore.ts.
 
-import type { BattlePhase, BreakKey, CrewId, HitGrade, JudgeCard } from '../contract';
+import type {
+  BattlePhase,
+  BreakKey,
+  CrewId,
+  HitGrade,
+  JudgeCard,
+  LaneNote,
+  SimState,
+} from '../contract';
 
 export interface CrewInfo {
   name: string;
@@ -61,6 +69,8 @@ export interface BreakHudState {
   reveal: { round: number; card: JudgeCard; at: number } | null;
   cards: JudgeCard[];
   winner: CrewId | 'tie' | null;
+  /** The song playing ("♪ title · artist"), null for the generated beat. */
+  song: string | null;
 }
 
 export interface BreakHudLive {
@@ -70,14 +80,32 @@ export interface BreakHudLive {
   prompts: { key: BreakKey; beat: number }[];
   /** The turn on the beat grid, for the timer. */
   turn: { from: number; to: number } | null;
-  /** Prompts already hit (beat → grade), so the track can pop them. */
-  hits: { beat: number; grade: HitGrade; at: number }[];
+  /** The rhythm lane (SimState.lane), null when the sim doesn't send one (prompts stand in). */
+  lane: LaneNote[] | null;
+  /** The move the dancer up is putting together (SimState.forming). */
+  forming: SimState['forming'] | null;
+  /** The local player's presses (performance.now() ms), flashed on the hit line at once. */
+  presses: { key: BreakKey; at: number }[];
 }
 
 export class BreakHudStore {
   private listeners = new Set<() => void>();
   state: BreakHudState;
-  readonly live: BreakHudLive = { beat: 0, prompts: [], turn: null, hits: [] };
+  readonly live: BreakHudLive = {
+    beat: 0,
+    prompts: [],
+    turn: null,
+    lane: null,
+    forming: null,
+    presses: [],
+  };
+
+  /** A local key press (keyboard, click or touch): the hit line shows it straight away. */
+  pressed(key: BreakKey, at = performance.now()) {
+    const p = this.live.presses;
+    p.push({ key, at });
+    if (p.length > 8) p.shift();
+  }
 
   constructor(initial?: Partial<BreakHudState>) {
     this.state = { ...initialHud(), ...initial };
@@ -129,6 +157,7 @@ export function initialHud(): BreakHudState {
     reveal: null,
     cards: [],
     winner: null,
+    song: null,
   };
 }
 
@@ -192,6 +221,84 @@ export function trackItems(
     });
   }
   return out;
+}
+
+export type LaneStatus = 'pending' | 'hit' | 'miss' | 'dead';
+
+export interface LaneItem {
+  id: string;
+  key: BreakKey;
+  beat: number;
+  /** 0 at the hit line, 1 at the far end (negative: scrolled past). */
+  x: number;
+  alpha: number;
+  down: boolean;
+  status: LaneStatus;
+  grade?: HitGrade;
+  /** On an OK hit: which side of the beat it was. */
+  timing?: 'EARLY' | 'LATE';
+  /** The move's name, on its first note. */
+  label?: string;
+}
+
+/** How far past the hit line notes keep scrolling (beats). */
+export const LANE_PAST = 1.2;
+
+/**
+ * Lay the rhythm lane out: notes scroll from `ahead` beats out to the hit
+ * line and on past it; a hit note's status is its grade (the track bursts
+ * it), a miss keeps going marked MISS, a dead one (its move broke) greys.
+ * Without a lane (the mock / stub), the prompts stand in as pending notes.
+ */
+export function laneItems(
+  lane: readonly LaneNote[] | null,
+  prompts: readonly { key: BreakKey; beat: number }[],
+  beat: number,
+  ahead = 4,
+  name: (move: string) => string = m => m,
+): LaneItem[] {
+  const src: readonly LaneNote[] =
+    lane ??
+    prompts.map(p => ({ key: p.key, beat: p.beat, id: `p${p.beat}`, move: 'drop', i: 1, n: 2 }));
+  const out: LaneItem[] = [];
+  for (const n of src) {
+    const d = n.beat - beat;
+    if (d < -LANE_PAST || d > ahead) continue;
+    const hit = n.grade !== undefined && n.grade !== 'miss';
+    const status: LaneStatus = hit
+      ? 'hit'
+      : n.grade === 'miss'
+        ? 'miss'
+        : n.dead === true
+          ? 'dead'
+          : 'pending';
+    const alpha =
+      d < 0
+        ? Math.max(0, 1 + d / LANE_PAST)
+        : Math.min(1, (ahead - d) / 0.6) * (status === 'dead' ? 0.45 : 1);
+    const it: LaneItem = {
+      id: n.id,
+      key: n.key,
+      beat: n.beat,
+      x: d / ahead,
+      alpha,
+      down: Math.abs(n.beat - Math.round(n.beat / 4) * 4) < 1e-3,
+      status,
+    };
+    if (n.grade !== undefined) it.grade = n.grade;
+    if (n.grade === 'ok' && n.off !== undefined && Math.abs(n.off) > 1e-3)
+      it.timing = n.off < 0 ? 'EARLY' : 'LATE';
+    if (lane !== null && n.i === 0) it.label = name(n.move).toUpperCase();
+    out.push(it);
+  }
+  return out;
+}
+
+/** "WINDMILL 2/4" (or "WINDMILL ✓" once it lands). */
+export function formingText(f: SimState['forming'] | null, name: (move: string) => string): string {
+  if (f === null || f === undefined) return '';
+  const n = name(f.move).toUpperCase();
+  return f.landed === true ? `${n} ✓` : `${n} ${f.got}/${f.of}`;
 }
 
 /** Fraction of the turn left (1 at the start, 0 at the end). */

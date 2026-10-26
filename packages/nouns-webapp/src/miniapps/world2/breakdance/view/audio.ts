@@ -7,8 +7,17 @@
 // clock drifts more than 25 ms (a re-sync), otherwise it creeps.
 //
 // Shares the game's AudioContext + a bus when given one (like HoopsAudio).
+//
+// A real song (BattleConfig.track, see ../tracks.ts) replaces the drum
+// machine once its file is decoded: one AudioBufferSourceNode started with
+// start(when, offset) so the song's first downbeat sits on the battle's
+// first beat, from the same anchor the drums use (so the same latency
+// compensation). It's only restarted on a re-sync (the anchor moving more
+// than 30 ms); a song shorter than the battle loops on whole bars.
 
 import * as THREE from 'three';
+
+import { songLoop, songPos, wrapPos } from '../tracks';
 
 import {
   breakStep,
@@ -57,6 +66,16 @@ export class BreakAudio {
   /** Kick hits scheduled (audio time), so the view can pump the speakers when they sound. */
   readonly kicks: number[] = [];
   volume = 0.85;
+  /** The song, once decoded (null: the drum machine plays). */
+  private song: {
+    buf: AudioBuffer;
+    offset: number;
+    loop: { start: number; end: number } | null;
+  } | null = null;
+  private songWant: { bytes: ArrayBuffer | null; offset: number; bpm: number } | null = null;
+  private songState: 'none' | 'loading' | 'decoding' | 'ready' | 'failed' = 'none';
+  private songSrc: { src: AudioBufferSourceNode; anchor: number; spb: number } | null = null;
+  private songBeat = -Infinity;
 
   constructor(private bus: () => AudioBus | null) {}
 
@@ -143,6 +162,93 @@ export class BreakAudio {
     return true;
   }
 
+  /**
+   * Play a song instead of the drums: its file's bytes (when they arrive),
+   * its first downbeat (s into the file) and tempo. Until it's decoded, or
+   * if it never is, the drum machine keeps the beat.
+   */
+  playTrack(bytes: Promise<ArrayBuffer | null>, offset: number, bpm: number) {
+    const want = { bytes: null as ArrayBuffer | null, offset, bpm };
+    this.songState = 'loading';
+    this.songWant = want;
+    void bytes.then(b => {
+      if (this.songWant !== want) return;
+      if (b === null) {
+        this.songState = 'failed';
+        console.warn('[breaks] track file missing: the generated beat plays');
+        return;
+      }
+      want.bytes = b;
+    });
+  }
+
+  /** 'ready' once the song plays; 'failed' = the drums stand in. */
+  get trackState() {
+    return this.songState;
+  }
+
+  private decodeSong(ctx: AudioContext) {
+    const w = this.songWant;
+    if (w === null || w.bytes === null || this.songState !== 'loading') return;
+    this.songState = 'decoding';
+    ctx.decodeAudioData(w.bytes.slice(0)).then(
+      buf => {
+        if (this.songWant !== w) return;
+        this.song = { buf, offset: w.offset, loop: songLoop(buf.duration, w.offset, w.bpm) };
+        this.songState = 'ready';
+      },
+      () => {
+        this.songState = 'failed';
+        console.warn("[breaks] couldn't decode the track: the generated beat plays");
+      },
+    );
+  }
+
+  /** Keep the song's source on the anchor (audio time of beat 0), restarting it on a re-sync. */
+  private updateSong(ctx: AudioContext, now: number, a: number, spb: number) {
+    const song = this.song!;
+    const cur = this.songSrc;
+    if (cur === null || Math.abs(a - cur.anchor) > 0.03 || cur.spb !== spb) {
+      if (cur !== null) {
+        try {
+          cur.src.stop(now + 0.01);
+        } catch {
+          /* never started */
+        }
+      }
+      this.songSrc = null;
+      const t0 = now + 0.03;
+      // Battle time t sounds at audio time a + t - INTRO_BEATS * spb (beat 0 at a)
+      let pos = songPos(t0 - a + 4 * spb, song.offset);
+      let when = t0;
+      if (pos < 0) {
+        when = t0 - pos;
+        pos = 0;
+      }
+      pos = wrapPos(pos, song.loop);
+      const src = ctx.createBufferSource();
+      if (pos < song.buf.duration - 0.05) {
+        src.buffer = song.buf;
+        if (song.loop !== null) {
+          src.loop = true;
+          src.loopStart = song.loop.start;
+          src.loopEnd = song.loop.end;
+        }
+        src.connect(this.music!);
+        src.start(when, pos);
+      }
+      this.songSrc = { src, anchor: a, spb };
+    }
+    // The speakers pump on the beat
+    let b = Math.max(this.songBeat, Math.ceil((now - a) / spb));
+    while (a + b * spb <= now + 0.12) {
+      if (a + b * spb >= now - 0.01) this.kicks.push(a + b * spb);
+      b++;
+    }
+    this.songBeat = b;
+    while (this.kicks.length > 0 && this.kicks[0] < now - 0.5) this.kicks.shift();
+  }
+
   private ready(): AudioContext | null {
     if (this.ctx === null && !this.start()) return null;
     return this.ctx;
@@ -174,6 +280,11 @@ export class BreakAudio {
     const lat =
       (ctx as AudioContext & { outputLatency?: number }).outputLatency ?? ctx.baseLatency ?? 0;
     const a = now - beat * spb - (Number.isFinite(lat) ? Math.min(lat, 0.2) : 0);
+    if (this.songState === 'loading') this.decodeSong(ctx);
+    if (this.song !== null) {
+      this.updateSong(ctx, now, a, spb);
+      return;
+    }
     if (this.anchor === null || Math.abs(a - this.anchor) > 0.025 || bpm !== this.bpm) {
       this.anchor = a;
       this.bpm = bpm;
@@ -413,6 +524,15 @@ export class BreakAudio {
     } catch {
       /* already stopped */
     }
+    try {
+      this.songSrc?.src.stop();
+    } catch {
+      /* never started */
+    }
+    this.songSrc = null;
+    this.song = null;
+    this.songWant = null;
+    this.songState = 'none';
     this.music?.disconnect();
     this.out?.disconnect();
     if (this.own) void this.ctx?.close();

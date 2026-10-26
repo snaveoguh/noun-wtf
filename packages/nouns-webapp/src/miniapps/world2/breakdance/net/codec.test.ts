@@ -164,4 +164,51 @@ describe('codec', () => {
     // Fields a future sim adds pass through
     expect((s as unknown as { extra: unknown }).extra).toEqual({ kept: 1.23456 });
   });
+
+  it('checks the rhythm lane, the move forming and the track id', () => {
+    const s = readState({
+      gid: 'g',
+      phase: 'turn',
+      t: 1,
+      beat: 2,
+      poses: [],
+      prompts: [],
+      totals: [0, 0],
+      cards: [],
+      lane: [
+        {
+          key: 'up',
+          beat: 3,
+          id: '0.2.windmill.2',
+          move: 'windmill',
+          i: 2,
+          n: 4,
+          grade: 'ok',
+          off: 0.12,
+        },
+        { key: 'a', beat: 4, id: 'x', move: 'flare', i: 99, n: 4, off: 9, dead: true },
+        { key: 'fly', beat: 4, id: 'y', move: 'flare' },
+        { key: 'up', beat: 4, id: 'z', move: '<script>' },
+        'nope',
+      ],
+      forming: { id: 'a', move: 'windmill', got: 9, of: 4 },
+    })!;
+    expect(s.lane).toEqual([
+      {
+        key: 'up',
+        beat: 3,
+        id: '0.2.windmill.2',
+        move: 'windmill',
+        i: 2,
+        n: 4,
+        grade: 'ok',
+        off: 0.12,
+      },
+      { key: 'a', beat: 4, id: 'x', move: 'flare', i: 16, n: 4, off: 1, dead: true },
+    ]);
+    expect(s.forming).toEqual({ id: 'a', move: 'windmill', got: 4, of: 4 });
+    expect(readState({ ...s, forming: { id: 'a' }, lane: 'x' })).not.toHaveProperty('lane');
+    expect(readConfig({ ...CFG, track: 'boom-bap_01' })?.track).toBe('boom-bap_01');
+    expect(readConfig({ ...CFG, track: '../../etc/passwd' })).not.toHaveProperty('track');
+  });
 });

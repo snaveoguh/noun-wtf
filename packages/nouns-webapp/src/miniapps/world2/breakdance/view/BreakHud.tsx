@@ -2,7 +2,7 @@
 //    judges' cards, the winner screen and phone controls. Sticker style,
 //    like HoopsHud. ─────────────────────────────────────────────────────
 
-import type { BreakKey, CrewId, JudgeCard } from '../contract';
+import type { BreakKey, CrewId, HitGrade, JudgeCard } from '../contract';
 import type { BreakHudState, BreakHudStore } from './hudStore';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -11,18 +11,45 @@ import {
   barsLeft,
   cardTotal,
   cardVotes,
+  formingText,
   GRADE_COLOR,
   GRADE_LABEL,
   KEY_GLYPH,
-  trackItems,
+  laneItems,
   turnLeft,
 } from './hudStore';
+import { moveName } from './moves';
+
+const PAD_KEY = 'noun-breaks-pad';
+
+/** Desktop: the clickable pad is on unless the player hid it (remembered). */
+function usePadPref(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return window.localStorage.getItem(PAD_KEY) !== 'off';
+    } catch {
+      return true;
+    }
+  });
+  const set = (v: boolean) => {
+    setOn(v);
+    try {
+      window.localStorage.setItem(PAD_KEY, v ? 'on' : 'off');
+    } catch {
+      /* storage blocked: just this session */
+    }
+  };
+  return [on, set];
+}
 
 export interface BreakHudProps {
   hud: BreakHudStore;
   /** On-screen arrows + A/B → a key press. Omit to hide them. */
   onKey?: (k: BreakKey) => void;
-  /** Force the touch pad on / off (default: coarse pointers only). */
+  /**
+   * Force the big touch pad on / off (default: coarse pointers). Fine
+   * pointers get a small clickable pad instead, which the player can hide.
+   */
   touch?: boolean;
   /** First touch: unlock audio. */
   onGesture?: () => void;
@@ -43,7 +70,11 @@ export function BreakHud({
 }: BreakHudProps) {
   const s = useSyncExternalStore(hud.subscribe, hud.get);
   const coarse = useCoarse();
-  const showTouch = onKey !== undefined && (touch ?? coarse) && s.winner === null;
+  const [padOn, setPadOn] = usePadPref();
+  const big = touch ?? coarse;
+  const canPad = onKey !== undefined && s.winner === null;
+  const showTouch = canPad && big;
+  const showMini = canPad && !big && padOn;
   const now = useNow(250);
   const calls = s.calls.filter(c => now - c.at < 1800);
   return (
@@ -69,7 +100,7 @@ export function BreakHud({
           </div>
         ))}
       </div>
-      {s.track !== null && s.winner === null && <Track hud={hud} s={s} />}
+      {s.track !== null && s.winner === null && <Track hud={hud} s={s} coarse={big} />}
       {s.reveal !== null &&
         s.winner === null &&
         (s.phase === 'judging' || now - s.reveal.at < 6500) && (
@@ -77,6 +108,16 @@ export function BreakHud({
         )}
       {showFinal && s.winner !== null && <Winner s={s} onRematch={onRematch} onLeave={onLeave} />}
       {showTouch && <Pad onKey={onKey!} onGesture={onGesture} />}
+      {showMini && <Pad onKey={onKey!} onGesture={onGesture} mini />}
+      {canPad && !big && (
+        <button
+          type="button"
+          className="w2-brk-padtoggle pointer-events-auto"
+          onClick={() => setPadOn(!padOn)}
+        >
+          {padOn ? 'hide pad' : 'show clickable pad'}
+        </button>
+      )}
     </div>
   );
 }
@@ -157,6 +198,7 @@ function TopBar({ s, hud }: { s: BreakHudState; hud: BreakHudStore }) {
         </b>
         <span className="w2-brk-cname">{b.name}</span>
       </div>
+      {s.song !== null && s.phase === 'intro' && <div className="w2-brk-song">{s.song}</div>}
       {s.up !== null && s.phase === 'turn' && (
         <div className="w2-brk-up" style={{ ['--cc' as string]: s.crews[s.up.crew].color }}>
           {s.up.local ? 'YOUR TURN' : `${s.up.name.toUpperCase()} IS UP`}
@@ -166,44 +208,109 @@ function TopBar({ s, hud }: { s: BreakHudState; hud: BreakHudStore }) {
   );
 }
 
-// ── beat track + grade flash + combo ────────────────────────────────────
+// ── rhythm lane + grade flash + combo + controls legend ─────────────────
+//
+// Notes scroll right to left onto the HIT LINE, which pulses on the beat.
+// A hit note bursts at the line in its grade's colour (OK hits say EARLY /
+// LATE); a miss keeps scrolling past marked MISS; a note whose move already
+// broke greys out. A redrawn plan's new notes glide in from the right
+// instead of popping up. Your own presses flash in the ring at once (the
+// grade follows when the sim has judged it).
 
 const AHEAD = 4;
-const POOL = 16;
+const POOL = 24;
+const BURSTS = 6;
+const ENTER_MS = 320;
+const name = (m: string) => moveName(m);
 
-function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
+function Track({ hud, s, coarse }: { hud: BreakHudStore; s: BreakHudState; coarse: boolean }) {
   const lane = useRef<HTMLDivElement>(null);
   const notes = useRef<(HTMLDivElement | null)[]>([]);
   const ticks = useRef<(HTMLDivElement | null)[]>([]);
+  const bursts = useRef<(HTMLDivElement | null)[]>([]);
+  const pressEl = useRef<HTMLDivElement>(null);
+  const formEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let raf = 0;
+    let owner: string | null = null;
+    let nextBurst = 0;
+    const seen = new Map<string, { at: number; from: number | null }>();
+    const burst = new Set<string>();
+    const fire = (grade: HitGrade, timing: string | undefined, key: BreakKey, x: number) => {
+      const b = bursts.current[nextBurst];
+      nextBurst = (nextBurst + 1) % BURSTS;
+      // Only the newest burst keeps its words (they overlap on quick notes)
+      for (const o of bursts.current) o?.classList.add('w2-brk-burst-old');
+      if (b === null || b === undefined) return;
+      b.style.setProperty('--gc', GRADE_COLOR[grade]);
+      b.style.setProperty('--bx', `${x.toFixed(1)}px`);
+      b.innerHTML = `<i>${KEY_GLYPH[key]}</i><b>${GRADE_LABEL[grade]}</b>${timing !== undefined ? `<span>${timing}</span>` : ''}`;
+      b.classList.remove('w2-brk-burst-go', 'w2-brk-burst-old');
+      void b.offsetWidth; // restart the animation
+      b.classList.add('w2-brk-burst-go');
+    };
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const el = lane.current;
       if (el === null) return;
       const w = el.clientWidth;
-      const hitX = 46;
+      // The hit line sits a fifth of the way in, so a miss is seen scrolling past it
+      const hitX = Math.max(52, Math.round(w * 0.2));
       const span = w - hitX - 18;
       const l = hud.live;
-      const items = trackItems(l.prompts, l.beat, AHEAD);
-      for (let i = 0; i < POOL; i++) {
-        const n = notes.current[i];
-        if (n === null || n === undefined) continue;
-        const it = items[i];
-        if (it === undefined) {
-          n.style.display = 'none';
+      const now = performance.now();
+      const who = hud.state.track?.id ?? null;
+      if (who !== owner) {
+        owner = who;
+        seen.clear();
+        burst.clear();
+      }
+      const items = laneItems(l.lane, l.prompts, l.beat, AHEAD, name);
+      let k = 0;
+      for (const it of items) {
+        if (it.status === 'hit') {
+          // Hit: it bursts on the line, and leaves the lane
+          if (!burst.has(it.id)) {
+            burst.add(it.id);
+            if (it.x > -0.3 && it.grade !== undefined)
+              fire(it.grade, it.timing, it.key, hitX + Math.max(-0.08, it.x) * span);
+          }
           continue;
         }
-        const hit = l.hits.find(h => Math.abs(h.beat - it.beat) < 1e-3);
+        if (k >= POOL) break;
+        const n = notes.current[k++];
+        if (n === null || n === undefined) continue;
+        let x = it.x;
+        let e = seen.get(it.id);
+        if (e === undefined) {
+          e = { at: now, from: it.status === 'pending' && x < 0.9 ? 1.08 : null };
+          seen.set(it.id, e);
+        }
+        if (e.from !== null) {
+          const t = Math.min(1, (now - e.at) / ENTER_MS);
+          x = e.from + (x - e.from) * (1 - (1 - t) ** 3);
+          if (t >= 1) e.from = null;
+        }
         n.style.display = 'flex';
-        n.style.opacity = hit !== undefined ? '0' : it.alpha.toFixed(2);
-        n.style.transform = `translate(${(hitX + it.x * span).toFixed(1)}px,-50%) scale(${it.down ? 1.12 : 1})`;
-        if (n.dataset.k !== it.key) {
-          n.dataset.k = it.key;
-          n.textContent = KEY_GLYPH[it.key];
-          n.className = `w2-brk-note w2-brk-k-${it.key}`;
+        n.style.opacity = it.alpha.toFixed(2);
+        n.style.transform = `translate(${(hitX + x * span).toFixed(1)}px,-50%) scale(${it.down ? 1.12 : 1})`;
+        const sig = `${it.key}|${it.status}|${it.label ?? ''}`;
+        if (n.dataset.k !== sig) {
+          n.dataset.k = sig;
+          n.className = `w2-brk-note w2-brk-k-${it.key} w2-brk-n-${it.status}`;
+          n.innerHTML =
+            KEY_GLYPH[it.key] +
+            (it.label !== undefined && it.status !== 'miss'
+              ? `<em class="w2-brk-nlabel">${it.label}</em>`
+              : '') +
+            (it.status === 'miss' ? '<em class="w2-brk-nmiss">MISS</em>' : '');
         }
       }
+      for (; k < POOL; k++) {
+        const n = notes.current[k];
+        if (n !== null && n !== undefined) n.style.display = 'none';
+      }
+      if (seen.size > 200) for (const id of [...seen.keys()].slice(0, 100)) seen.delete(id);
       // Beat lines scroll with the notes
       const b0 = Math.floor(l.beat);
       for (let i = 0; i < 6; i++) {
@@ -219,9 +326,38 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
         t.style.transform = `translateX(${(hitX + x * span).toFixed(1)}px)`;
         t.className = `w2-brk-tick ${((beat % 4) + 4) % 4 === 0 ? 'w2-brk-tick-down' : ''}`;
       }
-      // Hit line pulses on the beat
+      // The hit line pulses on the beat (harder on the downbeat)
       const ph = ((l.beat % 1) + 1) % 1;
-      el.style.setProperty('--pulse', Math.exp(-ph * 6).toFixed(3));
+      const down = ((Math.floor(l.beat) % 4) + 4) % 4 === 0 ? 1.4 : 1;
+      el.style.setProperty('--pulse', (Math.exp(-ph * 6) * down).toFixed(3));
+      el.style.setProperty('--hitx', `${hitX}px`);
+      // Your press, in the ring, right away
+      const p = pressEl.current;
+      if (p !== null) {
+        const last = l.presses[l.presses.length - 1];
+        const age = last !== undefined ? now - last.at : Infinity;
+        if (age < 180) {
+          if (p.dataset.k !== last.key) {
+            p.dataset.k = last.key;
+            p.textContent = KEY_GLYPH[last.key];
+          }
+          p.style.opacity = (1 - age / 180).toFixed(2);
+        } else p.style.opacity = '0';
+      }
+      // The move forming
+      const f = formEl.current;
+      if (f !== null) {
+        const fm =
+          l.forming !== null && l.forming !== undefined && l.forming.id === owner
+            ? l.forming
+            : null;
+        const txt = formingText(fm, name);
+        if (f.dataset.k !== txt) {
+          f.dataset.k = txt;
+          f.textContent = txt;
+          f.className = `w2-brk-forming ${fm?.landed === true ? 'w2-brk-forming-done' : ''}`;
+        }
+      }
     };
     tick();
     return () => cancelAnimationFrame(raf);
@@ -229,7 +365,7 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
   const local = s.track?.local === true;
   const crew = s.track?.crew ?? s.up?.crew ?? null;
   const f = s.flash;
-  const showFlash = f !== null && performance.now() - f.at < 700;
+  const showFlash = f !== null && performance.now() - f.at < 700 && !local;
   return (
     <div className={`w2-brk-trackwrap ${local ? '' : 'w2-brk-spect'}`}>
       {showFlash && (
@@ -237,6 +373,7 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
           {GRADE_LABEL[f.grade]}
         </div>
       )}
+      <div ref={formEl} className="w2-brk-forming" />
       <div
         ref={lane}
         className="w2-brk-lane"
@@ -245,7 +382,10 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
         {Array.from({ length: 6 }, (_, i) => (
           <div key={`t${i}`} ref={el => void (ticks.current[i] = el)} className="w2-brk-tick" />
         ))}
-        <div className="w2-brk-hitline" />
+        <div className="w2-brk-hitline">
+          <div ref={pressEl} className="w2-brk-press" />
+        </div>
+        <div className="w2-brk-hitlabel">HIT</div>
         {Array.from({ length: POOL }, (_, i) => (
           <div
             key={i}
@@ -253,6 +393,9 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
             className="w2-brk-note"
             style={{ display: 'none' }}
           />
+        ))}
+        {Array.from({ length: BURSTS }, (_, i) => (
+          <div key={`b${i}`} ref={el => void (bursts.current[i] = el)} className="w2-brk-burst" />
         ))}
       </div>
       {s.combo >= 2 && (
@@ -262,6 +405,21 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
         </div>
       )}
       <div className="w2-brk-score">{s.turnScore}</div>
+      {local && (
+        <div className="w2-brk-legend">
+          {coarse ? (
+            <>
+              tap the pad on the beat · <b className="w2-brk-lk-a">A</b>{' '}
+              <b className="w2-brk-lk-b">B</b> = the round buttons
+            </>
+          ) : (
+            <>
+              <b>← ↑ → ↓</b> / <b>WASD</b> · <b className="w2-brk-lk-a">A</b> = <b>J</b> or{' '}
+              <b>SPACE</b> · <b className="w2-brk-lk-b">B</b> = <b>K</b>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -394,7 +552,16 @@ function Winner({
 
 // ── phone controls: arrows + A / B, big thumb targets ───────────────────
 
-function Pad({ onKey, onGesture }: { onKey: (k: BreakKey) => void; onGesture?: () => void }) {
+function Pad({
+  onKey,
+  onGesture,
+  mini = false,
+}: {
+  onKey: (k: BreakKey) => void;
+  onGesture?: () => void;
+  /** Desktop: small, clickable with the mouse. */
+  mini?: boolean;
+}) {
   const [down, setDown] = useState<Partial<Record<BreakKey, boolean>>>({});
   const btn = (k: BreakKey, cls: string) => ({
     className: `w2-brk-pbtn ${cls} ${down[k] === true ? 'w2-brk-pdown' : ''}`,
@@ -402,7 +569,11 @@ function Pad({ onKey, onGesture }: { onKey: (k: BreakKey) => void; onGesture?: (
     'aria-label': k,
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      try {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        /* a synthetic pointer: nothing to capture, the press still counts */
+      }
       onGesture?.();
       onKey(k);
       setDown(d => ({ ...d, [k]: true }));
@@ -413,13 +584,13 @@ function Pad({ onKey, onGesture }: { onKey: (k: BreakKey) => void; onGesture?: (
   });
   return (
     <>
-      <div className="w2-brk-dpad pointer-events-auto">
+      <div className={`w2-brk-dpad pointer-events-auto ${mini ? 'w2-brk-mini' : ''}`}>
         <button type="button" {...btn('up', 'w2-brk-p-up')} />
         <button type="button" {...btn('left', 'w2-brk-p-left')} />
         <button type="button" {...btn('right', 'w2-brk-p-right')} />
         <button type="button" {...btn('down', 'w2-brk-p-down')} />
       </div>
-      <div className="w2-brk-ab pointer-events-auto">
+      <div className={`w2-brk-ab pointer-events-auto ${mini ? 'w2-brk-mini w2-brk-mini-r' : ''}`}>
         <button type="button" {...btn('b', 'w2-brk-p-b')} />
         <button type="button" {...btn('a', 'w2-brk-p-a')} />
       </div>
@@ -446,6 +617,7 @@ const CSS = `
 .w2-brk-bars{font-size:11px;letter-spacing:.1em;min-height:12px}
 .w2-brk-up{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%) rotate(-2deg);background:var(--cc);color:#000;padding:2px 14px;font-size:clamp(14px,2.2vw,20px);letter-spacing:.08em;white-space:nowrap;box-shadow:4px 4px 0 #000;animation:w2bpop .5s cubic-bezier(.2,1.8,.4,1)}
 @keyframes w2bpop{0%{transform:scale(1.8)}100%{transform:scale(1)}}
+.w2-brk-song{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#000;color:#ffd400;font-size:13px;letter-spacing:.08em;padding:1px 10px;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
 .w2-brk-up{animation:w2bslide .45s cubic-bezier(.2,1.6,.35,1)}
 @keyframes w2bslide{from{opacity:0;transform:translateX(-50%) translateY(-12px) rotate(-6deg)}}
 .w2-brk-banner{position:absolute;left:0;right:0;top:30%;display:flex;flex-direction:column;align-items:center;animation:w2bcall 1.9s cubic-bezier(.2,1.6,.35,1) forwards}
@@ -466,8 +638,35 @@ const CSS = `
 .w2-brk-spect{opacity:.72;width:min(440px,80vw)}
 .w2-brk-lane{position:relative;height:66px;background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.45));border:3px solid #fff;border-radius:40px;overflow:hidden;box-shadow:0 5px 0 #000}
 .w2-brk-spect .w2-brk-lane{height:48px}
-.w2-brk-hitline{position:absolute;left:22px;top:6px;bottom:6px;width:48px;border-radius:50%;border:4px solid var(--cc);box-shadow:0 0 calc(6px + 18px*var(--pulse,0)) var(--cc);transform:scale(calc(1 + .12*var(--pulse,0)))}
-.w2-brk-spect .w2-brk-hitline{width:36px;left:28px}
+.w2-brk-hitline{position:absolute;left:calc(var(--hitx,46px) - 27px);top:5px;bottom:5px;width:54px;border-radius:50%;border:5px solid var(--cc);background:rgba(255,255,255,calc(.06 + .22*var(--pulse,0)));box-shadow:0 0 calc(6px + 22px*var(--pulse,0)) var(--cc),inset 0 0 calc(10px*var(--pulse,0)) #fff;transform:scale(calc(1 + .14*var(--pulse,0)));z-index:1;display:flex;align-items:center;justify-content:center}
+.w2-brk-spect .w2-brk-hitline{width:40px;left:calc(var(--hitx,46px) - 20px)}
+.w2-brk-hitlabel{position:absolute;left:calc(var(--hitx,46px) - 14px);bottom:-1px;font-size:9px;letter-spacing:.16em;color:var(--cc);z-index:2}
+.w2-brk-press{font-size:30px;line-height:1;color:#fff;opacity:0;text-shadow:0 0 10px var(--cc),0 2px 0 #000}
+.w2-brk-n-dead{background:#555 !important;color:#999 !important;border-color:#333 !important;box-shadow:none !important}
+.w2-brk-n-miss{background:#2a1010 !important;color:#ff4a3d !important;border-color:#ff4a3d !important}
+.w2-brk-nmiss{position:absolute;top:-7px;right:-14px;font-style:normal;font-size:11px;letter-spacing:.08em;color:#fff;background:#ff4a3d;border:2px solid #000;padding:0 4px;line-height:1.15;transform:rotate(8deg)}
+.w2-brk-nlabel{position:absolute;bottom:100%;left:0;font-style:normal;font-size:9px;letter-spacing:.08em;color:#fff;white-space:nowrap;text-shadow:0 1px 0 #000;margin-bottom:1px}
+.w2-brk-burst{position:absolute;left:0;top:50%;width:0;height:0;pointer-events:none;opacity:0;z-index:3;transform:translateX(var(--bx,46px))}
+.w2-brk-burst i{position:absolute;left:-27px;top:-27px;width:54px;height:54px;border-radius:50%;border:5px solid var(--gc);font-style:normal;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--gc);box-shadow:0 0 18px var(--gc)}
+.w2-brk-burst b{position:absolute;left:30px;top:-24px;font-size:22px;font-style:italic;color:var(--gc);-webkit-text-stroke:1.5px #000;paint-order:stroke fill;white-space:nowrap;text-shadow:0 3px 0 #000}
+.w2-brk-burst span{position:absolute;left:32px;top:2px;font-size:12px;letter-spacing:.12em;background:#000;color:#fff;padding:0 5px;white-space:nowrap}
+.w2-brk-burst-go{animation:w2bburst .62s ease-out forwards}
+.w2-brk-burst-go i{animation:w2bring .62s ease-out forwards}
+.w2-brk-burst-old b,.w2-brk-burst-old span{display:none}
+@keyframes w2bburst{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@keyframes w2bring{0%{transform:scale(.7);background:var(--gc);color:#000}40%{transform:scale(1.45);background:transparent}100%{transform:scale(1.9);opacity:0}}
+.w2-brk-forming{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);font-size:clamp(16px,2.4vw,22px);font-style:italic;color:#fff;background:rgba(0,0,0,.7);padding:0 12px;letter-spacing:.06em;white-space:nowrap;min-height:0}
+.w2-brk-forming:empty{display:none}
+.w2-brk-forming-done{color:#3ddc84}
+.w2-brk-legend{margin-top:9px;align-self:center;font-size:clamp(11px,1.6vw,14px);letter-spacing:.06em;color:#fff;background:rgba(0,0,0,.6);padding:2px 10px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.w2-brk-legend b{font-weight:400;color:#ffd400}
+.w2-brk-legend b.w2-brk-lk-a{color:#ff6a5d}
+.w2-brk-legend b.w2-brk-lk-b{color:#5aa2ff}
+/* Desktop: small, above the site's bottom bar and NOUN FM chip */
+.w2-brk-mini{transform:scale(.6);transform-origin:bottom left;opacity:.85;bottom:120px !important}
+.w2-brk-mini-r{transform-origin:bottom right}
+.w2-brk-mini .w2-brk-pbtn{cursor:pointer}
+.w2-brk-padtoggle{position:absolute;right:14px;bottom:218px;font-size:11px;letter-spacing:.06em;color:#fff;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .w2-brk-tick{position:absolute;top:10px;bottom:10px;left:0;width:2px;background:rgba(255,255,255,.18)}
 .w2-brk-tick-down{background:rgba(255,212,0,.5);width:3px}
 .w2-brk-note{position:absolute;left:0;top:50%;width:46px;height:46px;margin-left:-23px;border-radius:50%;align-items:center;justify-content:center;font-size:28px;line-height:1;color:#000;background:#fff;border:3px solid #000;box-shadow:0 3px 0 rgba(0,0,0,.6)}

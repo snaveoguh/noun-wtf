@@ -11,7 +11,8 @@
 //            plans its run and queues its key presses; humans get the
 //            coach's plan, which feeds the HUD prompts)
 //   input    a key press, judged against the beat grid and fed to the
-//            move recogniser (see recognise.ts)
+//            move recogniser (see recognise.ts), and marked on the rhythm
+//            lane (SimState.lane) when it's a note of the plan
 //   expiry   an attempt's next key never came: the attempt ends. Expiries
 //            wait LATE_SLACK past the window so a remote player's key that's
 //            a little late over the network still counts.
@@ -25,6 +26,13 @@
 //   - bailing out of a power move or freeze two keys in, or landing a move
 //     that the previous one can't flow into (windmill from standing,
 //     toprock straight out of a flare: you need a transition) is a crash.
+//
+// The coach's plan (a human's prompts) is a rhythm-game chart: it stays put
+// when a note is missed (the miss scrolls past, the rest is where it was),
+// and is only redrawn, from a beat and a half ahead so it scrolls in, when
+// the dancer lands or commits to a different move than planned, crashes, or
+// is left somewhere the next planned move can't flow from. All of that
+// happens at agenda times, so the lane is as deterministic as the rest.
 
 import type {
   BattleConfig,
@@ -36,6 +44,7 @@ import type {
   DancerPose,
   HitGrade,
   JudgeCard,
+  LaneNote,
   MoveId,
   SimEvent,
   SimState,
@@ -65,6 +74,7 @@ import {
   expire,
   leading,
   nextDeadline,
+  progress,
   startAttempt,
   timingFactor,
 } from './recognise';
@@ -84,6 +94,12 @@ export const LATE_SLACK = 0.15;
 export const CRASH_COST = 8;
 /** Prompts shown ahead on the beat track. */
 export const PROMPT_COUNT = 8;
+/** Rhythm lane: beats kept behind now (misses scroll past) and shown ahead. */
+export const LANE_BACK = 1.5;
+export const LANE_AHEAD = 8;
+const LANE_MAX = 40;
+/** A redrawn plan starts at least this many beats ahead, so it scrolls in. */
+export const REPLAN_LEAD = 1.5;
 
 const KEYS = new Set<BreakKey>(['up', 'down', 'left', 'right', 'a', 'b']);
 
@@ -104,6 +120,9 @@ interface Item {
   n: number;
 }
 
+/** A planned move; `cut` hides its notes from that beat on (redrawn after). */
+type LaneMove = PlannedMove & { cut?: number };
+
 interface TurnRt {
   slot: TurnSlot;
   human: boolean;
@@ -117,8 +136,11 @@ interface TurnRt {
   crashed: boolean;
   inTurn: MoveId[];
   rec: TurnRecord;
-  plan: PlannedMove[];
-  dirty: boolean;
+  plan: LaneMove[];
+  /** Lane marks: the grade each planned note got (by beat), for SimState.lane. */
+  marks: Map<number, { key: BreakKey; g: HitGrade; off?: number }>;
+  /** This turn's presses (for EARLY / LATE on the lane). */
+  taps: { t: number; key: BreakKey }[];
   /** CPU: how hard it's answering back this turn, and whether it just slipped up. */
   answer: number;
   failed: boolean;
@@ -167,6 +189,10 @@ export class BreakBattle implements BattleSim {
   private promptsFor: string | null = null;
   private known: Set<string>;
   private skills = new Map<string, number>();
+  /** Battle time of the agenda entry being handled. */
+  private evT = 0;
+  private lane: LaneNote[] | null = null;
+  private forming: SimState['forming'] | null = null;
 
   constructor(config: BattleConfig) {
     this.config = config;
@@ -255,6 +281,8 @@ export class BreakBattle implements BattleSim {
       })),
     };
     if (this.promptsFor) s.promptsFor = this.promptsFor;
+    if (this.lane) s.lane = this.lane.map(n => ({ ...n }));
+    if (this.forming) s.forming = { ...this.forming };
     if (this.winner !== undefined) s.winner = this.winner;
     return s;
   }
@@ -329,11 +357,15 @@ export class BreakBattle implements BattleSim {
   }
 
   private onItem(it: Item, out: SimEvent[]): void {
+    this.evT = it.key;
     switch (it.kind) {
-      case 'beat':
+      case 'beat': {
         if (this.winner === undefined)
           out.push({ e: 'beat', beat: it.n, downbeat: isDownbeat(it.n) });
+        const cur = this.curTurn !== null ? this.rts[this.curTurn] : undefined;
+        if (cur) this.reconcile(cur, it.key);
         return;
+      }
       case 'seg':
         return this.onSegment(this.schedule.segments[it.n], out);
       case 'prep':
@@ -392,7 +424,8 @@ export class BreakBattle implements BattleSim {
         maxCombo: 0,
       },
       plan: [],
-      dirty: false,
+      marks: new Map(),
+      taps: [],
       answer: 0,
       failed: false,
     };
@@ -427,7 +460,9 @@ export class BreakBattle implements BattleSim {
     // whatever the stray key started is dropped too (no extra penalty)
     rt.att = null;
     const from = Math.ceil(beatAt(this.clock, t) + 0.3);
-    rt.plan = rt.plan.filter(p => p.start < from);
+    rt.plan = rt.plan
+      .filter(p => p.start < from)
+      .map(p => ({ ...p, cut: Math.min(p.cut ?? Infinity, from) }));
     if (from >= rt.slot.to) return;
     const skill = this.skills.get(id) ?? 0.5;
     const used = new Map(this.history.get(id) ?? []);
@@ -463,15 +498,18 @@ export class BreakBattle implements BattleSim {
   }
 
   private onInput(i: BreakInput, out: SimEvent[]): void {
+    this.evT = i.t;
     const rt = this.turnFor(i);
     if (!rt) return;
     this.judgeInput(rt, i, out);
     if (rt.failed) this.cpuRecover(rt, i.t);
+    this.reconcile(rt, i.t);
   }
 
   private judgeInput(rt: TurnRt, i: BreakInput, out: SimEvent[]): void {
     const beat = beatAt(this.clock, i.t);
-    rt.dirty = true;
+    rt.taps.push({ t: i.t, key: i.key });
+    if (rt.taps.length > 64) rt.taps.shift();
     if (rt.att && !expire(rt.att, i.t, this.clock, this.windows)) this.abandon(rt, out);
     if (rt.att) {
       const att = rt.att;
@@ -479,9 +517,16 @@ export class BreakBattle implements BattleSim {
       if (r.grade) {
         this.hit(rt, r.grade, i, out);
         if (r.done) this.land(rt, att, r.done, out);
+        this.markAll(rt, att);
         return;
       }
       this.abandon(rt, out);
+    }
+    if (this.deadNote(rt, i)) {
+      // Following the chart through a move that already broke: that note
+      // can't land anything, and it mustn't start some other move either
+      this.hit(rt, 'miss', i, out);
+      return;
     }
     const s = startAttempt(i.key, beat, this.clock, this.windows, rt.slot.to);
     this.hit(rt, s.grade, i, out);
@@ -491,6 +536,7 @@ export class BreakBattle implements BattleSim {
     }
     rt.att = s.attempt;
     rt.crashed = false;
+    this.markAll(rt, s.attempt);
   }
 
   private hit(rt: TurnRt, grade: HitGrade, i: BreakInput, out: SimEvent[]): void {
@@ -500,13 +546,127 @@ export class BreakBattle implements BattleSim {
 
   private onExpiry(rt: TurnRt, t: number, out: SimEvent[]): void {
     if (!rt.att) return;
-    rt.dirty = true;
+    this.evT = t + LATE_SLACK;
     if (!expire(rt.att, t + 1e-9, this.clock, this.windows)) this.abandon(rt, out);
     if (rt.failed) this.cpuRecover(rt, t + LATE_SLACK);
+    this.reconcile(rt, t + LATE_SLACK);
+  }
+
+  /** The plan's move starting on `start` (the live one, not a cut-off leftover). */
+  private plannedAt(rt: TurnRt, start: number): LaneMove | null {
+    for (let k = rt.plan.length - 1; k >= 0; k--) {
+      const p = rt.plan[k];
+      if (p.start === start && p.cut === undefined) return p;
+    }
+    return null;
   }
 
   private planned(rt: TurnRt, start: number): MoveId | null {
-    return rt.plan.find(p => p.start === start)?.move ?? null;
+    return this.plannedAt(rt, start)?.move ?? null;
+  }
+
+  /** Is the attempt `att` still the plan's move (the one starting where it did)? */
+  private onPlan(rt: TurnRt, att: Attempt): boolean {
+    const pm = this.plannedAt(rt, att.start);
+    return pm !== null && att.cands.some(c => c.move === pm.move);
+  }
+
+  // ── The rhythm lane ───────────────────────────────────────────────────
+
+  /**
+   * A human's key on a note that's dead on the lane: the rest of a planned
+   * move that already broke, or what was left of a plan a crash redrew.
+   */
+  private deadNote(rt: TurnRt, i: BreakInput): boolean {
+    if (!rt.human || rt.att) return false;
+    const ok = this.windows.ok;
+    for (const pm of rt.plan) {
+      const cut = pm.cut !== undefined;
+      if (!cut && timeOf(this.clock, pm.start) + ok >= i.t) continue;
+      const m = MOVES[pm.move];
+      for (let k = cut ? 0 : 1; k < m.pattern.length; k++) {
+        const b = pm.start + keyBeat(m, k);
+        if (b >= (pm.cut ?? Infinity) - 1e-9) break;
+        if (m.pattern[k] !== i.key || Math.abs(timeOf(this.clock, b) - i.t) > ok) continue;
+        if (!rt.marks.has(b)) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Mark the planned notes the attempt has judged so far (grades from the recogniser). */
+  private markAll(rt: TurnRt, att: Attempt): void {
+    const pm = this.plannedAt(rt, att.start);
+    if (!pm) return;
+    const c = att.cands.find(x => x.move === pm.move);
+    if (!c) return;
+    const m = MOVES[pm.move];
+    for (let k = 0; k < c.grades.length; k++) {
+      const beat = att.start + keyBeat(m, k);
+      const key = m.pattern[k];
+      const had = rt.marks.get(beat);
+      if (had && had.key === key && had.g === c.grades[k]) continue;
+      const at = timeOf(this.clock, beat);
+      let off: number | undefined;
+      for (const tp of rt.taps)
+        if (tp.key === key && Math.abs(tp.t - at) <= this.windows.ok + 1e-9)
+          if (off === undefined || Math.abs(tp.t - at) < Math.abs(off)) off = tp.t - at;
+      rt.marks.set(
+        beat,
+        off === undefined ? { key, g: c.grades[k] } : { key, g: c.grades[k], off },
+      );
+    }
+  }
+
+  /**
+   * Redraw a human's plan: keep what's behind (so misses keep scrolling
+   * past), put `cur` (the move they're actually doing) in, and plan the
+   * rest from REPLAN_LEAD beats ahead at the earliest.
+   */
+  private replan(rt: TurnRt, t: number, cur: PlannedMove | null): void {
+    if (!rt.human || rt.closed) return;
+    const b = beatAt(this.clock, t);
+    let from = Math.max(rt.slot.from, Math.ceil(b + REPLAN_LEAD - 1e-9));
+    if (cur) from = Math.max(from, cur.start + MOVES[cur.move].beats);
+    if (rt.lastEnd !== null) from = Math.max(from, rt.lastEnd);
+    const cutoff = cur ? cur.start : from;
+    const kept = rt.plan
+      .filter(p => p.start < cutoff)
+      .map(p => ({ ...p, cut: Math.min(p.cut ?? Infinity, cutoff) }));
+    const prev: FlowFrom = cur ? cur.move : rt.prev;
+    const next = from < rt.slot.to ? this.coachPlan(rt, from, prev) : [];
+    rt.plan = [...kept, ...(cur ? [{ move: cur.move, start: cur.start }] : []), ...next];
+  }
+
+  /**
+   * After each input / expiry / beat of a human's turn: is the plan still
+   * one they can follow from where they are? A stray key waits (it may
+   * come to nothing); committing two keys into a different move, or the
+   * next planned move not flowing from the last one landed, redraws it.
+   */
+  private reconcile(rt: TurnRt, t: number): void {
+    if (!rt.human || rt.closed) return;
+    const att = rt.att;
+    if (att) {
+      if (this.onPlan(rt, att) || progress(att) < 2) return;
+      const lead = leading(att, rt.prev, null);
+      if (!lead) return;
+      this.replan(rt, t, { move: lead.move, start: att.start });
+      this.markAll(rt, att);
+      return;
+    }
+    const b = beatAt(this.clock, t);
+    const okB = this.windows.ok / this.clock.spb;
+    const after = rt.lastEnd ?? -Infinity;
+    const next = rt.plan.find(
+      p => p.cut === undefined && p.start >= after - 1e-9 && p.start + okB >= b,
+    );
+    if (next) {
+      if (!canFlow(rt.prev, MOVES[next.move])) this.replan(rt, t, null);
+      return;
+    }
+    if (Math.ceil(b + REPLAN_LEAD - 1e-9) < rt.slot.to && rt.plan.every(p => p.start < b))
+      this.replan(rt, t, null);
   }
 
   /** An attempt ended without a move. */
@@ -541,6 +701,8 @@ export class BreakBattle implements BattleSim {
     rt.failed = true;
     rt.last = null;
     out.push({ e: 'crash', id: rt.slot.id });
+    // Picked themselves up: a fresh plan from a beat and a half ahead
+    this.replan(rt, this.evT, null);
   }
 
   private land(rt: TurnRt, att: Attempt, c: Candidate, out: SimEvent[]): void {
@@ -552,6 +714,7 @@ export class BreakBattle implements BattleSim {
       this.crash(rt, out);
       return;
     }
+    const offPlan = this.planned(rt, att.start) !== m.id;
     if (rt.lastEnd !== null && att.start > rt.lastEnd + 2) rt.combo = 0;
     if (c.slips > 0) {
       // landed, but scrappy: the slips are misses and the combo starts over
@@ -576,6 +739,8 @@ export class BreakBattle implements BattleSim {
     rt.last = { move: m.id, start: att.start };
     rt.consecMiss = 0;
     rt.crashed = false;
+    // Landed something else than planned: the plan carries on from there
+    if (offPlan) this.replan(rt, this.evT, { move: m.id, start: att.start });
     out.push({ e: 'move', id, move: m.id, landed: true, points: pts });
     if (rt.combo >= 2) out.push({ e: 'combo', id, combo: rt.combo });
     if (m.family === 'freeze') {
@@ -654,58 +819,84 @@ export class BreakBattle implements BattleSim {
     return null;
   }
 
+  /**
+   * The lane, the prompts and the move forming, read off the plan (which
+   * only the agenda changes) at the current time: a planned note is judged
+   * when its key is (marks), a miss once its window has gone by, and dead
+   * when its move broke before it came.
+   */
   private updatePrompts(): void {
     const rt = this.promptTurn();
+    this.forming = this.formingOf();
     if (!rt) {
       this.prompts = [];
       this.promptsFor = null;
+      this.lane = null;
       return;
     }
-    const beat = beatAt(this.clock, this.now);
+    const now = this.now;
+    const beat = beatAt(this.clock, now);
     const okB = this.windows.ok / this.clock.spb;
-    const out: { key: BreakKey; beat: number }[] = [];
-    let after = -Infinity;
-    if (rt.att) {
-      const lead = leading(rt.att, rt.prev, this.planned(rt, rt.att.start));
-      if (lead) {
-        const m = MOVES[lead.move];
-        for (let i = lead.grades.length; i < m.pattern.length; i++) {
-          out.push({ key: m.pattern[i], beat: rt.att.start + keyBeat(m, i) });
-        }
-        after = rt.att.start + m.beats;
-        if (rt.human && (rt.dirty || !rt.plan.some(p => p.start === after))) {
-          rt.plan = [
-            { move: lead.move, start: rt.att.start },
-            ...this.coachPlan(rt, after, lead.move),
-          ];
-        }
-      }
-    } else if (rt.human) {
-      const first = rt.plan[0] as PlannedMove | undefined;
-      const stale =
-        first === undefined ||
-        first.start < beat - okB ||
-        (rt.dirty && first.start < (rt.lastEnd ?? -Infinity));
-      if (rt.dirty || stale) {
-        const s = Math.max(rt.slot.from, rt.lastEnd ?? rt.slot.from, Math.ceil(beat - okB));
-        rt.plan = this.coachPlan(rt, s, rt.prev);
-      }
-    }
-    rt.dirty = false;
+    const lo = beat - LANE_BACK;
+    const hi = beat + LANE_AHEAD;
+    const lane: LaneNote[] = [];
+    const prompts: { key: BreakKey; beat: number }[] = [];
     for (const pm of rt.plan) {
-      if (pm.start < after) continue;
       const m = MOVES[pm.move];
+      if (pm.start + m.beats < lo) continue;
+      const alive =
+        pm.cut === undefined &&
+        rt.att !== null &&
+        rt.att.start === pm.start &&
+        rt.att.cands.some(c => c.move === pm.move);
+      const begun = timeOf(this.clock, pm.start) + this.windows.ok < now;
       for (let i = 0; i < m.pattern.length; i++) {
         const b = pm.start + keyBeat(m, i);
-        if (b >= beat - okB) out.push({ key: m.pattern[i], beat: b });
+        if (pm.cut !== undefined && b >= pm.cut - 1e-9) break;
+        const key = m.pattern[i];
+        const n: LaneNote = {
+          key,
+          beat: b,
+          id: `${rt.slot.idx}.${pm.start}.${pm.move}.${i}`,
+          move: pm.move,
+          i,
+          n: m.pattern.length,
+        };
+        const mk = rt.marks.get(b);
+        if (mk && mk.key === key) {
+          n.grade = mk.g;
+          if (mk.off !== undefined) n.off = mk.off;
+        } else if (timeOf(this.clock, b) + this.windows.ok < now) n.grade = 'miss';
+        else if (pm.cut !== undefined || (begun && !alive)) n.dead = true;
+        else if (b >= beat - okB && prompts.length < PROMPT_COUNT) prompts.push({ key, beat: b });
+        if (b >= lo && b <= hi && lane.length < LANE_MAX) lane.push(n);
       }
-      if (out.length >= PROMPT_COUNT) break;
     }
-    this.prompts = out.filter(p => p.beat >= beat - okB).slice(0, PROMPT_COUNT);
+    this.prompts = prompts;
     this.promptsFor = rt.slot.id;
+    this.lane = lane;
   }
 
-  private coachPlan(rt: TurnRt, from: number, prev: FlowFrom): PlannedMove[] {
+  /** The move the dancer up is putting together (or just landed). */
+  private formingOf(): SimState['forming'] | null {
+    const cur = this.curTurn !== null ? this.rts[this.curTurn] : undefined;
+    if (!cur) return null;
+    const id = cur.slot.id;
+    if (cur.att) {
+      const lead = leading(cur.att, cur.prev, this.planned(cur, cur.att.start));
+      if (!lead) return null;
+      const m = MOVES[lead.move];
+      return { id, move: m.id, got: lead.grades.length, of: m.pattern.length };
+    }
+    if (cur.last) {
+      const m = MOVES[cur.last.move];
+      if (beatAt(this.clock, this.now) < cur.last.start + m.beats + 0.5)
+        return { id, move: m.id, got: m.pattern.length, of: m.pattern.length, landed: true };
+    }
+    return null;
+  }
+
+  private coachPlan(rt: TurnRt, from: number, prev: FlowFrom): LaneMove[] {
     const used = new Map(this.history.get(rt.slot.id) ?? []);
     for (const m of rt.inTurn) used.set(m, (used.get(m) ?? 0) + 1);
     return planTurn(from, rt.slot.to, prev, coachOpts(used, this.seen));

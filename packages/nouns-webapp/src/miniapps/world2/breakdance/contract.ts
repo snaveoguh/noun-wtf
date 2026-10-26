@@ -131,6 +131,12 @@ export interface BattleConfig {
   turnBars: number;
   bpm: number;
   windows?: TimingWindows;
+  /**
+   * (Added: songs.) The host's music: a track id from public/breaks/tracks.json
+   * (the battle's `bpm` is then the track's). Absent, or a client that can't
+   * load the file: the generated break beat.
+   */
+  track?: string;
 }
 
 // ── Inputs ──────────────────────────────────────────────────────────────
@@ -177,6 +183,24 @@ export interface JudgeCard {
   power: [number, number];
 }
 
+/** One note on the rhythm lane (SimState.lane). */
+export interface LaneNote {
+  key: BreakKey;
+  beat: number;
+  /** Stable while the note stays planned (a replan's new notes get new ids). */
+  id: string;
+  /** The move it belongs to, and which of its keys it is (i of n). */
+  move: MoveId;
+  i: number;
+  n: number;
+  /** Judged: hit (perfect / great / ok) or 'miss'. Absent while it's still coming. */
+  grade?: HitGrade;
+  /** Seconds off the beat when hit (+ late, − early). */
+  off?: number;
+  /** Its move is already broken: pressing it won't land anything. */
+  dead?: boolean;
+}
+
 export interface SimState {
   gid: string;
   phase: BattlePhase;
@@ -197,6 +221,16 @@ export interface SimState {
    * intro / between the next dancer, so the beat track can lead in.
    */
   promptsFor?: string;
+  /**
+   * (Added: rhythm lane.) The beat track as a rhythm game: the planned notes of
+   * the dancer `promptsFor` from a beat or two behind now to several ahead,
+   * each judged as it's hit (or marked a miss once it scrolls past). The plan
+   * only changes when the dancer lands or commits to a different move, or
+   * crashes; a miss leaves the rest of it where it was.
+   */
+  lane?: LaneNote[];
+  /** (Added: rhythm lane.) The move the dancer up is putting together right now. */
+  forming?: { id: string; move: MoveId; got: number; of: number; landed?: boolean };
   /** Totals per crew so far, and the judges' card per round. */
   totals: [number, number];
   cards: JudgeCard[];
