@@ -1,0 +1,488 @@
+/* 3D Grand Exchange: the floor fills its window; the HUD sits on top. Scoped under .gx3d-root. */
+.gx3d-root {
+  position: absolute;
+  inset: 0;
+  min-height: 360px;
+  overflow: hidden;
+  background: #9cc9f0;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  user-select: none;
+  -webkit-user-select: none;
+  container: gx3d / inline-size;
+}
+.gx3d-root *,
+.gx3d-root *::before,
+.gx3d-root *::after {
+  box-sizing: border-box;
+}
+.gx3d-host {
+  position: absolute;
+  inset: 0;
+}
+.gx3d-book-open .gx3d-host,
+.gx3d-book-open .gx3d-labels {
+  right: min(46%, 640px);
+}
+.gx3d-canvas {
+  display: block;
+  cursor: grab;
+}
+.gx3d-canvas:active {
+  cursor: grabbing;
+}
+.gx3d-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.gx3d-err {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #0b0f0c;
+}
+
+/* ── Bubbles ── */
+.gx3d-l {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+  will-change: transform;
+  font-family: 'Arial Black', 'Helvetica Neue', Impact, sans-serif;
+}
+.gx3d-l i {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+}
+.gx3d-l b {
+  position: relative;
+  font-size: 13px;
+  line-height: 1.1;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+  border: 2px solid #111;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35);
+}
+.gx3d-l b::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top-color: #111;
+  border-bottom: 0;
+}
+.gx3d-buy b {
+  color: #0a7d3f;
+}
+.gx3d-sell b {
+  color: #c4261b;
+}
+.gx3d-say b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 12px;
+  max-width: 260px;
+  white-space: normal;
+  text-align: center;
+}
+.gx3d-filled b,
+.gx3d-got b {
+  background: #3ddc84;
+  color: #04220f;
+}
+.gx3d-got b {
+  background: #9fe0ff;
+  color: #062233;
+}
+/* The real exchange: gold */
+.gx3d-real b {
+  background: #ffd400;
+  border-color: #6b4b00;
+}
+.gx3d-real b::before {
+  content: '★ ';
+}
+.gx3d-real.gx3d-filled b {
+  background: #ffd400;
+  color: #0a5a2c;
+}
+.gx3d-real.gx3d-got b {
+  background: #ffd400;
+  color: #0b3d63;
+}
+.gx3d-real i {
+  background: #6b4b00;
+  color: #ffd400;
+}
+.gx3d-you i {
+  background: #d22209;
+  color: #fff;
+}
+.gx3d-followed i {
+  outline: 2px solid #fff;
+}
+.gx3d-pop b {
+  animation: gx3d-pop 0.45s cubic-bezier(0.2, 1.8, 0.4, 1);
+}
+@keyframes gx3d-pop {
+  0% {
+    transform: scale(0.3);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ── HUD ── */
+.gx3d-top {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  right: 230px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.gx3d-title {
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  color: #ffd400;
+  -webkit-text-stroke: 1px #3a2a00;
+}
+.gx3d-noggles {
+  color: #f3322c;
+}
+.gx3d-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.gx3d-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #3ddc84;
+  color: #3ddc84;
+  text-shadow: none;
+}
+.gx3d-offline,
+.gx3d-fallback {
+  border-color: #ffcf4a;
+  color: #ffcf4a;
+}
+.gx3d-stat {
+  font-size: 11px;
+}
+.gx3d-gold {
+  color: #ffd400;
+}
+.gx3d-muted {
+  opacity: 0.7;
+}
+.gx3d-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 10px;
+}
+.gx3d-key-real {
+  color: #ffd400;
+}
+.gx3d-tools {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  gap: 6px;
+}
+.gx3d-book-open .gx3d-tools {
+  right: calc(min(46%, 640px) + 10px);
+}
+.gx3d-btn,
+.gx3d-cam,
+.gx3d-x {
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  border: 2px solid #111;
+  background: #fff;
+  color: #111;
+  padding: 5px 9px;
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 #111;
+}
+.gx3d-btn:active,
+.gx3d-cam:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #111;
+}
+.gx3d-on {
+  background: #ffd400;
+}
+.gx3d-cams {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+}
+.gx3d-book-open .gx3d-cams {
+  left: calc((100% - min(46%, 640px)) / 2);
+}
+.gx3d-cam {
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.gx3d-cam kbd {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  opacity: 0.55;
+}
+.gx3d-cam-vast.gx3d-on {
+  background: #ff7ac8;
+}
+.gx3d-perf {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  font-size: 9px;
+  opacity: 0.6;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000;
+}
+.gx3d-book-open .gx3d-perf {
+  display: none;
+}
+.gx3d-news {
+  position: absolute;
+  left: 50%;
+  top: 64px;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100% - 24px));
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid #ffd400;
+  color: #ffd400;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+.gx3d-help {
+  position: absolute;
+  right: 10px;
+  top: 52px;
+  width: min(380px, calc(100% - 20px));
+  background: rgba(8, 10, 14, 0.92);
+  border: 2px solid #ffd400;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  z-index: 5;
+}
+.gx3d-help kbd {
+  font-size: 10px;
+  border: 1px solid #666;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* The followed trader */
+.gx3d-card {
+  position: absolute;
+  left: 12px;
+  bottom: 70px;
+  width: min(300px, calc(100% - 24px));
+  background: rgba(8, 10, 14, 0.9);
+  border: 2px solid #fff;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.gx3d-card-real {
+  border-color: #ffd400;
+}
+.gx3d-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gx3d-card-head img {
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+.gx3d-card-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.gx3d-card-name {
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 15px;
+}
+.gx3d-card-real .gx3d-card-name {
+  color: #ffd400;
+}
+.gx3d-card-blurb {
+  font-size: 11px;
+}
+.gx3d-card-now {
+  font-weight: 700;
+}
+.gx3d-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+.gx3d-x {
+  padding: 0 7px;
+  font-size: 16px;
+  line-height: 22px;
+  box-shadow: 2px 2px 0 #111;
+}
+
+/* The flat order book as a side panel */
+.gx3d-book {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(46%, 640px);
+  overflow: auto;
+  background: #0b0f0c;
+  border-left: 3px solid #ffd400;
+  z-index: 6;
+}
+.gx3d-book .gx-root {
+  min-height: 100%;
+}
+.gx3d-book-close {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: #111813;
+  border-bottom: 1px solid #223026;
+  color: #ffcf4a;
+  font:
+    700 12px ui-monospace,
+    monospace;
+}
+.gx3d-flat-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 10px;
+  background: #0b0f0c;
+}
+
+/* Phones (and narrow windows) */
+@container gx3d (max-width: 640px) {
+  .gx3d-top {
+    right: 10px;
+    top: 52px;
+  }
+  .gx3d-title {
+    font-size: 15px;
+  }
+  .gx3d-legend {
+    display: none;
+  }
+  .gx3d-tools {
+    left: 10px;
+    right: auto;
+  }
+  /* Clear of the site's NOUN FM chip, five buttons across a phone */
+  .gx3d-cams {
+    bottom: 64px;
+    gap: 4px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    max-width: none;
+    justify-content: center;
+  }
+  .gx3d-cam {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    font-size: 10px;
+    padding: 10px 2px;
+    box-shadow: 2px 2px 0 #111;
+  }
+  .gx3d-book-open .gx3d-cams {
+    left: 8px;
+  }
+  .gx3d-card {
+    bottom: 116px;
+    max-height: 38%;
+    overflow: auto;
+  }
+  .gx3d-news {
+    top: 110px;
+  }
+  .gx3d-perf {
+    display: none;
+  }
+  .gx3d-book-open .gx3d-host,
+  .gx3d-book-open .gx3d-labels {
+    right: 0;
+  }
+}
+@container gx3d (max-width: 640px) {
+  .gx3d-book {
+    width: 100%;
+  }
+}
