@@ -7,6 +7,8 @@ import type { Difficulty } from './lobby';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import { BreakHud } from '../view/BreakHud';
+
 import { INVITE_MS } from './lobby';
 import { ARROW } from './stubView';
 
@@ -66,6 +68,10 @@ export function BreakUi({ game }: { game: Game }) {
   }, [b, ui.near, ui.phase]);
 
   const fighting = ui.phase === 'countdown' || ui.phase === 'battle';
+  // The real view's HUD (beat track, prompts, judges' cards, its own touch
+  // pad); its store appears when the view chunk lands, so poll while fighting
+  useTick(fighting || ui.phase === 'results', 500);
+  const hud = fighting || ui.phase === 'results' ? (b.view?.hud() ?? null) : null;
   return (
     <div className="bk-root pointer-events-none absolute inset-0">
       <style>{CSS}</style>
@@ -138,7 +144,19 @@ export function BreakUi({ game }: { game: Game }) {
         </button>
       )}
 
-      {fighting && ui.role !== 'spectator' && coarse() && <TouchPad b={b} />}
+      {hud !== null && (
+        <BreakHud
+          hud={hud}
+          onKey={
+            fighting && ui.role !== 'spectator'
+              ? k => b.reader.press(k, performance.now())
+              : undefined
+          }
+          onGesture={() => b.view?.startAudio()}
+          showFinal={false}
+        />
+      )}
+      {hud === null && fighting && ui.role !== 'spectator' && coarse() && <TouchPad b={b} />}
 
       {ui.phase === 'results' && ui.results !== null && <Results b={b} ui={ui} />}
 

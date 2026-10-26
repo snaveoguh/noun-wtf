@@ -11,14 +11,16 @@
 // stub and hands over on arrival.
 
 import type { CharacterAssets } from '../../character/NounCharacter';
+import type { Game } from '../../Game';
 import type { BattleConfig, BattleSimFactory, BattleView, SimEvent, SimState } from '../contract';
+import type { BreakHudStore } from '../view/hudStore';
 import type * as THREE from 'three';
 
 import { StubSim } from './stubSim';
 import { StubBattleView } from './stubView';
 
 /** The one-line swap: false once breakdance/sim and breakdance/view are in. */
-const USE_STUBS = true;
+const USE_STUBS = false;
 
 /** What net/ hands the view (the real createBattleView takes this). */
 export interface BreakViewDeps {
@@ -37,7 +39,18 @@ export interface BreakViewDeps {
 }
 
 type SimModule = { createBattleSim?: BattleSimFactory };
-type ViewModule = { createBattleView?: (deps: BreakViewDeps) => BattleView };
+type ViewModule = {
+  createBattleView?: (game: Game) => BattleView;
+  hudOf?: (v: BattleView) => BreakHudStore | null;
+};
+
+/** The view as net/ holds it: a BattleView, plus the real view's HUD store and audio unlock. */
+export interface NetBattleView extends BattleView {
+  /** The real view's HUD store (null while the stub stands in). */
+  hud(): BreakHudStore | null;
+  /** Unlock / start the battle audio (call from a user gesture). */
+  startAudio(): void;
+}
 
 const sims = import.meta.glob<SimModule>('../sim/index.ts', { eager: true });
 const views = import.meta.glob<ViewModule>('../view/index.ts');
@@ -61,17 +74,15 @@ export function preloadBreakView(): Promise<ViewModule | null> {
   return loading;
 }
 
-export function createView(deps: BreakViewDeps): BattleView {
+export function createView(deps: BreakViewDeps, game: Game): NetBattleView {
   void preloadBreakView();
-  const make = (): BattleView | null => viewMod?.createBattleView?.(deps) ?? null;
-  const ready = USE_STUBS ? null : make();
-  if (ready !== null) return ready;
-  // Not here (yet): the stub stands in, then hands over to the real one
-  let cur: BattleView = new StubBattleView(deps);
+  const make = (): BattleView | null => viewMod?.createBattleView?.(game) ?? null;
+  // The real view if it's here; otherwise the stub stands in, then hands over to it
+  let cur: BattleView = (USE_STUBS ? null : make()) ?? new StubBattleView(deps);
   let mounted: { config: BattleConfig; at: Parameters<BattleView['mount']>[1] } | null = null;
   let local: string | null = null;
   let gone = false;
-  if (!USE_STUBS)
+  if (!USE_STUBS && cur instanceof StubBattleView)
     void preloadBreakView().then(() => {
       const real = gone ? null : make();
       if (real === null) return;
@@ -83,6 +94,10 @@ export function createView(deps: BreakViewDeps): BattleView {
       cur = real;
     });
   return {
+    hud: () => viewMod?.hudOf?.(cur) ?? null,
+    startAudio() {
+      (cur as BattleView & { startAudio?: () => void }).startAudio?.();
+    },
     mount(config, at) {
       mounted = { config, at };
       cur.mount(config, at);

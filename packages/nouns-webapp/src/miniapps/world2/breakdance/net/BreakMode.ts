@@ -13,7 +13,7 @@
 
 import type { Game } from '../../Game';
 import type { RespectApi } from '../../interiors/contract';
-import type { CrewId, CrewSize, BattleConfig, BattleView, BreakMsg } from '../contract';
+import type { CrewId, CrewSize, BattleConfig, BreakMsg } from '../contract';
 
 import * as THREE from 'three';
 
@@ -28,7 +28,7 @@ import {
   ringSlot,
   type CypherSpot,
 } from './cypher';
-import { createSim, createView, preloadBreakView } from './factory';
+import { createSim, createView, preloadBreakView, type NetBattleView } from './factory';
 import { BreakInputReader } from './input';
 import {
   BreakLobby,
@@ -104,7 +104,7 @@ export class BreakMode {
   readonly lobby: BreakLobby;
   readonly transport: BreakTransport;
   session: BreakSession | null = null;
-  view: BattleView | null = null;
+  view: NetBattleView | null = null;
   cypher: CypherSpot | null = null;
   /** DOM layer for the view's HUD (BreakUi mounts it). */
   hudLayer: HTMLElement | null = null;
@@ -467,18 +467,21 @@ export class BreakMode {
       at,
       lag,
     });
-    const view = createView({
-      scene: g.gfx.scene,
-      camera: g.gfx.camera,
-      renderer: g.gfx.renderer,
-      hudLayer: this.hudLayer,
-      labelLayer: g.labelLayerEl,
-      assets: g.assets,
-      toon: g.gfx.toon,
-      quality: g.gfx.quality,
-      audio: g.audio.ctx,
-      audioOut: g.audio.master,
-    });
+    const view = createView(
+      {
+        scene: g.gfx.scene,
+        camera: g.gfx.camera,
+        renderer: g.gfx.renderer,
+        hudLayer: this.hudLayer,
+        labelLayer: g.labelLayerEl,
+        assets: g.assets,
+        toon: g.gfx.toon,
+        quality: g.gfx.quality,
+        audio: g.audio.ctx,
+        audioOut: g.audio.master,
+      },
+      g,
+    );
     view.mount(config, c);
     view.setLocal(me);
     this.view = view;
