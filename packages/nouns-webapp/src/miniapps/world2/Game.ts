@@ -780,6 +780,10 @@ export class Game {
     this.step(dt, now);
   };
 
+  /** Dev: Noun Breaks' battle view on its mock battle, in front of the skater (breakdance/view/dev.ts). */
+  breakDev = (o?: import('./breakdance/view/dev').BreakDevOptions) =>
+    import('./breakdance/view/dev').then(m => m.breakDemo(this, o));
+
   /** One simulation + render step (exposed for tests/automation). */
   /** Character-select mode: physics paused, camera orbits the rider. */
   showroom = false;
