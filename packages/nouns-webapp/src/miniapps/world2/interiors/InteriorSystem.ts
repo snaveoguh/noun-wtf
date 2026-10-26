@@ -389,9 +389,22 @@ export class InteriorSystem implements InteriorsApi {
         if (this.phase === 'in' && this.pending !== null) {
           const door = this.pending;
           this.pending = null;
-          this.goIn(door);
+          try {
+            this.goIn(door);
+          } catch (err) {
+            // Never leave the screen black: back outside (or out, if half in)
+            console.warn('[interiors] enter failed', err);
+            if (this.live !== null) this.goOut();
+            else {
+              this.phase = 'outside';
+              this.fadeT = -FADE_S;
+            }
+          }
         } else if (this.phase === 'out') this.goOut();
-        this.fadeT = 0;
+        else {
+          this.phase = this.live !== null ? 'inside' : 'outside';
+          this.fadeT = -FADE_S;
+        }
       }
     } else if (this.fadeT < 0) {
       // Fading back in (fadeT runs −FADE_S → 0)
@@ -494,6 +507,14 @@ export class InteriorSystem implements InteriorsApi {
     const tAtlas = performance.now();
     const built = buildInterior(layout, atlas, { shadows: g.gfx.quality !== 'low' });
     const tBuild = performance.now();
+    // Residents
+    const rnd = mulberry32(hash32(`${door.id}:${Date.now()}`));
+    const defs = residentsFor(door.id, layout, tier);
+    const tFolk0 = performance.now();
+    const folk: Folk[] = defs.map(def => this.makeFolk(def, layout));
+    const tFolk = performance.now();
+    const { visit, effects } = arrive(door.id, kind, tier, defs, rnd);
+    // (Everything that could fail is done: now change the world)
     if (g.gfx.toon) toonify(built.group);
     const origin = new THREE.Vector3(door.x, POCKET_Y, door.z);
     built.group.position.copy(origin);
@@ -551,7 +572,8 @@ export class InteriorSystem implements InteriorsApi {
     p.softBounds = Infinity;
     p.mountain = null;
     const [ex, ez] = entryPoint(layout);
-    const entry = new THREE.Vector3(origin.x + ex, floorY + 0.05, origin.z + ez);
+    // A step in from the door (so the way out isn't the first thing offered)
+    const entry = new THREE.Vector3(origin.x + ex, floorY + 0.05, origin.z + ez + 0.7);
     p.homeSpots = [{ pos: entry.clone(), yaw: 0 }];
     if (p.mode === 'board') p.toggleBoard();
     p.spawn(entry, 0);
@@ -564,13 +586,6 @@ export class InteriorSystem implements InteriorsApi {
     this.camInit = false;
     g.stats.suspended = true;
 
-    // Residents
-    const rnd = mulberry32(hash32(`${door.id}:${Date.now()}`));
-    const defs = residentsFor(door.id, layout, tier);
-    const tFolk0 = performance.now();
-    const folk: Folk[] = defs.map(def => this.makeFolk(def, layout));
-    const tFolk = performance.now();
-    const { visit, effects } = arrive(door.id, kind, tier, defs, rnd);
     this.live = {
       door,
       kind,
@@ -688,7 +703,7 @@ export class InteriorSystem implements InteriorsApi {
     const d = L.door;
     const nx = Math.sin(d.yaw);
     const nz = Math.cos(d.yaw);
-    p.spawn(new THREE.Vector3(d.x + nx * 1.1, d.y + 0.3, d.z + nz * 1.1), d.yaw);
+    p.spawn(new THREE.Vector3(d.x + nx * 1.8, d.y + 0.3, d.z + nz * 1.8), d.yaw);
     p.mode = 'foot';
     g.cam.snap(p);
     g.cam.pitch = this.savedPitch;
@@ -826,14 +841,21 @@ export class InteriorSystem implements InteriorsApi {
     const yaw = g.cam.controlYaw;
     const o = L.origin;
     const lay = L.layout;
-    const tx = p.x;
-    const ty = p.y + 1.25;
-    const tz = p.z;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
     const m = 0.45;
-    let x = tx - Math.sin(yaw) * CAM_BACK;
-    let z = tz - Math.cos(yaw) * CAM_BACK;
+    let x = p.x - fx * CAM_BACK;
+    let z = p.z - fz * CAM_BACK;
     x = Math.min(o.x + lay.w / 2 - m, Math.max(o.x - lay.w / 2 + m, x));
     z = Math.min(o.z + lay.d - m, Math.max(o.z + m, z));
+    // Look a little ahead of you, the more so the closer the walls have
+    // pushed the camera in over your head (so the room fills the view, not
+    // the top of your head)
+    const pushed = 1 - Math.min(1, Math.hypot(x - p.x, z - p.z) / CAM_BACK);
+    const ahead = 0.6 + 1.6 * pushed;
+    const tx = p.x + fx * ahead;
+    const ty = p.y + 1.1 - 0.4 * pushed;
+    const tz = p.z + fz * ahead;
     const y = o.y + Math.max(lay.h + 0.35, 3.6);
     const k = this.camInit ? 1 - Math.exp(-7 * dt) : 1;
     this.camPos.lerp(this._w.set(x, y, z), k);
@@ -1154,6 +1176,7 @@ export class InteriorSystem implements InteriorsApi {
     const e = L.eat;
     if (e === null) return;
     e.mesh.removeFromParent();
+    inkExcluded.delete(e.mesh);
     e.mesh.traverse(o => {
       const m = o as THREE.Mesh;
       if (m.isMesh) m.geometry.dispose();
@@ -1362,7 +1385,7 @@ export class InteriorSystem implements InteriorsApi {
       return;
     }
     const me = this.toRoom(this.game.player.pos, this._w);
-    const atDoor = me.z < 1.6 && Math.abs(me.x - L.layout.door.x) < 1.2;
+    const atDoor = me.z < 1.3 && Math.abs(me.x - L.layout.door.x) < 1.1;
     const k = KIND_LABEL[L.kind];
     const actions = this.phase === 'inside' ? menu(L.visit, this.ctx) : [];
     const giftF = this.giftTo !== null ? L.folk.find(f => f.def.id === this.giftTo) : undefined;
@@ -1448,11 +1471,11 @@ export class InteriorSystem implements InteriorsApi {
     const inside = this.live !== null;
     if (e.code === 'KeyE') {
       if (!inside && this.near !== null && this.phase === 'outside') {
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         e.preventDefault();
         this.requestEnter();
       } else if (inside) {
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         e.preventDefault();
         if (this.view.prompt?.kind === 'leave') this.requestLeave();
       }
@@ -1461,12 +1484,12 @@ export class InteriorSystem implements InteriorsApi {
     if (!inside) return;
     // No board in here
     if (e.code === 'KeyF') {
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
       return;
     }
     if (e.code === 'Escape' && (this.shopOpen || this.giftTo !== null)) {
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       this.shopOpen = false;
       this.giftTo = null;
       return;
@@ -1475,7 +1498,7 @@ export class InteriorSystem implements InteriorsApi {
     const m = /^Digit([1-9])$/.exec(e.code);
     if (m !== null) {
       const i = Number(m[1]) - 1;
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       e.preventDefault();
       if (this.giftTo !== null) {
         const amt = [1, 5, 25][i];

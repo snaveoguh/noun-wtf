@@ -231,7 +231,8 @@ function shell(kit: Kit, l: Layout, rnd: Rng) {
   for (const li of l.lights) {
     kit.frame.makeTranslation(li.x, 0, li.z);
     if (li.kind === 'pendant') {
-      const drop = Math.min(1.0, H - 2.25);
+      // Short drops: the camera looks down past them from above
+      const drop = Math.min(0.55, H - 2.6);
       kit.add(cyl(0.008, 0.008, drop, 4, 0, H - drop), 0x222222);
       kit.add(cyl(0.08, 0.32, 0.26, 12, 0, H - drop - 0.2), P.accent);
       kit.add(cyl(0.28, 0.28, 0.02, 12, 0, H - drop - 0.21), 0xfff2c4, 'glow');
@@ -1190,6 +1191,15 @@ function buildItem(kit: Kit, it: Item, P: Palette, rnd: Rng, atlas: ArtAtlas, l:
       kit.add(cyl(0.12, 0.2, 0.32, 12, 0, h - 0.34), 0xffe2a8, 'glow');
       break;
     }
+    case 'bag': {
+      // A heavy bag on a chain from the ceiling
+      kit.add(cyl(0.005, 0.005, l.h - 1.9, 4, 0, 1.9), 0x9aa0a6);
+      kit.add(cyl(0.24, 0.24, 1.1, 12, 0, 0.75), pick(rnd, [0xc23a2b, 0x2b2b2b, 0x2c6fb0]));
+      kit.add(cyl(0.25, 0.25, 0.08, 12, 0, 1.25), 0x2b2b2b);
+      kit.add(cyl(0.25, 0.25, 0.08, 12, 0, 0.75), 0x2b2b2b);
+      kit.add(cyl(0.1, 0.24, 0.12, 12, 0, 1.85), 0x2b2b2b);
+      break;
+    }
     case 'wardrobe': {
       const c = pick(rnd, [P.wood, 0xf4f1ea, shade(P.wood, -0.25)]);
       kit.add(boxAt(-w / 2, w / 2, 0, h, -d / 2, d / 2), c);
@@ -1323,7 +1333,8 @@ function buildDecor(kit: Kit, d: Decor, i: number, l: Layout, atlas: ArtAtlas, r
           .translate(0, y, 0.02),
         0x2b2b2b,
       );
-      if (uv !== undefined) kit.addArt(panel(w * 0.9, h * 0.9, 0, y, 0.045), uv);
+      // In front of the rim (its face is at z 0.06)
+      if (uv !== undefined) kit.addArt(panel(w * 0.9, h * 0.9, 0, y, 0.066), uv);
       break;
     case 'wall_shelf': {
       kit.add(boxAt(-w / 2, w / 2, y - 0.03, y, 0, 0.25), P.wood);

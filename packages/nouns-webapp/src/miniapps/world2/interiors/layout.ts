@@ -72,7 +72,8 @@ export type ItemType =
   | 'mat'
   | 'water_cooler'
   | 'side_table'
-  | 'wardrobe';
+  | 'wardrobe'
+  | 'bag';
 
 export type Wall = 'n' | 'e' | 's' | 'w';
 
@@ -444,6 +445,7 @@ const SIZE: Record<ItemType, [number, number, number]> = {
   water_cooler: [0.42, 0.42, 1.25],
   side_table: [0.5, 0.5, 0.55],
   wardrobe: [1.2, 0.6, 2.0],
+  bag: [0.6, 0.6, 1.9],
 };
 
 const FLAT = new Set<ItemType>(['rug', 'mat']);
@@ -885,9 +887,37 @@ const vending: Maker = () => ({
   wall: true,
 });
 
-const treadmill: Maker = () => ({
-  parts: [{ type: 'treadmill', x: 0, z: 0 }],
-  spots: [{ x: 0, z: -0.2, rot: 0, kind: 'work' }],
+const treadmill: Maker = rnd => {
+  // A row of one to three, side by side, with room to step on at the back
+  const n = 1 + Math.floor(rnd() * 3);
+  const parts: Part[] = [];
+  for (let i = 0; i < n; i++) parts.push({ type: 'treadmill', x: (i - (n - 1) / 2) * 1.15, z: 0 });
+  return {
+    parts,
+    spots: [{ x: 0, z: -1.35, rot: 0, kind: 'work' }],
+    wall: false,
+    region: 'main',
+  };
+};
+
+const punchBag: Maker = () => ({
+  parts: [
+    { type: 'mat', x: 0, z: 0, w: 1.8, d: 1.8 },
+    { type: 'bag', x: 0, z: 0 },
+  ],
+  spots: [{ x: 0, z: 1.0, rot: 2, kind: 'work' }],
+  wall: false,
+  region: 'main',
+});
+
+const yogaMats: Maker = rnd => ({
+  parts: [0, 1, 2].slice(0, 2 + Math.floor(rnd() * 2)).map(i => ({
+    type: 'mat' as const,
+    x: (i - 1) * 1.0,
+    z: 0,
+    w: 0.7,
+    d: 1.8,
+  })),
   wall: false,
   region: 'main',
 });
@@ -991,9 +1021,13 @@ const SETS: Record<InteriorKind, [Maker, number, number, boolean][]> = {
   gym: [
     [deskSet, 1, 1, true],
     [weights, 1.2, 2, true],
-    [treadmill, 1.2, 3, true],
+    [treadmill, 1.2, 2, true],
+    [punchBag, 1, 2, false],
+    [yogaMats, 0.8, 1, false],
+    [shopShelf, 0.5, 1, false],
+    [waitingBench, 0.6, 1, false],
     [cooler, 0.7, 1, false],
-    [plantCorner, 0.4, 1, false],
+    [plantCorner, 0.6, 2, false],
   ],
 };
 
@@ -1200,10 +1234,10 @@ const PALETTES: Record<InteriorKind, Palette[]> = {
   ],
   gym: [
     {
-      wall: 0x3a3f46,
+      wall: 0x4a5059,
       wall2: 0xf2c94c,
-      floor: 0x2a2d31,
-      floor2: 0x1f2226,
+      floor: 0x50565e,
+      floor2: 0x3a3f46,
       trim: 0xf2c94c,
       ceiling: 0x2b2f34,
       wood: 0x8a6a4a,
@@ -1731,6 +1765,8 @@ function addWallArt(l: Layout, rnd: Rng) {
   for (let k = 0, placed = 0; k < n * 6 && placed < n; k++) {
     const wall = pick(rnd, ['n', 'e', 'w', 'n', 's'] as Wall[]);
     const type = pick(rnd, types);
+    // One clock is plenty
+    if (type === 'clock' && l.decor.some(q => q.type === 'clock')) continue;
     const big = l.kind === 'gallery' ? 0.9 + rnd() * 0.9 : 0.6 + rnd() * 0.5;
     const w = type === 'clock' ? 0.45 : type === 'wall_shelf' ? 1.2 : type === 'neon' ? 1.4 : big;
     const h =

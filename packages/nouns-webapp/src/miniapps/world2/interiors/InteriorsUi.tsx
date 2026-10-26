@@ -41,7 +41,11 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
 
       {v.inside !== null && (
         <div
-          className="absolute left-1/2 top-2 flex -translate-x-1/2 items-center gap-2 bg-black/75 px-3 py-1 text-white"
+          className={
+            touch
+              ? 'absolute bottom-[262px] left-1/2 flex -translate-x-1/2 items-center gap-2 bg-black/75 px-3 py-1 text-white'
+              : 'absolute left-1/2 top-2 flex -translate-x-1/2 items-center gap-2 bg-black/75 px-3 py-1 text-white'
+          }
           data-interiors="title"
         >
           <span className="text-lg">{v.inside.icon}</span>
@@ -76,8 +80,8 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
           data-interiors="menu"
           className={
             touch
-              ? 'absolute inset-x-0 bottom-[132px] flex gap-2 overflow-x-auto px-3 pb-1'
-              : 'absolute right-3 top-1/2 flex max-h-[70vh] w-60 -translate-y-1/2 flex-col gap-2 overflow-y-auto'
+              ? 'absolute inset-x-0 bottom-[208px] flex gap-2 overflow-x-auto px-3 pb-1'
+              : 'absolute bottom-20 left-1/2 flex w-[min(720px,56vw)] -translate-x-1/2 flex-wrap justify-center gap-2'
           }
         >
           {v.actions.map((a, i) => (
@@ -121,7 +125,7 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
 
       {v.shop !== null && (
         <Sheet title={v.shop.title} onClose={() => act({ a: 'close' })} touch={touch}>
-          <div className="flex max-h-[42vh] flex-col gap-2 overflow-y-auto">
+          <div className="flex max-h-[36vh] flex-col gap-2 overflow-y-auto">
             {v.shop.rows.map((r, i) => (
               <button
                 key={r.id}
@@ -165,8 +169,8 @@ function Sheet({
       data-interiors="sheet"
       className={
         touch
-          ? 'pointer-events-auto absolute inset-x-0 bottom-0 border-t-4 border-black bg-[#f4f1ea] p-3 pb-6'
-          : 'pointer-events-auto absolute right-3 top-1/2 w-80 -translate-y-1/2 border-4 border-black bg-[#f4f1ea] p-3 shadow-[6px_6px_0_#d22209]'
+          ? 'pointer-events-auto absolute inset-x-3 bottom-[200px] border-4 border-black bg-[#f4f1ea] p-3 shadow-[5px_5px_0_#d22209]'
+          : 'pointer-events-auto absolute left-1/2 top-1/2 w-96 -translate-x-1/2 -translate-y-1/2 border-4 border-black bg-[#f4f1ea] p-3 shadow-[6px_6px_0_#d22209]'
       }
     >
       <div className="mb-2 flex items-center justify-between">

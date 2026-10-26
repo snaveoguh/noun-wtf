@@ -232,19 +232,36 @@ export function shade(hex: number, k: number): number {
   return _c.getHex();
 }
 
-/** Free a subtree's materials (and their toon twins); `bodyMaps`: the Noun shirt textures too. */
-export function disposeMaterials(root: THREE.Object3D, bodyMaps = false) {
+/** Free a subtree's materials (and their toon twins); `textures`: their own maps too. */
+export function disposeMaterials(root: THREE.Object3D, textures = false) {
   root.traverse(o => {
     const m = o as THREE.Mesh;
     if (!m.isMesh) return;
     for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
       const src = mat.userData.toonSrc as THREE.Material | undefined;
-      if (bodyMaps) {
-        const sm = mat as THREE.MeshStandardMaterial;
-        if (/nounbody/i.test(sm.name)) sm.map?.dispose();
-      }
+      if (textures) for (const x of [mat, src]) if (x !== undefined) disposeMaps(x);
       src?.dispose();
       mat.dispose();
     }
   });
+}
+
+const MAPS = [
+  'map',
+  'emissiveMap',
+  'alphaMap',
+  'normalMap',
+  'aoMap',
+  'roughnessMap',
+  'metalnessMap',
+] as const;
+
+/**
+ * Free a material's own textures (a character's shirt, head, board art).
+ * Cached ones are re-uploaded if something else still draws them; the
+ * shared toon ramp (gradientMap) is never touched.
+ */
+function disposeMaps(mat: THREE.Material) {
+  const rec = mat as unknown as Record<string, THREE.Texture | null | undefined>;
+  for (const k of MAPS) rec[k]?.dispose();
 }

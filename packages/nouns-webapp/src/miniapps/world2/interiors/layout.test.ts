@@ -15,13 +15,15 @@ import {
 } from './layout';
 import { INTERIOR_KINDS } from './names';
 
-const IDS = Array.from({ length: 24 }, (_, i) => `plaza:${(i * 7.3).toFixed(1)},${i % 5}`);
+const IDS = Array.from({ length: 60 }, (_, i) => `plaza:${(i * 7.3).toFixed(1)},${i % 5}`);
 const SIZES: [number, number, number][] = [
   [8, 8, 3],
   [16, 16, 14],
   [12.6, 12, 4.6],
   [6, 7, 3],
   [20, 14, 10],
+  [4.5, 8, 11],
+  [56, 26, 8.6],
 ];
 
 function all(): Layout[] {

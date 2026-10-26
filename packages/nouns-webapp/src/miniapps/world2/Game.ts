@@ -1364,7 +1364,10 @@ export class Game {
     // Gamepad: right trigger sprays only on foot (it's a grab on the board).
     // Never on the Big Drop: its snow isn't anywhere the shared walls know.
     const active =
-      input.spray && (p.mode === 'foot' || input.mode !== 'gamepad') && !this.missions.ud.active;
+      input.spray &&
+      (p.mode === 'foot' || input.mode !== 'gamepad') &&
+      !this.missions.ud.active &&
+      !this.interiors.inside;
     const cam = this.gfx.camera;
     const dirs: THREE.Vector3[] = [];
     const trail = this.input.cursorTrail.splice(0);
