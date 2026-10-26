@@ -32,8 +32,9 @@ import { createCombo } from '../skate/Tricks';
 import { ALT } from './bigdrop/contract';
 import { snowColor } from './bigdrop/surface';
 import { PEAK_SYSTEMS } from './bigdrop/systems';
+import { basinBrake } from './bigdrop/terrainBasin';
 import { type GridSampler, GridMesh } from './peakGrid';
-import { PEAK_LIPSCHITZ, peakHeight, peakNormal, raycastHeight } from './peakTerrain';
+import { PEAK, PEAK_LIPSCHITZ, peakHeight, peakNormal, raycastHeight } from './peakTerrain';
 
 /** Gravity scale inside (of the player's own tuning). */
 export const PEAK_GRAVITY = 0.4;
@@ -309,6 +310,13 @@ export class Peak {
       p.pos.y + this.origin.y - ALT,
       p.pos.z + this.origin.z,
     );
+    // The basin's powder runout: ~13,000 km/h on arrival down to a cruise
+    if (p.state === 'ground') {
+      const sp = p.vel.length();
+      const out = Math.hypot(this.riderPeak.x, this.riderPeak.z) - PEAK.pad;
+      const v = basinBrake(sp, out, dt);
+      if (v < sp) p.vel.multiplyScalar(v / sp);
+    }
     for (const sys of this.systems)
       try {
         sys.update(dt);

@@ -5,12 +5,14 @@
 // steady ~49° until it's 1,000 km down, then eases out onto a flat snowfield.
 // On the way down: moguls and ridges across the fall line, and the race
 // track (bigdrop/track.ts) carved into it by bigdrop/terrainCarve.ts: a
-// groomed lane, powder pillows, gullies, berms, kickers, loop pads. No
+// groomed lane, powder pillows, gullies, berms, kickers, loop pads. At the
+// bottom, the basin (bigdrop/terrainBasin.ts): valleys, canyons, kickers. No
 // three.js here, so it's tested on its own and the dimension (peak.ts) only
 // has to shift it into world space.
 
 import { smoothstep, vnoise } from '../world/mountain/config';
 
+import { basinRelief } from './bigdrop/terrainBasin';
 import { CARVED, trackCarve } from './bigdrop/terrainCarve';
 import { coneDepth, PEAK } from './bigdrop/terrainPeak';
 
@@ -20,7 +22,8 @@ export { coneDepth, coneHeight, PEAK } from './bigdrop/terrainPeak';
  * Upper bound on |∇height| (the ray marcher's step size relies on it). The
  * open mountain stays under 1.52 (a board counts ground with a normal above
  * 0.55); the only steeper faces are the short back faces right behind the
- * track's kicker lips (bigdrop/track.ts KickerShape), up to ~3.2.
+ * track's kicker lips (bigdrop/track.ts KickerShape), up to ~3.2, and the
+ * basin's (bigdrop/terrainBasin.ts), which use the same lip.
  */
 export const PEAK_LIPSCHITZ = 3.6;
 
@@ -58,11 +61,13 @@ export function peakHeight(x: number, z: number): number {
   const depth = coneDepth(s);
   // Detail fades in below the pad and out on the snowfield
   const on = smoothstep(0, 60, s) * (1 - smoothstep(PEAK.drop - 20_000, PEAK.drop, depth));
-  if (on <= 0) return -depth;
+  // ...where the basin's valleys, canyons and kickers take over
+  const base = -depth + basinRelief(x, z, s);
+  if (on <= 0) return base;
   const carved = trackCarve(x, z, -depth);
-  if (carved !== carved) return -depth + on * detail(x, z, s);
+  if (carved !== carved) return base + on * detail(x, z, s);
   const keep = CARVED.keep;
-  return -depth + on * (keep > 0 ? carved + keep * detail(x, z, s) : carved);
+  return base + on * (keep > 0 ? carved + keep * detail(x, z, s) : carved);
 }
 
 /** Unit surface normal at (x, z) (central differences). */

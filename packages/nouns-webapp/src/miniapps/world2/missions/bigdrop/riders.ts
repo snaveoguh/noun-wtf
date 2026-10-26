@@ -8,6 +8,8 @@
 // round you down the line (never more than RIDER.window m away, so their
 // float32 bones stay near the floating origin). Far off they're a glowing
 // dot; near they spray snow (spray.ts), and the fast ones whoosh past.
+// Out on the basin at the bottom there's no line, so a bigger pack free-
+// rides round you there instead (basinRiderSim.ts), sending its kickers.
 // Visual only: they swerve round you rather than collide.
 
 import type { Feature, PeakCtx, PeakSystem } from './contract';
@@ -17,8 +19,16 @@ import * as THREE from 'three';
 import { randomSeed } from '../../character/NounAppearance';
 import { NounCharacter } from '../../character/NounCharacter';
 import { inkExcluded, toonify } from '../../render/Toon';
-import { peakHeight, peakNormal } from '../peakTerrain';
+import { PEAK, peakHeight, peakNormal } from '../peakTerrain';
 
+import {
+  type BasinEnv,
+  basinPack,
+  basinShouldRecycle,
+  basinSpawn,
+  basinStep,
+  basinToLip,
+} from './basinRiderSim';
 import {
   RIDER,
   riderCreate,
@@ -32,10 +42,13 @@ import {
 } from './riderSim';
 import { sprayActive, sprayBoard, type SprayBoard } from './spray';
 import { surfaceAt } from './surface';
+import { BASIN, basinKickersNear } from './terrainBasin';
 import { featuresIn, nearestTrack } from './track';
 
 /** NPCs by quality. */
 const COUNT = { low: 3, medium: 5, high: 8 } as const;
+/** …and out on the basin, where there's room for a pack. */
+const BASIN_COUNT = { low: 5, medium: 8, high: 12 } as const;
 /** Extra float on top of the character's own hover (m): the board rides ~0.4 m up. */
 const HOVER_EXTRA = 0.22;
 /** Draw the character within this (m); beyond, only its glow dot. */
@@ -114,7 +127,7 @@ const DOT_FRAG = /* glsl */ `
 
 /** Riders built on an earlier visit, ready to ride again. */
 const kept: NounCharacter[] = [];
-const KEEP = 8;
+const KEEP = 12;
 
 /** Free a character's own GPU bits (geometry and textures are shared caches). */
 function riderFree(ch: NounCharacter) {
@@ -135,6 +148,11 @@ function riderFree(ch: NounCharacter) {
 class Riders implements PeakSystem {
   private slots: Slot[] = [];
   private env: RiderEnv;
+  private benv: BasinEnv;
+  /** Riding the basin (free riders) rather than the line. */
+  private basin = false;
+  /** Slots in use (the rest wait, hidden, for the basin). */
+  private live = 0;
   private features: Feature[] = [];
   private featAt = -Infinity;
   private started = false;
@@ -153,8 +171,16 @@ class Riders implements PeakSystem {
   ms = 0;
 
   constructor(private ctx: PeakCtx) {
-    const n = COUNT[ctx.quality];
+    const n = Math.max(COUNT[ctx.quality], BASIN_COUNT[ctx.quality]);
     this.env = { height: peakHeight, riderS: 0, riderLat: 0, riderV: 0, features: this.features };
+    this.benv = {
+      height: peakHeight,
+      kickersNear: basinKickersNear,
+      px: 0,
+      pz: 0,
+      phd: 0,
+      pv: 0,
+    };
     for (let i = 0; i < n; i++)
       this.slots.push({
         st: riderCreate(),
@@ -264,7 +290,8 @@ class Riders implements PeakSystem {
   }
 
   private spawn(slot: Slot, initial: boolean) {
-    riderSpawn(slot.st, this.env, Math.random, initial);
+    if (this.basin) basinSpawn(slot.st, this.benv, Math.random, initial);
+    else riderSpawn(slot.st, this.env, Math.random, initial);
     slot.count = 0;
     slot.grow = 0;
     slot.rel = slot.st.s - this.env.riderS;
@@ -290,9 +317,26 @@ class Riders implements PeakSystem {
       for (const f of featuresIn(env.riderS - RIDER.window - 200, env.riderS + RIDER.window + 400))
         if (f.kind === 'kicker' || f.kind === 'berm' || f.kind === 'loop') this.features.push(f);
     }
-    if (!this.started) {
+    // The player over the snow, for the basin's free riders
+    const be = this.benv;
+    be.px = rp.x;
+    be.pz = rp.z;
+    const hv = Math.hypot(p.vel.x, p.vel.z);
+    be.pv = hv;
+    if (hv > 1) be.phd = Math.atan2(p.vel.x, p.vel.z);
+    const basin = Math.hypot(rp.x, rp.z) - PEAK.pad > BASIN.start - 300;
+    const live = (basin ? BASIN_COUNT : COUNT)[ctx.quality];
+    if (basin) {
+      // No line out here: passes are judged in plain peak x / z
+      env.riderS = rp.z;
+      env.riderLat = rp.x;
+    }
+    if (!this.started || basin !== this.basin) {
+      // Onto the basin (or back up, after a respawn): a fresh pack round you
       this.started = true;
-      for (const s of this.slots) this.spawn(s, true);
+      this.basin = basin;
+      this.live = live;
+      for (let i = 0; i < live; i++) this.spawn(this.slots[i]!, true);
     }
     this.buildIn -= dt;
     this.whooshIn -= dt;
@@ -302,12 +346,26 @@ class Riders implements PeakSystem {
     const fog = g.gfx.scene.fog as THREE.FogExp2 | null;
     const density = fog !== null && 'density' in fog ? fog.density : 0;
     const spray = sprayActive();
+    basinPack.length = 0;
 
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;
       const st = slot.st;
-      riderStep(st, dt, env, Math.random);
-      if (riderShouldRecycle(st, env.riderS, env.riderV)) this.spawn(slot, false);
+      if (i >= this.live) {
+        // Waiting for the basin
+        if (slot.ch !== null) slot.ch.root.visible = false;
+        this.dSA[i * 2 + 1] = 0;
+        this.writeRibbon(i, slot, 0);
+        continue;
+      }
+      if (this.basin) {
+        basinStep(st, dt, be, Math.random);
+        if (basinShouldRecycle(st, be)) this.spawn(slot, false);
+        basinPack.push(st.x, st.s, st.air ? 0 : st.sp);
+      } else {
+        riderStep(st, dt, env, Math.random);
+        if (riderShouldRecycle(st, env.riderS, env.riderV)) this.spawn(slot, false);
+      }
       ctx.toLocal(st.x, st.y, st.s, _p);
       const dist = _p.distanceTo(cam.position);
       const fogK = Math.exp(-Math.pow(density * dist, 2));
@@ -438,13 +496,18 @@ class Riders implements PeakSystem {
     else if (st.sinceLand < 0.35) {
       clip = 'skate_land';
       once = true;
-    } else if (Math.abs(lean) > 0.55 || this.kickerAhead(st.s)) clip = 'skate_crouch';
+    } else if (Math.abs(lean) > 0.55 || this.kickerAhead(st)) clip = 'skate_crouch';
     ch.play({ clip, once, fade: once ? 0.06 : 0.2 });
     ch.update(dt, { lean, travelled: 0, riding: true, grounded: !st.air });
     if (slot.pool !== null) slot.pool.position.y -= HOVER_EXTRA;
   }
 
-  private kickerAhead(s: number): boolean {
+  private kickerAhead(st: RiderState): boolean {
+    if (st.free) {
+      const d = basinToLip(st);
+      return d > 0 && d < 45;
+    }
+    const s = st.s;
     for (const f of this.features)
       if (f.kind === 'kicker' && f.s + f.len - s > 0 && f.s + f.len - s < 45) return true;
     return false;

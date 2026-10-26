@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   coneDepth,
+  coneHeight,
   PEAK,
   PEAK_LIPSCHITZ,
   peakHeight,
@@ -17,11 +18,12 @@ describe('the Big Drop', () => {
     expect(peakHeight(10, -15)).toBe(0);
   });
 
-  it('drops 1,000 km, then flattens onto the snowfield', () => {
+  it('drops 1,000 km, then eases out onto the snowfield', () => {
     const r = PEAK.pad + PEAK.drop / PEAK.grade;
     expect(peakHeight(r * 0.5, 0)).toBeLessThan(-450_000);
-    expect(peakHeight(0, r + 20_000)).toBeCloseTo(-PEAK.drop, 0);
-    expect(peakHeight(-(r + 50_000), 0)).toBeCloseTo(-PEAK.drop, 0);
+    // The cone bottoms out (the basin's valleys and kickers sit on top of it)
+    expect(coneHeight(0, r + 20_000)).toBeCloseTo(-PEAK.drop, 0);
+    expect(Math.abs(peakHeight(-(r + 50_000), 0) + PEAK.drop)).toBeLessThan(400);
     // The cone itself only ever goes down
     let prev = 0;
     for (let s = 0; s < r + 10_000; s += 997) {

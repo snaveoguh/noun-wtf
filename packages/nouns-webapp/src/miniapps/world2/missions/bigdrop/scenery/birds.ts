@@ -144,7 +144,7 @@ export class Birds implements PeakSystem {
 
   /** Track distance of the rider. */
   private get s(): number {
-    return Math.min(TRACK.end, Math.max(TRACK.start, this.ctx.riderPeak.z));
+    return Math.max(TRACK.start, this.ctx.riderPeak.z);
   }
 
   private used(kind: CreatureKind): number {
@@ -161,8 +161,9 @@ export class Birds implements PeakSystem {
 
   /** A point over the slope `ahead` m down the line, `lat` m across, `alt` m up (local). */
   private overSlope(ahead: number, lat: number, alt: number, out: THREE.Vector3): THREE.Vector3 {
-    const s = Math.min(TRACK.end, this.s + ahead);
-    const x = centerX(s) + lat;
+    const s = this.s + ahead;
+    // Out on the basin there's no line: round the rider instead
+    const x = (s > TRACK.end ? this.ctx.riderPeak.x : centerX(s)) + lat;
     return this.ctx.toLocal(x, peakHeight(x, s) + alt, s, out);
   }
 
