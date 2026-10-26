@@ -41,6 +41,7 @@ import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
+import { InteriorSystem } from './interiors/InteriorSystem';
 import { MissionSystem } from './missions/MissionSystem';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
@@ -308,6 +309,8 @@ export class Game {
   landmarks: LandmarkSystem | null = null;
   /** Missions: the Oracle and the cast, progress, the Big Drop (missions/). */
   readonly missions: MissionSystem = new MissionSystem(this);
+  /** Enterable buildings (interiors/): doors, rooms, residents; InteriorsApi. */
+  readonly interiors: InteriorSystem = new InteriorSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
@@ -504,6 +507,7 @@ export class Game {
     if (new URLSearchParams(window.location.search).get('dressing') === '1')
       this.buildDressingDemo(level);
     void this.billboards.attach(level.root);
+    this.interiors.start(level);
 
     // Local-only NPC crew at the secret Noun Jersey park (spawns within ~400 m)
     if (this.mountain !== null)
@@ -929,11 +933,12 @@ export class Game {
     this.dragon.update(dt);
     // On the Big Drop the world you left waits: nothing down there streams
     // or triggers round a rider who's somewhere else entirely
-    const away = this.missions.ud.active;
+    const away = this.missions.ud.active || this.interiors.inside;
     // A van ride can't touch a drop (its proof would be a 140 km/h walk)
     if (!driving && !away) this.drops?.update(dt, this.player);
     if (!away) this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
+    this.interiors.update(dt);
     if (!away) {
       this.towns?.update(dt);
       this.landmarks?.update(dt);
@@ -983,7 +988,7 @@ export class Game {
     this.updateFm(dt);
     this.updateNetwork(dt);
     this.van2.update(wdt);
-    const away = this.missions.ud.active;
+    const away = this.missions.ud.active || this.interiors.inside;
     if (!away) this.crew?.update(wdt, this.player.pos);
     this.missions.update(wdt);
     if (!away) this.towns?.update(wdt);
@@ -1404,7 +1409,10 @@ export class Game {
     // Gamepad: right trigger sprays only on foot (it's a grab on the board).
     // Never on the Big Drop: its snow isn't anywhere the shared walls know.
     const active =
-      input.spray && (p.mode === 'foot' || input.mode !== 'gamepad') && !this.missions.ud.active;
+      input.spray &&
+      (p.mode === 'foot' || input.mode !== 'gamepad') &&
+      !this.missions.ud.active &&
+      !this.interiors.inside;
     const cam = this.gfx.camera;
     const dirs: THREE.Vector3[] = [];
     const trail = this.input.cursorTrail.splice(0);
@@ -2140,6 +2148,7 @@ export class Game {
     this.voices.dispose();
     this.sfx.dispose();
     this.missions.dispose();
+    this.interiors.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
     this.van2.dispose();

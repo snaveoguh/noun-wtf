@@ -339,6 +339,8 @@ function doneText(a: TradeAction): string {
       return `Served ${a.good}`;
     case 'upgrade':
       return `Fitted: ${a.up}`;
+    case 'spend':
+      return `Spent ${a.coin} COIN`;
     default:
       return 'Done';
   }

@@ -182,6 +182,7 @@ export function SprayPanel({ game }: { game: Game }) {
   const right = 16 + 248 * (Number(fmScreen) + Number(beatsScreen));
   if (g === null || t === null) return null;
   if (hud.mode !== 'foot' && !hud.spray.active) return null;
+  if (game.interiors.inside) return null; // no spraying indoors
   return (
     <HudDrag id="spray" className="absolute bottom-24" style={{ right }} handle>
       <div className="sp-panel" data-spray="panel">
@@ -280,6 +281,7 @@ export function SprayTouch({ game }: { game: Game }) {
   }, [open, foot, fmScreen]);
 
   if (g === null || t === null || !foot) return null;
+  if (game.interiors.inside) return null; // no spraying indoors
   const tap = (fn: () => void) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.stopPropagation();

@@ -16,6 +16,7 @@ import { DragonHud } from './dragon/DragonHud';
 import { Game, type HudState } from './Game';
 import { SprayPanel } from './graffiti/SprayPanel';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
+import { InteriorsUi } from './interiors/InteriorsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import { DROP_PARAM } from './missions/unlocks';
 import {
@@ -411,6 +412,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
           <UnderFountain game={game} touch={touchPage} />
         </Suspense>
       )}
+      {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && (
