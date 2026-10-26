@@ -5,7 +5,15 @@ import type { BreakMsg } from '../contract';
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { BreakLobby, EXPECT_MS, INVITE_MS, PRESENCE_MS, SKILL, type LobbyDeps } from './lobby';
+import {
+  BreakLobby,
+  EASY_WINDOWS,
+  EXPECT_MS,
+  INVITE_MS,
+  PRESENCE_MS,
+  SKILL,
+  type LobbyDeps,
+} from './lobby';
 
 let now = 0;
 
@@ -70,6 +78,10 @@ describe('BreakLobby', () => {
     expect(crew.dancers.filter(d => d.crew === 0)).toHaveLength(3);
     expect(crew.dancers.filter(d => !d.human)).toHaveLength(5);
     expect(new Set(crew.dancers.map(d => d.id)).size).toBe(6);
+    // EASY widens the timing windows; the others keep the default
+    expect(crew.windows).toEqual(EASY_WINDOWS);
+    expect(crew.windows!.ok).toBeGreaterThanOrEqual(0.2);
+    expect(cfg.windows).toBeUndefined();
   });
 
   it('1V1: challenge → accept → go; the rival expects the start', () => {

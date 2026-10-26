@@ -18,7 +18,16 @@ import type { CrewId, CrewSize, BattleConfig, BreakMsg } from '../contract';
 import * as THREE from 'three';
 
 import { parseSeedKey, randomSeed } from '../../character/NounAppearance';
+import {
+  fetchTrack,
+  HOUSE_ID,
+  HOUSE_TRACK,
+  loadManifest,
+  trackById,
+  type TrackInfo,
+} from '../tracks';
 
+import { loadCalib, saveCalib } from './calibrate';
 import {
   HERE_R,
   PROMPT_R,
@@ -73,6 +82,21 @@ export interface BreakUiState {
   /** Debug: last snapshot size (bytes, JSON) and the clock's round trip. */
   snapBytes: number;
   rtt: number | null;
+  /** Songs (public/breaks/tracks.json, the generated beat first) and the one picked. */
+  tracks: TrackInfo[];
+  track: string;
+  /** Latency calibration (ms taken off every press's stamp; + = you tap late). */
+  calibMs: number;
+}
+
+const TRACK_PREF = 'noun-breaks-track';
+
+function loadTrackPref(): string {
+  try {
+    return window.localStorage.getItem(TRACK_PREF) ?? HOUSE_ID;
+  } catch {
+    return HOUSE_ID;
+  }
 }
 
 const ANNOUNCE_S = 2;
@@ -96,6 +120,9 @@ export class BreakMode {
     toast: null,
     snapBytes: 0,
     rtt: null,
+    tracks: [HOUSE_TRACK],
+    track: typeof window === 'undefined' ? HOUSE_ID : loadTrackPref(),
+    calibMs: typeof window === 'undefined' ? 0 : loadCalib(),
   };
   /** Where the world streams around while active (the cypher). */
   readonly focus = new THREE.Vector3();
@@ -311,6 +338,11 @@ export class BreakMode {
   promptAction() {
     if (this.ui.phase !== 'idle' || this.ensureCypher() === null) return;
     void preloadBreakView();
+    void loadManifest().then(tracks => {
+      this.set({ tracks });
+      const t = trackById(tracks, this.ui.track);
+      if (t.file !== null) void fetchTrack(t);
+    });
     this.refresh();
     this.set({ phase: 'menu', near: false });
   }
@@ -323,6 +355,24 @@ export class BreakMode {
 
   setDifficulty(d: Difficulty) {
     this.difficulty = d;
+  }
+
+  /** The song picker: battles I host play this (and it's fetched now, so it's ready). */
+  setTrack(id: string) {
+    const t = trackById(this.ui.tracks, id);
+    this.set({ track: t.id });
+    try {
+      window.localStorage.setItem(TRACK_PREF, t.id);
+    } catch {
+      /* storage blocked: this session only */
+    }
+    if (t.file !== null) void fetchTrack(t);
+  }
+
+  /** Latency calibration result (ms; 0 resets). */
+  setCalib(ms: number) {
+    saveCalib(ms);
+    this.set({ calibMs: Math.round(ms) });
   }
 
   vsCpu(difficulty: Difficulty = this.difficulty, crewSize: CrewSize = 1) {
@@ -434,6 +484,12 @@ export class BreakMode {
 
   /** Host: announce the battle and go. */
   private begin(config: BattleConfig) {
+    // My song: the battle runs at its tempo, and clients load the same file
+    const t = trackById(this.ui.tracks, this.ui.track);
+    if (t.file !== null && t.bpm !== null) {
+      config.track = t.id;
+      config.bpm = t.bpm;
+    }
     const lag = JUDGE_DELAY;
     this.transport.send({ type: 'break:start', host: this.myId, config, at: -COUNTDOWN, lag });
     this.enter(config, 'host', this.myId, -COUNTDOWN, lag);
@@ -500,7 +556,12 @@ export class BreakMode {
     this.view = view;
     if (this.marker) this.marker.group.visible = false;
     this.reader.attach();
-    this.reader.onPress = (k, ms) => this.session?.press(k, ms);
+    // Stamped on the battle clock, less the player's calibrated latency;
+    // the HUD's hit line shows the press at once (the grade follows)
+    this.reader.onPress = (k, ms) => {
+      this.session?.press(k, ms - this.ui.calibMs);
+      this.view?.hud()?.pressed(k);
+    };
     this.reader.onEscape = () => this.leave();
     this.seenDropped.clear();
     this.announceAcc = ANNOUNCE_S;

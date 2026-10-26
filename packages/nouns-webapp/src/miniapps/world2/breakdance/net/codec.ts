@@ -18,6 +18,8 @@ import type {
   DancerPose,
   HitGrade,
   JudgeCard,
+  LaneNote,
+  MoveId,
   SimEvent,
   SimState,
 } from '../contract';
@@ -30,6 +32,7 @@ const EVENTS = ['beat', 'turn', 'hit', 'move', 'crash', 'freeze', 'combo', 'card
 export const MAX_DANCERS = 6;
 const MAX_POSES = 8;
 const MAX_PROMPTS = 64;
+const MAX_LANE = 48;
 const MAX_CARDS = 32;
 const MAX_EVENTS = 64;
 
@@ -96,6 +99,7 @@ export function readConfig(v: unknown): BattleConfig | null {
     turnBars: num(v.turnBars) ? clamp(Math.round(v.turnBars), 1, 16) : 4,
     bpm: num(v.bpm) ? clamp(v.bpm, 60, 200) : 100,
   };
+  if (typeof v.track === 'string' && /^[\da-z][\d_a-z-]{0,39}$/.test(v.track)) cfg.track = v.track;
   const w = v.windows;
   if (isObj(w) && num(w.perfect) && num(w.great) && num(w.ok))
     cfg.windows = {
@@ -121,6 +125,43 @@ function readPose(v: unknown): DancerPose | null {
   if (!num(v.lastAt)) delete p.lastAt;
   if (typeof v.crashed !== 'boolean') delete p.crashed;
   return p;
+}
+
+const moveOf = (v: unknown): MoveId | null =>
+  typeof v === 'string' && /^[_a-z]{1,24}$/.test(v) ? (v as MoveId) : null;
+
+function readLaneNote(v: unknown): LaneNote | null {
+  if (!isObj(v) || !num(v.beat) || typeof v.id !== 'string' || v.id.length > 64) return null;
+  const key = KEYS.find(k => k === v.key);
+  const move = moveOf(v.move);
+  if (key === undefined || move === null) return null;
+  const n: LaneNote = {
+    key,
+    beat: v.beat,
+    id: v.id,
+    move,
+    i: num(v.i) ? clamp(Math.round(v.i), 0, 16) : 0,
+    n: num(v.n) ? clamp(Math.round(v.n), 1, 16) : 1,
+  };
+  const g = GRADES.find(x => x === v.grade);
+  if (g !== undefined) n.grade = g;
+  if (num(v.off)) n.off = clamp(v.off, -1, 1);
+  if (v.dead === true) n.dead = true;
+  return n;
+}
+
+function readForming(v: unknown): SimState['forming'] | null {
+  if (!isObj(v) || !okId(v.id) || !num(v.got) || !num(v.of)) return null;
+  const move = moveOf(v.move);
+  if (move === null) return null;
+  const of = clamp(Math.round(v.of), 1, 16);
+  return {
+    id: v.id,
+    move,
+    got: clamp(Math.round(v.got), 0, of),
+    of,
+    ...(v.landed === true ? { landed: true } : {}),
+  };
 }
 
 const pair = (v: unknown): [number, number] =>
@@ -181,6 +222,15 @@ export function readState(v: unknown): SimState | null {
   const w = winnerOf(v.winner);
   if (w !== null) s.winner = w;
   else delete s.winner;
+  if (Array.isArray(v.lane))
+    s.lane = v.lane
+      .slice(0, MAX_LANE)
+      .map(readLaneNote)
+      .filter((n): n is LaneNote => n !== null);
+  else delete s.lane;
+  const f = readForming(v.forming);
+  if (f) s.forming = f;
+  else delete s.forming;
   return s;
 }
 

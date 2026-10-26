@@ -5,10 +5,19 @@ import type { BreakKey, CrewId, CrewSize } from '../contract';
 import type { BreakMode, BreakUiState } from './BreakMode';
 import type { Difficulty } from './lobby';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { BreakHud } from '../view/BreakHud';
 
+import {
+  CALIB_BPM,
+  CALIB_CLICKS,
+  CALIB_COUNT_IN,
+  calibrate,
+  outputLatency,
+  type CalibResult,
+} from './calibrate';
+import { eventMs } from './input';
 import { INVITE_MS } from './lobby';
 import { ARROW } from './stubView';
 
@@ -68,6 +77,14 @@ export function BreakUi({ game }: { game: Game }) {
   }, [b, ui.near, ui.phase]);
 
   const fighting = ui.phase === 'countdown' || ui.phase === 'battle';
+  // The site's NOUN FM chip sits right where the A button is on phones: hide it mid-battle
+  useEffect(() => {
+    if (!fighting) return;
+    document.body.dataset.breaks = '1';
+    return () => {
+      delete document.body.dataset.breaks;
+    };
+  }, [fighting]);
   // The real view's HUD (beat track, prompts, judges' cards, its own touch
   // pad); its store appears when the view chunk lands, so poll while fighting
   useTick(fighting || ui.phase === 'results', 500);
@@ -129,8 +146,9 @@ export function BreakUi({ game }: { game: Game }) {
       )}
 
       {ui.phase === 'countdown' && ui.countdown !== null && (
-        <div className="bk-count absolute inset-0 flex items-center justify-center">
+        <div className="bk-count absolute inset-0 flex flex-col items-center justify-center gap-4">
           <b key={ui.countdown}>{ui.countdown}</b>
+          {ui.role !== 'spectator' && <HowTo coarse={coarse()} />}
         </div>
       )}
 
@@ -172,9 +190,31 @@ export function BreakUi({ game }: { game: Game }) {
 
 // ── The menu ──
 
+/** The countdown's three lines. */
+function HowTo({ coarse: touch }: { coarse: boolean }) {
+  return (
+    <div className="bk-howto">
+      <span>HOW TO PLAY</span>
+      <ol>
+        <li>
+          hit the arrows <em>on the beat</em>, as each note reaches the ring
+          {touch ? ' (the pad)' : ' (← ↑ → ↓ / WASD)'}
+        </li>
+        <li>chain moves: a few notes make a move, keep them coming for a combo</li>
+        <li>
+          end your turn on a <em>freeze</em>: A or B on the last beat
+          {touch ? '' : ' (A = J / SPACE, B = K)'}
+        </li>
+      </ol>
+    </div>
+  );
+}
+
 function Menu({ b, ui }: { b: BreakMode; ui: BreakUiState }) {
   const [tab, setTab] = useState<Tab>('cpu');
   const [diff, setDiff] = useState<Difficulty>('normal');
+  const [calib, setCalib] = useState(false);
+  if (calib) return <Calibrate b={b} ui={ui} onClose={() => setCalib(false)} />;
   return (
     <div className="w2-panel bk-menu pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -212,9 +252,22 @@ function Menu({ b, ui }: { b: BreakMode; ui: BreakUiState }) {
                     b.setDifficulty(d);
                   }}
                 >
-                  {d}
+                  {d === 'easy' ? 'easy · wide timing' : d}
                 </button>
               ))}
+            </Row>
+          )}
+          {tab !== 'watch' && <Songs b={b} ui={ui} />}
+          {tab !== 'watch' && (
+            <Row label="timing">
+              <span className="text-xs opacity-80">
+                {ui.calibMs === 0
+                  ? 'not calibrated'
+                  : `${ui.calibMs > 0 ? '+' : ''}${ui.calibMs} ms`}
+              </span>
+              <button type="button" className="bk-pill" onClick={() => setCalib(true)}>
+                calibrate
+              </button>
             </Row>
           )}
           {tab === 'cpu' && <VsCpu b={b} diff={diff} />}
@@ -245,7 +298,7 @@ function VsCpu({ b, diff }: { b: BreakMode; diff: Difficulty }) {
       </Row>
       <div className="text-xs opacity-70">
         {size === 1 ? 'you against a CPU b-boy.' : `you + ${size - 1} CPU against a CPU crew.`} hit
-        the keys on the beat: arrows / WASD, J and K (or the pad).
+        the notes on the beat: arrows / WASD, A = J or Space, B = K (or click / tap the pad).
       </div>
       <button type="button" className="bk-go" onClick={() => b.vsCpu(diff, size)}>
         BATTLE
@@ -456,6 +509,211 @@ function Challenge({ b, ui }: { b: BreakMode; ui: BreakUiState }) {
   );
 }
 
+/** The song picker (battles I host play it; online, everyone loads the same file). */
+function Songs({ b, ui }: { b: BreakMode; ui: BreakUiState }) {
+  const cur = ui.tracks.find(t => t.id === ui.track) ?? ui.tracks[0];
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="text-[11px] uppercase tracking-wider opacity-60">song</div>
+      <div className="bk-songs flex flex-col gap-1">
+        {ui.tracks.map(t => (
+          <button
+            key={t.id}
+            type="button"
+            className={`bk-song ${t.id === cur?.id ? 'bk-on' : ''}`}
+            onClick={() => b.setTrack(t.id)}
+          >
+            <b>{t.title}</b>
+            <span>
+              {t.artist}
+              {t.bpm !== null ? ` · ${Math.round(t.bpm)} bpm` : ' · follows the battle'}
+            </span>
+          </button>
+        ))}
+      </div>
+      {cur !== undefined && (
+        <div className="text-[10px] opacity-50">
+          {cur.license}
+          {cur.source !== undefined && (
+            <>
+              {' · '}
+              <a href={cur.source} target="_blank" rel="noreferrer" className="underline">
+                source
+              </a>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Latency calibration: a one-bar count-in and 8 clicks, scheduled the way
+ * the battle schedules its beat (output latency taken off); tap along with
+ * any key or the button. The median lateness is taken off every press.
+ */
+function Calibrate({ b, ui, onClose }: { b: BreakMode; ui: BreakUiState; onClose: () => void }) {
+  const [state, setState] = useState<'ready' | 'run' | 'done'>('ready');
+  const [res, setRes] = useState<CalibResult | null>(null);
+  const [flash, setFlash] = useState(-1);
+  const run = useRef<{ clicks: number[]; taps: number[]; end: number; close: () => void } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (state !== 'run') return;
+    const tap = (ms: number) => run.current?.taps.push(ms);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' || e.code === 'Tab' || e.repeat) return;
+      e.preventDefault();
+      e.stopPropagation();
+      tap(eventMs(e.timeStamp));
+    };
+    window.addEventListener('keydown', onKey, true);
+    let raf = 0;
+    const tick = () => {
+      const r = run.current;
+      if (r === null) return;
+      const now = performance.now();
+      let k = -1;
+      r.clicks.forEach((c, i) => {
+        if (now >= c && now < c + 160) k = i;
+      });
+      setFlash(k);
+      if (now > r.end) {
+        const out = calibrate(r.taps, r.clicks.slice(CALIB_COUNT_IN));
+        r.close();
+        run.current = null;
+        setRes(out);
+        setState('done');
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      cancelAnimationFrame(raf);
+    };
+  }, [state]);
+  useEffect(() => () => run.current?.close(), []);
+  const start = () => {
+    const w = window as unknown as {
+      AudioContext?: typeof AudioContext;
+      webkitAudioContext?: typeof AudioContext;
+    };
+    const AC = w.AudioContext ?? w.webkitAudioContext;
+    if (AC === undefined) return;
+    const ctx = new AC();
+    void ctx.resume();
+    const spb = 60 / CALIB_BPM;
+    const t0 = ctx.currentTime + 0.5;
+    const perf0 = performance.now();
+    const ctx0 = ctx.currentTime;
+    const lat = outputLatency(ctx);
+    const clicks: number[] = [];
+    for (let i = 0; i < CALIB_COUNT_IN + CALIB_CLICKS; i++) {
+      const t = t0 + i * spb;
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = i < CALIB_COUNT_IN ? 1760 : i % 4 === 0 ? 1320 : 990;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.25, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.08);
+      // When it's heard, on the performance.now() clock
+      clicks.push(perf0 + (t - ctx0 + lat) * 1000);
+    }
+    run.current = {
+      clicks,
+      taps: [],
+      end: clicks[clicks.length - 1] + spb * 1000,
+      close: () => void ctx.close(),
+    };
+    setRes(null);
+    setState('run');
+  };
+  return (
+    <div className="w2-panel bk-menu pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div className="bk-title">⏱ TIMING</div>
+        <button type="button" className="bk-x" aria-label="close" onClick={onClose}>
+          ✕
+        </button>
+      </div>
+      <div className="text-sm opacity-80">
+        sound on. four high clicks count you in, then tap along to the next {CALIB_CLICKS}: any key,
+        or the button. your average lateness is taken off every press in a battle.
+      </div>
+      <div className="flex items-center justify-center gap-2 py-1">
+        {Array.from({ length: CALIB_COUNT_IN + CALIB_CLICKS }, (_, i) => (
+          <i
+            key={i}
+            className={`bk-dot ${i < CALIB_COUNT_IN ? 'bk-dot-in' : ''} ${flash === i ? 'bk-dot-on' : ''}`}
+          />
+        ))}
+      </div>
+      {state === 'run' ? (
+        <button
+          type="button"
+          className="bk-go bk-tap"
+          onPointerDown={e => {
+            e.preventDefault();
+            run.current?.taps.push(eventMs(e.timeStamp));
+          }}
+        >
+          TAP
+        </button>
+      ) : (
+        <button type="button" className="bk-go" onClick={start}>
+          {state === 'done' ? 'AGAIN' : 'START'}
+        </button>
+      )}
+      {state === 'done' &&
+        (res === null ? (
+          <div className="text-sm">not enough taps on the clicks: try again.</div>
+        ) : (
+          <div className="flex flex-col gap-2 text-sm">
+            <div>
+              you tap{' '}
+              <b>
+                {Math.abs(res.offsetMs)} ms {res.offsetMs >= 0 ? 'late' : 'early'}
+              </b>{' '}
+              (±{res.spreadMs} ms over {res.n} taps)
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="bk-go flex-1"
+                onClick={() => {
+                  b.setCalib(res.offsetMs);
+                  onClose();
+                }}
+              >
+                USE IT
+              </button>
+              <button type="button" className="bk-no" onClick={onClose}>
+                KEEP {ui.calibMs} MS
+              </button>
+            </div>
+          </div>
+        ))}
+      {ui.calibMs !== 0 && state !== 'run' && (
+        <button
+          type="button"
+          className="text-xs underline opacity-60"
+          onClick={() => b.setCalib(0)}
+        >
+          reset to 0 (now {ui.calibMs} ms)
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 text-sm">
@@ -550,6 +808,7 @@ function Results({ b, ui }: { b: BreakMode; ui: BreakUiState }) {
 }
 
 const CSS = `
+body[data-breaks] [data-nounfm="off"]{display:none!important}
 .bk-root{font-family:system-ui,sans-serif}
 .bk-prompt{background:#ffd400;color:#000;padding:12px 20px;font-size:18px;font-weight:900;font-style:italic;box-shadow:6px 6px 0 #d22209;white-space:nowrap;max-width:calc(100vw - 32px)}
 .bk-menu{width:400px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow-y:auto}
@@ -567,6 +826,17 @@ const CSS = `
 .bk-card span{font-size:10px;letter-spacing:.2em}.bk-card b{font-size:17px;font-style:italic}
 .bk-card .bk-no{background:rgba(0,0,0,.15);color:#000}
 .bk-bar{width:100%;height:4px;background:rgba(0,0,0,.15)}.bk-bar i{display:block;height:100%;background:#d22209;transition:width .25s linear}
+.bk-howto{background:#000;color:#fff;padding:10px 16px 12px;box-shadow:6px 6px 0 #ffd400;max-width:min(460px,calc(100vw - 32px));transform:rotate(-1deg);animation:none}
+.bk-howto span{display:block;font-size:12px;letter-spacing:.3em;color:#ffd400;font-weight:900;margin-bottom:4px}
+.bk-howto ol{margin:0;padding-left:20px;list-style:decimal;font-size:15px;line-height:1.35}
+.bk-howto em{font-style:normal;color:#ffd400}
+.bk-songs{max-height:22vh;overflow-y:auto}
+.bk-song{display:flex;flex-direction:column;align-items:flex-start;text-align:left;background:rgba(255,255,255,.08);border-radius:10px;padding:6px 10px}
+.bk-song b{font-size:13px;font-style:italic}.bk-song span{font-size:11px;opacity:.7}
+.bk-dot{display:block;width:14px;height:14px;border-radius:999px;background:rgba(255,255,255,.18);transition:background .05s}
+.bk-dot-in{width:10px;height:10px}
+.bk-dot-on{background:#ffd400;box-shadow:0 0 12px #ffd400}
+.bk-tap{font-size:28px;padding:18px 16px;touch-action:none}
 .bk-count b{font-size:min(30vw,180px);font-weight:900;font-style:italic;color:#ffd400;text-shadow:0 8px 0 #d22209;animation:bkpop .9s ease-out both}
 @keyframes bkpop{0%{transform:scale(1.6);opacity:0}30%{transform:scale(1);opacity:1}100%{opacity:.2}}
 /* Clear of the site's NOUN FM / hoops chips in the bottom corner */

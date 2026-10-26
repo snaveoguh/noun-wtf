@@ -17,10 +17,12 @@
 //              declines itself. Accepting expects that host's
 //              `break:start` (10 s, or "the battle fell through").
 
-import type { BattleConfig, BreakMsg, CrewId, CrewSize, Dancer } from '../contract';
+import type { BattleConfig, BreakMsg, CrewId, CrewSize, Dancer, TimingWindows } from '../contract';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export const SKILL: Record<Difficulty, number> = { easy: 0.3, normal: 0.55, hard: 0.8 };
+/** EASY's judging windows (s either side of the beat; the default is 0.045 / 0.09 / 0.14). */
+export const EASY_WINDOWS: TimingWindows = { perfect: 0.07, great: 0.13, ok: 0.2 };
 
 export const INVITE_MS = 20_000;
 export const PRESENCE_MS = 6_000;
@@ -280,7 +282,15 @@ export class BreakLobby {
         }
       }
     }
-    return { gid: o.gid, seed, crewSize: o.crewSize, dancers, ...FORMATS[o.crewSize] };
+    return {
+      gid: o.gid,
+      seed,
+      crewSize: o.crewSize,
+      dancers,
+      ...FORMATS[o.crewSize],
+      // EASY: a softer CPU and wider timing windows for everyone
+      ...(o.difficulty === 'easy' ? { windows: { ...EASY_WINDOWS } } : {}),
+    };
   }
 
   // ── Invited ──
