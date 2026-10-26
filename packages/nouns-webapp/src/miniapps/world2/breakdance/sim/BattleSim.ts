@@ -511,6 +511,26 @@ export class BreakBattle implements BattleSim {
     rt.taps.push({ t: i.t, key: i.key });
     if (rt.taps.length > 64) rt.taps.shift();
     if (rt.att && !expire(rt.att, i.t, this.clock, this.windows)) this.abandon(rt, out);
+    if (rt.human && this.config.chart === 'strict' && rt.plan.length > 0) {
+      // The chart is the judge: a human's key counts only when it's the
+      // note due right now. Anything else (the wrong arrow, or a key between
+      // notes) is a miss, never quietly the start of some other move.
+      const due = this.dueNote(rt, i.t);
+      if (due === null || due.key !== i.key) {
+        if (rt.att) this.abandon(rt, out);
+        if (due !== null) rt.marks.set(due.beat, { key: due.key, g: 'miss' });
+        this.grades.set(rt.slot.id, { g: 'miss', at: i.t });
+        out.push({
+          e: 'hit',
+          id: rt.slot.id,
+          grade: 'miss',
+          key: i.key,
+          ...(due !== null ? { wrong: due.key } : {}),
+        });
+        this.miss(rt, out);
+        return;
+      }
+    }
     if (rt.att) {
       const att = rt.att;
       const r = advance(att, i.key, beat, this.clock, this.windows);
@@ -592,6 +612,27 @@ export class BreakBattle implements BattleSim {
       }
     }
     return false;
+  }
+
+  /** The unjudged chart note nearest `t` within the OK window, if any. */
+  private dueNote(rt: TurnRt, t: number): { key: BreakKey; beat: number } | null {
+    const ok = this.windows.ok + 1e-9;
+    let best: { key: BreakKey; beat: number } | null = null;
+    let bestD = Infinity;
+    for (const pm of rt.plan) {
+      const m = MOVES[pm.move];
+      for (let k = 0; k < m.pattern.length; k++) {
+        const b = pm.start + keyBeat(m, k);
+        if (b >= (pm.cut ?? Infinity) - 1e-9) break;
+        if (rt.marks.has(b)) continue;
+        const d = Math.abs(timeOf(this.clock, b) - t);
+        if (d <= ok && d < bestD) {
+          bestD = d;
+          best = { key: m.pattern[k], beat: b };
+        }
+      }
+    }
+    return best;
   }
 
   /** Mark the planned notes the attempt has judged so far (grades from the recogniser). */

@@ -214,6 +214,18 @@ export const STAT_INFO: Record<
   },
 };
 
+/**
+ * A new best only when it beats the old one as shown (471.31 over 471.29 km/h
+ * both read "471 km/h": not a record). Top speed lands on the same physics
+ * cap run after run, so without this every run "set a record" again: the
+ * card, the rider's "new record, baby" and another upload, all saying 471.
+ */
+export function beatsShown(k: BestKey, v: number, prev: number | undefined): boolean {
+  if (!(v > (prev ?? 0))) return false;
+  if (prev === undefined || !(prev > 0)) return true;
+  return STAT_INFO[k].fmt(v) !== STAT_INFO[k].fmt(prev);
+}
+
 function load(key: string): string | null {
   try {
     return localStorage.getItem(key);
@@ -574,7 +586,7 @@ export class StatsTracker {
   }
 
   private raise(k: BestKey, v: number, src?: Float32Array, keep?: [number, number]) {
-    if (!(v > (this.mine.best[k] ?? 0))) return false;
+    if (!beatsShown(k, v, this.mine.best[k])) return false;
     if (isProved(k)) {
       const trace = this.trace;
       if (trace === null) return false;
