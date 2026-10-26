@@ -32,6 +32,7 @@ import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
 import { introAllowed, introEnabled } from './radio/FmSpots';
 import { FmSpotsUi } from './radio/FmSpotsUi';
 import { RecordsUi, useReplayActive } from './replay/RecordsUi';
+import { RespectBanner, RespectMeter } from './respect/RespectHud';
 import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
 import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
@@ -596,6 +597,7 @@ function Hud({
           </div>
         )}
       </HudDrag>
+      <RespectBanner respect={game.respect} sfx={game.sfx} />
 
       {/* Top-centre: landmarks compass (no room for it on phones) */}
       <div
@@ -631,6 +633,7 @@ function Hud({
           </button>
           <SettingsCog game={game} />
         </div>
+        <RespectMeter respect={game.respect} />
         {!touch && (
           <div data-w2hud="fps" className="w2-chip text-[10px] opacity-60">
             {hud.fps} fps, {hud.quality}
