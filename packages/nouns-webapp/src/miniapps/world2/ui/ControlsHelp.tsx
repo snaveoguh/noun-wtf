@@ -118,7 +118,7 @@ export const GAMEPAD: ControlGroup[] = [
 export function ControlsHelp({ pad }: { pad: boolean }) {
   const groups = pad ? GAMEPAD : KEYBOARD;
   return (
-    <div className="w2-help pointer-events-auto absolute bottom-4 left-[292px] right-4 hidden max-w-[980px] md:block">
+    <div className="w2-help pointer-events-auto absolute bottom-[76px] left-[292px] right-4 hidden max-w-[980px] md:block">
       <style>{HELP_CSS}</style>
       <div className="w2-help-head">
         <b>CONTROLS</b>
@@ -146,7 +146,7 @@ export function ControlsHelp({ pad }: { pad: boolean }) {
 }
 
 const HELP_CSS = `
-.w2-help{background:rgba(10,12,20,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:12px 16px 14px;font-family:system-ui,sans-serif;color:#fff;max-height:calc(100vh - 140px);overflow:auto}
+.w2-help{background:rgba(10,12,20,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:12px 16px 14px;font-family:system-ui,sans-serif;color:#fff;max-height:calc(100vh - 200px);overflow:auto}
 .w2-help-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
 .w2-help-head b{font-size:13px;font-weight:900;letter-spacing:.16em;color:#ffd400}
 .w2-help-head span{font-size:11px;opacity:.5}
