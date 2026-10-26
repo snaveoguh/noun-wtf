@@ -39,6 +39,7 @@ const NOG = '<svg viewBox="0 0 17 6" shape-rendering="crispEdges"><g fill="#e826
 const SPLAT = c => '<svg viewBox="-60 -60 120 120"><path fill="' + c + '" stroke="#0b0b0f" stroke-width="5" stroke-linejoin="round" d="M0-38C10-38 12-52 20-50S22-34 30-28 50-34 50-24 36-12 40 0 56 10 50 18 34 14 30 26 34 46 24 48 10 34 0 38-14 54-22 48-16 32-28 26-50 30-50 20-36 8-40-2-54-16-46-22-30-14-28-26-38-44-28-46-10-38 0-38Z"/><circle cx="46" cy="-44" r="6" fill="' + c + '" stroke="#0b0b0f" stroke-width="4"/><circle cx="-48" cy="44" r="8" fill="' + c + '" stroke="#0b0b0f" stroke-width="4"/></svg>';
 const BALL = '<svg viewBox="-60 -60 120 120"><circle r="52" fill="#ff7a1a" stroke="#0b0b0f" stroke-width="7"/><path d="M-52 0H52M0-52V52M-37-37C-12-14-12 14-37 37M37-37C12-14 12 14 37 37" fill="none" stroke="#0b0b0f" stroke-width="5"/><path d="M-30-38a48 48 0 0 1 30-12" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" opacity=".7"/></svg>';
 const FLAKE = '<svg viewBox="-60 -60 120 120"><g stroke="#0b0b0f" stroke-width="15" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g><g stroke="#e9fbff" stroke-width="8" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g></svg>';
+const VINYL = '<svg viewBox="-60 -60 120 120"><circle r="54" fill="#141418" stroke="#0b0b0f" stroke-width="6"/><g fill="none" stroke="#3a3a46" stroke-width="2"><circle r="46"/><circle r="40"/><circle r="34"/><circle r="28"/></g><path d="M-40-22a46 46 0 0 1 30-22" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".55"/><circle r="17" fill="#ffe23a" stroke="#0b0b0f" stroke-width="4"/><circle r="3.5" fill="#0b0b0f"/></svg>';
 const K = {
   hoops: { bg: 'linear-gradient(150deg,#ff8a1f 0%,#ff5a3c 45%,#7b3cff 100%)', accent: '#ffe23a', badge: '#20d6ff',
     t1: 'NOUN', t2: 'HOOPS', tag: 'DUNK · CROSS · SWISH', url: 'NOUN.WTF/WORLD', bdg: '3 ON 3',
@@ -52,9 +53,25 @@ const K = {
     t1: 'THE BIG', t2: 'DROP', tag: 'CARVE · LOOP · FLY', url: 'NOUN.WTF/WORLD', bdg: '1,000 KM',
     sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['send it!', 'left:860px;top:205px', '6deg'], ts: '190px', l2x: '120px', br: '1.08',
     prop: '<div class="speed" style="left:46px;top:452px;width:130px;transform:rotate(-48deg)"></div><div class="speed" style="left:28px;top:520px;width:170px;transform:rotate(-48deg)"></div><div class="prop" style="left:150px;top:380px;width:270px;transform:rotate(-14deg)">' + FLAKE + '</div>' },
+  breaks: { bg: 'linear-gradient(155deg,#ff2f8e 0%,#7b3cff 55%,#1b1464 100%)', accent: '#ffe23a', badge: '#20d6ff',
+    t1: 'NOUN', t2: 'BREAKS', tag: 'TOPROCK · POWER · FREEZE', url: 'NOUN.WTF/WORLD', bdg: '1V1 · CREWS',
+    sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['ohhhh!', 'left:70px;top:372px', '-8deg'], ts: '200px', l2x: '110px', br: '1.05',
+    prop: '<div class="prop" style="left:70px;top:430px;width:300px;transform:rotate(-12deg)">' + VINYL + '</div>',
+    portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '132px', l2x: '24px', cap: ['ohhhh!', 'left:520px;top:340px', '6deg'],
+      prop: '<div class="prop" style="left:560px;top:860px;width:190px;transform:rotate(14deg)">' + VINYL + '</div>' } },
 }[kind];
 const img = q.get('img');
 const c = document.getElementById('c');
+// ?p=1: the homepage shelf card (800×1200, like home/covers/hoops.webp)
+if (q.get('p') === '1') {
+  document.documentElement.style.cssText = 'width:800px;height:1200px';
+  document.body.style.cssText = 'width:800px;height:1200px';
+  c.style.width = '800px'; c.style.height = '1200px';
+  Object.assign(K, K.portrait || {});
+  const st = document.createElement('style');
+  st.textContent = '.tag{font-size:25px;right:36px;bottom:104px}.url{right:44px;bottom:44px}';
+  document.head.appendChild(st);
+}
 c.style.setProperty('--bg', K.bg); c.style.setProperty('--accent', K.accent); c.style.setProperty('--badge', K.badge);
 if (K.ts) c.style.setProperty('--ts', K.ts); if (K.l2x) c.style.setProperty('--l2x', K.l2x);
 c.innerHTML = `

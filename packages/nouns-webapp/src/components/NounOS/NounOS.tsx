@@ -185,6 +185,20 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // NOUN BREAKS: Noun World at the plaza cypher with the battle menu open
+  // (`?play=breaks`, read when the game starts, so a running one reloads)
+  const goBreaks = useCallback(() => {
+    const url = '/world?play=breaks';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // THE BIG DROP: Noun World straight onto the mountain (`?drop=1`, read when
   // the game starts, so a running one reloads, like Hoops)
   const goDrop = useCallback(() => {
@@ -339,6 +353,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           warfareLoaded={arena === 'warfare'}
           onEnterWorld={goNounWorld}
           onEnterHoops={goHoops}
+          onEnterBreaks={goBreaks}
           onEnterDrop={goDrop}
           onEnterWarfare={goWarfare}
           onOpen={id => os.open(id)}

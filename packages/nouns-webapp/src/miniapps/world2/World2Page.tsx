@@ -262,6 +262,22 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => window.clearInterval(t);
   }, [game, started, searchParams]);
 
+  // `?play=breaks` (the homepage's NOUN BREAKS card): straight to the
+  // plaza cypher with the battle menu open
+  const breaksLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || breaksLaunched.current || searchParams.get('play') !== 'breaks')
+      return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.breaks.arrive()) return false;
+      breaksLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   useEffect(() => {

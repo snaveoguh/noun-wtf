@@ -7,7 +7,7 @@ import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
 
 import { hostOf, KIND_LABEL, type CommunityEntry } from './community';
 
-export type GameId = 'world' | 'hoops' | 'warfare' | 'drop';
+export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'drop';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -98,6 +98,23 @@ export const GAMES: Game[] = [
     facts: ['1v1 up to 5v5', 'Play friends or the Jersey crew', 'Runs inside Noun World'],
     cta: 'PLAY 3V3',
     loading: 'lacing up. off to the noun jersey court',
+  },
+  {
+    id: 'breaks',
+    name: 'Noun Breaks',
+    cover: '/world2/breaks-cover.webp',
+    card: '/home/covers/breaks.webp',
+    focus: '50% 58%',
+    teaser:
+      'Breakdance battles in the plaza cypher. Toprock, windmills, headspins and freezes on the beat while three judges and a crowd of Nouns watch.',
+    tagline: 'TOPROCK · POWER · FREEZE',
+    facts: [
+      'VS CPU, 1v1 or 2v2 / 3v3 crews',
+      'Hit your moves on the beat',
+      'Runs inside Noun World',
+    ],
+    cta: 'BATTLE',
+    loading: 'clearing the floor. off to the plaza cypher',
   },
   {
     id: 'warfare',
