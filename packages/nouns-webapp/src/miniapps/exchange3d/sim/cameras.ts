@@ -59,7 +59,7 @@ export function preset(mode: CamMode, c: PresetCtx): Orbit {
     case 'wide':
       return { tx: 0, ty: 0, tz: 0, r: 120 * fit, az: Math.PI * 0.82, el: 0.62 };
     case 'vast':
-      return { tx: 0, ty: 0, tz: 0, r: 720 * fit, az: Math.PI * 0.78, el: 0.36 };
+      return { tx: 0, ty: 0, tz: 0, r: 720 * Math.sqrt(fit), az: Math.PI * 0.78, el: 0.36 };
     case 'follow': {
       const f = c.follow ?? { x: c.pit.x, y: 0, z: c.pit.z };
       return { tx: f.x, ty: f.y + 1.7, tz: f.z, r: 11 * Math.sqrt(fit), az: c.az, el: 0.42 };
