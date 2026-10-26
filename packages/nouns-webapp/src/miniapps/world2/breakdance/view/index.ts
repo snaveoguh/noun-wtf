@@ -40,6 +40,7 @@ import * as THREE from 'three';
 
 import { type CharacterAssets } from '../../character/NounCharacter';
 import { inkExcluded, toonify } from '../../render/Toon';
+import { fetchTrack, HOUSE_ID, loadManifest, trackById } from '../tracks';
 
 import { BreakAudio, type AudioBus } from './audio';
 import { BattleCamera, type ShotKind } from './camera';
@@ -167,6 +168,23 @@ export class BreakView implements BattleView {
     this.phase = null;
     this.winnerAt = null;
     this.cam.cut();
+    this.loadSong(config);
+  }
+
+  /** BattleConfig.track: the host's song, when this client can load it (the drums otherwise). */
+  private loadSong(config: BattleConfig) {
+    const id = config.track;
+    if (id === undefined || id === HOUSE_ID) return;
+    void loadManifest().then(list => {
+      if (this.config !== config) return;
+      const t = trackById(list, id);
+      if (t.id !== id || t.file === null) {
+        console.warn(`[breaks] no track "${id}" here: the generated beat plays`);
+        return;
+      }
+      this.audio.playTrack(fetchTrack(t), t.offset, config.bpm);
+      this.hud.set({ song: `♪ ${t.title}${t.artist !== '' ? ` · ${t.artist}` : ''}` });
+    });
   }
 
   setLocal(id: string | null) {
@@ -243,9 +261,9 @@ export class BreakView implements BattleView {
     const live = this.hud.live;
     live.beat = beat;
     live.prompts = state.prompts;
+    live.lane = state.lane ?? null;
+    live.forming = state.forming ?? null;
     live.turn = state.turn !== null ? { from: state.turn.from, to: state.turn.to } : null;
-    const tnow = performance.now();
-    live.hits = live.hits.filter(h => tnow - h.at < 1500);
     this.hudAcc += dt;
     const hs = this.hud.state;
     if (
@@ -345,7 +363,8 @@ export class BreakView implements BattleView {
   /** Whose notes are on the beat track: SimState.promptsFor, else the dancer up. */
   private trackOwner(state: SimState): BreakHudState['track'] {
     const id = state.promptsFor ?? state.turn?.id;
-    if (id === undefined || state.prompts.length === 0) return null;
+    if (id === undefined || (state.prompts.length === 0 && (state.lane?.length ?? 0) === 0))
+      return null;
     const d = this.config?.dancers.find(x => x.id === id);
     return d !== undefined ? { id, crew: d.crew, local: id === this.localId } : null;
   }
@@ -412,7 +431,6 @@ export class BreakView implements BattleView {
         );
         this.audio.crowd('cheer', 0.5);
         this.crowd?.react('clap', 0.6);
-        this.hud.live.hits = [];
         break;
       }
       case 'hit': {
@@ -421,10 +439,7 @@ export class BreakView implements BattleView {
         this.hud.set({
           flash: { id: ++this.calls, grade: e.grade, local: isLocal, at: performance.now() },
         });
-        const p = state.prompts;
-        // Pop the note that was hit (the earliest still showing)
-        const target = p.length > 0 ? p[0].beat : this.clock.beat;
-        this.hud.live.hits.push({ beat: target, grade: e.grade, at: performance.now() });
+        // (The lane bursts the note that was hit: SimState.lane carries its grade.)
         if (isLocal) this.audio.tick(e.grade);
         break;
       }

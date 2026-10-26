@@ -1,8 +1,53 @@
-import type { JudgeCard } from '../contract';
+import type { JudgeCard, LaneNote } from '../contract';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { barsLeft, BreakHudStore, cardTotal, cardVotes, trackItems, turnLeft } from './hudStore';
+import {
+  barsLeft,
+  BreakHudStore,
+  cardTotal,
+  cardVotes,
+  formingText,
+  laneItems,
+  trackItems,
+  turnLeft,
+} from './hudStore';
+
+describe('rhythm lane layout', () => {
+  const lane: LaneNote[] = [
+    { key: 'down', beat: 7, id: 'm', move: 'windmill', i: 0, n: 4, grade: 'miss' },
+    { key: 'left', beat: 8, id: 'h', move: 'windmill', i: 1, n: 4, grade: 'ok', off: -0.12 },
+    { key: 'up', beat: 9, id: 'p', move: 'windmill', i: 2, n: 4 },
+    { key: 'a', beat: 10, id: 'd', move: 'flare', i: 0, n: 4, dead: true },
+  ];
+
+  it('scrolls misses past the line, bursts hits, greys dead notes, labels moves', () => {
+    const items = laneItems(lane, [], 8, 4, m => `<${m}>`);
+    const by = (id: string) => items.find(x => x.id === id)!;
+    expect(by('m')).toMatchObject({ status: 'miss', x: -0.25, label: '<WINDMILL>' });
+    expect(by('m').alpha).toBeGreaterThan(0);
+    expect(by('h')).toMatchObject({ status: 'hit', grade: 'ok', timing: 'EARLY', x: 0 });
+    expect(by('p')).toMatchObject({ status: 'pending', x: 0.25 });
+    expect(by('d').status).toBe('dead');
+    expect(by('d').alpha).toBeLessThan(0.5);
+    // Far enough past the line, a miss is gone
+    expect(laneItems(lane, [], 8.3, 4).find(x => x.id === 'm')).toBeUndefined();
+  });
+
+  it('falls back to the prompts when the sim sends no lane', () => {
+    const items = laneItems(null, [{ key: 'b', beat: 9 }], 8, 4);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ key: 'b', x: 0.25, status: 'pending' });
+    expect(items[0].label).toBeUndefined();
+  });
+
+  it('names the move forming', () => {
+    const f = { id: 'a', move: 'windmill' as const, got: 2, of: 4 };
+    expect(formingText(f, m => m)).toBe('WINDMILL 2/4');
+    expect(formingText({ ...f, got: 4, landed: true }, m => m)).toBe('WINDMILL ✓');
+    expect(formingText(null, m => m)).toBe('');
+  });
+});
 
 describe('beat track layout', () => {
   const prompts = [
