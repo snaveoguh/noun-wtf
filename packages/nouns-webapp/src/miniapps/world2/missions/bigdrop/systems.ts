@@ -11,8 +11,10 @@ import { makeAtmosphere } from './scenery/atmosphere';
 import { makeBirds } from './scenery/birds';
 import { makeForest } from './scenery/forest';
 import { createSpray } from './spray';
+import { createTrackDressing } from './trackDressing';
 
 export const PEAK_SYSTEMS: PeakSystemFactory[] = [
+  createTrackDressing,
   makeAtmosphere,
   makeForest,
   createLoops,
