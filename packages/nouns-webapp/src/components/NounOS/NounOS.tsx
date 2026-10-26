@@ -22,6 +22,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { ChainNotificationsMount } from '@/components/Notifications/useChainNotifications';
 import { Toaster } from '@/components/ui/sonner';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
+import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
 
 import AccessoryIcon from './AccessoryIcon';
 import AgentHome from './AgentHome';
@@ -184,6 +185,19 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // THE BIG DROP: Noun World straight onto the mountain (`?drop=1`, read when
+  // the game starts, so a running one reloads, like Hoops)
+  const goDrop = useCallback(() => {
+    if (gameMounted) {
+      window.location.assign(BIG_DROP_URL);
+      return;
+    }
+    navigate(BIG_DROP_URL);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   const goWarfare = useCallback(() => {
     setArena('warfare');
     os.setMode('world');
@@ -325,6 +339,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           warfareLoaded={arena === 'warfare'}
           onEnterWorld={goNounWorld}
           onEnterHoops={goHoops}
+          onEnterDrop={goDrop}
           onEnterWarfare={goWarfare}
           onOpen={id => os.open(id)}
           onNavigate={openPath}

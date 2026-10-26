@@ -252,6 +252,20 @@ export const HOME_CSS = `
 .nh-hot{position:absolute;right:5cqw;top:5cqw;z-index:4;width:20cqw;height:20cqw;border-radius:50%;display:grid;place-items:center;
   font-size:7.2cqw;font-weight:900;letter-spacing:.02em;color:#fff;background:#ff3b3b;box-shadow:0 0 0 1.2cqw var(--ink),1.6cqw 1.6cqw 0 1.2cqw var(--ink);transform:rotate(12deg)}
 .nh-cover~.nh-hot{display:none}
+/* locked (THE BIG DROP before the deepest door opens): frosted art, a padlock and how to open it */
+.nh-card.is-locked .nh-cover-main,.nh-card.is-locked .nh-art{filter:grayscale(.75) brightness(.55) blur(.5cqw);transform:scale(1.04)}
+.nh-card.is-locked .nh-box::after{background-image:${GRAIN},linear-gradient(180deg,rgba(214,236,255,.34),rgba(150,190,230,.16) 55%,rgba(10,16,30,.5));opacity:1;mix-blend-mode:normal}
+.nh-lock{position:absolute;left:50%;top:50%;z-index:6;width:76cqw;transform:translate(-50%,-50%) rotate(-3deg);display:flex;flex-direction:column;align-items:center;gap:3cqw;
+  padding:6cqw 5cqw 5cqw;border-radius:3cqw;background:rgba(11,11,15,.82);color:#cfeaff;text-align:center;
+  box-shadow:0 0 0 1cqw #cfeaff,2.4cqw 2.4cqw 0 1cqw var(--ink);backdrop-filter:blur(2px)}
+.nh-lock svg{width:15cqw;height:auto;color:#cfeaff;filter:drop-shadow(1cqw 1cqw 0 #ff2f8e)}
+.nh-lock span{font-size:max(10px,6cqw);font-weight:900;line-height:1.15;letter-spacing:.04em;text-transform:uppercase;color:#fff}
+.nh-card.is-locked:hover .nh-lock,.nh-card.is-locked:focus-visible .nh-lock{opacity:0;transition:opacity .25s}
+@media (hover:none){.nh-card.is-locked:hover .nh-lock{opacity:1}}
+body .nh-sheet .nh-locked-note{display:flex;gap:10px;align-items:flex-start;margin:0 0 16px;padding:12px 14px;border-radius:12px;background:#0b0b0f;color:#cfeaff;
+  box-shadow:0 0 0 2px #cfeaff;font-size:14px;line-height:1.45}
+body .nh-sheet .nh-locked-note svg{flex:none;margin-top:2px}
+body .nh-sheet-art.is-locked img{filter:grayscale(.75) brightness(.6) blur(2px)}
 .nh-sheen{position:absolute;inset:0;z-index:5;pointer-events:none;
   background:linear-gradient(115deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.22) 45%,rgba(255,255,255,0) 60%);
   transform:translateX(-120%);transition:transform .9s cubic-bezier(.2,.8,.2,1)}

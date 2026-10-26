@@ -16,6 +16,7 @@ import { Game, type HudState } from './Game';
 import { SprayPanel } from './graffiti/SprayPanel';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
+import { DROP_PARAM } from './missions/unlocks';
 import {
   shortAddr,
   STAT_INFO,
@@ -241,6 +242,22 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     game.spots.introPlayed = true;
     if (ok) void game.spots.intro();
   }, [game, phase, searchParams]);
+  // `?drop=1` (the homepage's THE BIG DROP card): once the rider is in,
+  // straight onto the mountain if the deepest door is open to them
+  const dropLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || dropLaunched.current || searchParams.get(DROP_PARAM) !== '1') return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null) return false;
+      dropLaunched.current = true;
+      game.missions.launchBigDrop();
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   useEffect(() => {

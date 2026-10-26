@@ -5,7 +5,18 @@ import { describe, expect, it } from 'vitest';
 
 import { CATALOG } from '../catalog';
 
-import { buildRows, CLIENTS, coverForPath, GAMES, HERO_SLIDES, searchItems } from './rows';
+import {
+  BIG_DROP_CARD,
+  BIG_DROP_COVER,
+  BIG_DROP_HINT,
+  BIG_DROP_URL,
+  buildRows,
+  CLIENTS,
+  coverForPath,
+  GAMES,
+  HERO_SLIDES,
+  searchItems,
+} from './rows';
 
 describe('buildRows', () => {
   const rows = buildRows(CATALOG, [
@@ -28,12 +39,13 @@ describe('buildRows', () => {
     ]);
   });
 
-  it('leads Play now with the three games (real covers), then the extra toys', () => {
+  it('leads Play now with the games (real covers), then the extra toys', () => {
     const play = rows[0]!;
-    expect(play.items.slice(0, 3).map(i => i.action)).toEqual(
+    const n = GAMES.length;
+    expect(play.items.slice(0, n).map(i => i.action)).toEqual(
       GAMES.map(g => ({ t: 'game', id: g.id })),
     );
-    expect(play.items.slice(0, 3).every(i => i.cover !== undefined)).toBe(true);
+    expect(play.items.slice(0, n).every(i => i.cover !== undefined)).toBe(true);
     const paths = play.items.flatMap(i => (i.action.t === 'entry' ? [i.action.entry.path] : []));
     expect(paths).toEqual(
       expect.arrayContaining(['/world/voice', '/icecreamvan', '/playground', '/crystal-ball']),
@@ -82,6 +94,43 @@ describe('buildRows', () => {
 
   it('has unique keys within each row', () => {
     for (const r of rows) expect(new Set(r.items.map(i => i.key)).size).toBe(r.items.length);
+  });
+});
+
+describe('THE BIG DROP card', () => {
+  const drop = (opts?: { dropUnlocked?: boolean }) =>
+    buildRows(CATALOG, [], opts)[0]!.items.find(i => i.key === 'game:drop')!;
+
+  it('sits in Play now after the three games, with one obvious cover to swap', () => {
+    const play = buildRows(CATALOG)[0]!;
+    expect(play.items.findIndex(i => i.key === 'game:drop')).toBe(3);
+    expect(GAMES.find(g => g.id === 'drop')).toMatchObject({
+      card: BIG_DROP_CARD,
+      cover: BIG_DROP_COVER,
+    });
+    expect(drop().cover).toBe(BIG_DROP_CARD);
+    const pub = resolve(__dirname, '../../../../public');
+    for (const f of [BIG_DROP_CARD, BIG_DROP_COVER])
+      expect(existsSync(resolve(pub, `.${f}`)), f).toBe(true);
+  });
+
+  it('is locked (no HOT, the hint) unless the deepest door is open', () => {
+    expect(drop()).toMatchObject({ locked: { hint: BIG_DROP_HINT }, hot: false });
+    expect(drop({ dropUnlocked: false }).locked).toBeDefined();
+    const open = drop({ dropUnlocked: true });
+    expect(open.locked).toBeUndefined();
+    expect(open.hot).toBe(true);
+    expect(open.action).toEqual({ t: 'game', id: 'drop' });
+  });
+
+  it('launches Noun World straight onto the mountain', () => {
+    expect(BIG_DROP_URL).toBe('/world?drop=1');
+  });
+
+  it('only ever locks the Big Drop', () => {
+    for (const r of buildRows(CATALOG))
+      for (const it of r.items)
+        if (it.key !== 'game:drop') expect(it.locked, it.key).toBeUndefined();
   });
 });
 

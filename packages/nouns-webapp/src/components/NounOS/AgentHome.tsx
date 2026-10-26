@@ -16,6 +16,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
 
+import { bigDropUnlocked } from '@/miniapps/world2/missions/unlocks';
+
 import { CATALOG } from './catalog';
 import AskBar from './home/AskBar';
 import { parseEntries, SUBMISSIONS_URL } from './home/community';
@@ -23,7 +25,15 @@ import { GameSheet, SubmitDialog } from './home/Dialogs';
 import Hero from './home/Hero';
 import { HOME_CSS } from './home/homeStyles';
 import Intro, { shouldPlayIntro } from './home/Intro';
-import { buildRows, GAMES, HERO_SLIDES, type Game, type GameId, type Item } from './home/rows';
+import {
+  BIG_DROP_HINT,
+  buildRows,
+  GAMES,
+  HERO_SLIDES,
+  type Game,
+  type GameId,
+  type Item,
+} from './home/rows';
 import { Shelf } from './home/Shelf';
 import { ident, unlockAudio } from './home/sound';
 import { cx } from './osStore';
@@ -59,6 +69,7 @@ export default function AgentHome({
   onEnterWorld,
   onEnterHoops,
   onEnterWarfare,
+  onEnterDrop,
   onOpen,
   onNavigate,
 }: {
@@ -69,6 +80,8 @@ export default function AgentHome({
   onEnterWorld: () => void;
   onEnterHoops: () => void;
   onEnterWarfare: () => void;
+  /** Noun World straight onto the Big Drop (only offered once it's unlocked) */
+  onEnterDrop: () => void;
   onOpen: (app: AppKind) => void;
   onNavigate: (path: string) => void;
 }) {
@@ -78,6 +91,22 @@ export default function AgentHome({
   const [sheet, setSheet] = useState<Game | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+  // THE BIG DROP opens with the deepest door in Noun World (saved in this
+  // browser). Re-read whenever the visitor comes back to the homepage.
+  const [dropOpen, setDropOpen] = useState(bigDropUnlocked);
+  useEffect(() => {
+    const check = () => setDropOpen(bigDropUnlocked());
+    check();
+    const onVis = () => document.visibilityState === 'visible' && check();
+    window.addEventListener('focus', check);
+    window.addEventListener('storage', check);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('focus', check);
+      window.removeEventListener('storage', check);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [active]);
 
   const community = useQuery({
     queryKey: ['community-submissions'],
@@ -90,7 +119,10 @@ export default function AgentHome({
     retry: 0,
   });
 
-  const rows = useMemo(() => buildRows(CATALOG, community.data ?? []), [community.data]);
+  const rows = useMemo(
+    () => buildRows(CATALOG, community.data ?? [], { dropUnlocked: dropOpen }),
+    [community.data, dropOpen],
+  );
 
   const resumable = useCallback(
     (id: GameId) => (id === 'world' && worldLoaded) || (id === 'warfare' && warfareLoaded),
@@ -103,9 +135,16 @@ export default function AgentHome({
     (id: GameId) => {
       if (id === 'hoops') onEnterHoops();
       else if (id === 'warfare') onEnterWarfare();
-      else onEnterWorld();
+      else if (id === 'drop') {
+        // Locked: the sheet says how to open it (its button opens Noun World)
+        if (bigDropUnlocked()) onEnterDrop();
+        else {
+          setDropOpen(false);
+          setSheet(GAMES.find(g => g.id === 'drop') ?? null);
+        }
+      } else onEnterWorld();
     },
-    [onEnterHoops, onEnterWarfare, onEnterWorld],
+    [onEnterHoops, onEnterWarfare, onEnterWorld, onEnterDrop],
   );
 
   const activate = useCallback(
@@ -261,7 +300,13 @@ export default function AgentHome({
       </footer>
 
       {sheet && (
-        <GameSheet game={sheet} resume={resumable(sheet.id)} onPlay={play} onClose={closeSheet} />
+        <GameSheet
+          game={sheet}
+          resume={resumable(sheet.id)}
+          locked={sheet.id === 'drop' && !dropOpen ? { hint: BIG_DROP_HINT } : undefined}
+          onPlay={play}
+          onClose={closeSheet}
+        />
       )}
       {submitting && <SubmitDialog onClose={closeSubmit} />}
     </div>

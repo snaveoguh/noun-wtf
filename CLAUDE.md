@@ -201,6 +201,24 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
   - **Train my voice.** 100 original sentences, local only. The booth exports an LJSpeech zip (22050 Hz mono 16-bit WAVs + `metadata.csv` + a free Piper/Colab README) via a store-only zip writer (`booth/zip.ts`).
   - **My voice model.** Load `.onnx` + `.onnx.json` (validated in `booth/piperConfig.ts`, kept in IndexedDB, never uploaded). A second `TtsEngine` runs it (`init-bytes`). Two switches, both off by default: `modelVoice` (callouts without a recording, and typed chat, in the player's voice) and `modelShare`. With `modelShare` on, chat lines become ephemeral clips: 8 s max, 1 per 5 s, 60/h, served for 10 min.
 
+### The Big Drop (snow peak behind the deepest door)
+
+The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,000 km snow peak, a per-player dimension. Nothing done there counts: stats are suspended. The homepage card (`BIG_DROP_CARD` / `BIG_DROP_COVER` in `home/rows.ts`) is locked until `doorUnlocked()` (`missions/unlocks.ts`). Unlocked, `/world?drop=1` launches straight onto the summit.
+- **Dimension** (`missions/peak.ts`):
+  - swaps the player's and the collision world's terrain;
+  - 40% gravity, 15% air drag;
+  - hides and pauses the city;
+  - floating origin: everything recentres every 3 km, 20 km above the city's coordinates (`Player.shift`, `SkateCamera.shift`, `CollisionWorld.shiftDynamic`);
+  - terrain: a near grid every frame plus a far grid in slices (`peakGrid.ts`).
+- **Shape:** `peakTerrain.ts` (`peakHeight`; tested, including the ray marcher's `PEAK_LIPSCHITZ`).
+- **Everything else** is a PeakSystem in `missions/bigdrop/` (contract and coordinate rules in `contract.ts`, registry in `systems.ts`):
+  - the race line `track.ts` (`s` = peak z; sections, features, `kickerShape`, `loopBase`, sized by expected speed in `trackSpeed.ts`), carved by `terrainCarve.ts`, with snow colours and surfaces in `surface.ts` and gates, km boards and poles in `trackDressing.ts`;
+  - rideable loops: `loops.ts` / `loopPath.ts` / `loopMesh.ts` (`Player.ride` hook, `SkateCamera.rig`);
+  - sky, sun, cloud sea, ranges, giant Noun, forests and creatures: `scenery/` (`journey.ts` maps depth to time of day: storm, blue, golden, sunset, aurora);
+  - NPC hoverboarders: `riders.ts` / `riderSim.ts`; built Nouns are kept between visits, because a build is a hitch;
+  - snow spray, wind streaks and sonic booms: `spray.ts` / `sprayRules.ts`.
+- In dev: `window.__w2.missions.enterUpsideDown()` / `leaveUpsideDown()`.
+
 ### Books (Meme Value)
 
 `/books/meme-value` (alias `/memevalue`) is "MEME VALUE" by LIL 67 (the site owner's own book) as a flipbook, with an ART / CULTURE card (`public/home/covers/meme-value.webp`).

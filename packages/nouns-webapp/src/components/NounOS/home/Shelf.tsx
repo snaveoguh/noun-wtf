@@ -1,8 +1,6 @@
 // A row of box-art cards (Netflix shelf): subheader, a horizontal strip
 // that snaps, arrow buttons on desktop, swipe on touch.
 
-import type { Item, Row } from './rows';
-
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -10,6 +8,7 @@ import { cx } from '../osStore';
 
 import { artSpec, NOUN_COUNTS, nounSvgUrl } from './boxArt';
 import { ClipVideo, motionOk } from './Hero';
+import { BIG_DROP_URL, type Item, type Row } from './rows';
 
 export const ACCENT: Record<string, string> = {
   play: '#ff2f8e',
@@ -70,7 +69,25 @@ export const BoxArt = memo(function BoxArt({ item }: { item: Item }) {
   );
 });
 
+/** A padlock (pixel-ish, ink outlined), for locked cards. */
+export function LockIcon() {
+  return (
+    <svg viewBox="0 0 16 18" width="16" height="18" aria-hidden>
+      <path
+        d="M4 8V5.5a4 4 0 0 1 8 0V8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="square"
+      />
+      <rect x="1.5" y="8" width="13" height="9" rx="1.5" fill="currentColor" />
+      <rect x="7" y="11" width="2" height="3.5" fill="#0b0b0f" />
+    </svg>
+  );
+}
+
 function verb(it: Item): string {
+  if (it.locked !== undefined) return 'HOW TO UNLOCK ▸';
   if (it.action.t === 'submit') return 'SUBMIT +';
   if (it.external === true) return 'VISIT ↗';
   if (it.action.t === 'game' || it.group === 'play') return 'PLAY ▸';
@@ -82,7 +99,9 @@ function hrefOf(it: Item): string | undefined {
     case 'entry':
       return it.action.entry.path;
     case 'game':
-      return it.action.id === 'hoops' ? '/world?play=hoops&mode=3' : `/${it.action.id}`;
+      if (it.action.id === 'hoops') return '/world?play=hoops&mode=3';
+      if (it.action.id === 'drop') return it.locked !== undefined ? '/world' : BIG_DROP_URL;
+      return `/${it.action.id}`;
     case 'external':
       return it.action.url;
     default:
@@ -181,17 +200,26 @@ export const Card = memo(function Card({
         )}
         <span className="nh-label">{item.label}</span>
         {item.hot === true && <span className="nh-hot">HOT</span>}
+        {item.locked !== undefined && (
+          <span className="nh-lock" aria-hidden>
+            <LockIcon />
+            <span>{item.locked.hint}</span>
+          </span>
+        )}
         <span className="nh-sheen" />
         <span className="nh-info">
           <b>{item.title}</b>
-          <span>{item.blurb}</span>
+          <span>{item.locked !== undefined ? `Locked. ${item.locked.hint}.` : item.blurb}</span>
           <em>{verb(item)}</em>
         </span>
       </span>
     </>
   );
   const style = { '--acc': accent } as CSSProperties;
-  const label = `${item.title.toLowerCase()}: ${item.blurb}`;
+  const label =
+    item.locked !== undefined
+      ? `${item.title.toLowerCase()} (locked: ${item.locked.hint.toLowerCase()})`
+      : `${item.title.toLowerCase()}: ${item.blurb}`;
   if (item.action.t === 'submit')
     return (
       <button
@@ -220,7 +248,11 @@ export const Card = memo(function Card({
     );
   return (
     <a
-      className={cx('nh-card', pv.playing && 'is-previewing')}
+      className={cx(
+        'nh-card',
+        pv.playing && 'is-previewing',
+        item.locked !== undefined && 'is-locked',
+      )}
       style={style}
       href={href}
       aria-label={label}

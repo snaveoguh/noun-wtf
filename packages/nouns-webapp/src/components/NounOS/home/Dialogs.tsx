@@ -20,6 +20,7 @@ import {
   type SubmissionKind,
 } from './community';
 import { GAME_ACCENT, GameTitle } from './Hero';
+import { LockIcon } from './Shelf';
 
 function Modal({
   label,
@@ -90,17 +91,20 @@ function Modal({
 export function GameSheet({
   game,
   resume,
+  locked,
   onPlay,
   onClose,
 }: {
   game: Game;
   resume: boolean;
+  /** Not open yet: says how to open it, and the button opens Noun World instead */
+  locked?: { hint: string };
   onPlay: (id: GameId) => void;
   onClose: () => void;
 }) {
   return (
     <Modal label={game.name} onClose={onClose} className="is-game">
-      <div className="nh-sheet-art">
+      <div className={locked ? 'nh-sheet-art is-locked' : 'nh-sheet-art'}>
         <img src={game.cover} alt={`${game.name} cover art`} />
       </div>
       <div className="nh-sheet-body">
@@ -109,6 +113,16 @@ export function GameSheet({
         </h2>
         <span className="nh-strapline">{game.tagline}</span>
         <p>{game.teaser}</p>
+        {locked && (
+          <p className="nh-locked-note">
+            <LockIcon />
+            <span>
+              <b>Locked.</b> {locked.hint}: meet the Oracle by the fountain, then find the Keymaker
+              in the GO DOWN alley and ride his line until he hands you the key. Once the door is
+              open to you, the mountain is one click from here.
+            </span>
+          </p>
+        )}
         <ul>
           {game.facts.map(f => (
             <li key={f}>{f}</li>
@@ -119,10 +133,10 @@ export function GameSheet({
           className="nh-play"
           onClick={() => {
             onClose();
-            onPlay(game.id);
+            onPlay(locked ? 'world' : game.id);
           }}
         >
-          <span aria-hidden>▶</span> {resume ? 'RESUME' : game.cta}
+          <span aria-hidden>▶</span> {locked ? 'PLAY NOUN WORLD' : resume ? 'RESUME' : game.cta}
         </button>
       </div>
     </Modal>
