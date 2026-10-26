@@ -130,8 +130,21 @@ export function flatKicker(h: number, alpha: number): KickerShape {
   };
 }
 
-/** The kicker in grid cell (i, j), or null (deterministic). */
-export function basinKickerIn(i: number, j: number, out: BasinKicker): BasinKicker | null {
+/** Kickers by grid cell (they're asked for per terrain vertex: build each once). */
+const cells = new Map<number, BasinKicker | null>();
+
+/** The kicker in grid cell (i, j), or null (deterministic; shared, don't modify). */
+export function basinKickerIn(i: number, j: number): BasinKicker | null {
+  const key = i * 131072 + j;
+  const hit = cells.get(key);
+  if (hit !== undefined) return hit;
+  if (cells.size > 8192) cells.clear();
+  const k = buildKicker(i, j);
+  cells.set(key, k);
+  return k;
+}
+
+function buildKicker(i: number, j: number): BasinKicker | null {
   if (hash2(i, j, SEED + 10) > BASIN.kickOdds) return null;
   const C = BASIN.cell;
   const x = (i + 0.2 + 0.6 * hash2(i, j, SEED + 11)) * C;
@@ -143,17 +156,11 @@ export function basinKickerIn(i: number, j: number, out: BasinKicker): BasinKick
   // Facing out from the summit, give or take 20°
   const a = Math.atan2(x, z) + (hash2(i, j, SEED + 13) - 0.5) * 40 * DEG;
   const u = hash2(i, j, SEED + 14);
-  const h = u < 0.06 ? 26 + 8 * u * 16 : u < 0.32 ? 12 + 8 * hash2(i, j, SEED + 15) : 4 + 8 * u;
-  const alpha = (18 + 12 * hash2(i, j, SEED + 16)) * DEG;
-  out.x = x;
-  out.z = z;
-  out.dx = Math.sin(a);
-  out.dz = Math.cos(a);
-  out.shape = flatKicker(h, alpha);
-  return out;
+  // Mostly 4–11 m, a quarter 11–16 m, the odd 20 m+ monster
+  const h = u < 0.05 ? 20 + 80 * u : u < 0.3 ? 11 + 5 * hash2(i, j, SEED + 15) : 4 + 7 * u;
+  const alpha = (15 + 9 * hash2(i, j, SEED + 16)) * DEG;
+  return { x, z, dx: Math.sin(a), dz: Math.cos(a), shape: flatKicker(h, alpha) };
 }
-
-const _k: BasinKicker = { x: 0, z: 0, dx: 0, dz: 1, shape: flatKicker(8, 20 * DEG) };
 
 /** Height (m) a kicker adds at (x, z), relative to the ground under it. */
 export function kickerHeightAt(k: BasinKicker, x: number, z: number): number {
@@ -177,7 +184,7 @@ function kickers(x: number, z: number): number {
   let h = 0;
   for (let j = cj - 1; j <= cj + 1; j++)
     for (let i = ci - 1; i <= ci + 1; i++) {
-      const k = basinKickerIn(i, j, _k);
+      const k = basinKickerIn(i, j);
       if (k !== null) h = Math.max(h, kickerHeightAt(k, x, z));
     }
   return h;
@@ -189,7 +196,7 @@ export function basinKickersNear(x: number, z: number, r: number): BasinKicker[]
   const out: BasinKicker[] = [];
   for (let j = Math.floor((z - r) / C); j <= Math.floor((z + r) / C); j++)
     for (let i = Math.floor((x - r) / C); i <= Math.floor((x + r) / C); i++) {
-      const k = basinKickerIn(i, j, { x: 0, z: 0, dx: 0, dz: 1, shape: _k.shape });
+      const k = basinKickerIn(i, j);
       if (k !== null && Math.hypot(k.x - x, k.z - z) <= r) out.push(k);
     }
   return out;
@@ -206,7 +213,7 @@ export function basinKickerPaint(x: number, z: number): number {
   let best = 0;
   for (let j = cj - 1; j <= cj + 1; j++)
     for (let i = ci - 1; i <= ci + 1; i++) {
-      const k = basinKickerIn(i, j, _k);
+      const k = basinKickerIn(i, j);
       if (k === null) continue;
       const sh = k.shape;
       const ox = x - k.x;
