@@ -264,13 +264,13 @@ export class PoseDriver {
       this.blendInto(result, s, layers[i].w);
     }
     if (keepMixer) {
-      // result := mixer → result by procW (mixer pose sits on the floor as authored)
+      // mixer → result by procW (the clip's pose sits on the floor as authored;
+      // blendInto hands over the ground mode once the procedural side dominates)
       const out = this.snap(n++);
       this.copySnap(out, this.mixSnap);
-      out.ground = procW > 0.5 ? result.ground : 'none';
-      out.planted = procW > 0.5 ? [...result.planted] : [false, false, false, false];
+      out.ground = 'none';
+      out.planted = [false, false, false, false];
       this.blendInto(out, result, procW);
-      out.ground = procW > 0.5 ? result.ground : 'none';
       this.write(out);
       this.settle(dt, out.air * procW, out.ground, out.planted, procW);
     } else {

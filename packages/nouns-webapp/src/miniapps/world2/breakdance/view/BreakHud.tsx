@@ -69,7 +69,7 @@ export function BreakHud({
           </div>
         ))}
       </div>
-      {s.phase === 'turn' && s.up !== null && <Track hud={hud} s={s} />}
+      {s.track !== null && s.winner === null && <Track hud={hud} s={s} />}
       {s.reveal !== null &&
         s.winner === null &&
         (s.phase === 'judging' || now - s.reveal.at < 6500) && (
@@ -226,7 +226,8 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
     tick();
     return () => cancelAnimationFrame(raf);
   }, [hud]);
-  const local = s.up?.local === true;
+  const local = s.track?.local === true;
+  const crew = s.track?.crew ?? s.up?.crew ?? null;
   const f = s.flash;
   const showFlash = f !== null && performance.now() - f.at < 700;
   return (
@@ -239,7 +240,7 @@ function Track({ hud, s }: { hud: BreakHudStore; s: BreakHudState }) {
       <div
         ref={lane}
         className="w2-brk-lane"
-        style={{ ['--cc' as string]: s.up !== null ? s.crews[s.up.crew].color : '#fff' }}
+        style={{ ['--cc' as string]: crew !== null ? s.crews[crew].color : '#fff' }}
       >
         {Array.from({ length: 6 }, (_, i) => (
           <div key={`t${i}`} ref={el => void (ticks.current[i] = el)} className="w2-brk-tick" />
@@ -284,17 +285,22 @@ function CardReveal({ s, card, round }: { s: BreakHudState; card: JudgeCard; rou
     <div className="w2-brk-reveal">
       <div className="w2-brk-reveal-kick">JUDGES · ROUND {round + 1}</div>
       <div className="w2-brk-cards">
-        {card.votes.map((v, i) => (
-          <div
-            key={i}
-            className="w2-brk-card"
-            style={{ ['--cc' as string]: s.crews[v].color, animationDelay: `${0.25 + i * 0.45}s` }}
-          >
-            <i>J{i + 1}</i>
-            <b>{v === 0 ? '◀' : '▶'}</b>
-            <span>{s.crews[v].name}</span>
-          </div>
-        ))}
+        {card.votes
+          .map((v, i) => ({ v, n: i + 1 }))
+          .map(({ v, n }) => (
+            <div
+              key={`J${n}`}
+              className="w2-brk-card"
+              style={{
+                ['--cc' as string]: s.crews[v].color,
+                animationDelay: `${0.25 + (n - 1) * 0.45}s`,
+              }}
+            >
+              <i>J{n}</i>
+              <b>{v === 0 ? '◀' : '▶'}</b>
+              <span>{s.crews[v].name}</span>
+            </div>
+          ))}
       </div>
       <table className="w2-brk-cats" style={{ animationDelay: '1.7s' }}>
         <tbody>
@@ -343,7 +349,7 @@ function Winner({
         ? 'YOU WIN!'
         : 'YOU LOSE'
       : `${s.crews[w].name} WINS`;
-  const rounds = s.cards.map(c => cardVotes(c));
+  const rounds = s.cards.map((c, i) => ({ v: cardVotes(c), n: i + 1 }));
   return (
     <div className="w2-brk-final">
       <div className="w2-brk-final-card pointer-events-auto" style={{ ['--cc' as string]: col }}>
@@ -357,11 +363,11 @@ function Winner({
         </div>
         {rounds.length > 0 && (
           <div className="w2-brk-final-rounds">
-            {rounds.map((v, i) => {
+            {rounds.map(({ v, n }) => {
               const r: CrewId | null = v[0] === v[1] ? null : v[0] > v[1] ? 0 : 1;
               return (
-                <span key={i} style={{ background: r === null ? '#888' : s.crews[r].color }}>
-                  R{i + 1} {v[0]}–{v[1]}
+                <span key={`R${n}`} style={{ background: r === null ? '#888' : s.crews[r].color }}>
+                  R{n} {v[0]}–{v[1]}
                 </span>
               );
             })}
@@ -476,11 +482,11 @@ const CSS = `
 .w2-brk-combo b{font-size:clamp(28px,4.4vw,46px);line-height:.9;color:#ffd400;text-shadow:0 4px 0 #000}
 .w2-brk-combo span{font-size:12px;letter-spacing:.2em;background:#000;color:#fff;padding:1px 6px}
 .w2-brk-score{position:absolute;left:-4px;bottom:calc(100% + 6px);font-size:clamp(18px,2.6vw,26px);background:#000;color:#fff;padding:1px 10px;transform:rotate(-4deg);box-shadow:3px 3px 0 var(--cc,#ffd400)}
-.w2-brk-reveal{position:absolute;left:50%;top:16%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;width:min(560px,96vw);animation:w2bfade .35s ease-out}
+.w2-brk-reveal{position:absolute;left:50%;top:11%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;width:min(560px,96vw);animation:w2bfade .35s ease-out}
 @keyframes w2bfade{from{opacity:0}}
 .w2-brk-reveal-kick{background:#000;color:#ffd400;font-size:14px;letter-spacing:.3em;padding:2px 12px}
 .w2-brk-cards{display:flex;gap:clamp(8px,2vw,18px);perspective:600px}
-.w2-brk-card{width:clamp(78px,15vw,120px);height:clamp(96px,18vw,140px);background:var(--cc);border:5px solid #fff;box-shadow:6px 6px 0 #000;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;opacity:0;animation:w2bflip .55s cubic-bezier(.2,1.5,.4,1) forwards}
+.w2-brk-card{width:clamp(64px,11vw,96px);height:clamp(78px,13vw,112px);background:var(--cc);border:5px solid #fff;box-shadow:6px 6px 0 #000;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;opacity:0;animation:w2bflip .55s cubic-bezier(.2,1.5,.4,1) forwards}
 .w2-brk-card i{font-style:normal;font-size:12px;letter-spacing:.2em;background:#000;padding:0 6px}
 .w2-brk-card b{font-size:clamp(34px,6vw,54px);line-height:1;text-shadow:0 3px 0 #000}
 .w2-brk-card span{font-size:clamp(11px,1.7vw,15px);text-shadow:0 2px 0 #000;text-align:center;padding:0 4px}
@@ -517,5 +523,7 @@ const CSS = `
 .w2-brk-p-b{left:0;bottom:0;width:80px;height:80px;border-radius:50%;background:#2f8bff;color:#fff;font-size:32px}
 .w2-brk-touch .w2-brk-calls{top:30%}
 @media (max-width:640px){.w2-brk-top{top:6px}.w2-brk-calls{right:3%;top:22%}.w2-brk-reveal{top:13%}}
+/* Narrow phones: the d-pad and A/B have to share 360-400 px */
+@media (max-width:440px){.w2-brk-dpad{left:8px;bottom:12px;width:162px;height:162px}.w2-brk-p-up,.w2-brk-p-down{left:54px;width:54px;height:54px}.w2-brk-p-left,.w2-brk-p-right{top:54px;width:54px;height:54px}.w2-brk-ab{right:8px;width:168px;height:140px}.w2-brk-p-a{width:86px;height:86px}.w2-brk-p-b{width:66px;height:66px;bottom:2px}.w2-brk-touch{--pad-h:140px}}
 @media (pointer:coarse){.w2-brk-top{top:46px}}
 `;

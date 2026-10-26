@@ -192,6 +192,11 @@ export interface SimState {
   combo: number;
   /** Next keys the dancer up should hit (for the HUD's beat track). */
   prompts: { key: BreakKey; beat: number }[];
+  /**
+   * (Added by sim/.) Whose prompts those are: the dancer up, or during the
+   * intro / between the next dancer, so the beat track can lead in.
+   */
+  promptsFor?: string;
   /** Totals per crew so far, and the judges' card per round. */
   totals: [number, number];
   cards: JudgeCard[];

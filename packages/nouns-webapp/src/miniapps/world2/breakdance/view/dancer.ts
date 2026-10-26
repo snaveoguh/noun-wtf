@@ -176,7 +176,6 @@ export class DancerView {
       const ph = ((((f.beat + (hashStr(this.id) % 4)) / 4) % 1) + 1) % 1;
       this.ch.play({ clip: 'dance', fade: 0.3, time: ph * 2, timeScale: 0 });
     }
-    void spb;
     this.ch.update(dt, { lean: 0, travelled: 0, riding: false });
 
     // ── the move ──

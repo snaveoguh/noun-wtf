@@ -47,6 +47,11 @@ export interface BreakHudState {
   localId: string | null;
   /** The dancer up. */
   up: { id: string; name: string; crew: CrewId; local: boolean } | null;
+  /**
+   * Whose prompts the beat track shows: the dancer up, or (lead-in, when the
+   * sim says so with SimState.promptsFor) the next one, before their turn.
+   */
+  track: { id: string; crew: CrewId; local: boolean } | null;
   combo: number;
   turnScore: number;
   calls: MoveCall[];
@@ -115,6 +120,7 @@ export function initialHud(): BreakHudState {
     ],
     localId: null,
     up: null,
+    track: null,
     combo: 0,
     turnScore: 0,
     calls: [],

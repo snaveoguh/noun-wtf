@@ -14,6 +14,16 @@
 //
 // The view keeps its own beat clock phase-locked to the sim's (clock.ts),
 // so animation and music stay on the beat between snapshots.
+//
+// For net/:
+//   const view = createBattleView(game);           // a BattleView (+ .hud, .startAudio)
+//   view.mount(config, { x, y, z, yaw });           // cypher −z (judges) faces `yaw + π`
+//   view.setLocal(myId);
+//   each frame: view.update(dt, sim.state(), events);
+//   <BreakHud hud={view.hud} onKey={k => …} onGesture={() => view.startAudio()} />
+//   view.unmount();                                 // puts the camera back as it was
+// The cypher needs ~15 m of flat floor (crowd ring r ≈ 6.5 m, light poles at the corners).
+// While mounted the view writes the game camera every update; hide the skate HUD around it.
 
 import type { Game } from '../../Game';
 import type {
@@ -37,7 +47,14 @@ import { BeatClock } from './clock';
 import { Crowd } from './crowd';
 import { centreYaw, CypherDressing, edgeSpot } from './cypher';
 import { DancerView } from './dancer';
-import { BreakHudStore, CREW_COLORS, CREW_NAMES, initialHud, type CrewInfo } from './hudStore';
+import {
+  BreakHudStore,
+  CREW_COLORS,
+  CREW_NAMES,
+  initialHud,
+  type BreakHudState,
+  type CrewInfo,
+} from './hudStore';
 import { moveFamily, moveInfo, moveName } from './moves';
 
 export { BreakHud, type BreakHudProps } from './BreakHud';
@@ -247,6 +264,7 @@ export class BreakView implements BattleView {
         combo: state.combo,
         turnScore: state.turnScore,
         crews: this.crewInfo(state.totals, state),
+        track: this.trackOwner(state),
         up:
           upCfg !== undefined
             ? {
@@ -322,6 +340,14 @@ export class BreakView implements BattleView {
         })),
     });
     return [mk(0), mk(1)];
+  }
+
+  /** Whose notes are on the beat track: SimState.promptsFor, else the dancer up. */
+  private trackOwner(state: SimState): BreakHudState['track'] {
+    const id = state.promptsFor ?? state.turn?.id;
+    if (id === undefined || state.prompts.length === 0) return null;
+    const d = this.config?.dancers.find(x => x.id === id);
+    return d !== undefined ? { id, crew: d.crew, local: id === this.localId } : null;
   }
 
   private nameOf(id: string) {
@@ -500,19 +526,15 @@ export class BreakView implements BattleView {
         shot = 'wide';
     }
     const focus = _v.set(0, 1, 0);
-    let facing = 0;
     if (subject !== undefined) {
       subject.driver.hipsAt(_w);
       subject.root.updateMatrix();
       _w.applyMatrix4(subject.root.matrix);
       focus.copy(_w);
-      facing = subject.root.rotation.y;
-      const e = new THREE.Euler().setFromQuaternion(subject.root.quaternion, 'YXZ');
-      facing = e.y;
     }
     this.cam.update(
       dt,
-      { shot, focus, facing, beat, calm: up !== undefined && up.id === this.localId },
+      { shot, focus, beat, calm: up !== undefined && up.id === this.localId },
       g.matrixWorld,
     );
   }

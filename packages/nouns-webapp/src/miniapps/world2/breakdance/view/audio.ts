@@ -51,6 +51,8 @@ export class BreakAudio {
   private anchor: number | null = null;
   private bpm = 100;
   private next = 0;
+  /** Audio time of the last step scheduled. */
+  private lastWhen = -Infinity;
   private mode: MusicMode = 'off';
   /** Kick hits scheduled (audio time), so the view can pump the speakers when they sound. */
   readonly kicks: number[] = [];
@@ -176,13 +178,19 @@ export class BreakAudio {
       this.anchor = a;
       this.bpm = bpm;
       this.next = Math.ceil((now - a) / step);
+      // Steps already queued in the lookahead keep their slot: never play one twice
+      let g = 0;
+      while (stepTime(a, 0, this.next, spb) <= this.lastWhen + 0.01 && g++ < 64) this.next++;
     } else this.anchor += (a - this.anchor) * 0.02;
     // Steps from `next` up to the lookahead
     let guard = 0;
     while (guard++ < 64) {
       const when = stepTime(this.anchor, 0, this.next, spb);
       if (when > now + 0.12) break;
-      if (when >= now - 0.01) this.playStep(this.next, Math.max(when, now));
+      if (when >= now - 0.01) {
+        this.playStep(this.next, Math.max(when, now));
+        this.lastWhen = when;
+      }
       this.next++;
     }
     while (this.kicks.length > 0 && this.kicks[0] < now - 0.5) this.kicks.shift();

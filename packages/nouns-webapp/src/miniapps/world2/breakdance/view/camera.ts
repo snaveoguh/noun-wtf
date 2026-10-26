@@ -16,11 +16,18 @@ export interface ShotFrame {
   shot: ShotKind;
   /** Subject (cypher space): the dancer's hips (its height frames the shot), the winner. */
   focus: THREE.Vector3;
-  /** Which way the subject faces (yaw), to keep faces in shot. */
-  facing: number;
   beat: number;
   /** Slower orbit (the local player is dancing and needs to read their Noun). */
   calm: boolean;
+}
+
+/**
+ * Close shots orbit on the judges' side of the circle (−z, looking at the DJ
+ * booth), sweeping ±`span` rad: the crews wait at x = ±3.8 m, right on a
+ * close orbit's radius, so the camera never swings round through them.
+ */
+export function closeAngle(orbit: number, span: number) {
+  return Math.PI + Math.sin(orbit) * span;
 }
 
 /** Orbit position for a shot (cypher space). Pure, for tests. */
@@ -34,14 +41,15 @@ export function shotPose(
     case 'intro': {
       // High crane, swinging round the whole cypher
       const a = orbit * 0.6 + 0.6;
-      out.pos.set(Math.sin(a) * 9.5, 5.2, Math.cos(a) * 9.5);
+      // (high enough to clear the light poles and the crowd's heads)
+      out.pos.set(Math.sin(a) * 9.5, 6.6, Math.cos(a) * 9.5);
       out.look.set(0, 0.9, 0);
       out.fov = 46;
       break;
     }
     case 'wide': {
       const a = orbit * 0.4 + 2.2;
-      out.pos.set(Math.sin(a) * 10.5, 4.4, Math.cos(a) * 10.5);
+      out.pos.set(Math.sin(a) * 10.5, 6.2, Math.cos(a) * 10.5);
       out.look.set(0, 1.1, 0);
       out.fov = 48;
       break;
@@ -53,7 +61,7 @@ export function shotPose(
       break;
     }
     case 'winner': {
-      const a = f.facing + Math.sin(orbit * 0.5) * 0.9;
+      const a = closeAngle(orbit * 0.5, 0.8);
       out.pos.set(fc.x + Math.sin(a) * 4.4, 1.6, fc.z + Math.cos(a) * 4.4);
       out.look.set(fc.x, 1.0 + 0.4 * fc.y, fc.z);
       out.fov = 44;
@@ -61,7 +69,7 @@ export function shotPose(
     }
     case 'punch': {
       // Low and tight on the floor work
-      const a = f.facing + 0.7 + orbit;
+      const a = closeAngle(orbit * 1.3 + 0.6, 0.7);
       out.pos.set(fc.x + Math.sin(a) * 4.1, 0.95 + 0.35 * fc.y, fc.z + Math.cos(a) * 4.1);
       out.look.set(fc.x, 0.45 + 0.6 * fc.y, fc.z);
       out.fov = 46;
@@ -69,7 +77,7 @@ export function shotPose(
     }
     default: {
       // Three-quarter on the dancer, slowly orbiting
-      const a = f.facing + 0.55 + orbit;
+      const a = closeAngle(orbit, 0.9);
       out.pos.set(fc.x + Math.sin(a) * 5.2, 1.55 + 0.35 * fc.y, fc.z + Math.cos(a) * 5.2);
       out.look.set(fc.x, 0.75 + 0.6 * fc.y, fc.z);
       out.fov = 44;

@@ -178,6 +178,8 @@ export class MockBattle implements BattleSim {
   private lastGrade: { id: string; grade: HitGrade; at: number } | null = null;
   private moveMiss = 0;
   private held: { move: MoveId; start: number } | null = null;
+  /** The next dancer whose notes lead in before their turn. */
+  private leadIn: string | null = null;
 
   constructor(o: MockOptions = {}) {
     this.config = mockConfig(o);
@@ -284,29 +286,18 @@ export class MockBattle implements BattleSim {
       this.crashed = false;
       this.moveMiss = 0;
       ev.push({ e: 'turn', id: seg.dancer, round: seg.round });
-      const r = ROUTINES[(seg.turn ?? 0) % ROUTINES.length];
-      this.routine = [];
-      let b = seg.from;
-      const len = seg.to - seg.from;
-      let i = 0;
-      while (b < seg.from + len) {
-        const [move, n] = r[i % r.length];
-        const nn = Math.min(n, seg.from + len - b);
-        this.routine.push({ move, from: b, n: nn });
-        b += nn;
-        i++;
-      }
-      this.prompts = [];
-      for (const m of this.routine) {
-        const fam = moveFamily(m.move) ?? 'toprock';
-        const p = PATTERNS[fam];
-        let j = 0;
-        for (let x = 0; x < m.n - 1e-6; x += p.step, j++) {
-          const key: BreakKey = m.move === 'get_up' ? 'up' : p.keys[j % p.keys.length];
-          this.prompts.push({ key, beat: m.from + x, judged: false });
-        }
+      this.buildTurn(seg);
+      this.leadIn = null;
+    }
+    // Intro / between: the next dancer's notes lead in on the track (SimState.promptsFor)
+    if (seg.phase === 'intro' || seg.phase === 'between') {
+      const next = this.segs.find(x => x.phase === 'turn' && x.from >= seg.to - 1e-6);
+      if (next !== undefined && next.dancer !== undefined) {
+        this.buildTurn(next);
+        this.leadIn = next.dancer;
       }
     }
+    if (seg.phase === 'judging' || seg.phase === 'final') this.leadIn = null;
     if (seg.phase === 'judging') {
       const card = this.makeCard();
       this.cards.push(card);
@@ -344,6 +335,31 @@ export class MockBattle implements BattleSim {
       return lead === 0 ? [hi, lo] : [lo, hi];
     };
     return { votes, technique: cat(), musicality: cat(), originality: cat(), power: cat() };
+  }
+
+  /** Lay out a turn's routine and its prompts. */
+  private buildTurn(seg: Segment) {
+    const r = ROUTINES[(seg.turn ?? 0) % ROUTINES.length];
+    this.routine = [];
+    let b = seg.from;
+    let i = 0;
+    while (b < seg.to) {
+      const [move, n] = r[i % r.length];
+      const nn = Math.min(n, seg.to - b);
+      this.routine.push({ move, from: b, n: nn });
+      b += nn;
+      i++;
+    }
+    this.prompts = [];
+    for (const m of this.routine) {
+      const fam = moveFamily(m.move) ?? 'toprock';
+      const p = PATTERNS[fam];
+      let j = 0;
+      for (let x = 0; x < m.n - 1e-6; x += p.step, j++) {
+        const key: BreakKey = m.move === 'get_up' ? 'up' : p.keys[j % p.keys.length];
+        this.prompts.push({ key, beat: m.from + x, judged: false });
+      }
+    }
   }
 
   private current(beat: number) {
@@ -511,12 +527,13 @@ export class MockBattle implements BattleSim {
       turnScore: this.turnScore,
       combo: this.combo,
       prompts:
-        up !== null || this.held !== null
+        up !== null || this.held !== null || this.leadIn !== null
           ? this.prompts
               .filter(p => !p.judged)
               .slice(0, 8)
               .map(p => ({ key: p.key, beat: p.beat }))
           : [],
+      promptsFor: this.held !== null ? (turn?.id ?? undefined) : (up ?? this.leadIn ?? undefined),
       totals: [...this.totals] as [number, number],
       cards: [...this.cards],
       winner: this.winner,

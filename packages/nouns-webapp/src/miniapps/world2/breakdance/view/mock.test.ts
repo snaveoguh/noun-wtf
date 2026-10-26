@@ -101,6 +101,16 @@ describe('mock battle', () => {
     expect(m.state().combo).toBe(0);
   });
 
+  it('leads the next dancer in: their notes are on the track before their turn', () => {
+    const m = createMockBattle({ crewSize: 1 });
+    m.step(0.5); // intro
+    const s = m.state();
+    expect(s.phase).toBe('intro');
+    expect(s.promptsFor).toBe(m.config.dancers[0].id);
+    expect(s.prompts.length).toBeGreaterThan(0);
+    expect(s.prompts[0].beat).toBeGreaterThanOrEqual(0);
+  });
+
   it('hold() pins a move in the middle', () => {
     const m = createMockBattle();
     m.step(0.5);
