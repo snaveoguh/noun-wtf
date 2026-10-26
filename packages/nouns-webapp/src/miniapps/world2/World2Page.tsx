@@ -579,7 +579,6 @@ function Hud({
             {hud.mountain.streak}s
           </div>
         )}
-        <RespectMeter respect={game.respect} />
       </HudDrag>
       <RespectBanner respect={game.respect} sfx={game.sfx} />
 
@@ -617,6 +616,7 @@ function Hud({
           </button>
           <SettingsCog game={game} />
         </div>
+        <RespectMeter respect={game.respect} />
         {!touch && (
           <div data-w2hud="fps" className="w2-chip text-[10px] opacity-60">
             {hud.fps} fps, {hud.quality}

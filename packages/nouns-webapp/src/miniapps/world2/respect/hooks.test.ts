@@ -3,8 +3,10 @@ import type { BuildingDoor } from '../interiors/contract';
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 
+import { PIXELS } from '../../../components/NounOS/home/introScene';
 import { createCombo, bankCombo, addTrick, bailCombo } from '../skate/Tricks';
 
+import { LEGEND_BADGE, nogglesSvg, tipBonus } from './effects';
 import {
   classifyTag,
   nearestWho,
@@ -185,5 +187,19 @@ describe('RespectHooks', () => {
       new THREE.Vector3(),
     );
     expect(g.voice.speak).not.toHaveBeenCalled();
+  });
+});
+
+describe('effects', () => {
+  it('tips a little more the better known you are (never the price)', () => {
+    expect(tipBonus(10, 'stranger')).toBe(10);
+    expect(tipBonus(10, 'legend')).toBe(12);
+    expect(tipBonus(10, 'outcast')).toBe(9);
+    expect(tipBonus(10, undefined)).toBe(10);
+  });
+
+  it('the legend badge is the canonical noggles, pixel for pixel', () => {
+    expect(nogglesSvg().match(/<rect /g)).toHaveLength(PIXELS.length);
+    expect(LEGEND_BADGE).toContain('data:image/svg+xml');
   });
 });

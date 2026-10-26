@@ -9,7 +9,10 @@
 import type { RespectEntry, RespectSystem } from './RespectSystem';
 import type { RespectTier } from '../interiors/contract';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+
+import { createPortal } from 'react-dom';
 
 import { NOGGLES_SRC } from './effects';
 import { RESPECT_CSS, TIER_COLOR } from './hudStyle';
@@ -78,13 +81,14 @@ function Line({ e }: { e: RespectEntry }) {
 export function RespectMeter({ respect }: { respect: RespectSystem }) {
   const s = useRespect(respect);
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   // The ticker: changes since the last render are in s.recent / notes
   const ticking = respect.ticker().length > 0;
   const now = useClock(ticking || open);
   const lines = respect.ticker(now);
   const color = TIER_COLOR[s.tier];
   return (
-    <div className="relative flex flex-col items-start gap-1" data-w2hud="respect">
+    <div ref={ref} className="relative flex flex-col items-end" data-w2hud="respect">
       <button
         type="button"
         className="w2-chip w2-respect pointer-events-auto"
@@ -93,7 +97,7 @@ export function RespectMeter({ respect }: { respect: RespectSystem }) {
         aria-expanded={open}
       >
         {s.tier === 'legend' && (
-          <img src={NOGGLES_SRC} alt="" width={18} height={9} className="w2-respect-nog" />
+          <img src={NOGGLES_SRC} alt="" width={18} height={7} className="w2-respect-nog" />
         )}
         <span className="w2-respect-tier" style={{ color }}>
           {TIER_NAME[s.tier]}
@@ -101,11 +105,46 @@ export function RespectMeter({ respect }: { respect: RespectSystem }) {
         <span className="w2-respect-bar" aria-hidden="true">
           <i style={{ width: `${Math.round(s.progress * 100)}%`, background: color }} />
         </span>
-        <span className="opacity-60">{Math.round(s.score)}</span>
+        <span className="w2-respect-score opacity-60">{Math.round(s.score)}</span>
       </button>
-      {!open && lines.map(e => <Line key={`${e.at}-${e.label}`} e={e} />)}
-      {open && <RespectPanel respect={respect} now={now} onClose={() => setOpen(false)} />}
+      {/* The ticker flies out to the meter's left, over the scene, so nothing reflows */}
+      {!open && lines.length > 0 && (
+        <div className="w2-respect-ticker">
+          {lines.map(e => (
+            <Line key={`${e.at}-${e.label}`} e={e} />
+          ))}
+        </div>
+      )}
+      {open && (
+        <PanelLayer anchor={ref.current}>
+          <RespectPanel respect={respect} now={now} onClose={() => setOpen(false)} />
+        </PanelLayer>
+      )}
     </div>
+  );
+}
+
+/**
+ * The panel is lifted out of the HUD column (a draggable block is its own
+ * stacking context, so later HUD pieces would paint over it) into the HUD
+ * root, placed under the meter.
+ */
+function PanelLayer({ anchor, children }: { anchor: HTMLElement | null; children: ReactNode }) {
+  // The draggable block (it sets `translate`) and the HUD root above it
+  let block: HTMLElement | null = anchor;
+  while (block !== null && block.style.translate === '') block = block.parentElement;
+  const root = block?.parentElement ?? null;
+  if (anchor === null || root === null) return <>{children}</>;
+  const a = anchor.getBoundingClientRect();
+  const r = root.getBoundingClientRect();
+  return createPortal(
+    <div
+      className="w2-respect-layer"
+      style={{ top: a.bottom - r.top + 6, right: Math.max(8, r.right - a.right) }}
+    >
+      {children}
+    </div>,
+    root,
   );
 }
 
@@ -224,7 +263,7 @@ export function RespectBanner({ respect, sfx }: { respect: RespectSystem; sfx?: 
       >
         <span>{shown.up ? 'RESPECT UP' : 'RESPECT DOWN'}</span>
         <b style={shown.up ? undefined : { color: TIER_COLOR[shown.to] }}>
-          {shown.to === 'legend' && <img src={NOGGLES_SRC} alt="" width={32} height={16} />}
+          {shown.to === 'legend' && <img src={NOGGLES_SRC} alt="" width={32} height={12} />}
           {TIER_NAME[shown.to]}
         </b>
       </div>
