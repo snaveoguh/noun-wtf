@@ -88,6 +88,8 @@ export interface RecordEvent {
   value: number;
   reason?: string;
   run: RideRun;
+  /** A gain too small to show (471.31 over 471.29): saved, but no card. */
+  quiet?: boolean;
 }
 
 /**
@@ -215,10 +217,11 @@ export const STAT_INFO: Record<
 };
 
 /**
- * A new best only when it beats the old one as shown (471.31 over 471.29 km/h
- * both read "471 km/h": not a record). Top speed lands on the same physics
- * cap run after run, so without this every run "set a record" again: the
- * card, the rider's "new record, baby" and another upload, all saying 471.
+ * Does a new best beat the old one as shown? (471.31 over 471.29 km/h both
+ * read "471 km/h".) Top speed lands on the same physics cap run after run,
+ * so every run used to "set a record" again: the card and the rider's "new
+ * record, baby", all saying 471. Such gains are still saved, to the
+ * hundredth, but quietly: no callout, no card.
  */
 export function beatsShown(k: BestKey, v: number, prev: number | undefined): boolean {
   if (!(v > (prev ?? 0))) return false;
@@ -374,6 +377,8 @@ interface Proof {
   runAt: number;
   /** Answers that neither took nor refused it. */
   tries: number;
+  /** Some raise in it beat the old best as shown (else saved quietly: no card). */
+  loud: boolean;
 }
 
 /** A pending proof as stored across a reload. */
@@ -394,6 +399,7 @@ interface SentClaim {
   samples: Float32Array;
   runId: string;
   runAt: number;
+  loud: boolean;
 }
 
 interface PostAnswer {
@@ -586,7 +592,8 @@ export class StatsTracker {
   }
 
   private raise(k: BestKey, v: number, src?: Float32Array, keep?: [number, number]) {
-    if (!beatsShown(k, v, this.mine.best[k])) return false;
+    if (!(v > (this.mine.best[k] ?? 0))) return false;
+    const loud = beatsShown(k, v, this.mine.best[k]);
     if (isProved(k)) {
       const trace = this.trace;
       if (trace === null) return false;
@@ -599,6 +606,7 @@ export class StatsTracker {
         runId: trace.id,
         runAt: trace.at,
         tries: 0,
+        loud: loud || (prev?.loud ?? false),
       });
       // Post soon, while the proof is fresh
       this.flushAcc = Math.max(this.flushAcc, 17);
@@ -606,7 +614,8 @@ export class StatsTracker {
     const prev = this.mine.best[k];
     this.mine.best[k] = v;
     this.dirty = true;
-    this.onRaise?.(k, v, prev);
+    // Saved to the hundredth, but only announced when the shown number goes up
+    if (loud) this.onRaise?.(k, v, prev);
     return true;
   }
 
@@ -773,7 +782,15 @@ export class StatsTracker {
           const p = this.proofs.get(k)!;
           if (v === undefined) continue;
           best[k] = v;
-          sent.push({ k, v, seq: p.seq, samples: pr.s, runId: p.runId, runAt: p.runAt });
+          sent.push({
+            k,
+            v,
+            seq: p.seq,
+            samples: pr.s,
+            runId: p.runId,
+            runAt: p.runAt,
+            loud: p.loud,
+          });
         }
       }
     }
@@ -894,6 +911,7 @@ export class StatsTracker {
       key: c.k,
       value: c.v,
       ...(reason !== undefined ? { reason } : {}),
+      ...(c.loud ? {} : { quiet: true }),
       run,
     });
   }
