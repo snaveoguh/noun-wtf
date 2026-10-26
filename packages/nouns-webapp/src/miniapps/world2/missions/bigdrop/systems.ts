@@ -5,4 +5,6 @@
 
 import type { PeakSystemFactory } from './contract';
 
-export const PEAK_SYSTEMS: PeakSystemFactory[] = [];
+import { createLoops } from './loops';
+
+export const PEAK_SYSTEMS: PeakSystemFactory[] = [createLoops];

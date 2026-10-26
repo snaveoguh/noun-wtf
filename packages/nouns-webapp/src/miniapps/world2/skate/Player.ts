@@ -304,6 +304,15 @@ export class Player {
     private rails: RailSet,
   ) {}
 
+  /**
+   * A system driving the rider for a while (the Big Drop's loops). Called
+   * at the top of every board physics step; when it returns true it has
+   * moved the rider itself (pos, vel, fwd, up, state) and this step's board
+   * physics (and the terrain rescue) are skipped; the streak, bounds and
+   * respawn checks still run. Its owner sets it back to null.
+   */
+  ride: ((dt: number) => boolean) | null = null;
+
   /** Bumped on every spawn / rescue, so the ride recorder can start afresh. */
   respawns = 0;
 
@@ -374,21 +383,24 @@ export class Player {
       return;
     }
 
-    switch (this.state) {
-      case 'ground':
-      case 'manual':
-        this.updateGround(dt, input, now);
-        break;
-      case 'air':
-        this.updateAir(dt, input, now);
-        break;
-      case 'grind':
-        this.updateGrind(dt, input, now);
-        break;
-      case 'bail':
-        this.updateBail(dt);
-        break;
-    }
+    // A set piece may be driving the rider (see `ride`)
+    const driven = this.ride !== null && this.ride(dt);
+    if (!driven)
+      switch (this.state) {
+        case 'ground':
+        case 'manual':
+          this.updateGround(dt, input, now);
+          break;
+        case 'air':
+          this.updateAir(dt, input, now);
+          break;
+        case 'grind':
+          this.updateGrind(dt, input, now);
+          break;
+        case 'bail':
+          this.updateBail(dt);
+          break;
+      }
 
     // Ride streak on the mountain (anything but a bail keeps it going).
     // Distance always counts; time only counts while actually riding fast,
@@ -406,7 +418,7 @@ export class Player {
     this.updateFlipVisual(dt);
 
     this.clampBounds();
-    this.terrainRescue();
+    if (!driven) this.terrainRescue();
     // Fell out of the world, or wedged in geometry mid-fall → respawn
     if (this.fellOut() || this.wedged(dt)) this.respawnSafe();
     if (input.respawnPressed) this.respawnHome();
