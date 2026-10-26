@@ -734,6 +734,8 @@ export class Game {
   private updateFm(dt: number) {
     const cam = this.gfx.camera;
     cam.getWorldDirection(this.fmFwd);
+    // One music player at a time: NOUN BEATS on keeps the van's screen down
+    this.fm.nearScreen = this.radio.mode !== 'beats';
     this.fm.update(dt, cam.position, this.fmFwd);
     // our radio on, or the van audible nearby: the site-wide NOUN FM holds
     claimAudio(
