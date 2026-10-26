@@ -20,7 +20,7 @@ import { myTag, voiceNet } from './audio/voice/booth/voiceSync';
 import { seedVoice } from './audio/voice/cast';
 import { RiderVoice } from './audio/voice/RiderVoice';
 import { TtsEngine } from './audio/voice/TtsEngine';
-import { hyped, RIDER_VOICE, ttsVoiceOf } from './audio/voice/ttsVoice';
+import { HOUSE_VOICE, hyped, RIDER_VOICE, ttsVoiceOf } from './audio/voice/ttsVoice';
 import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
 import { DeckSync } from './character/deckStore';
@@ -266,6 +266,7 @@ export class Game {
     realOn: () => this.realVoicesOn(),
     busy: () => this.cutscene.id !== null,
     own: this.voices.own,
+    house: () => (this.realVoicesOn() ? this.voices.house() : null),
     onSay: pick => {
       // Relay the event + line only (never audio): others play my clip or my TTS
       this.net.callout = [
@@ -1682,10 +1683,13 @@ export class Game {
     const seed = parseSeedKey(rp.seedKey) ?? randomSeed();
     const sv = seedVoice([seed.background, seed.body, seed.accessory, seed.head, seed.glasses]);
     this.voices.log.remoteFallbacks++;
+    // Everyone's default is the house voice; their seed voice until it's loaded
+    const house = this.voices.house();
     this.voice.speak({
       text: res.text,
       voice: sv,
-      tts: { ...hyped(ttsVoiceOf(sv)), gap: RIDER_VOICE.gap },
+      tts: house !== null ? HOUSE_VOICE : { ...hyped(ttsVoiceOf(sv)), gap: RIDER_VOICE.gap },
+      engine: house ?? undefined,
       gain: hear.gain,
       pan: hear.pan,
     });

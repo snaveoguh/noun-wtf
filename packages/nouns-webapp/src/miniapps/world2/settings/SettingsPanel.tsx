@@ -15,7 +15,7 @@ import { createPortal } from 'react-dom';
 import { voiceMutes } from '../audio/voice/booth/runtime';
 import { report as reportVoice } from '../audio/voice/booth/voiceSync';
 import { npcVoice } from '../audio/voice/cast';
-import { PIPER_MODEL_BYTES } from '../audio/voice/ttsVoice';
+import { HOUSE_MODEL_BYTES, PIPER_MODEL_BYTES } from '../audio/voice/ttsVoice';
 import VoiceBooth from '../booth/VoiceBooth';
 import { installState, subscribeInstall } from '../pwa/install';
 import { InstallButton } from '../pwa/InstallButton';
@@ -445,9 +445,9 @@ function VoiceStatus({ game }: { game: Game }) {
     text =
       game.voiceMode === 'off'
         ? 'Off: characters babble.'
-        : `Babble on this device. Pick "on" for real voices (${mb(PIPER_MODEL_BYTES)} download, once).`;
+        : `Babble on this device. Pick "on" for real voices (${mb(PIPER_MODEL_BYTES + HOUSE_MODEL_BYTES)} download, once).`;
   else if (st.state === 'idle')
-    text = `Real voices load the first time someone speaks (${mb(PIPER_MODEL_BYTES)}, once, then cached).`;
+    text = `Real voices load the first time someone speaks (${mb(PIPER_MODEL_BYTES + HOUSE_MODEL_BYTES)}, once, then cached).`;
   else if (st.state === 'loading')
     text =
       st.total > 0

@@ -110,6 +110,20 @@ export const MODEL_VOICE: TtsVoice = {
   rate: 1.04,
 };
 
+/**
+ * The house voice: the site owner's own trained Piper model (single speaker,
+ * 22.05 kHz, en-us), hosted with the site. Every rider speaks with it, yours
+ * and everyone else's, unless they recorded their lines or loaded their own
+ * model in the Voice Booth; the LibriTTS-R speaker above is the fallback if
+ * it can't load. Bump HOUSE_REV when the files are replaced (the TTS worker
+ * caches by URL).
+ */
+const HOUSE_REV = 1;
+export const HOUSE_MODEL_URL = `/world2/voices/house.onnx?v=${HOUSE_REV}`;
+export const HOUSE_CONFIG_URL = `/world2/voices/house.onnx.json?v=${HOUSE_REV}`;
+export const HOUSE_MODEL_BYTES = 63_516_051;
+export const HOUSE_VOICE: TtsVoice = MODEL_VOICE;
+
 /** The same voice, revved up (the rider shouting a callout). */
 export function hyped(t: TtsVoice, k = 1.06): TtsVoice {
   return { ...t, rate: Math.round(clamp(t.rate * k, 0.8, 1.35) * 1000) / 1000 };

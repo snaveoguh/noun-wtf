@@ -19,7 +19,7 @@ import type { ClipPlay, VoiceBox } from '../VoiceBox';
 
 import { settings } from '../../../settings/store';
 import { defaultWorker, TtsEngine } from '../TtsEngine';
-import { MODEL_VOICE } from '../ttsVoice';
+import { HOUSE_CONFIG_URL, HOUSE_MODEL_URL, MODEL_VOICE } from '../ttsVoice';
 
 import { bleep, CHAT_CLIP_MAX_S, chatSwears, type ClipMeta } from './clips';
 import { myVoice } from './myVoice';
@@ -75,6 +75,7 @@ export class PlayerVoices {
   private remote = new Map<string, Promise<AudioBuffer | null>>();
   private engine: TtsEngine | null = null;
   private engineFor = 0;
+  private houseEngine: TtsEngine | null = null;
 
   constructor(
     private ctx: () => AudioContext | null,
@@ -132,6 +133,23 @@ export class PlayerVoices {
       });
     }
     return this.engine.status.state === 'failed' ? null : this.engine;
+  }
+
+  /**
+   * The house voice (ttsVoice HOUSE_*): every rider's default. Starts loading
+   * on first ask; null until it's ready, or for good if it failed (callers
+   * then use the stock LibriTTS-R rider voice).
+   */
+  house(): TtsEngine | null {
+    this.houseEngine ??= new TtsEngine(defaultWorker, () => ({
+      t: 'init',
+      modelUrl: HOUSE_MODEL_URL,
+      configUrl: HOUSE_CONFIG_URL,
+    }));
+    const e = this.houseEngine;
+    if (e.status.state === 'failed') return null;
+    e.load();
+    return e.ready ? e : null;
   }
 
   /** Status of the own-model engine (booth / settings show it). */
@@ -242,5 +260,7 @@ export class PlayerVoices {
 
   dispose() {
     this.dropEngine();
+    this.houseEngine?.dispose();
+    this.houseEngine = null;
   }
 }
