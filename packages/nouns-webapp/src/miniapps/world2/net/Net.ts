@@ -15,6 +15,8 @@
 //       only, never audio; listeners play that rider's clip or their TTS
 //   cv  [tag, id, seq] their last chat line spoken in their own voice (an
 //       ephemeral clip on the world-voice function)
+// Respect (respect/): `rs: 'L'` only while the rider is a legend (the
+// noggles badge on their name tag; cosmetic, not checked by the server).
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -108,6 +110,8 @@ export interface RemotePlayer {
   lastSeen: number;
   /** Custom deck shared as `address:slot:savedAt` (board shop), '' = stock. */
   deck?: string;
+  /** Respect badge ('L' = legend), '' = none. */
+  respectBadge?: string;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -166,6 +170,8 @@ export class Net {
   callout: [number, number, number, number] | null = null;
   /** My last voiced chat line, relayed in the blob. */
   chatVoice: [string, string, number] | null = null;
+  /** My respect badge ('L' while a legend), relayed in the blob. */
+  respectBadge = '';
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
@@ -324,6 +330,7 @@ export class Net {
     if (rp.samples.length > 8) rp.samples.shift();
     rp.deck = typeof blob.dk === 'string' && SHARE_RE.test(blob.dk) ? blob.dk : '';
     rp.voiceTag = typeof blob.vo === 'string' && TAG_RE.test(blob.vo) ? blob.vo : '';
+    rp.respectBadge = blob.rs === 'L' ? 'L' : '';
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -406,6 +413,7 @@ export class Net {
       ...(this.voiceTag !== '' ? { vo: this.voiceTag } : {}),
       ...(this.callout !== null ? { co: this.callout } : {}),
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
+      ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

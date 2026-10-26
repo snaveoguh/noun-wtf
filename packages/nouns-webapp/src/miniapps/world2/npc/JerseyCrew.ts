@@ -456,6 +456,8 @@ export interface JerseyCrewOptions {
   labelLayer: HTMLElement;
   camera: THREE.Camera;
   canvas: HTMLCanvasElement;
+  /** A hangout member waved at the rider (respect/: they greet a legend). */
+  onWave?: (name: string, seed: NounSeed, at: THREE.Vector3) => void;
 }
 
 export class JerseyCrew {
@@ -747,6 +749,7 @@ export class JerseyCrew {
       if (!npc.waved) {
         npc.waved = true;
         npc.waveT = 2.6;
+        this.o.onWave?.(npc.name, npc.ch.seed, npc.pos);
       }
     } else if (dx * dx + dz * dz > 14 * 14) npc.waved = false;
     npc.waveT -= dt;

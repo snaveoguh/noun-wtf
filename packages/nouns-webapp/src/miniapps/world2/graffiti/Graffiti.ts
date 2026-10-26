@@ -334,6 +334,8 @@ export class Graffiti {
   group = new THREE.Group();
   cells = new Map<string, Cell>();
   spraying = false;
+  /** A stroke was finished on `plane`, ending at `at` (respect/hooks: homes vs walls). */
+  onStroke: ((plane: string, at: THREE.Vector3) => void) | null = null;
   /** Aim point for the HUD crosshair (null when nothing in range). */
   aim: { point: THREE.Vector3; normal: THREE.Vector3 } | null = null;
 
@@ -961,6 +963,7 @@ export class Graffiti {
     };
     const { out } = this.history.addStroke(l.cell.id, s);
     this.send(out);
+    this.onStroke?.(l.cell.plane, this.lastEnd.world);
     this.rememberColor(s.color);
     this.setTools({});
   }

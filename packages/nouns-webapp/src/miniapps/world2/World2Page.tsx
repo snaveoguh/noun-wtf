@@ -31,6 +31,7 @@ import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
 import { introAllowed, introEnabled } from './radio/FmSpots';
 import { FmSpotsUi } from './radio/FmSpotsUi';
 import { RecordsUi, useReplayActive } from './replay/RecordsUi';
+import { RespectBanner, RespectMeter } from './respect/RespectHud';
 import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
 import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
@@ -578,7 +579,9 @@ function Hud({
             {hud.mountain.streak}s
           </div>
         )}
+        <RespectMeter respect={game.respect} />
       </HudDrag>
+      <RespectBanner respect={game.respect} sfx={game.sfx} />
 
       {/* Top-centre: landmarks compass (no room for it on phones) */}
       <div
