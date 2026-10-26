@@ -5,38 +5,45 @@
 // the trade scheduler and its effects, bubbles, cameras and input, sound.
 // React only mounts it and draws the HUD from `onHud` (4 Hz).
 
-import type { LabelSpec } from './labels';
 import type { GoodId, Ticker } from '../../exchange/engine/types';
-import type {
-  Bubble,
-  alive,
-  BUBBLE_TTL,
-  fillText,
-  orderText,
-  pickBubbles,
-  type BubbleCand,
-} from '../sim/bubbles';
-import type { CamMode, Orbit } from '../sim/cameras';
-import type {
-  FeedMode,
-  FloorFrame,
-  FeedTracker,
-  fillKey,
-  refPrices,
-  SimFlow,
-  spreadDelays,
-  type PriceRef,
-} from '../sim/feed';
-import type { Budget } from '../sim/lod';
 
 import * as THREE from 'three';
 
 import { BOT_BY_ID, ROSTER } from '../../exchange/engine/bots/roster';
 import { GOOD_INFO } from '../../exchange/engine/goods';
-import { modeForKey, orbitEye, pan, preset, rotate, stepOrbit, zoom } from '../sim/cameras';
+import {
+  alive,
+  BUBBLE_TTL,
+  fillText,
+  orderText,
+  pickBubbles,
+  type Bubble,
+  type BubbleCand,
+} from '../sim/bubbles';
+import {
+  type CamMode,
+  type Orbit,
+  modeForKey,
+  orbitEye,
+  pan,
+  preset,
+  rotate,
+  stepOrbit,
+  zoom,
+} from '../sim/cameras';
 import { Crowd, type Trader } from '../sim/crowd';
+import {
+  FeedTracker,
+  fillKey,
+  refPrices,
+  SimFlow,
+  spreadDelays,
+  type FeedMode,
+  type FloorFrame,
+  type PriceRef,
+} from '../sim/feed';
 import { hallCopies, PIT_BY_GOOD, PIT_GOODS, PITS } from '../sim/layout';
-import { copyRings, pickRigs } from '../sim/lod';
+import { copyRings, pickRigs, type Budget } from '../sim/lod';
 import { hashStr, seedFromArray, seedFromId, type Seed } from '../sim/looks';
 import { TIMING, TradeScheduler, type FillJob, type TradeEvent } from '../sim/trades';
 import { FloorSource } from '../source';
@@ -45,7 +52,7 @@ import { FloorAudio } from './audio';
 import { ART, CrowdMesh, LOW } from './crowdMesh';
 import { Fx } from './fx';
 import { buildGround, buildHall, liteHallGeometry, liteHallMaterial, type HallParts } from './hall';
-import { Labels } from './labels';
+import { Labels, type LabelSpec } from './labels';
 import { RigPool, type RigAct } from './rigs';
 
 export interface FollowInfo {
@@ -87,6 +94,8 @@ export interface FloorSceneOpts {
   budget: Budget;
   phone: boolean;
   onHud: (h: HudState) => void;
+  /** 'descent': open looking straight down through the roof (arriving from the fountain). */
+  intro?: 'swoop' | 'descent';
 }
 
 /** Riders shown on the floor at once (older ones hand their slot on). */
@@ -231,8 +240,12 @@ export class FloorScene {
 
     const aspect = this.aspect();
     const ctx = { pit: PITS[0]!, follow: null, aspect, az: Math.PI * 0.8 };
-    // Open on the aerial and swoop down to the hall
-    this.cur = preset('vast', ctx);
+    // Open on the aerial and swoop down to the hall; from the fountain, drop
+    // in through the roof
+    this.cur =
+      o.intro === 'descent'
+        ? { tx: 0, ty: 0, tz: 0, r: 70, az: ctx.az, el: 1.5 }
+        : preset('vast', ctx);
     this.want = preset('wide', ctx);
 
     this.ro = new ResizeObserver(() => this.resize());

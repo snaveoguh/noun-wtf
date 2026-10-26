@@ -4,7 +4,6 @@
 // buttons, the followed trader's card, sound, and the way back to the flat
 // order book (as a side panel, or the whole flat view).
 
-import type { HudState } from '../render/FloorScene';
 import type { CamMode } from '../sim/cameras';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -12,7 +11,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { nounSvgDataUri } from '@/lib/marketplace/nouns-svg';
 
 import { isMobile, readDevice } from '../../world2/render/deviceTier';
-import { FloorScene } from '../render/FloorScene';
+import { FloorScene, type HudState } from '../render/FloorScene';
 import { budgetFor } from '../sim/lod';
 
 import './exchange3d.css';
@@ -53,7 +52,12 @@ export default function Exchange3D({
   bookOpen,
   onBook,
   children,
+  onExit,
+  intro,
 }: {
+  /** Under the fountain in Noun World: the way back up (button and Esc). */
+  onExit?: () => void;
+  intro?: 'descent';
   onFlat: () => void;
   bookOpen: boolean;
   onBook: (open: boolean) => void;
@@ -79,6 +83,7 @@ export default function Exchange3D({
         budget: budgetFor(phone, { traders: num(q, 'traders'), rigs: num(q, 'rigs') }),
         phone,
         onHud: setHud,
+        intro,
       });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'WebGL unavailable');
@@ -92,7 +97,21 @@ export default function Exchange3D({
       scene.dispose();
       sceneRef.current = null;
     };
-  }, [phone]);
+  }, [phone]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Esc climbs back out (unless it's stopping a follow first)
+  const followingRef = useRef(false);
+  followingRef.current = hud?.follow != null;
+  useEffect(() => {
+    if (onExit === undefined) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || followingRef.current) return;
+      e.preventDefault();
+      onExit();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onExit]);
 
   const s = sceneRef.current;
   const f = hud?.follow ?? null;
@@ -135,6 +154,11 @@ export default function Exchange3D({
       </header>
 
       <div className="gx3d-tools">
+        {onExit !== undefined && (
+          <button type="button" className="gx3d-btn gx3d-exit" onClick={onExit}>
+            ↑ PLAZA
+          </button>
+        )}
         <button
           type="button"
           className="gx3d-btn"

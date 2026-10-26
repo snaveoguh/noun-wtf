@@ -414,7 +414,9 @@
   background: #111813;
   border-bottom: 1px solid #223026;
   color: #ffcf4a;
-  font: 700 12px ui-monospace, monospace;
+  font:
+    700 12px ui-monospace,
+    monospace;
 }
 .gx3d-flat-bar {
   position: sticky;

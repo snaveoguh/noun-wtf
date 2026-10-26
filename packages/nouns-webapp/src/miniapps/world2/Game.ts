@@ -755,6 +755,12 @@ export class Game {
     this.gfx.resize(w, h);
   }
 
+  /**
+   * Overrides the gameplay camera just before the world renders (the Grand
+   * Exchange's descent through the Noggles Fountain, exchange3d/world/).
+   */
+  camHook: ((cam: THREE.PerspectiveCamera, dt: number) => void) | null = null;
+
   /** Backgrounded behind the NounOS desk: no sim, no render, no input. */
   paused = false;
 
@@ -920,6 +926,7 @@ export class Game {
       this.nature?.update(dt, this.player.pos);
       this.billboards.update(dt);
     }
+    this.camHook?.(this.gfx.camera, dt);
     this.gfx.render(dt);
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);

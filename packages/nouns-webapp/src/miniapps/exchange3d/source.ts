@@ -7,13 +7,10 @@
 //              plain vite dev server, or it's down): the engine runs here
 //              and the HUD says so. It retries the server now and then.
 
-import type { ExchangeSnapshot } from '../exchange/engine';
-import type { Floor3d, FloorFrame, FeedMode } from './sim/feed';
-
 import { LocalExchange, riderId } from '../exchange/client';
-import { botsPublic, tick, tickers } from '../exchange/engine';
+import { botsPublic, tick, tickers, type ExchangeSnapshot } from '../exchange/engine';
 
-import { maskOwner, publicFloor } from './sim/feed';
+import { maskOwner, publicFloor, type FeedMode, type Floor3d, type FloorFrame } from './sim/feed';
 
 const URL_ = '/.netlify/functions/world-exchange';
 const RETRY_LIVE_MS = 60_000;
