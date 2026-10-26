@@ -80,7 +80,7 @@ export const CARVE = {
   /** Powder pillows off the lane: height and the band they fill. */
   pillow: 1.1,
   /** Nothing reaches further than this past the lane edge. */
-  reach: 170,
+  reach: 130,
   /** Loop pads: lead-in / lead-out (× scale) and the least half-width. */
   padLead: 60,
   padHalf: 16,
@@ -722,7 +722,11 @@ const FEAT_MARGIN = 400;
 interface Chunk {
   data: Float64Array;
   feats: Feature[];
+  /** x range anything of the track reaches, per 64 m block of the chunk. */
+  lo: Float64Array;
+  hi: Float64Array;
 }
+const BLOCK = 64;
 const chunks = new Map<number, Chunk>();
 let lastKey = NaN;
 let lastChunk: Chunk | null = null;
@@ -743,7 +747,22 @@ function buildChunk(key: number): Chunk {
   const feats = featuresIn(s0 - FEAT_MARGIN, s0 + CHUNK + FEAT_MARGIN).filter(
     f => f.kind === 'kicker' || f.kind === 'berm' || f.kind === 'loop',
   );
-  return { data, feats };
+  const nb = CHUNK / BLOCK;
+  const lo = new Float64Array(nb).fill(Infinity);
+  const hi = new Float64Array(nb).fill(-Infinity);
+  for (let j = 0; j < NS; j++) {
+    const o = j * STRIDE;
+    // The weave's slope stretches lateral reach in x by up to √(1 + dcx²)
+    const r = (data[o + 2]! / 2 + CARVE.reach) * Math.sqrt(1 + data[o + 1]! ** 2) + 2 * SP;
+    // A sample on a block edge counts for both blocks
+    const b0 = Math.max(0, Math.ceil((j * SP) / BLOCK) - 1);
+    const b1 = Math.min(nb - 1, Math.floor((j * SP) / BLOCK));
+    for (let b = b0; b <= b1; b++) {
+      lo[b] = Math.min(lo[b]!, data[o]! - r);
+      hi[b] = Math.max(hi[b]!, data[o]! + r);
+    }
+  }
+  return { data, feats, lo, hi };
 }
 
 function chunkFor(key: number): Chunk {
@@ -760,6 +779,14 @@ function chunkFor(key: number): Chunk {
   lastKey = key;
   lastChunk = c;
   return c;
+}
+
+/** Whether anything of the track can reach x at track distance `s` (one compare, mostly). */
+export function lineNear(x: number, s: number): boolean {
+  const key = Math.floor(s / CHUNK);
+  const c = chunkFor(key);
+  const b = Math.min(CHUNK / BLOCK - 1, Math.floor((s - key * CHUNK) / BLOCK));
+  return x >= c.lo[b]! && x <= c.hi[b]!;
 }
 
 /** The line at track distance `s` off the cached table (cheap; fills `out`). */

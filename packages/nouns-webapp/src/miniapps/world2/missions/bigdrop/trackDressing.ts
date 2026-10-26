@@ -209,7 +209,7 @@ class TrackDressing implements PeakSystem {
   private lightPos: Float32Array;
   private lightCol: Float32Array;
   private gateGeo: THREE.BufferGeometry;
-  private gateMat: THREE.MeshStandardMaterial;
+  private gateMat: THREE.MeshBasicMaterial;
   private gates: Gate[] = [];
   private signs: Sign[] = [];
   private postGeo = new THREE.BoxGeometry(0.4, 1, 0.4).translate(0, 0.5, 0);
@@ -269,11 +269,8 @@ class TrackDressing implements PeakSystem {
     this.lights.frustumCulled = false;
     inkExcluded.add(this.lights);
     this.gateGeo = noggleGeometry();
-    this.gateMat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.55,
-      emissive: 0x2a0806,
-    });
+    // Unlit: the noggles read flat and true (#f3322c, white, black) in any light
+    this.gateMat = new THREE.MeshBasicMaterial({ vertexColors: true });
     for (let i = 0; i < GATES; i++) {
       const mesh = new THREE.Mesh(this.gateGeo, this.gateMat);
       mesh.visible = false;

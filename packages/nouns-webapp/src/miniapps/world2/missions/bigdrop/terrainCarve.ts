@@ -5,7 +5,7 @@
 // table read), near it the carving's height relative to the bare cone:
 //
 //   lane     groomed, 0.6 m sunk, no moguls, soft 12 m shoulders
-//   powder   rolling pillows either side, fullest along cruise sections
+//   powder   rolling pillows either side of the cruise sections
 //   gully    a halfpipe 48 m lip to lip: a floor 9 m down, 13–20 m walls
 //   berms    the outside of every slalom turn banked up 4–9 m
 //   kickers  kickerShape (track.ts): a ramp, a lip, a long landing
@@ -19,7 +19,16 @@ import type { LineSample } from './track';
 
 import { smoothstep, vnoise } from '../../world/mountain/config';
 
-import { CARVE, kickerProfile, kickerShape, lineAt, loopBase, TRACK, X_BAND } from './track';
+import {
+  CARVE,
+  kickerProfile,
+  kickerShape,
+  lineAt,
+  lineNear,
+  loopBase,
+  TRACK,
+  X_BAND,
+} from './track';
 
 /** Side outputs of the last trackCarve call. */
 export const CARVED = {
@@ -33,13 +42,18 @@ export const CARVED = {
 const PILLOW_SEED = 0x70696c;
 const ln: LineSample = { cx: 0, dcx: 0, w: 0, gully: 0, cruise: 0, feats: [] };
 
+/** The powder pillows' noise at (x, z), −1..1: long along the fall line, rolling across it. */
+export function pillowAt(x: number, z: number): number {
+  return vnoise(x / 14, z / 45, PILLOW_SEED);
+}
+
 /**
  * The track's carving at (x, z) (peak coordinates) in m relative to the
  * bare cone (whose height there is `cone`), or NaN where the track doesn't
  * reach. Sets CARVED.
  */
 export function trackCarve(x: number, z: number, cone: number): number {
-  if (x > X_BAND || x < -X_BAND || z < TRACK.start || z > TRACK.end) return NaN;
+  if (x > X_BAND || x < -X_BAND || z < TRACK.start || z > TRACK.end || !lineNear(x, z)) return NaN;
   lineAt(z, ln);
   const lat = (x - ln.cx) / Math.sqrt(1 + ln.dcx * ln.dcx);
   const a = lat < 0 ? -lat : lat;
@@ -53,12 +67,12 @@ export function trackCarve(x: number, z: number, cone: number): number {
   // steepen the shoulder past what's rideable)
   let keep = smoothstep(half, half + CARVE.detailFade, a);
   // Powder pillows: long along the fall line, rolling across it
-  if (a > half + 2) {
+  if (a > half + 2 && ln.cruise > 0.01) {
     const band =
-      (0.12 + 0.88 * ln.cruise) *
+      ln.cruise *
       smoothstep(half + 2, half + 22, a) *
-      (1 - smoothstep(half + 100, half + CARVE.reach, a));
-    if (band > 0) off += band * CARVE.pillow * vnoise(x / 14, z / 45, PILLOW_SEED);
+      (1 - smoothstep(half + 70, half + CARVE.reach, a));
+    if (band > 0) off += band * CARVE.pillow * pillowAt(x, z);
   }
   // The gully's halfpipe
   if (ln.gully > 0) {

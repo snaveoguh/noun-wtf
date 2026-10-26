@@ -16,15 +16,16 @@ import * as THREE from 'three';
 
 import { smoothstep } from '../../world/mountain/config';
 
-import { CARVE, kickerShape, lineAt, TRACK, X_BAND } from './track';
+import { pillowAt } from './terrainCarve';
+import { CARVE, kickerShape, lineAt, lineNear, TRACK, X_BAND } from './track';
 
 const SNOW_LIT = new THREE.Color(0xf7fbff);
 const SNOW_SHADE = new THREE.Color(0xd6e2f0);
 const ROCK = new THREE.Color(0x8d97a6);
 const POWDER = new THREE.Color(0xffffff);
-const GROOMED = new THREE.Color(0xeef1f6);
+const GROOMED = new THREE.Color(0xcfd8e4);
 const ICE = new THREE.Color(0xa8c8ec);
-const DYE_BLUE = new THREE.Color(0x1f5fd6);
+const DYE_BLUE = new THREE.Color(0x1848c8);
 const DYE_RED = new THREE.Color(0xf3322c);
 
 const ln: LineSample = { cx: 0, dcx: 0, w: 0, gully: 0, cruise: 0, feats: [] };
@@ -41,11 +42,11 @@ export function setSnowViewer(x: number, z: number) {
 export function snowColor(x: number, z: number, ny: number, out: THREE.Color): THREE.Color {
   // Fresh snow on the gentler bits, bluer on the steep
   out.copy(SNOW_SHADE).lerp(SNOW_LIT, Math.min(1, Math.max(0, (ny - 0.6) / 0.25)));
-  const onTrack = x < X_BAND && x > -X_BAND && z > TRACK.start && z < TRACK.end;
+  const onTrack = x < X_BAND && x > -X_BAND && z > TRACK.start && z < TRACK.end && lineNear(x, z);
   if (!onTrack) {
-    // Rock where it's steepest
-    if (ny < 0.62) out.lerp(ROCK, Math.min(1, (0.62 - ny) / 0.05) * 0.6);
-    return out;
+    // Rock where it's steepest, powder everywhere else
+    if (ny < 0.62) return out.lerp(ROCK, Math.min(1, (0.62 - ny) / 0.05) * 0.6);
+    return out.lerp(POWDER, 0.55 * smoothstep(0.55, 0.8, ny));
   }
   lineAt(z, ln);
   const lat = (x - ln.cx) / Math.sqrt(1 + ln.dcx * ln.dcx);
@@ -62,22 +63,29 @@ export function snowColor(x: number, z: number, ny: number, out: THREE.Color): T
   const vd = viewer.x === viewer.x ? Math.hypot(x - viewer.x, z - viewer.z) : 0;
   const spacing = 1.5 + 0.09 * vd;
   if (a < half) {
-    out.lerp(GROOMED, 0.5);
+    out.lerp(GROOMED, 0.7);
     // Corduroy along the line, only where the grid can draw it
     if (spacing < 2.4) {
       const stripe = Math.cos((2 * Math.PI * lat) / 4.5);
-      const k = 1 - 0.045 * stripe * (1 - spacing / 2.4);
+      const k = 1 - 0.07 * stripe * (1 - spacing / 2.4);
       out.r *= k;
       out.g *= k;
       out.b *= k * 0.995;
     }
-  } else out.lerp(POWDER, 0.4 * smoothstep(half, half + CARVE.shoulder + 30, a));
+  } else {
+    out.lerp(POWDER, 0.55 * smoothstep(half, half + CARVE.shoulder + 30, a));
+    // Powder pillows: blue in the hollows (the same noise terrainCarve raises them by)
+    if (ln.cruise > 0.01 && a > half + 2) {
+      const p = pillowAt(x, z);
+      if (p < 0) out.lerp(SNOW_SHADE, -0.5 * p * ln.cruise);
+    }
+  }
   // Blue dye down both edges
   if (vd < 4000) {
-    const lw = Math.max(0.9, 0.55 * spacing);
+    const lw = Math.min(half * 0.15, Math.max(0.8, 0.4 * spacing));
     const d = a > half ? a - half : half - a;
     if (d < 2 * lw)
-      out.lerp(DYE_BLUE, 0.85 * (1 - smoothstep(lw, 2 * lw, d)) * (1 - smoothstep(2000, 4000, vd)));
+      out.lerp(DYE_BLUE, 0.95 * (1 - smoothstep(lw, 2 * lw, d)) * (1 - smoothstep(2000, 4000, vd)));
   }
   // Red dye across every kicker lip
   const feats = ln.feats;
@@ -87,6 +95,8 @@ export function snowColor(x: number, z: number, ny: number, out: THREE.Color): T
     const u = z - f.s;
     if (u < 0 || u > f.len) continue;
     const k = kickerShape(f)!;
+    // The ramp is icy blue, deepening up to the lip, so kickers read from afar
+    if (u < k.lip && a < k.halfW + 4) out.lerp(ICE, 0.45 * (u / k.lip) * (a < k.halfW ? 1 : 0.5));
     const lw = Math.max(1.2, 0.55 * spacing);
     const d = Math.abs(u - (k.lip - lw));
     if (d < lw * 1.5 && a < k.halfW)
