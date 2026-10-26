@@ -5,4 +5,8 @@
 
 import type { PeakSystemFactory } from './contract';
 
-export const PEAK_SYSTEMS: PeakSystemFactory[] = [];
+import { makeAtmosphere } from './scenery/atmosphere';
+import { makeBirds } from './scenery/birds';
+import { makeForest } from './scenery/forest';
+
+export const PEAK_SYSTEMS: PeakSystemFactory[] = [makeAtmosphere, makeForest, makeBirds];
