@@ -84,8 +84,17 @@ export const CARVE = {
   /** Loop pads: lead-in / lead-out (× scale) and the least half-width. */
   padLead: 60,
   padHalf: 16,
-  /** Kickers: the angle the lip breaks over (lip + back face, rad). */
-  kink: (25 * Math.PI) / 180,
+  /**
+   * Kickers' lips (see KickerShape): the last `tipLen` m kick up `tipAngle`
+   * steeper than the ramp, then the snow drops away at `backAngle` past the
+   * fall line for `backLen` m. The board only leaves a surface whose normal
+   * turns > 21.6° from its own at once, and it reads normals over ±0.5 m,
+   * so a plain 25° edge smears out and the board rolls over it.
+   */
+  tipLen: 1.2,
+  tipAngle: (14 * Math.PI) / 180,
+  backAngle: (24 * Math.PI) / 180,
+  backLen: 1.0,
 } as const;
 
 /** |x| past which nothing of the track reaches (the line stays well inside). */
@@ -260,40 +269,55 @@ function rawCenter(s: number): number {
   return free * (wander + weave);
 }
 
-/** Loop pads: the chord the line is pulled straight onto, per loop section. */
-interface PadChord {
+/**
+ * Where the line is pulled dead straight: over each loop's pad, and over
+ * each kicker from its run-in to the end of its back face (so the ramp is
+ * square to the line and a rider who doesn't steer stays on it).
+ */
+interface Chord {
   a: number;
   b: number;
   xa: number;
   xb: number;
+  /** Fully straight between s and e, eased in from a and out to b. */
   s: number;
   e: number;
 }
-const chords = new Map<number, PadChord>();
+const chords = new Map<number, Chord[]>();
 
-function padChord(i: number): PadChord | null {
-  const c = SEC[i]!;
-  if (c.kind !== 'loop') return null;
+function chordsOf(i: number): Chord[] {
   const hit = chords.get(i);
   if (hit !== undefined) return hit;
-  const f = loopFeatureOf(i);
-  const lead = 120 * c.scale;
-  const a = f.s - lead;
-  const b = f.s + f.len + lead;
-  const ch = { a, b, xa: rawCenter(a), xb: rawCenter(b), s: f.s, e: f.s + f.len };
-  chords.set(i, ch);
-  return ch;
+  const c = SEC[i]!;
+  const out: Chord[] = [];
+  const add = (a: number, s: number, e: number, b: number) =>
+    out.push({ a, b, xa: rawCenter(a), xb: rawCenter(b), s, e });
+  if (c.kind === 'loop') {
+    const f = loopFeatureOf(i);
+    const lead = 120 * c.scale;
+    add(f.s - lead, f.s, f.s + f.len, f.s + f.len + lead);
+  } else if (c.kind === 'jumps') {
+    for (const f of sectionFeatures(i))
+      if (f.kind === 'kicker')
+        add(f.s - 260 * c.scale, f.s - 60 * c.scale, f.s + f.len, f.s + f.len + 150 * c.scale);
+  }
+  chords.set(i, out);
+  return out;
 }
 
 /** Centre line x at track distance `s` (peak coordinates). */
 export function centerX(s: number): number {
   const raw = rawCenter(s);
-  const ch = padChord(sectionIndexAt(s));
-  if (ch === null || s <= ch.a || s >= ch.b) return raw;
-  // Dead straight over the loop's pad, eased in and out
-  const w = smoothstep(ch.a, ch.s, s) * (1 - smoothstep(ch.e, ch.b, s));
-  const chord = ch.xa + ((ch.xb - ch.xa) * (s - ch.a)) / (ch.b - ch.a);
-  return raw + (chord - raw) * w;
+  const list = chordsOf(sectionIndexAt(s));
+  for (let k = 0; k < list.length; k++) {
+    const ch = list[k]!;
+    if (s <= ch.a || s >= ch.b) continue;
+    // Dead straight, eased in and out
+    const w = smoothstep(ch.a, ch.s, s) * (1 - smoothstep(ch.e, ch.b, s));
+    const chord = ch.xa + ((ch.xb - ch.xa) * (s - ch.a)) / (ch.b - ch.a);
+    return raw + (chord - raw) * w;
+  }
+  return raw;
 }
 
 function widthOf(c: TrackSection): number {
@@ -358,12 +382,18 @@ export function nearestTrack(
  * metres above the bare cone, slopes are dh/dz relative to the cone's):
  *
  *   [0, lt)        transition: the slope bends up from the cone's to the lip's
- *   [lt, lip)      straight ramp at `alpha` above the fall line
- *   lip            the lip, `h` m up: the surface breaks over by `kink`, so
- *                  the board leaves it at any speed (Player: a normal that
- *                  turns > 21.6° away from the board at once launches it)
- *   [lip, +lb1)    a short steep back face, `beta` steeper than the cone
+ *   [lt, lip−tip)  straight ramp at `alpha` above the fall line
+ *   [lip−tip, lip) the tip: 1.2 m kicking up 14° more
+ *   lip            `h` m up: the snow breaks over by ~40°, so the board
+ *                  leaves it at any speed (Player: a normal that turns
+ *                  > 21.6° away from the board at once launches it; it reads
+ *                  normals over ±0.5 m, which a gentler edge smears out)
+ *   [lip, +lb1)    a 1 m steep back face, `beta` (24°) steeper than the cone
  *   [.., end)      a long landing back face 2° steeper than the cone
+ *
+ * terrainCarve.test.ts rides the ramp with the board's own ground-follow
+ * rules and flies the air: it takes off at ~alpha at 0.5–1.3× the design
+ * speed and lands clean on a downslope.
  *
  * The air lands back on the fall line itself.
  */
@@ -371,7 +401,11 @@ export interface KickerShape {
   /** Track distance (peak z) of the ramp's foot. */
   s: number;
   lt: number;
+  /** Straight ramp, including the tip. */
   ls: number;
+  /** The tip: its length (m of z) and relative slope. */
+  tip: number;
+  pt: number;
   lb1: number;
   lb2: number;
   /** Relative slopes (dh/dz) of the ramp, the steep and the landing back faces. */
@@ -402,7 +436,9 @@ const kickers = new Map<string, KickerShape>();
 export function kickerProfile(k: KickerShape, u: number): number {
   if (u <= 0 || u >= k.end) return 0;
   if (u < k.lt) return (k.p * u * u) / (2 * k.lt);
-  if (u < k.lip) return k.p * (k.lt / 2 + (u - k.lt));
+  const tip0 = k.lip - k.tip;
+  if (u < tip0) return k.p * (k.lt / 2 + (u - k.lt));
+  if (u < k.lip) return k.p * (k.lt / 2 + (tip0 - k.lt)) + k.pt * (u - tip0);
   const b = u - k.lip;
   if (b < k.lb1) return k.h - k.pb1 * b;
   return Math.max(0, k.h - k.pb1 * k.lb1 - k.pb2 * (b - k.lb1));
@@ -421,7 +457,7 @@ function designKicker(s: number, size: number, rnd: number, laneHalf: number): K
     22 * DEG,
     Math.max(1.5 * DEG, Math.asin(Math.min(1, (hang * G_NORMAL) / (2 * v)))),
   );
-  const beta = Math.min(23.5 * DEG, Math.max(3 * DEG, CARVE.kink - alpha));
+  const beta = CARVE.backAngle;
   const p = G - Math.tan(th - alpha);
   const pb1 = Math.tan(th + beta) - G;
   const pb2 = Math.tan(th + 2 * DEG) - G;
@@ -430,8 +466,10 @@ function designKicker(s: number, size: number, rnd: number, laneHalf: number): K
   // the surface by ~45 ms) before the lip
   const lt = Math.max(want / p, v * 0.25, 12);
   const ls = Math.max(lt / 2, v * 0.12, 6);
-  const h = p * (lt / 2 + ls);
-  const lb1 = Math.min(1.5, h / pb1);
+  const tip = CARVE.tipLen;
+  const pt = G - Math.tan(th - alpha - CARVE.tipAngle);
+  const h = p * (lt / 2 + ls - tip) + pt * tip;
+  const lb1 = Math.min(CARVE.backLen, h / pb1);
   const lb2 = Math.max(0, (h - pb1 * lb1) / pb2);
   const lip = lt + ls;
   const end = lip + lb1 + lb2;
@@ -441,6 +479,8 @@ function designKicker(s: number, size: number, rnd: number, laneHalf: number): K
     s,
     lt,
     ls,
+    tip,
+    pt,
     lb1,
     lb2,
     p,
@@ -449,7 +489,7 @@ function designKicker(s: number, size: number, rnd: number, laneHalf: number): K
     h,
     lip,
     end,
-    halfW: Math.max(8, Math.min(laneHalf - 4, 14)),
+    halfW: Math.max(10, laneHalf - 3),
     shoulder: Math.max(12, 3 * h),
     alpha,
     beta,
@@ -600,7 +640,10 @@ export function sectionFeatures(index: number): Feature[] {
     for (let k = 0; k < 6; k++) {
       const size = 6 + Math.floor(rand(index, 10 + k) * 5);
       const shape = designKicker(s, size, rand(index, 30 + k), widthAt(s) / 2);
-      if (k > 0 && s + shape.end > sec.s1 - sec.r1) break;
+      // Even 30% faster than it's built for, the air comes down on
+      // this section's own fall line (flights grow with the speed squared)
+      const far = s + shape.lip + 1.75 * (shape.landAt - s - shape.lip);
+      if (k > 0 && far > sec.s1 - sec.r1) break;
       const f: Feature = {
         id: `k${index}.${k}`,
         kind: 'kicker',
