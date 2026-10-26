@@ -223,8 +223,10 @@ export class Peak {
     this.lastRespawns = p.respawns;
     g.cam.snap(p);
     gfx.renderer.domElement.style.filter = '';
-    // See all the way down to the fog (the terrain mesh reaches GRID_EDGE)
-    gfx.camera.far = GRID_EDGE + 1000;
+    // Never clip the terrain: its downhill corners are GRID_EDGE·√2 across
+    // and ~1.15× that further down (~15 km away). It fogs out long before;
+    // a clipped edge would show the sky through the fog
+    gfx.camera.far = GRID_EDGE * 2.3;
     gfx.camera.updateProjectionMatrix();
     // Sky, sun + fill lights, fog, snowfall and wind: the atmosphere system
     this.buildTerrain();

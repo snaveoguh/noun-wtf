@@ -263,9 +263,12 @@ export function nounGeometry(az: number, el: number): THREE.BufferGeometry {
   const parts: { g: THREE.BufferGeometry; c: number }[] = [];
   const add = (g: THREE.BufferGeometry, c: number) => parts.push({ g: g.toNonIndexed(), c });
   // Plinth: a stepped rock spire
-  const plinth = new THREE.CylinderGeometry(0.05, 0.11, 0.16, 6, 1);
-  plinth.translate(0, -0.08, 0);
-  add(plinth, 0x6a7088);
+  const plinth = new THREE.CylinderGeometry(0.045, 0.16, 0.34, 6, 1);
+  plinth.translate(0, -0.17, 0);
+  add(plinth, 0x5a6278);
+  const shoulders = new THREE.CylinderGeometry(0.075, 0.06, 0.03, 6, 1);
+  shoulders.translate(0, -0.012, 0);
+  add(shoulders, 0xf2f6ff);
   // The head
   // Carved stone, snow on its crown
   const head = new THREE.BoxGeometry(0.11, 0.09, 0.08);
