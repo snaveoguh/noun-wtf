@@ -404,6 +404,16 @@ export class ParkourMotor {
     return m !== null && m.nx * nx + m.nz * nz > 0.8;
   }
 
+  /** A pole to launch at: along `yaw` ± 0.45 rad, up to 10 m out (once per launch). */
+  private poleAhead(x: number, y: number, z: number, yaw: number): PoleHit | null {
+    for (const off of [0, 0.22, -0.22, 0.45, -0.45]) {
+      const a = yaw + off;
+      const pl = poleAlong(this.w, x, y, z, Math.sin(a), Math.cos(a), 10);
+      if (pl !== null && pl.top > y + 1) return pl;
+    }
+    return null;
+  }
+
   private scanPole(b: PkBody, hs: number): PoleHit | null {
     const base = hs > 0.8 ? Math.atan2(b.vel.x, b.vel.z) : b.yaw;
     for (const off of [0, 0.45, -0.45, 0.9, -0.9]) {
@@ -912,7 +922,7 @@ export class ParkourMotor {
       // Launch: outward, carried round by the swing, or where the stick points
       const tx = Math.cos(m.ang) * Math.sign(m.spin || 1);
       const tz = -Math.sin(m.ang) * Math.sign(m.spin || 1);
-      const sw = Math.min(1, Math.abs(m.spin) / 3);
+      const sw = Math.min(0.45, Math.abs(m.spin) / 7);
       let dx = ox + tx * sw;
       let dz = oz + tz * sw;
       const wl = Math.hypot(i.wishX, i.wishZ);
@@ -923,6 +933,15 @@ export class ParkourMotor {
       const dl = Math.hypot(dx, dz);
       dx /= dl;
       dz /= dl;
+      // Pole to pole: another pole within ~25° of the launch gets aimed at
+      const next = this.poleAhead(p.x + ox * R, p.y, p.z + oz * R, Math.atan2(dx, dz));
+      if (next !== null) {
+        const ax = next.cx - p.x;
+        const az = next.cz - p.z;
+        const al = Math.hypot(ax, az);
+        dx = ax / al;
+        dz = az / al;
+      }
       const sp = PK.poleLaunchOut + Math.abs(m.spin) * R * 0.9;
       b.vel.x = dx * sp;
       b.vel.z = dz * sp;

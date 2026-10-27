@@ -47,30 +47,30 @@ const GAUNTLET: Route = {
   props: [
     // Wall A: run along it (on your left)
     { k: 'box', x: 22, y: 2, z: 18.3, sx: 8, sy: 4, sz: 0.6, color: WALL },
-    // Wall B: jump across to it, run it (on your right)
+    // Wall B: jump across to it, run it (on your right), run off its end
     { k: 'box', x: 29, y: 3, z: 22.9, sx: 6, sy: 6, sz: 0.6, color: WALL },
     // The tower: run up its face, pull up on top
-    { k: 'box', x: 40, y: 1.75, z: 20, sx: 4, sy: 3.5, sz: 4, color: RED },
+    { k: 'box', x: 40, y: 1.75, z: 21.5, sx: 4, sy: 3.5, sz: 4, color: RED },
     // Posts: precision
-    { k: 'box', x: 40, y: 1.6, z: 24.8, sx: 0.6, sy: 3.2, sz: 0.6, color: YEL },
-    { k: 'box', x: 40, y: 1.6, z: 27.8, sx: 0.6, sy: 3.2, sz: 0.6, color: YEL },
+    { k: 'box', x: 40, y: 1.6, z: 26.3, sx: 0.6, sy: 3.2, sz: 0.6, color: YEL },
+    { k: 'box', x: 40, y: 1.6, z: 29.3, sx: 0.6, sy: 3.2, sz: 0.6, color: YEL },
     // The pole
-    { k: 'pole', x: 40, z: 31.6, y0: 0, y1: 6.5, r: 0.08 },
+    { k: 'pole', x: 40, z: 33.1, y0: 0, y1: 6.5, r: 0.08 },
     // Slide bar on two uprights
-    { k: 'box', x: 40, y: 1.2, z: 40, sx: 3.6, sy: 0.35, sz: 0.3, color: RED },
-    { k: 'box', x: 38.1, y: 0.6, z: 40, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
-    { k: 'box', x: 41.9, y: 0.6, z: 40, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
+    { k: 'box', x: 40, y: 1.2, z: 41.5, sx: 3.6, sy: 0.35, sz: 0.3, color: RED },
+    { k: 'box', x: 38.1, y: 0.6, z: 41.5, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
+    { k: 'box', x: 41.9, y: 0.6, z: 41.5, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
     // Low wall to vault
-    { k: 'box', x: 40, y: 0.45, z: 44, sx: 3.6, sy: 0.9, sz: 0.4, color: WALL },
+    { k: 'box', x: 40, y: 0.45, z: 45.5, sx: 3.6, sy: 0.9, sz: 0.4, color: WALL },
   ],
   checkpoints: [
     { x: 24, y: 2.7, z: 19.2, r: 1.2, hint: 'SPRINT + JUMP BY THE WALL: WALL RUN' },
     { x: 29.8, y: 3.0, z: 22.0, r: 1.4, hint: 'JUMP ACROSS, RUN THE OTHER WALL' },
-    { x: 40, y: 4.4, z: 20, r: 1.6, hint: 'JUMP AT THE TOWER: RUN UP, PULL UP' },
-    { x: 40, y: 4.1, z: 27.8, r: 0.9, hint: 'POST TO POST' },
-    { x: 40, y: 3.0, z: 31.6, r: 1.4, hint: 'CATCH THE POLE' },
-    { x: 40, y: 1.0, z: 40.2, r: 1.4, hint: 'Q WHILE RUNNING: SLIDE UNDER' },
-    { x: 40, y: 1.3, z: 46.5, r: 1.6, hint: 'VAULT · FINISH' },
+    { x: 40, y: 4.4, z: 21.5, r: 1.6, hint: 'RUN OFF ITS END, JUMP AT THE TOWER, PULL UP' },
+    { x: 40, y: 4.1, z: 29.3, r: 0.9, hint: 'POST TO POST' },
+    { x: 40, y: 3.0, z: 33.1, r: 1.4, hint: 'CATCH THE POLE' },
+    { x: 40, y: 1.0, z: 41.7, r: 1.4, hint: 'Q WHILE RUNNING: SLIDE UNDER' },
+    { x: 40, y: 1.3, z: 48.0, r: 1.6, hint: 'VAULT · FINISH' },
   ],
   medals: { gold: 30, silver: 40, bronze: 60 },
 };

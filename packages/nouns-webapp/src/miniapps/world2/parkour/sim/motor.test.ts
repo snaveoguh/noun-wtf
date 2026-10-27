@@ -262,6 +262,40 @@ describe('poles', () => {
   });
 });
 
+describe('pole to pole', () => {
+  it('a launch roughly at the next pole is aimed at it and catches it', () => {
+    const { w } = level(
+      [],
+      [
+        [0, 0, 0.09, 6.5],
+        [1.2, -7.5, 0.09, 6.5],
+      ],
+    );
+    const r = new Rig(w, 0, 0, 2.2, Math.PI);
+    r.b.grounded = false;
+    r.b.vel.y = 5;
+    r.b.vel.z = -3;
+    expect(r.until('pole', 40, input())).toBe(true);
+    r.run(40, input({ moveY: 1 }));
+    // Swing round to the far side (out ≈ −z), then let go
+    expect(r.until('pole', 1, input())).toBe(true);
+    for (let k = 0; k < 400; k++) {
+      const m = r.motor.move;
+      if (m !== null && m.k === 'pole' && Math.cos(m.ang) < -0.9) break;
+      r.step(input({ moveX: 1, moveY: 1 }));
+    }
+    r.step(input({ jump: true }));
+    expect(r.b.has('poleLaunch')).toBe(true);
+    let caught = false;
+    for (let k = 0; k < 120 && !caught; k++) {
+      r.step(input());
+      const m = r.motor.move;
+      caught = m !== null && m.k === 'pole' && Math.abs(m.cz + 7.5) < 0.3;
+    }
+    expect(caught).toBe(true);
+  });
+});
+
 describe('ground moves', () => {
   it('slides under a bar a standing rider walks into', () => {
     // A bar 1.0–1.5 m up across the path at z = 6
