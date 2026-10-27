@@ -8,6 +8,8 @@
 
 import * as THREE from 'three';
 
+import { MINOR_CAP, shrinkTexture, textureDiet } from '../render/textureDiet';
+
 interface TowerSpec {
   /** Footprint centre (world XZ). */
   x: number;
@@ -100,6 +102,8 @@ function getFacadeTextures() {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;
+    // The far skyline: 256 px is plenty on a weak phone (render/textureDiet)
+    if (textureDiet.on) shrinkTexture(t, MINOR_CAP);
     return t;
   };
   facadeTextures = { map: mk(a), emissive: mk(e) };
