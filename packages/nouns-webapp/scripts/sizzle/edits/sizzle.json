@@ -10,11 +10,11 @@
     { "shot": "brk-headspin", "in": 0.3, "dur": 1.7 },
     { "shot": "bd-chase", "in": 0.4, "dur": 1.75, "placeholder": "cars" },
     { "shot": "bd-loop", "in": 2.0, "dur": 3.45 },
-    { "shot": "gx-shout", "in": 0.3, "dur": 2.2, "placeholder": "pool" },
+    { "shot": "pl-break", "in": 0.3, "dur": 2.2 },
     { "shot": "brk-windmill", "in": 0.2, "dur": 1.6 },
     { "shot": "w-skate2", "in": 0.3, "dur": 1.5, "placeholder": "hide-seek" },
     { "shot": "bd-herd", "in": 0.3, "dur": 2.45 },
-    { "shot": "bd-basin-air", "in": 0.3, "dur": 2.25, "placeholder": "parkour" },
+    { "shot": "pk-lamps", "in": 0.3, "dur": 2.25 },
     { "shot": "gx-pullout", "in": 2.3, "dur": 3.08 }
   ]
 }

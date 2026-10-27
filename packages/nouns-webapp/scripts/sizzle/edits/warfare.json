@@ -1,0 +1,12 @@
+{
+  "name": "hero-warfare",
+  "poster": 1.4,
+  "grade": "eq=contrast=1.06:saturation=1.15,unsharp=5:5:0.4",
+  "music": { "file": "scripts/sizzle/music/imperial-march.mp3", "in": 0 },
+  "cuts": [
+    { "shot": "wf-tp-kill", "in": 0.5, "dur": 2.4 },
+    { "shot": "wf-fp-double", "in": 0.3, "dur": 2.4 },
+    { "shot": "wf-tp-head", "in": 0.4, "dur": 2.0 },
+    { "shot": "wf-fp-head", "in": 0.4, "dur": 2.4 }
+  ]
+}

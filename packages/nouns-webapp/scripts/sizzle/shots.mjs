@@ -3,13 +3,16 @@
 // installs `window.__sizzleFrame(i)` (advance one frame, leave it drawn).
 // Setups run in the browser, so each one is self-contained. See README.md.
 
-import { openBigDrop, openBreaks, openExchange, openWorld } from './scenes.mjs';
+import { openBigDrop, openBreaks, openExchange, openParkour, openPool, openWarfare, openWorld } from './scenes.mjs';
 
 export const SCENES = {
   world: openWorld,
   bigdrop: openBigDrop,
   breaks: openBreaks,
   exchange: openExchange,
+  pool: openPool,
+  parkour: openParkour,
+  warfare: openWarfare,
 };
 
 // ── Noun Breaks (scene: breaks; window.__d is the breakDev() harness) ──
@@ -279,7 +282,273 @@ function gxShot(o) {
 
 const gx = (frames, arg) => ({ scene: 'exchange', frames, setup: gxShot, arg });
 
+// ── Noun Pool (scene: pool; window.__pl, scenes.mjs) ──
+
+/**
+ * The tables the pool shots start from (sim frame: x along the length, y
+ * across, metres from the middle), found offline with the pool sim so
+ * every shot does what it says. They run as one frame: the break (rack
+ * seed 56) drops six, then 10 straight into the corner, then a 35° cut on
+ * the 15, and a staged finish: stripes gone, the 8 cut into the corner.
+ */
+const POOL = {
+  // newFrame(56, 0): staged in the page (the rack comes from the seed)
+  break: { rack: 56, cue: { x: -0.61525, y: 0.15 }, aim: { dx: 0.9905204433671789, dy: -0.13736539328261504 }, power: 1, top: -0.15 },
+  pot: {
+    state: {"balls":[{"x":-0.61201,"y":-0.25234},null,null,null,{"x":0.51639,"y":0.06061},{"x":0.93613,"y":0.32974},null,{"x":0.43596,"y":-0.17023},{"x":0.62115,"y":-0.03114},{"x":-0.67962,"y":-0.05834},{"x":0.47669,"y":-0.42782},{"x":0.86754,"y":-0.03118},null,null,{"x":-0.91614,"y":0.41374},{"x":0.67256,"y":-0.27515}],"phase":"play","turn":0,"groups":[null,null],"inHand":null,"shots":1,"fouls":[0,0],"last":null,"winner":null},
+    aim: { dx: 0.9864370285002273, dy: -0.16414014988308553 }, power: 0.24081746433266488, top: 0.2,
+  },
+  cut: {
+    state: {"balls":[{"x":-0.29,"y":-0.266},null,null,null,{"x":0.51639,"y":0.06061},{"x":0.93613,"y":0.32974},null,{"x":0.43596,"y":-0.17023},{"x":0.62115,"y":-0.03114},{"x":-0.67962,"y":-0.05834},null,{"x":0.86754,"y":-0.03118},null,null,{"x":-0.91614,"y":0.41374},{"x":0.67256,"y":-0.27515}],"phase":"play","turn":0,"groups":["stripes","solids"],"inHand":null,"shots":2,"fouls":[0,0],"last":null,"winner":null},
+    aim: { dx: 0.9997072875837084, dy: 0.024193783334245392 }, power: 0.2665011470313027, top: 0,
+  },
+  eight: {
+    state: {"balls":[{"x":-0.54,"y":0.084},null,null,null,{"x":0.3,"y":-0.25},{"x":0.78,"y":-0.32},null,{"x":-0.5,"y":0.3},{"x":0.62,"y":0.2},null,null,null,null,null,null,null],"phase":"play","turn":0,"groups":["stripes","solids"],"inHand":null,"shots":5,"fouls":[0,0],"last":null,"winner":null},
+    aim: { dx: 0.9973733086364289, dy: 0.07243261157532943 }, power: 0.22364133917596424, top: 0, call: 3,
+  },
+};
+
+/**
+ * A pool shot. `table`: one of POOL (null: the menu's racked table);
+ * `shootAt`: seconds into the shot the cue goes through (null: never);
+ * cam: null = the game's own cameras (`gameCam` to start in: aim / top /
+ * orbit), else {eye, look, fov} in the table frame (y = height over the
+ * floor; the cloth is at __pl.feltY ≈ 0.87), eased to {eye1, look1} over
+ * T s when given, or {orbit: {r, h, a0, w}} round the table.
+ * Expects (checked on the first frame): `pots` (ball ids that must drop).
+ */
+async function plShot(o) {
+  const pl = window.__pl;
+  const sz = window.__sz;
+  const pool = pl.pool;
+  pl.cam = null;
+  if (o.table === null) {
+    pool.session = null;
+    pl.view.setCam('orbit');
+    pl.view.setPlayers(pl.seeds);
+  } else {
+    const d = o.table;
+    let state = d.state;
+    if (d.rack !== undefined) {
+      const R = await import('/src/miniapps/world2/pool/sim/rules.ts');
+      state = R.newFrame(d.rack, 0);
+    }
+    pl.stage(state, { ...d, gameCam: o.gameCam });
+  }
+  // Warm: let the Nouns walk to their spots / the cue settle
+  sz.run(Math.round((o.warm ?? 1.2) * 60));
+  pl.t = 0;
+  const ease = t => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+  const lerp = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+  const c = o.cam;
+  if (c?.orbit) {
+    const q = c.orbit;
+    pl.cam = t => {
+      const a = (q.a0 ?? 0) + (q.w ?? 0.1) * t;
+      return { eye: [Math.cos(a) * q.r, q.h, Math.sin(a) * q.r * (q.squash ?? 0.8)], look: c.look ?? [0, 0.75, 0], fov: c.fov };
+    };
+  } else if (c) {
+    pl.cam = t => {
+      const k = c.T ? ease(t / c.T) : 0;
+      return { eye: c.eye1 ? lerp(c.eye, c.eye1, k) : c.eye, look: c.look1 ? lerp(c.look, c.look1, k) : c.look, fov: c.fov };
+    };
+  }
+  const at = o.shootAt === undefined || o.shootAt === null ? -1 : Math.round(o.shootAt * 30);
+  window.__plEvents = [];
+  window.__sizzleFrame = i => {
+    if (i === at) pl.shoot();
+    sz.step();
+    const s = pool.session;
+    if (s?.state?.last && i >= at && at >= 0) window.__plLast = { last: s.state.last, winner: s.state.winner, reason: s.state.reason };
+  };
+  window.__sizzleSkip = i => {
+    if (i === at) pl.shoot();
+    sz.run(2);
+  };
+}
+
+const pool = (frames, arg, extra = {}) => ({ scene: 'pool', frames, setup: plShot, arg, ...extra });
+
+// ── NOUN PARKOUR (scene: parkour; window.__pk, scenes.mjs) ──
+
+/**
+ * Scripted runs of the three routes (pilot phases, see installParkour),
+ * each worked out against the real collision and the real engine: every
+ * move in them is the engine's own, started by the inputs a player would
+ * give. THE GAUNTLET's second gate sits above a wall run on wall B, so its
+ * clock is staged past it (`gate`); all three run clean to the finish
+ * (≈18.4 s, ≈18.1 s and ≈17.0 s).
+ */
+const STEP = 1 / 60;
+const PK_RUNS = {
+  gauntlet: [
+    { dir: [1, 0], sprint: true, until: 'p.pos.x > 18.4' },
+    { dir: [1, 0], sprint: true, jump: true, dur: STEP },
+    { dir: [1, 0], sprint: true, until: 'p.pos.x > 22.6' },
+    // Wall jump across, run wall B
+    { dir: [1, 0.5], sprint: true, jump: true, dur: STEP },
+    { dir: [1, 0.6], sprint: true, until: "a === 'wallrun' && t > 0.1" },
+    { dir: [1, 0], sprint: true, until: "a !== 'wallrun'" },
+    { dir: [1, 0], sprint: true, until: 'p.footGrounded && t > 0.1', gate: 2 },
+    // The tower: climb it hand over hand, mantle on top
+    { to: [40, 21.5], sprint: true, until: 'p.pos.x > 36.2' },
+    { to: [40, 21.5], sprint: true, jump: true, dur: STEP },
+    { to: [40, 21.5], sprint: true, hold: true, until: "p.pos.y > 3.3 && p.footGrounded && a === 'none'" },
+    // Post to post (standing precision jumps), then the pole
+    { to: [40, 23.0], move: 0.5, until: 'p.pos.z > 22.9' },
+    { dur: 0.4 },
+    { dir: [0, 1], jump: true, dur: STEP },
+    { until: 'p.footGrounded && t > 0.2' },
+    { dur: 0.5 },
+    { dir: [0, 1], jump: true, dur: STEP },
+    { until: 'p.footGrounded && t > 0.2' },
+    { dur: 0.5 },
+    { dir: [0, 1], jump: true, dur: STEP },
+    { until: "a === 'pole'" },
+    { until: "a !== 'pole'" },
+    // Slide under the bar, vault the wall, through the finish
+    { to: [40, 44], sprint: true, until: 'p.pos.z > 42.3' },
+    { to: [40, 50], sprint: true, duckPress: true, duck: true, dur: 0.3 },
+    { to: [40, 52], sprint: true, dur: 3 },
+  ],
+  north: [
+    // At the 6.8 m block: run up the wall, leap up the two sills, pull up
+    { dir: [0, -1], sprint: true, until: 'p.pos.z < -73.8' },
+    { dir: [0, -1], sprint: true, jump: true, dur: STEP },
+    { dir: [0, -1], sprint: true, until: "a === 'hang' && t > 0.3" },
+    { stick: [0, 0], dur: 0.3 },
+    { stick: [0, 1], jump: true, dur: STEP },
+    { stick: [0, 0], until: "a === 'hang' && t > 0.3" },
+    { stick: [0, 0], dur: 0.3 },
+    { stick: [0, 1], jump: true, dur: STEP },
+    { stick: [0, 0], until: "a === 'hang' && t > 0.3" },
+    { stick: [0, 0], dur: 0.3 },
+    { stick: [0, 1], until: "a !== 'hang' && a !== 'pullup' && t > 0.3" },
+    // Up the step
+    { to: [-24, -77.4], move: 0.6, until: 'Math.abs(p.pos.z + 77.4) < 0.3 || t > 1.2' },
+    { dir: [-1, 0], sprint: true, until: 'p.pos.x < -24.5' },
+    { dir: [-1, 0], sprint: true, jump: true, dur: STEP },
+    { dir: [-1, 0], sprint: true, until: "a === 'hang' || (p.pos.y > 10 && p.footGrounded && t > 0.3)" },
+    { stick: [0, 1], until: "p.pos.y > 10 && p.footGrounded && a === 'none' && t > 0.3" },
+    // Over the alley onto the sill, leap up to the roof
+    { dir: [-1, 0], sprint: true, until: 'p.pos.x < -35.6' },
+    { dir: [-1, 0], sprint: true, jump: true, dur: STEP },
+    { dir: [-1, 0], sprint: true, until: "a === 'hang'" },
+    { stick: [0, 0], dur: 0.3 },
+    { stick: [0, 1], jump: true, dur: STEP },
+    { stick: [0, 1], until: "p.footGrounded && a === 'none' && t > 0.3" },
+    // Over the parapet onto the pole, down to the street
+    { to: [-46, -77.4], until: 'Math.hypot(p.pos.x + 46, p.pos.z + 77.4) < 0.8' },
+    { to: [-50, -78], until: 'Math.hypot(p.pos.x + 50, p.pos.z + 78) < 0.4' },
+    { dir: [0, 1], move: 0.3, dur: 0.3 },
+    { dir: [0, 1], sprint: true, until: "a === 'pole' || (t > 0.3 && !p.footGrounded && p.pos.y < 12)" },
+    { until: "a === 'pole'", dur: 1 },
+    { until: "a !== 'pole' && t > 0.2" },
+    { dir: [0, 1], dur: 1.5 },
+  ],
+  lamps: [
+    // Vault the wall, jump on the lamp, climb it
+    { dir: [0, -1], sprint: true, until: 'p.pos.z < 17.3' },
+    { dir: [0, -1], sprint: true, jump: true, dur: STEP },
+    { dir: [0, -1], until: "a === 'pole'" },
+    { stick: [0, 1], until: 'p.pos.y > 5.0' },
+    // Swing round to the far side, launch at the next pole (×4)
+    { stick: [0.9, 0.6], until: 'p.pos.z < 14.75 && Math.abs(p.pos.x - 15) < 0.3', dur: 2.5 },
+    { dir: [0, -1], jump: true, dur: STEP },
+    ...[7.5, 0, -7.5, -15].flatMap(z => [
+      { dir: [0, -1], until: "a === 'pole' && t > 0.1" },
+      { stick: [0, 1], dur: 0.7 },
+      { stick: [0.9, 0.6], until: `p.pos.z < ${z} - 0.25 && Math.abs(p.pos.x - 15) < 0.3`, dur: 2.5 },
+      { dir: [0, -1], jump: true, dur: STEP },
+    ]),
+    // Off the big mast: roll the landing
+    { dir: [0, -1], duck: true, until: 'p.footGrounded && t > 0.2' },
+    { dir: [0, -1], dur: 1.5 },
+  ],
+};
+
+/**
+ * A parkour shot: start `route` (gates + course props), run its scripted
+ * run silently for `from` s, then roll. `ghost`: first run the route once
+ * through to set a best (its ghost), then start `ghost` s behind it, so the
+ * ghost leads; otherwise any saved best is cleared (no ghost).
+ * cam: [mode, opts] for __sz.rig, or null for the game's own camera.
+ */
+function pkShot(o) {
+  const k = window.__pk;
+  const sz = window.__sz;
+  sz.input = null;
+  sz.rig(null);
+  const key = `noun-parkour-v1:${o.route}`;
+  localStorage.removeItem(key);
+  if (o.ghost !== undefined) {
+    k.route(o.route);
+    k.pilot(o.run);
+    for (let i = 0; i < 60 * 40 && k.course.view.phase === 'running'; i++) sz.run(1);
+    if (localStorage.getItem(key) === null) throw new Error(`${o.route}: the ghost run didn't finish`);
+  }
+  k.route(o.route);
+  k.pilot(o.ghost !== undefined ? [{ dur: o.ghost }, ...o.run] : o.run);
+  sz.run(Math.round(o.from * 60));
+  if (o.cam) sz.rig(o.cam[0], o.cam[1]);
+  window.__sizzleFrame = () => sz.step();
+  window.__sizzleSkip = () => sz.run(2);
+}
+
+const pk = (frames, route, arg, extra = {}) => ({
+  scene: 'parkour',
+  frames,
+  setup: pkShot,
+  arg: { route, run: PK_RUNS[route], ...arg },
+  ...extra,
+});
+
+// ── Noun Warfare (scene: warfare; window.__wf, scenes.mjs) ──
+
+/**
+ * A slice of a bots-only Team Splat (the local player played by a bot
+ * brain too): `seed` picks the match, `at` s of it run silently first,
+ * then `speed` × real time (0.5: half-speed slow motion), in third person
+ * (`tp`, the game's over-the-shoulder camera) or first person.
+ */
+function wfShot(o) {
+  const wf = window.__wf;
+  wf.match(o.seed ?? 7);
+  wf.run(o.at ?? 8);
+  window.__sizzleFrame = () => wf.frame(o.speed ?? 0.5, o.tp ?? false);
+  window.__sizzleSkip = window.__sizzleFrame;
+}
+
+const wf = (frames, arg) => ({ scene: 'warfare', frames, setup: wfShot, arg });
+
 export const SHOTS = {
+  // Moments the local player splats someone (found by scanning the matches' kill events)
+  'wf-tp-kill': wf(90, { seed: 13, at: 3.6, speed: 0.5, tp: true }),
+  'wf-fp-double': wf(90, { seed: 13, at: 6.3, speed: 0.5, tp: false }),
+  'wf-tp-head': wf(80, { seed: 7, at: 34.1, speed: 0.5, tp: true }),
+  'wf-fp-head': wf(90, { seed: 21, at: 45.7, speed: 0.5, tp: false }),
+  'wf-tp-slow': wf(80, { seed: 13, at: 11.6, speed: 0.33, tp: true }),
+
+  'pk-facade': pk(120, 'north', { from: 0.6, cam: ['fixed', { at: [-17.2, 1.6, -71.6] }] }),
+  'pk-wallrun': pk(100, 'gauntlet', { from: 0.45, cam: null }),
+  'pk-climb': pk(90, 'gauntlet', { from: 4.25, cam: ['fixed', { at: [34.5, 2.2, 17.5] }] }),
+  'pk-posts': pk(150, 'gauntlet', { from: 10.5, cam: ['fixed', { at: [45, 4.5, 27] }] }),
+  'pk-slide': pk(90, 'gauntlet', { from: 16.4, cam: ['fixed', { at: [44, 1.2, 46] }] }),
+  'pk-gap': pk(140, 'north', { from: 8.4, cam: ['fixed', { at: [-38.8, 11.4, -71.5] }] }),
+  'pk-pole': pk(150, 'north', { from: 13.0, cam: ['fixed', { at: [-55.5, 4.5, -65.5] }] }),
+  'pk-lamps': pk(180, 'lamps', { from: 5.6, cam: ['fixed', { at: [24, 4.5, 4] }] }),
+  'pk-roll': pk(105, 'lamps', { from: 15.0, cam: ['fixed', { at: [20.5, 1.4, -27] }] }),
+  'pk-ghost': pk(120, 'lamps', { from: 7.1, ghost: 0.5, cam: ['side', { side: -6, up: 1.5, lead: 1, flat: true, smooth: 3, fov: 60 }] }),
+
+  'pl-hall': pool(75, { table: null, cam: { orbit: { r: 3.2, h: 2.0, a0: 1.2, w: 0.16 }, look: [0, 0.8, 0], fov: 52 } }),
+  'pl-break': pool(80, { table: POOL.break, shootAt: 0.5, cam: { eye: [1.28, 1.0, 0.42], look: [0.0, 0.87, -0.04], eye1: [1.2, 1.1, 0.36], T: 2.6, fov: 42 } }),
+  'pl-break-high': pool(90, { table: POOL.break, shootAt: 0.15, cam: { eye: [-0.2, 2.35, 1.5], look: [0.35, 0.82, 0], eye1: [0.3, 2.45, 1.35], T: 3, fov: 50 } }),
+  'pl-pot': pool(75, { table: POOL.pot, shootAt: 0.5, cam: { eye: [-0.35, 1.55, -1.3], look: [0.55, 0.87, -0.3], eye1: [-0.1, 1.45, -1.2], look1: [0.75, 0.87, -0.35], T: 2.5, fov: 46 } }),
+  'pl-pot-aim': pool(75, { table: POOL.pot, shootAt: 0.7, cam: null, gameCam: 'aim' }),
+  'pl-pot-top': pool(75, { table: POOL.pot, shootAt: 0.3, cam: null, gameCam: 'top' }),
+  'pl-cut': pool(70, { table: POOL.cut, shootAt: 0.3, cam: { eye: [1.3, 0.98, -0.78], look: [0.25, 0.84, -0.22], fov: 44 } }),
+  'pl-eight': pool(120, { table: POOL.eight, shootAt: 0.6, cam: { eye: [1.85, 1.4, 1.15], look: [-0.3, 0.95, 0.1], eye1: [1.6, 1.3, 1.0], look1: [-0.5, 1.0, 0.1], T: 4, fov: 46 } }),
+
   'brk-intro': brk(60, brkScripted, { phase: 'intro', dt: 0.6 }),
   'brk-toprock': brk(60, brkScripted, { phase: 'turn', dt: 0.8 }),
   'brk-headspin': brk(75, brkMove, { move: 'headspin' }),
