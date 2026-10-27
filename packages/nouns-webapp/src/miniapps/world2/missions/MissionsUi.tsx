@@ -66,7 +66,8 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
         e.preventDefault();
         e.stopPropagation();
         sys.talk();
-      } else if (e.code === 'KeyX') {
+      } else if (e.code === 'KeyX' && !game.cars.driving) {
+        // (in a car X is the car's special: the ROADSTAR takes off)
         e.preventDefault();
         sys.openPanel('journal');
       }

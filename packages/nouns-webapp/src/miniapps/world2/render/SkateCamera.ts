@@ -12,6 +12,8 @@ import * as THREE from 'three';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const DOWN = new THREE.Vector3(0, -1, 0);
+/** How high a pulled-back camera sits over the slope behind the rider (m). */
+const SLOPE_CLEAR = 3;
 // Per-frame scratch (update runs every frame; no garbage on weak phones)
 const _hv = new THREE.Vector3();
 const _f = new THREE.Vector3();
@@ -183,6 +185,16 @@ export class SkateCamera {
         UP,
         (onBoard ? (preset.h - preset.la + 0.35) * this.zoom : 0.2) + dist * Math.sin(pitch),
       );
+
+    // Pulled back (the Big Drop), a camera this far behind is under the slope
+    // you just came down: riding a 30° fall line, the snow 11 m uphill is
+    // 5.6 m above you. The obstruction check then yanked it in to skim the
+    // surface right behind the board (too close, and the snow's edge drawn
+    // across the bottom of the screen). Sit above the slope behind instead.
+    if (onBoard && this.zoom > 1) {
+      const gb = this.world.raycast(_probe.copy(desired).addScaledVector(UP, 80), DOWN, 160);
+      if (gb && desired.y < gb.point.y + SLOPE_CLEAR) desired.y = gb.point.y + SLOPE_CLEAR;
+    }
 
     // Collision: pull in toward the target
     const blocked = this.world.obstruction(target, desired);

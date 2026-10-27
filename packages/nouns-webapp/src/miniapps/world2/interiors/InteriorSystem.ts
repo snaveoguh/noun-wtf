@@ -1904,13 +1904,21 @@ export class InteriorSystem implements InteriorsApi {
     const parts: THREE.BufferGeometry[] = [];
     L.floors.forEach((f, i) => {
       if (f.built === null) return;
-      const c = f.built.collision.clone();
+      // The BVH adds an index to a geometry it's built on, so the ground floor
+      // (already in the world) comes back indexed and the new floor doesn't:
+      // mergeGeometries refuses that mix and returned null, the upstairs had
+      // no collision at all and you fell back down the stairwell
+      const src = f.built.collision;
+      const c = src.index !== null ? src.toNonIndexed() : src.clone();
       c.translate(0, i * L.storey, 0);
       parts.push(c);
     });
     const merged = mergeGeometries(parts, false);
     for (const c of parts) c.dispose();
-    if (merged === null) return;
+    if (merged === null) {
+      console.warn("[interiors] could not merge the floors' collision");
+      return;
+    }
     this.game.world.setDynamic('interior', merged, L.origin);
     L.collision?.dispose();
     L.collision = merged;

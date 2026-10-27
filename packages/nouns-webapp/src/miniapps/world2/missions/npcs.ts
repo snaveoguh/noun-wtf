@@ -20,6 +20,7 @@ import { inkExcluded, toonify } from '../render/Toon';
 const Y = new THREE.Vector3(0, 1, 0);
 const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
+const _c = new THREE.Vector3();
 
 export const seedOf = (s: readonly number[]): NounSeed => ({
   background: s[0]!,
@@ -131,6 +132,14 @@ export class StandingNpc {
     this.root.quaternion.setFromAxisAngle(Y, yaw);
   }
 
+  /** Where the tag hangs: the middle of the characters, else the anchor. */
+  private tagAnchor(out: THREE.Vector3): THREE.Vector3 {
+    if (this.chars.length === 0) return out.copy(this.pos);
+    out.set(0, 0, 0);
+    for (const ch of this.chars) out.add(ch.root.getWorldPosition(_c));
+    return out.multiplyScalar(1 / this.chars.length);
+  }
+
   update(dt: number, player: THREE.Vector3) {
     this.t += dt;
     const cam = this.host.camera;
@@ -140,7 +149,9 @@ export class StandingNpc {
     // Label
     let show = d < LABEL_DIST;
     if (show) {
-      const v = _p.copy(this.pos);
+      // Over the characters themselves (the Twins stand at their start line,
+      // off the anchor; a tag at the anchor floated metres to one side)
+      const v = this.tagAnchor(_p);
       v.y += 2.15;
       v.project(cam);
       show = v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
