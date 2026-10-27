@@ -131,7 +131,7 @@ const LAMPS: Route = {
     { x: 15, y: 4.2, z: -15, r: 1.8, hint: 'THE BIG MAST' },
     { x: 15, y: 1.5, z: -27, r: 2.4, hint: 'LAUNCH OFF, Q TO ROLL · FINISH' },
   ],
-  medals: { gold: 26, silver: 34, bronze: 50 },
+  medals: { gold: 18, silver: 25, bronze: 38 },
 };
 
 export const ROUTES: Route[] = [GAUNTLET, NORTH, LAMPS];

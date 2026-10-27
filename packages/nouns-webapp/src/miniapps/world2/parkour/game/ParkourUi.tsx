@@ -100,7 +100,7 @@ export function ParkourUi({ game, touch }: { game: Game; touch: boolean }) {
           <button type="button" className="pk-x" onClick={() => c.close()} aria-label="close">
             ✕
           </button>
-          <h2>NOUN PARKOUR</h2>
+          <div className="pk-title">NOUN PARKOUR</div>
           <p className="pk-tag">RUN THE ROOFS · BEAT YOUR GHOST</p>
           <div className="pk-cards">
             {v.routes.map(r => (
@@ -226,7 +226,7 @@ const CSS = `
 .pk-ui,.pk-ui *{font-family:${F}}
 .pk-menu-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,12,.35);padding:16px}
 .pk-menu{position:relative;background:#111;color:#fff;padding:18px 20px 14px;max-width:880px;width:100%;max-height:calc(100% - 24px);overflow:auto;box-shadow:8px 8px 0 #ff2f8e;border:3px solid #fff}
-.pk-menu h2{margin:0;font-size:44px;line-height:1;letter-spacing:.02em;color:#fff;text-shadow:4px 4px 0 #ff2f8e,7px 7px 0 #20d6ff}
+.pk-menu .pk-title{margin:0;font-size:44px;font-weight:900;font-style:italic;line-height:1;letter-spacing:.02em;color:#fff;text-shadow:4px 4px 0 #ff2f8e,7px 7px 0 #20d6ff}
 .pk-tag{margin:6px 0 14px;color:#ffd400;font-size:15px;letter-spacing:.12em}
 .pk-x{position:absolute;top:10px;right:12px;background:none;border:0;color:#fff;font-size:22px;cursor:pointer}
 .pk-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
@@ -263,7 +263,7 @@ const CSS = `
 .pk-prev{font:14px system-ui,sans-serif;opacity:.8}
 .pk-res-btns{display:flex;gap:8px;margin-top:8px}
 @media (max-width:640px){
-  .pk-menu{padding:14px 12px}.pk-menu h2{font-size:32px}
+  .pk-menu{padding:14px 12px}.pk-menu .pk-title{font-size:32px}
   .pk-top{top:6px;gap:8px;padding:2px 10px}.pk-time{font-size:26px;min-width:92px}.pk-name{display:none}
   .pk-btns{top:auto;left:auto;bottom:calc(200px + env(safe-area-inset-bottom));right:10px}
   .pk-count{font-size:100px}
