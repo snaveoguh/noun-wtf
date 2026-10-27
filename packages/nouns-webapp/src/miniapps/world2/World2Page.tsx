@@ -8,6 +8,7 @@ import { useAppSelector } from '@/hooks';
 
 import { BeatsScreen } from './audio/BeatsScreen';
 import { bindUiSounds } from './audio/sfx/uiSounds';
+import { FreestyleUi } from './breakdance/freestyle/FreestyleUi';
 import { BreakUi, useBreakActive } from './breakdance/net/BreakUi';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
@@ -356,6 +357,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
+      {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && (
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
       )}

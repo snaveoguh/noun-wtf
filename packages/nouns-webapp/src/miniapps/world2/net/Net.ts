@@ -19,6 +19,8 @@
 //       without it, listeners speak their chat lines in the house voice
 // Respect (respect/): `rs: 'L'` only while the rider is a legend (the
 // noggles badge on their name tag; cosmetic, not checked by the server).
+// Freestyle (breakdance/freestyle/wire.ts): `fs: [move, seq, beat, n, bpm]`
+// only while the rider is breakdancing on the spot.
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -31,6 +33,7 @@ import * as THREE from 'three';
 import { PARTYKIT_HOST } from '../../world/engine/types';
 import { CHAT_ID_RE, TAG_RE } from '../audio/voice/booth/clips';
 import { type CalloutEvent } from '../audio/voice/callouts';
+import { decodeFs, type FsState, type FsWire } from '../breakdance/freestyle/wire';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
 
@@ -117,6 +120,8 @@ export interface RemotePlayer {
   deck?: string;
   /** Respect badge ('L' = legend), '' = none. */
   respectBadge?: string;
+  /** Freestyling: the move + its beat phase (null = not dancing). */
+  freestyle?: FsState | null;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -181,6 +186,8 @@ export class Net {
   ownChat = false;
   /** My respect badge ('L' while a legend), relayed in the blob. */
   respectBadge = '';
+  /** My freestyle (breakdance/freestyle), relayed in the blob while dancing. */
+  freestyle: FsWire | null = null;
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
@@ -346,6 +353,7 @@ export class Net {
     rp.voiceTag = typeof blob.vo === 'string' && TAG_RE.test(blob.vo) ? blob.vo : '';
     rp.respectBadge = blob.rs === 'L' ? 'L' : '';
     rp.ownChat = blob.mv === 1;
+    rp.freestyle = decodeFs(blob.fs);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -430,6 +438,7 @@ export class Net {
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
       ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
+      ...(this.freestyle !== null ? { fs: this.freestyle } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

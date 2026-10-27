@@ -23,6 +23,7 @@ import { TtsEngine } from './audio/voice/TtsEngine';
 import { HOUSE_VOICE, hyped, RIDER_VOICE, ttsVoiceOf } from './audio/voice/ttsVoice';
 import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
+import { FreestyleMode } from './breakdance/freestyle/FreestyleMode';
 import { BreakMode } from './breakdance/net/BreakMode';
 import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
@@ -315,6 +316,8 @@ export class Game {
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
   readonly breaks: BreakMode = new BreakMode(this);
+  /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
+  readonly freestyle: FreestyleMode = new FreestyleMode(this);
   /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
   readonly trade: TradeClient;
   /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
@@ -884,6 +887,25 @@ export class Game {
       this.gfx.followShadow(this.breaks.focus);
       this.gfx.render(dt);
       return;
+    }
+    // ── Freestyle: breakdancing on the spot; skater parked, skate camera orbiting ──
+    if (this.freestyle.active) {
+      const fin = this.input.poll(now);
+      if (this.freestyle.frame(dt, fin, now)) {
+        this.updateFm(dt);
+        this.animTime += dt;
+        this.updateNetwork(dt);
+        this.crew?.update(dt, this.player.pos);
+        this.missions.update(dt);
+        this.towns?.update(dt);
+        this.mountain?.update(this.player.pos, this.player.vel);
+        this.nature?.update(dt, this.player.pos);
+        this.billboards.update(dt);
+        this.gfx.followShadow(this.player.pos);
+        this.gfx.render(dt);
+        this.updateHud(dt, fin);
+        return;
+      }
     }
     if (this.cutscene.active) return this.stepCutscene(dt, now);
     this.cutscene.tick();
@@ -1829,6 +1851,7 @@ export class Game {
         travelled: c.mode === 'board' ? travelled : 0,
         riding: c.mode === 'board' && !c.anim.includes('bail'),
       });
+      this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       // Name tag
       if (r.label) {
         const v = c.pos
@@ -2180,6 +2203,7 @@ export class Game {
     this.interiors.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
+    this.freestyle.dispose();
     this.van2.dispose();
     this.dragon.dispose();
     this.stats.dispose();
