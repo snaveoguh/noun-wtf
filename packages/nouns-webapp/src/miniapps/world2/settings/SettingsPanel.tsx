@@ -17,6 +17,7 @@ import { report as reportVoice } from '../audio/voice/booth/voiceSync';
 import { npcVoice } from '../audio/voice/cast';
 import { HOUSE_MODEL_BYTES, PIPER_MODEL_BYTES } from '../audio/voice/ttsVoice';
 import VoiceBooth from '../booth/VoiceBooth';
+import { HudIcon } from '../hud/icons';
 import { installState, subscribeInstall } from '../pwa/install';
 import { InstallButton } from '../pwa/InstallButton';
 import { resetHudPositions } from '../ui/HudDrag';
@@ -54,13 +55,15 @@ export function SettingsCog({ game }: { game: Game }) {
       <button
         type="button"
         data-w2cog=""
-        className={`w2-chip text-base leading-none ${open ? 'w2-on' : ''}`}
+        data-tip="Settings"
+        className={`w2h-ib ${open ? 'w2h-on' : ''}`}
+        onPointerDown={e => e.stopPropagation()}
         onClick={() => setOpen(o => !o)}
         title="Settings"
         aria-label="Settings"
         aria-expanded={open}
       >
-        ⚙
+        <HudIcon name="cog" size={20} />
       </button>
       {open && createPortal(<Panel game={game} onClose={() => setOpen(false)} />, document.body)}
     </>
