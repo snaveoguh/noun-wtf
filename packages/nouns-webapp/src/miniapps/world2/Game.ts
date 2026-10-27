@@ -50,6 +50,7 @@ import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from
 import { JerseyCrew } from './npc/JerseyCrew';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
+import { PoolMode } from './pool/net/PoolMode';
 import { FmSpots } from './radio/FmSpots';
 import { NounFm } from './radio/NounFm';
 import {
@@ -315,6 +316,8 @@ export class Game {
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
   readonly breaks: BreakMode = new BreakMode(this);
+  /** Noun Pool (pool/net/PoolMode.ts, PoolApi): bar tables + the pool hall; owns the frame. */
+  readonly pool: PoolMode = new PoolMode(this);
   /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
   readonly trade: TradeClient;
   /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
@@ -876,6 +879,16 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    // ── Noun Pool: at a table (a bar's, or the pool hall); the room stays, the skater waits ──
+    if (this.pool.active) {
+      this.input.poll(now);
+      this.pool.step(dt);
+      this.updateFm(dt);
+      this.animTime += dt;
+      this.updateNetwork(dt);
+      this.gfx.render(dt);
+      return;
+    }
     if (this.cutscene.active) return this.stepCutscene(dt, now);
     this.cutscene.tick();
     const input = this.input.poll(now);
@@ -973,6 +986,7 @@ export class Game {
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
+    this.pool.idle(dt);
   }
 
   /**
@@ -2151,6 +2165,7 @@ export class Game {
     this.interiors.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
+    this.pool.dispose();
     this.van2.dispose();
     this.dragon.dispose();
     this.stats.dispose();

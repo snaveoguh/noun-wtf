@@ -69,6 +69,7 @@ export default function AgentHome({
   onEnterWorld,
   onEnterHoops,
   onEnterBreaks,
+  onEnterPool,
   onEnterWarfare,
   onEnterDrop,
   onOpen,
@@ -81,6 +82,7 @@ export default function AgentHome({
   onEnterWorld: () => void;
   onEnterHoops: () => void;
   onEnterBreaks: () => void;
+  onEnterPool?: () => void;
   onEnterWarfare: () => void;
   /** Noun World straight onto the Big Drop (only offered once it's unlocked) */
   onEnterDrop: () => void;
@@ -137,6 +139,7 @@ export default function AgentHome({
     (id: GameId) => {
       if (id === 'hoops') onEnterHoops();
       else if (id === 'breaks') onEnterBreaks();
+      else if (id === 'pool') onEnterPool?.();
       else if (id === 'warfare') onEnterWarfare();
       else if (id === 'drop') {
         // Locked: the sheet says how to open it (its button opens Noun World)
@@ -147,7 +150,7 @@ export default function AgentHome({
         }
       } else onEnterWorld();
     },
-    [onEnterHoops, onEnterBreaks, onEnterWarfare, onEnterWorld, onEnterDrop],
+    [onEnterHoops, onEnterBreaks, onEnterPool, onEnterWarfare, onEnterWorld, onEnterDrop],
   );
 
   const activate = useCallback(

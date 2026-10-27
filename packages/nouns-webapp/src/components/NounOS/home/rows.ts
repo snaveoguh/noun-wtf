@@ -7,7 +7,7 @@ import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
 
 import { hostOf, KIND_LABEL, type CommunityEntry } from './community';
 
-export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'drop';
+export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'drop' | 'pool';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -149,6 +149,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'DROP IN',
     loading: 'off to the summit. wrap up warm',
+  },
+  {
+    id: 'pool',
+    name: 'Noun Pool',
+    cover: '/world2/pool-cover.webp',
+    card: '/home/covers/pool.webp',
+    focus: '50% 55%',
+    teaser:
+      'Eight-ball in the pool hall, or on any pool table in a Noun World bar. Real ball physics, spin, the CPU on four levels, or rack up against a friend.',
+    tagline: 'BREAK · CUT · SINK THE 8',
+    facts: [
+      'VS CPU or 1v1 online',
+      'Top, back and side spin',
+      'Plays on every bar table in Noun World',
+    ],
+    cta: 'RACK EM',
+    loading: 'chalking up. off to the pool hall',
   },
 ];
 

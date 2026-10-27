@@ -3,6 +3,7 @@ import type { Connection, Party } from './room';
 import { BreakRelay } from './breakRelay';
 import { FmRelay } from './fmRelay';
 import { HoopsRelay } from './hoopsRelay';
+import { PoolRelay } from './poolRelay';
 import { WarfareRelay } from './warfareRelay';
 
 /**
@@ -33,6 +34,9 @@ import { WarfareRelay } from './warfareRelay';
  *
  * 6. Noun Breaks (break: prefix, world v2): breakdance battles, relayed only
  *    to the players a message is for (see breakRelay.ts), nothing persisted.
+ *
+ * 7. Noun Pool (pool: prefix, world v2): 8-ball frames, relayed only to the
+ *    players a message is for (see poolRelay.ts), nothing persisted.
  */
 
 const WARFARE_ROOM = 'noun-warfare';
@@ -89,6 +93,7 @@ interface RoomState {
   _leaderboard: LeaderboardEntry[];
   _hoops?: HoopsRelay;
   _break?: BreakRelay;
+  _pool?: PoolRelay;
   _warfare?: WarfareRelay;
 }
 
@@ -214,6 +219,14 @@ export const handlers = {
         if (message.length > 16384) return;
         rs._break ??= new BreakRelay();
         rs._break.handle(data, connection, room.getConnections());
+        return;
+      }
+
+      // ── Noun Pool (pool: prefix) ────────────────────────────────────
+      if (typeof data.type === 'string' && data.type.startsWith('pool:')) {
+        if (message.length > 8192) return;
+        rs._pool ??= new PoolRelay();
+        rs._pool.handle(data, connection, room.getConnections());
         return;
       }
 
@@ -569,6 +582,7 @@ export const handlers = {
 
     rs._hoops?.close(connection.id, room.getConnections());
     rs._break?.close(connection.id, room.getConnections());
+    rs._pool?.close(connection.id, room.getConnections());
     void fmRelays.get(room.id)?.then(fm => fm.close(connection.id));
 
     const count = [...room.getConnections()].length;

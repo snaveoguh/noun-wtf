@@ -28,6 +28,7 @@ import {
   type StatRow,
   type WorldStats,
 } from './net/Stats';
+import { PoolUi, usePoolActive } from './pool/net/PoolUi';
 import { applyWorldManifest, registerWorldSw } from './pwa/install';
 import { InstallButton } from './pwa/InstallButton';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
@@ -171,7 +172,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
 
   // A Noun Breaks battle hides the skate HUD the same way hoops does
   const breakOn = useBreakActive(game);
-  const hoopsOn = useHoopsActive(game) || breakOn;
+  const poolOn = usePoolActive(game);
+  const hoopsOn = useHoopsActive(game) || breakOn || poolOn;
   // (flying the dragon keeps the skate stick: it turns and sets the speed)
   const driving = useVanDriving(game);
   const replaying = useReplayActive(game);
@@ -216,6 +218,20 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     const tryLaunch = () => {
       if (game.me === null || game.hud.loading !== null || !game.breaks.arrive()) return false;
       breaksLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
+  // `?play=pool` (the homepage's NOUN POOL card): into the pool hall, menu open
+  const poolLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || poolLaunched.current || searchParams.get('play') !== 'pool') return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.pool.arrive()) return false;
+      poolLaunched.current = true;
       return true;
     };
     if (tryLaunch()) return;
@@ -356,6 +372,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
+      {game && started && <PoolUi game={game} />}
       {game && started && !hoopsOn && (
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
       )}
