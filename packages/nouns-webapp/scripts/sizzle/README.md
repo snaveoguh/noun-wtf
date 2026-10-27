@@ -61,7 +61,7 @@ the last 0.9 s, loudness-normalised to −16 LUFS). Set `audio: true` on the
 slide's clip in `home/rows.ts`: the hero plays it only once the visitor
 turns sound on. `music/` holds excerpts of the owner's Suno tracks, each
 already starting where it should (the Drop from 0:59.3 of the full song,
-Breaks, Grand Exchange and Beat Your Ghost (parkour) from 0:00). To add music to a clip whose frames
+Breaks and Grand Exchange from 0:00, Beat Your Ghost (parkour, the second take) from 0:30). To add music to a clip whose frames
 are gone, `sh scripts/sizzle/mux.sh public/home/<clip> scripts/sizzle/music/<track>.mp3`
 swaps the audio in without touching the video.
 
