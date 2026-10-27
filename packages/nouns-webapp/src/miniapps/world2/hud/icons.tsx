@@ -58,8 +58,6 @@ export type IconName =
   | 'decks'
   | 'chat'
   | 'fm'
-  | 'dance'
-  | 'hide'
   | 'cog';
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -319,31 +317,9 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   fm: (
     <>
-      <rect x="2.5" y="7" width="19" height="13.5" rx="2.5" fill={PINK} {...S} />
-      <path d="M7 7l5-4.5L17 7" fill="none" {...S} />
-      <path d="M6.5 11.5h5M6.5 15.5h5" fill="none" {...S} strokeWidth={2} />
-      <circle cx="16.5" cy="13.5" r="2.5" fill={YELLOW} {...S} strokeWidth={2} />
-    </>
-  ),
-  dance: (
-    <>
-      <circle cx="13" cy="4.5" r="2.5" fill={YELLOW} {...S} />
-      <path
-        d="M12.5 8l-1.5 6 4 3 1 5M11 14l-4.5 4M12.5 8.5l5.5-2M12.5 8.5L7 10.5l-2-3"
-        fill="none"
-        {...S}
-      />
-    </>
-  ),
-  hide: (
-    <>
-      <path
-        d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"
-        fill={WHITE}
-        {...S}
-      />
-      <circle cx="12" cy="12" r="3" fill={PINK} {...S} />
-      <path d="M4 20L20 4" fill="none" {...S} />
+      <path d="M8 2.5l4 4 4-4" fill="none" {...S} strokeWidth={2} />
+      <rect x="2.5" y="6.5" width="19" height="14" rx="3" fill={PINK} {...S} />
+      <path d="M10 10v6.5l5.5-3.25z" fill={YELLOW} {...S} strokeWidth={2} />
     </>
   ),
   cog: (

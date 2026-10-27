@@ -361,7 +361,7 @@ function Ring({
   const board = hud.mode === 'board';
   const size = L.size;
   const frac = board ? Math.min(1, kmh / RING_KMH) : 0;
-  // A 270° arc, open at the bottom-left (the badges' side)
+  // A 270° arc, open at the bottom
   const r = size / 2 - 3;
   const arc = 2 * Math.PI * r * 0.75;
   const mtn = hud.mountain;
@@ -528,8 +528,8 @@ function Ring({
             viewBox={`0 0 ${size} ${size}`}
             aria-hidden="true"
           >
-            {/* Open at the bottom-left, where the badges sit */}
-            <g transform={`rotate(180 ${size / 2} ${size / 2})`}>
+            {/* Open at the bottom, over the speed readout */}
+            <g transform={`rotate(135 ${size / 2} ${size / 2})`}>
               <circle
                 cx={size / 2}
                 cy={size / 2}

@@ -272,49 +272,52 @@ function ChallengeChip({ game, ui }: { game: Game; ui: HoopsUiState }) {
   if (!ui.hasCourt || ui.challenge !== null) return null;
   const others = [...game.net.players.values()];
   return (
-    <div className="pointer-events-auto absolute bottom-14 right-4 flex flex-col items-end gap-1">
-      {open && (
-        <div className="w2-panel flex w-[240px] flex-col gap-2 text-xs">
-          <div className="font-bold">🏀 CHALLENGE TO HOOPS</div>
-          <div className="flex gap-1">
-            {MODES.map(m => (
-              <button
-                key={m}
-                type="button"
-                className={`hp-pill ${size === m ? 'hp-on' : ''}`}
-                onClick={() => setSize(m)}
-              >
-                {m}v{m}
-              </button>
-            ))}
-          </div>
-          {others.length === 0 && <div className="opacity-60">no one else online right now</div>}
-          <div className="flex max-h-[30vh] flex-col gap-1 overflow-y-auto">
-            {others.map(p => (
-              <div key={p.id} className="flex items-center justify-between gap-2">
-                <span className="truncate">{p.name || 'noun'}</span>
+    // A mode chip in the ring HUD's row
+    <HudSlot name="modes">
+      <div className="pointer-events-auto absolute bottom-14 right-4 flex flex-col items-end gap-1">
+        {open && (
+          <div className="w2-panel flex w-[240px] flex-col gap-2 text-xs">
+            <div className="font-bold">🏀 CHALLENGE TO HOOPS</div>
+            <div className="flex gap-1">
+              {MODES.map(m => (
                 <button
+                  key={m}
                   type="button"
-                  className="hp-pill hp-on shrink-0"
-                  onClick={() => {
-                    game.hoops.challenge(p.id, size);
-                    setOpen(false);
-                  }}
+                  className={`hp-pill ${size === m ? 'hp-on' : ''}`}
+                  onClick={() => setSize(m)}
                 >
-                  🏀 challenge
+                  {m}v{m}
                 </button>
-              </div>
-            ))}
+              ))}
+            </div>
+            {others.length === 0 && <div className="opacity-60">no one else online right now</div>}
+            <div className="flex max-h-[30vh] flex-col gap-1 overflow-y-auto">
+              {others.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{p.name || 'noun'}</span>
+                  <button
+                    type="button"
+                    className="hp-pill hp-on shrink-0"
+                    onClick={() => {
+                      game.hoops.challenge(p.id, size);
+                      setOpen(false);
+                    }}
+                  >
+                    🏀 challenge
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] opacity-50">
+              you both teleport to the Noun Jersey court; spare spots get bots
+            </div>
           </div>
-          <div className="text-[10px] opacity-50">
-            you both teleport to the Noun Jersey court; spare spots get bots
-          </div>
-        </div>
-      )}
-      <button type="button" className="w2-chip text-xs" onClick={() => setOpen(o => !o)}>
-        🏀 hoops
-      </button>
-    </div>
+        )}
+        <button type="button" className="w2-chip text-xs" onClick={() => setOpen(o => !o)}>
+          🏀 hoops
+        </button>
+      </div>
+    </HudSlot>
   );
 }
 
