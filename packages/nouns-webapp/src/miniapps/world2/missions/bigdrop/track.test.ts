@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { CAVE_KICKER, COURSE, COURSE_SECTIONS, courseCap } from './courseSpec';
 import {
   centerX,
   featuresIn,
@@ -21,7 +22,11 @@ describe('the Big Drop track', () => {
       expect(SECTIONS[i]!.s0).toBe(SECTIONS[i - 1]!.s1);
       expect(SECTIONS[i]!.kind).not.toBe(SECTIONS[i - 1]!.kind);
     }
-    expect(SECTIONS.map(s => s.kind).slice(0, 4)).toEqual(['cruise', 'jumps', 'slalom', 'loop']);
+    // The SSX course as designed, then a cruise and a loop
+    const n = COURSE_SECTIONS.length;
+    expect(SECTIONS.slice(0, n).map(s => s.kind)).toEqual(COURSE_SECTIONS.map(c => c.kind));
+    expect(SECTIONS[n - 1]!.s1).toBe(COURSE.end);
+    expect(SECTIONS.map(s => s.kind).slice(n, n + 2)).toEqual(['cruise', 'loop']);
     expect(new Set(SECTIONS.map(s => s.kind)).size).toBe(5);
   });
 
@@ -49,15 +54,19 @@ describe('the Big Drop track', () => {
     for (const k of ['gate', 'kicker', 'loop', 'berm', 'marker'])
       expect(kinds.has(k as never)).toBe(true);
     for (const f of all) {
-      if (f.kind === 'kicker') expect(sectionAt(f.s).kind).toBe('jumps');
+      if (f.kind === 'kicker' && f.s !== CAVE_KICKER.s) expect(sectionAt(f.s).kind).toBe('jumps');
       if (f.kind === 'loop') expect(sectionAt(f.s).kind).toBe('loop');
-      if (f.kind === 'berm') expect(sectionAt(f.s + f.len / 2).kind).toBe('slalom');
+      if (f.kind === 'berm' && !f.id.endsWith('.split'))
+        expect(sectionAt(f.s + f.len / 2).kind).toBe('slalom');
     }
   });
 
-  it('reaches 500 km/h within a minute of riding and keeps going', () => {
-    expect(expectedSpeed(1000) * 3.6).toBeGreaterThan(300);
-    expect(expectedSpeed(6000) * 3.6).toBeGreaterThan(500);
+  it('holds the SSX course to its governor, then reaches 500 km/h within a minute and keeps going', () => {
+    for (let s = TRACK.start; s < COURSE.end - 100; s += 50)
+      expect(expectedSpeed(s)).toBeLessThanOrEqual(courseCap(s) + 0.1);
+    expect(expectedSpeed(COURSE.end - 100) * 3.6).toBeGreaterThan(180);
+    expect(expectedSpeed(COURSE.end + 1000) * 3.6).toBeGreaterThan(400);
+    expect(expectedSpeed(COURSE.end + 3000) * 3.6).toBeGreaterThan(600);
     expect(expectedSpeed(60_000) * 3.6).toBeGreaterThan(2000);
     expect(trackScale(TRACK.start)).toBe(1);
     expect(trackScale(200_000)).toBe(5);

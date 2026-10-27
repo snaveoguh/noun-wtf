@@ -59,6 +59,8 @@ export interface InputFrame {
   /** On foot: Q / gamepad B / touch STOP held, and its press (parkour slide, roll, drop). */
   duck?: boolean;
   duckPressed?: boolean;
+  /** The Big Drop's SSX boost: Tab / gamepad X / its touch button. */
+  boostPressed?: boolean;
   tricks: TrickInput[];
   mode: InputMode;
 }
@@ -189,7 +191,11 @@ export class Input {
     respawn: false,
     /** OLLIE button held: crouch to load, the release pops. */
     crouch: false,
+    /** The Big Drop's BOOST button (a press, consumed by the next poll). */
+    boost: false,
   };
+  /** The last frame poll() returned (systems that run after the physics read it). */
+  last: InputFrame | null = null;
 
   private el: HTMLElement;
   private disposers: (() => void)[] = [];
@@ -404,6 +410,7 @@ export class Input {
     f.respawnPressed = this.keyPressed('KeyR');
     f.duck = this.key('KeyQ');
     f.duckPressed = this.keyPressed('KeyQ');
+    f.boostPressed = this.keyPressed('Tab');
     f.spray = this.key('KeyG') || this.lmb;
     f.colorCyclePressed = this.keyPressed('KeyT');
     f.sizeStep =
@@ -475,6 +482,7 @@ export class Input {
         f.brake = btn(1);
         f.duck = btn(1);
         f.duckPressed = btnPressed(1);
+        f.boostPressed = f.boostPressed || btnPressed(2);
         f.grabL = btn(6);
         f.grabR = btn(7);
         f.sprint = btn(10);
@@ -541,9 +549,12 @@ export class Input {
       f.tricks.push(...this.pendingTricks);
       this.pendingTricks = [];
     }
+    if (this.touch.boost) f.boostPressed = true;
+    this.touch.boost = false;
 
     this.pressed.clear();
     this.released.clear();
+    this.last = f;
     return f;
   }
 

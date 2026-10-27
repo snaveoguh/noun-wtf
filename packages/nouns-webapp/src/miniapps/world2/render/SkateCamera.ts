@@ -42,6 +42,8 @@ export class SkateCamera {
   private shake = 0;
   mode: CamMode = 'follow';
   fov = 70;
+  /** Degrees added to the board's speed FOV (the Big Drop's boost kick). */
+  fovKick = 0;
   /** 0..1 blend into the climbing framing (pulled back, low, looking up the wall). */
   private climbK = 0;
   /** Rider position last frame (camera feed-forward at speed). */
@@ -285,6 +287,7 @@ export class SkateCamera {
     let targetFov = onBoard
       ? 68 + Math.min(14, p.speed * 0.9) + 28 * (1 - Math.exp(-fast / 45))
       : 62 + (pk?.fov ?? 0);
+    if (onBoard) targetFov += this.fovKick;
     // These are vertical FOVs tuned on landscape screens. On a portrait phone
     // the same vertical FOV leaves a sliver of the world either side, so
     // keep at least the horizontal view a 1.4:1 screen would get (capped)
