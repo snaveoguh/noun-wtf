@@ -28,6 +28,7 @@ import {
   SHOE_COLORS,
   SHOE_LABELS,
   SHOE_STYLES,
+  keepOutfit,
   outfitFromSeed,
   parseOutfit,
   randomOutfit,
@@ -194,7 +195,7 @@ export function CharacterSelect({
   const [name, setName] = useState(initial.name);
   const [board, setBoard] = useState<BoardType>(() => parseBoardType(initial.board));
   const [build, setBuild] = useState<number>(initial.build ?? 2);
-  /** null = wear the seed's default (follows the head until you pick something). */
+  /** null = wear the seed's default (pinned by the first trait change, `keepOutfit`). */
   const [picked, setPicked] = useState<Outfit | null>(initial.outfit ?? null);
   const outfit = useMemo(() => picked ?? outfitFromSeed(seed), [picked, seed]);
   const [tab, setTab] = useState<Tab>('noun');
@@ -280,17 +281,30 @@ export function CharacterSelect({
     bump();
   }, []);
 
-  const cycleTrait = useCallback((r: TraitRow, dir: number) => {
-    const n = traitCount(r);
-    setSeedState(s => ({ ...s, [r]: wrap(s[r] + dir, n) }));
-    bump();
+  /** Change the Noun's traits without touching its clothes. */
+  const setSeed = useCallback((fn: (s: NounSeed) => NounSeed) => {
+    const prev = seedRef.current;
+    setPicked(p => keepOutfit(p, prev));
+    setSeedState(fn);
   }, []);
 
-  const randomTrait = useCallback((r: TraitRow) => {
-    const n = traitCount(r);
-    setSeedState(s => ({ ...s, [r]: Math.floor(Math.random() * n) }));
-    bump();
-  }, []);
+  const cycleTrait = useCallback(
+    (r: TraitRow, dir: number) => {
+      const n = traitCount(r);
+      setSeed(s => ({ ...s, [r]: wrap(s[r] + dir, n) }));
+      bump();
+    },
+    [setSeed],
+  );
+
+  const randomTrait = useCallback(
+    (r: TraitRow) => {
+      const n = traitCount(r);
+      setSeed(s => ({ ...s, [r]: Math.floor(Math.random() * n) }));
+      bump();
+    },
+    [setSeed],
+  );
 
   const cycle = useCallback(
     (r: Row, dir: number) => {
@@ -332,9 +346,9 @@ export function CharacterSelect({
   );
 
   const randomNoun = useCallback(() => {
-    setSeedState(s => ({ ...randomSeed(), background: s.background }));
+    setSeed(s => ({ ...randomSeed(), background: s.background }));
     bump();
-  }, []);
+  }, [setSeed]);
   const randomFit = useCallback(() => {
     setPicked(randomOutfit());
     bump();
@@ -573,7 +587,7 @@ export function CharacterSelect({
                     type="button"
                     className="cs-btn"
                     onClick={() => {
-                      setSeedState(auctionSeed);
+                      setSeed(() => auctionSeed);
                       bump();
                     }}
                   >

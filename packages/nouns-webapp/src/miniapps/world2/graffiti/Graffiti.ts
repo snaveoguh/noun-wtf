@@ -15,16 +15,19 @@
 // (and is carried over into the store). Offline (dev) runs keep paint in
 // localStorage instead.
 //
-// Detail: a cell's canvas starts at 512×256 (~12 mm a pixel) and steps up
-// to 1024 or 2048 wide when it holds fine-tip strokes, with a cap on how
-// many big canvases exist at once so memory stays bounded.
+// Detail: every cell is drawn as soon as its paint arrives, small (128×64,
+// lod.ts) so the whole plaza fits in a phone's memory. Cells round the rider
+// are redrawn sharp: 512×256 (~12 mm a pixel), stepping up to 1024 or 2048
+// wide when they hold fine-tip strokes, with a cap on how many big canvases
+// exist at once so memory stays bounded.
 
 import type { CollisionWorld } from '../physics/Collision';
 
 import * as THREE from 'three';
 
 import { type DrawItem, SprayHistory, WallLog, type Outgoing } from './history';
-import { inParallel, nearestFirst } from './loadOrder';
+import { inParallel, nearestFirst, retry } from './loadOrder';
+import { FAR_W, type LodCell, lodChanges } from './lod';
 import { postTag, type QueuedTag, StoreQueue } from './storeQueue';
 import {
   CELL_H_MM,
@@ -96,6 +99,14 @@ const STORE_URL = '/.netlify/functions/world-graffiti';
 const STORE_BATCH = 40;
 /** Store batches in flight at once while loading. */
 const STORE_PARALLEL = 4;
+/** Goes at each store read, and the first wait between them (doubling). */
+const STORE_TRIES = 4;
+const STORE_RETRY_MS = 1_000;
+/** Walls the store still owes us are asked for again after this long. */
+const STORE_AGAIN_MS = 30_000;
+/** How often cells are re-sorted by distance, and how many change size each time. */
+const LOD_EVERY = 0.2;
+const LOD_BUDGET = 12;
 const PREFS_KEY = 'w2-spray-v1';
 const OFFLINE_KEY = 'w2-graffiti-offline';
 const OFFLINE_MAX_CHARS = 1_500_000;
@@ -128,7 +139,12 @@ interface Cell {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   texture: THREE.CanvasTexture;
+  /** Drawn full size round the rider (else FAR_W wide). */
+  near: boolean;
+  /** Full-size canvas tier while near. */
   tier: number;
+  /** The tier its finest strokes ask for. */
+  want: number;
   origin: THREE.Vector3; // world position of the cell's bottom-left corner
   u: THREE.Vector3;
   v: THREE.Vector3;
@@ -354,12 +370,18 @@ export class Graffiti {
   private lastEnd: { plane: string; world: THREE.Vector3 } | null = null;
   private prevWorld: THREE.Vector3 | null = null;
   private sinceSpray = 0;
+  /** Seconds to the next look at which cells should be sharp. */
+  private lodClock = 0;
   private indexed = new Set<string>();
   /** Walls asked of PartyKit on this connection. */
   private asked = new Set<string>();
-  /** Permanent-store load; PartyKit's index waits for it. */
+  /** Permanent-store load in progress; PartyKit's index waits for it. */
   private stored: Promise<void> | null = null;
   private storedDone = false;
+  /** Walls the store listed that haven't come back from it yet (null: no list yet). */
+  private storeTodo: Set<string> | null = null;
+  private storeAgain: ReturnType<typeof setTimeout> | null = null;
+  private disposed = false;
   /** Where the rider is (Game sets it): stored walls load nearest-first. */
   near: (() => { x: number; y: number; z: number } | null) | null = null;
   private readonly startedAt = Date.now();
@@ -424,7 +446,10 @@ export class Graffiti {
     this.cursor.visible = false;
     this.group.add(this.cursor);
 
+    // The store loads on arrival: it used to wait for PartyKit's socket to
+    // open, so a slow or failed connection left every wall bare
     if (net === null) queueMicrotask(() => this.loadOffline());
+    else queueMicrotask(() => void this.loadStore());
   }
 
   // ── Tools ─────────────────────────────────────────────────────────────
@@ -603,13 +628,30 @@ export class Graffiti {
   loadAll() {
     if (this.net === null) return;
     this.asked.clear();
-    this.stored ??= this.loadStored().finally(() => {
-      this.storedDone = true;
-    });
-    void this.stored.then(() => {
+    void this.loadStore().then(() => {
       for (let i = 0; i < INDEX_BUCKETS; i++) this.net?.load(this.indexId(i));
       for (const id of this.indexed) this.askParty(id);
     });
+  }
+
+  /**
+   * Fetch the permanent store's walls (Graffiti starts this itself on
+   * arrival). Reads that fail are retried; walls still missing after that
+   * are asked for again a little later, and on the next call.
+   */
+  loadStore(): Promise<void> {
+    if (this.net === null) return Promise.resolve();
+    this.stored ??= this.loadStored().finally(() => {
+      this.storedDone = true;
+      this.stored = null;
+      const owed = this.storeTodo === null || this.storeTodo.size > 0;
+      if (owed && !this.disposed && this.storeAgain === null)
+        this.storeAgain = setTimeout(() => {
+          this.storeAgain = null;
+          if (!this.disposed) void this.loadStore();
+        }, STORE_AGAIN_MS);
+    });
+    return this.stored;
   }
 
   /** Ask PartyKit for a wall's tags (once per connection). */
@@ -620,33 +662,41 @@ export class Graffiti {
   }
 
   private async loadStored() {
-    try {
-      const res = await fetch(`${STORE_URL}?level=${this.levelKey}`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const { walls } = (await res.json()) as { walls: string[] };
-      for (const id of walls) this.indexed.add(id);
-      // The walls round the rider first, a few batches at once (loadOrder.ts)
-      const order = nearestFirst(walls, this.near?.() ?? null, CELL_W, CELL_H);
-      const batches: string[][] = [];
-      for (let i = 0; i < order.length; i += STORE_BATCH)
-        batches.push(order.slice(i, i + STORE_BATCH));
-      await inParallel(batches, STORE_PARALLEL, async batch => {
-        const r = await fetch(
-          `${STORE_URL}?level=${this.levelKey}&ids=${encodeURIComponent(JSON.stringify(batch))}`,
-          { cache: 'no-store' },
-        );
-        if (!r.ok) return;
-        const got = (await r.json()) as { walls: Record<string, string[]> };
-        for (const [id, tags] of Object.entries(got.walls))
+    const wait = (n: number) => new Promise<void>(r => setTimeout(r, STORE_RETRY_MS * 2 ** n));
+    const get = async <T>(query: string) => {
+      const r = await fetch(`${STORE_URL}?level=${this.levelKey}${query}`, { cache: 'no-store' });
+      return r.ok ? ((await r.json()) as T) : null;
+    };
+    if (this.storeTodo === null) {
+      const index = await retry(() => get<{ walls: string[] }>(''), STORE_TRIES, wait);
+      if (index === null || !Array.isArray(index.walls)) return;
+      for (const id of index.walls) this.indexed.add(id);
+      this.storeTodo = new Set(index.walls);
+    }
+    // The walls round the rider first, a few batches at once (loadOrder.ts)
+    const order = nearestFirst([...this.storeTodo], this.near?.() ?? null, CELL_W, CELL_H);
+    const batches: string[][] = [];
+    for (let i = 0; i < order.length; i += STORE_BATCH)
+      batches.push(order.slice(i, i + STORE_BATCH));
+    await inParallel(batches, STORE_PARALLEL, async batch => {
+      const got = await retry(
+        () =>
+          get<{ walls: Record<string, string[]> }>(
+            `&ids=${encodeURIComponent(JSON.stringify(batch))}`,
+          ),
+        STORE_TRIES,
+        wait,
+      );
+      if (got === null || this.disposed) return;
+      for (const id of batch) this.storeTodo?.delete(id);
+      for (const [id, tags] of Object.entries(got.walls ?? {}))
+        if (Array.isArray(tags))
           this.paintTags(
             id,
             tags.map(d => ({ imageData: d })),
             false,
           );
-      });
-    } catch {
-      // Offline or the function is down: PartyKit still has recent tags
-    }
+    });
   }
 
   private offlineKey() {
@@ -731,9 +781,12 @@ export class Graffiti {
         0,
         ...res.items.map(i => (i.kind === 'stroke' ? tierFor(i.stroke.r) : 0)),
       );
-      if (want > cell.tier && this.retier(cell, want)) {
-        redraw = true;
-        continue;
+      if (want > cell.want) {
+        cell.want = want;
+        if (cell.near && this.retier(cell, want)) {
+          redraw = true;
+          continue;
+        }
       }
       if (!redraw) {
         // Under a live stroke, paint into the snapshot so it isn't wiped
@@ -809,8 +862,8 @@ export class Graffiti {
     const hit = this.cells.get(id);
     if (hit !== undefined) return hit;
     const canvas = document.createElement('canvas');
-    canvas.width = TIER_W[0];
-    canvas.height = TIER_W[0] / 2;
+    canvas.width = FAR_W;
+    canvas.height = FAR_W / 2;
     const ctx = canvas.getContext('2d')!;
     const texture = this.makeTexture(canvas);
     const mat = new THREE.MeshStandardMaterial({
@@ -846,7 +899,9 @@ export class Graffiti {
       canvas,
       ctx,
       texture,
+      near: false,
       tier: 0,
+      want: 0,
       origin,
       u,
       v,
@@ -865,12 +920,13 @@ export class Graffiti {
     return texture;
   }
 
-  /** Move a cell to a bigger canvas (if the cap allows). True if it did. */
+  /** Move a sharp cell to a bigger canvas (if the cap allows). True if it did. */
   private retier(cell: Cell, want: number): boolean {
+    if (!cell.near) return false;
     let tier = cell.tier;
     for (let t = Math.min(want, TIER_W.length - 1); t > cell.tier; t--) {
       let used = 0;
-      for (const c of this.cells.values()) if (c.tier === t) used++;
+      for (const c of this.cells.values()) if (c.near && c.tier === t) used++;
       if (used < this.tierCaps[t]) {
         tier = t;
         break;
@@ -878,14 +934,47 @@ export class Graffiti {
     }
     if (tier === cell.tier) return false;
     cell.tier = tier;
-    cell.canvas.width = TIER_W[tier];
-    cell.canvas.height = TIER_W[tier] / 2;
+    this.resize(cell, TIER_W[tier]);
+    return true;
+  }
+
+  /** Give a cell a canvas `w` wide (cleared) and a texture to match. */
+  private resize(cell: Cell, w: number) {
+    if (cell.canvas.width === w) return;
+    cell.canvas.width = w;
+    cell.canvas.height = w / 2;
     cell.texture.dispose();
     cell.texture = this.makeTexture(cell.canvas);
     const mat = cell.mesh.material as THREE.MeshStandardMaterial;
     mat.map = cell.texture;
     mat.needsUpdate = true;
-    return true;
+  }
+
+  /** Redraw a cell sharp (near the rider) or small (far off). */
+  private setNear(cell: Cell, near: boolean) {
+    if (cell.near === near) return;
+    cell.near = near;
+    cell.tier = 0;
+    if (!near) this.resize(cell, FAR_W);
+    else if (!this.retier(cell, cell.want)) this.resize(cell, TIER_W[0]);
+    this.redraw(cell);
+  }
+
+  /** Sharpen the cells round `at`, let distant ones go back to small. */
+  private updateLod(at: THREE.Vector3) {
+    const live = this.live?.cell;
+    const list: LodCell[] = [];
+    for (const c of this.cells.values())
+      list.push({
+        id: c.id,
+        near: c.near,
+        dist: c.mesh.position.distanceTo(at),
+        pinned: c === live,
+      });
+    const { promote, demote } = lodChanges(list, LOD_BUDGET);
+    // Down first, so the big-canvas caps have room for the ones going up
+    for (const id of demote) this.setNear(this.cells.get(id)!, false);
+    for (const id of promote) this.setNear(this.cells.get(id)!, true);
   }
 
   /** Repaint a cell from scratch: its log, then my unsent strokes. */
@@ -937,6 +1026,8 @@ export class Graffiti {
 
   private startStroke(cell: Cell, first: [number, number], anchor: [number, number] | null) {
     const r = quantRadius(this.radius);
+    this.setNear(cell, true);
+    cell.want = Math.max(cell.want, tierFor(r));
     if (this.retier(cell, tierFor(r))) this.redraw(cell);
     const pts = anchor !== null ? [anchor[0], anchor[1], first[0], first[1]] : [first[0], first[1]];
     this.live = {
@@ -1090,6 +1181,11 @@ export class Graffiti {
     // Flush after a short pause so one burst = one save per wall
     if (!active && this.sinceSpray > 0.8 && this.history.hasPending) this.flush();
 
+    this.lodClock -= dt;
+    if (this.lodClock <= 0) {
+      this.lodClock = LOD_EVERY;
+      this.updateLod(playerPos);
+    }
     this.updateCursor(opts.cursor !== false);
     for (const c of this.cells.values()) {
       if (c.dirty) {
@@ -1174,6 +1270,8 @@ export class Graffiti {
   }
 
   dispose() {
+    this.disposed = true;
+    if (this.storeAgain !== null) clearTimeout(this.storeAgain);
     this.flush();
     for (const c of this.cells.values()) {
       c.texture.dispose();

@@ -24,6 +24,7 @@ export const KEYBOARD: ControlGroup[] = [
       { keys: ['SPACE'], what: 'hold to crouch, let go to ollie' },
       { keys: ['F'], what: 'board on / off' },
       { keys: ['R'], what: 'respawn (fountain or van)' },
+      { keys: ['TAB'], what: 'the Big Drop: boost (fills from air, grabs, grinds)' },
     ],
   },
   {
@@ -106,6 +107,7 @@ export const GAMEPAD: ControlGroup[] = [
       { keys: ['A', 'X'], what: 'push' },
       { keys: ['B'], what: 'brake' },
       { keys: ['Y'], what: 'board on / off' },
+      { keys: ['X'], what: 'the Big Drop: boost' },
     ],
   },
   {

@@ -7,8 +7,11 @@
 // gravity along a 49° slope at 40%, rolling friction, air drag that eases
 // off with distance ridden, the ride-streak push) once, from a standing
 // start on the summit pad, and tabulates the speed by track distance. The
-// track scales its sections, weaves and kickers by it (trackScale).
+// track scales its sections, weaves and kickers by it (trackScale). Over
+// the SSX course at the top the board is governed (courseSpec.ts
+// courseCap), so the table is too.
 
+import { courseCap } from './courseSpec';
 import { PEAK } from './terrainPeak';
 
 /** Gravity inside the Big Drop: 12.5 m/s² (Player tuning) × 0.4 (peak.ts PEAK_GRAVITY). */
@@ -52,7 +55,7 @@ function build() {
       FRICTION -
       (DRAG / (1 + run / RUN_DRAG_K)) * sp * sp +
       (sp > 30 / 3.6 ? STREAK * t : 0);
-    sp = Math.max(1, sp + a * dt);
+    sp = Math.min(courseCap(z), Math.max(1, sp + a * dt));
     const d = sp * dt;
     run += d;
     z += d / SLOPE_PER_Z;

@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { PEAK_LIPSCHITZ, peakHeight, peakNormal } from '../peakTerrain';
 
+import { BRANCH, COURSE } from './courseSpec';
+import { type Flight, flyKicker } from './kickerFlight';
 import { surfaceAt } from './surface';
 import { coneHeight } from './terrainPeak';
 import {
+  branchKicker,
   CARVE,
   centerX,
   featuresIn,
@@ -14,9 +17,7 @@ import {
   SECTIONS,
   widthAt,
 } from './track';
-import { PEAK_G } from './trackSpeed';
 
-const n = { x: 0, y: 0, z: 0 };
 const FAR = 160_000;
 const kickers = featuresIn(0, FAR).filter(f => f.kind === 'kicker');
 const loops = featuresIn(0, FAR).filter(f => f.kind === 'loop');
@@ -35,135 +36,10 @@ function grad(x: number, z: number, e = 0.25) {
   return { gx, gz, m: Math.hypot(gx, gz) };
 }
 
-interface Flight {
-  hang: number;
-  x: number;
-  z: number;
-  ny: number;
-  impact: number;
-  along: number;
-  peak: number;
-}
-
-/**
- * Player.updateGround's surface follow (skate/Player.ts), in the vertical
- * plane x = const: physics substeps of ≤ 0.5 m, the ground probe (0.5 m up,
- * snap 0.08 + min(0.35, 0.03 v)), normals read at ±0.5 m (peakNormal) and
- * averaged with nose / tail probes, the board's up easing toward them at
- * 22/s, velocity kept tangent to the board. It leaves the ground when the
- * probe misses or the normal turns > 21.6° away at once. Returns where and
- * at what velocity (z, y components) the board takes off.
- */
-function rideOff(x: number, z0: number, v: number, stopZ: number) {
-  const nn = { x: 0, y: 0, z: 0 };
-  const norm = (z: number): [number, number] => {
-    peakNormal(x, z, nn);
-    const l = Math.hypot(nn.y, nn.z);
-    return [nn.z / l, nn.y / l];
-  };
-  let pz = z0;
-  let py = peakHeight(x, z0);
-  let [uz, uy] = norm(z0);
-  let vz = uy * v;
-  let vy = -uz * v;
-  const dt = 1 / 60;
-  const h = dt / Math.max(Math.ceil(dt * 90), Math.ceil((v * dt) / 0.5));
-  while (pz < stopZ) {
-    const snap = 0.08 + Math.min(0.35, Math.hypot(vz, vy) * 0.03);
-    const oz = pz + uz * 0.5;
-    const oy = py + uy * 0.5;
-    let hit = -1;
-    for (let t = 0; t <= 0.5 + snap; t += 0.004)
-      if (oy - uy * t < peakHeight(x, oz - uz * t)) {
-        hit = t;
-        break;
-      }
-    if (hit < 0) return { z: pz, y: py, vz, vy };
-    const hz = oz - uz * hit;
-    const [rz, ry] = norm(hz);
-    if (rz * uz + ry * uy < 0.93 && vz * rz + vy * ry > 0.6) return { z: pz, y: py, vz, vy };
-    let az = rz;
-    let ay = ry;
-    for (const off of [0.32, -0.32]) {
-      const [qz, qy] = norm(hz + uy * off);
-      if (qz * rz + qy * ry > 0.6) {
-        az += qz;
-        ay += qy;
-      }
-    }
-    const al = Math.hypot(az, ay);
-    pz = hz;
-    py = oy - uy * hit;
-    const k = 1 - Math.exp(-22 * h);
-    uz += (az / al - uz) * k;
-    uy += (ay / al - uy) * k;
-    const ul = Math.hypot(uz, uy);
-    uz /= ul;
-    uy /= ul;
-    const gd = -PEAK_G * uy;
-    vz -= gd * uz * h;
-    vy += (-PEAK_G - gd * uy) * h;
-    const vu = vz * uz + vy * uy;
-    vz -= vu * uz;
-    vy -= vu * uy;
-    pz += vz * h;
-    py += vy * h;
-  }
-  return null;
-}
-
-/**
- * Ride at `speed` up a kicker's ramp the way the board does (rideOff), then
- * fly ballistically at the Big Drop's gravity and come down on the first
- * ground the path meets.
- */
+/** Fly a track kicker at `speed` (kickerFlight.ts). */
 function fly(f: (typeof kickers)[number], speed: number): Flight {
   const k = kickerShape(f)!;
-  const x0 = centerX(f.s + k.lip);
-  const off = rideOff(x0, f.s + k.lip - 25, speed, f.s + k.end + 50);
-  if (off === null) throw new Error(`${f.id} at ${speed.toFixed(0)} m/s never left the ground`);
-  const vx = 0;
-  const vz = off.vz;
-  let vy = off.vy;
-  let z = off.z;
-  let y = off.y;
-  let x = x0;
-  let time = 0;
-  let peak = 0;
-  const dt = 1 / 240;
-  for (let i = 0; i < 240 * 120; i++) {
-    const px = x;
-    const py = y;
-    const pz = z;
-    vy -= PEAK_G * dt;
-    x += vx * dt;
-    y += vy * dt;
-    z += vz * dt;
-    time += dt;
-    peak = Math.max(peak, y - peakHeight(x, z));
-    if (y < peakHeight(x, z)) {
-      // Bisect the crossing
-      let a = 0;
-      let b = 1;
-      for (let j = 0; j < 30; j++) {
-        const m = (a + b) / 2;
-        const mx = px + (x - px) * m;
-        const my = py + (y - py) * m;
-        const mz = pz + (z - pz) * m;
-        if (my > peakHeight(mx, mz)) a = m;
-        else b = m;
-      }
-      x = px + (x - px) * b;
-      z = pz + (z - pz) * b;
-      peakNormal(x, z, n);
-      const impact = -(vx * n.x + vy * n.y + vz * n.z);
-      const tx = vx + n.x * impact;
-      const ty = vy + n.y * impact;
-      const tz = vz + n.z * impact;
-      return { hang: time, x, z, ny: n.y, impact, along: Math.hypot(tx, ty, tz), peak };
-    }
-  }
-  throw new Error('never came down');
+  return flyKicker(k, centerX(f.s + k.lip), speed);
 }
 
 describe('the carved track: kickers', () => {
@@ -190,13 +66,17 @@ describe('the carved track: kickers', () => {
     let longest = 0;
     for (const f of kickers) {
       const k = kickerShape(f)!;
-      for (const factor of [0.5, 0.75, 1, 1.15, 1.3]) {
+      // The SSX course's are governed to their design speed (a little under
+      // after a slow corner, 45% over on a boost) and built snappier
+      const course = f.s < COURSE.end;
+      const factors = course ? [0.75, 1, 1.15, 1.3, 1.45] : [0.5, 0.75, 1, 1.15, 1.3];
+      for (const factor of factors) {
         const v = k.speed * factor;
         const fl = fly(f, v);
         longest = Math.max(longest, fl.hang);
-        // Built for its arrival speed: 6–14 s of air
+        // Built for its arrival speed: 6–14 s of air (4–6 on the course)
         if (factor === 1) {
-          expect(fl.hang).toBeGreaterThan(5);
+          expect(fl.hang).toBeGreaterThan(course ? 3 : 5);
           expect(fl.hang).toBeLessThan(22);
           // (the board reads the lip a little soft or hard: within a third)
           expect(Math.abs(fl.hang - k.hang) / k.hang).toBeLessThan(0.35);
@@ -219,7 +99,8 @@ describe('the carved track: kickers', () => {
 
 describe('the carved track: lane, gully, berms, loop pads', () => {
   it('grooms a sunk lane with no moguls', () => {
-    for (const sec of SECTIONS.filter(c => c.kind === 'cruise').slice(0, 6)) {
+    // (past the SSX course: its cruises carry whoops, berms and the split)
+    for (const sec of SECTIONS.filter(c => c.kind === 'cruise' && c.s0 >= COURSE.end).slice(0, 6)) {
       const s = (sec.s0 + sec.s1) / 2 + 7;
       const x = centerX(s);
       expect(peakHeight(x, s) - coneHeight(x, s)).toBeCloseTo(-CARVE.sink, 1);
@@ -229,7 +110,7 @@ describe('the carved track: lane, gully, berms, loop pads', () => {
   });
 
   it('cuts a halfpipe through the gullies', () => {
-    const g = SECTIONS.find(s => s.kind === 'gully')!;
+    const g = SECTIONS.find(s => s.kind === 'gully' && s.s0 >= COURSE.end)!;
     const s = (g.s0 + g.s1) / 2;
     const t = side(s);
     const x = centerX(s);
@@ -265,7 +146,7 @@ describe('the carved track: lane, gully, berms, loop pads', () => {
       const out = peakHeight(x + t.x * half * f.side, s + t.z * half * f.side);
       const inn = peakHeight(x - t.x * half * f.side, s - t.z * half * f.side);
       expect(out - inn).toBeGreaterThan(3);
-      expect(sectionAt(s).kind).toBe('slalom');
+      if (!f.id.endsWith('.split')) expect(sectionAt(s).kind).toBe('slalom');
     }
   });
 
@@ -296,11 +177,17 @@ describe('the carved track is safe ground', () => {
     for (let z = 30; z < 40_000; z += 13) {
       const x0 = centerX(z);
       const reach = widthAt(z) / 2 + CARVE.reach + 10;
-      // Kicker back faces are the one steep thing (nobody rides them: the lip launches you)
-      const back = kickers.some(f => {
-        const k = kickerShape(f)!;
-        return z > f.s + k.lip - 0.5 && z < f.s + k.lip + k.lb1 + 0.5;
-      });
+      // Kicker back faces are the one steep thing (nobody rides them: the lip
+      // launches you), and the SPLIT's crevasse wall just past its gap kicker
+      const bk = branchKicker();
+      const gap = bk.s + bk.lip + BRANCH.gapFrom;
+      const back =
+        kickers.some(f => {
+          const k = kickerShape(f)!;
+          return z > f.s + k.lip - 0.5 && z < f.s + k.lip + k.lb1 + 0.5;
+        }) ||
+        (z > bk.s + bk.lip - 0.5 && z < bk.s + bk.lip + bk.lb1 + 0.5) ||
+        (z > gap - 1 && z < gap + 16);
       for (let lat = -reach; lat <= reach; lat += 5) {
         const g = grad(x0 + lat, z);
         steepest = Math.max(steepest, g.m);

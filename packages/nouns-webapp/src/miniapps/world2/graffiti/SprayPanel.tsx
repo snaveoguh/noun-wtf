@@ -1,10 +1,12 @@
 // ── Spray-can HUD: colour, nozzle, cap, opacity, undo, eyedropper ───────
 //
-// Desktop: a panel bottom-right while on foot (it steps left of the NOUN FM
-// deck screen when that's up). Phones: a colour button in the touch column
-// opens a compact strip under the site tray: swatches, nozzles, undo, pick.
-// It stays open while you spray and is sized to end above the steering
-// stick's area and the deck screen (which sits on the left on phones).
+// Desktop: a panel bottom-right (it steps left of the NOUN FM deck screen
+// when that's up), opened from the ring's spray icon and open until the
+// player closes it: on foot or on the board (both can spray), remembered
+// across visits. Phones: a colour button in the touch column opens a
+// compact strip under the site tray: swatches, nozzles, undo, pick. It
+// stays open until closed and is sized to end above the steering stick's
+// area and the deck screen (which sits on the left on phones).
 
 import type { Game } from '../Game';
 import type { Graffiti, SprayTools } from './Graffiti';
@@ -12,7 +14,6 @@ import type { Graffiti, SprayTools } from './Graffiti';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useBeats } from '../audio/BeatsScreen';
-import { HudIcon } from '../hud/icons';
 import { useFm } from '../radio/FmPanel';
 import { HudDrag } from '../ui/HudDrag';
 
@@ -33,7 +34,7 @@ function useHudSpray(game: Game) {
 }
 
 const FOLD_KEY = 'noun-world-spray-open';
-/** The desktop panel starts folded behind its can; opening it is remembered. */
+/** The desktop panel starts closed; opening it is remembered. */
 function loadUnfolded(): boolean {
   try {
     return localStorage.getItem(FOLD_KEY) === '1';
@@ -48,6 +49,37 @@ function saveUnfolded(on: boolean) {
   } catch {
     // private mode: it just starts folded
   }
+}
+
+/** The desktop panel's open state, shared by the panel and the ring's spray icon. */
+let panelOpen: boolean | null = null;
+const openListeners = new Set<() => void>();
+export const sprayPanel = {
+  isOpen(): boolean {
+    if (panelOpen === null) panelOpen = loadUnfolded();
+    return panelOpen;
+  },
+  set(on: boolean) {
+    panelOpen = on;
+    saveUnfolded(on);
+    for (const l of openListeners) l();
+  },
+  toggle() {
+    sprayPanel.set(!sprayPanel.isOpen());
+  },
+  subscribe(cb: () => void) {
+    openListeners.add(cb);
+    return () => openListeners.delete(cb);
+  },
+};
+
+export function useSprayOpen(): boolean {
+  return useSyncExternalStore(sprayPanel.subscribe, sprayPanel.isOpen);
+}
+
+/** Somewhere the can works: not indoors, not on the Big Drop. */
+export function canSpray(game: Game): boolean {
+  return game.graffiti !== null && !game.interiors.inside && !game.missions.ud.active;
 }
 
 /** Buttons that never take focus (Space would "click" them mid-jump). */
@@ -189,7 +221,7 @@ function Note({ t }: { t: SprayTools }) {
   return fresh ? <div className="sp-note">{t.note!.text}</div> : null;
 }
 
-/** Desktop spray panel (bottom-right, on foot). */
+/** Desktop spray panel (bottom-right). */
 export function SprayPanel({ game }: { game: Game }) {
   const hud = useHudSpray(game);
   const g = game.graffiti;
@@ -199,37 +231,8 @@ export function SprayPanel({ game }: { game: Game }) {
   const fmScreen = useFm(game.fm).screen;
   const beatsScreen = useBeats(game.beats).screen;
   const right = 16 + 248 * (Number(fmScreen) + Number(beatsScreen));
-  const [unfolded, setUnfolded] = useState(loadUnfolded);
-  const fold = (on: boolean) => {
-    setUnfolded(on);
-    saveUnfolded(on);
-  };
-  if (g === null || t === null) return null;
-  if (hud.mode !== 'foot' && !hud.spray.active) return null;
-  if (game.interiors.inside) return null; // no spraying indoors
-  // Folded: a spray can in the corner (spraying itself never needs the panel)
-  if (!unfolded && !hud.spray.active)
-    return (
-      <HudDrag id="spray" className="absolute bottom-24" style={{ right }} handle>
-        <button
-          type="button"
-          {...noFocus}
-          data-w2drag
-          data-spray="fold"
-          data-tip="Spray paint: colours and nozzles (G / drag to spray)"
-          title="Spray paint: colours and nozzles (G / drag to spray)"
-          aria-label="Open the spray panel"
-          className="w2h-ib"
-          onClick={() => fold(true)}
-        >
-          <HudIcon name="spray" size={20} />
-          <i
-            className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-[#0b0b12]"
-            style={{ background: t.hex }}
-          />
-        </button>
-      </HudDrag>
-    );
+  const open = useSprayOpen();
+  if (g === null || t === null || !open || !canSpray(game)) return null;
   return (
     <HudDrag id="spray" className="absolute bottom-24" style={{ right }} handle>
       <div className="sp-panel" data-spray="panel">
@@ -240,11 +243,11 @@ export function SprayPanel({ game }: { game: Game }) {
             type="button"
             {...noFocus}
             className="sp-fold"
-            title="Fold the spray panel"
-            aria-label="Fold the spray panel"
-            onClick={() => fold(false)}
+            title="Close the spray panel"
+            aria-label="Close the spray panel"
+            onClick={() => sprayPanel.set(false)}
           >
-            ▾
+            ✕
           </button>
           <div className="sp-meta" data-w2drag title="drag to move · double-click to reset">
             <b>{t.hex.toUpperCase()}</b>
@@ -305,20 +308,19 @@ export function SprayPanel({ game }: { game: Game }) {
 
 /** Phone: colour button for the touch column + the strip it opens. */
 export function SprayTouch({ game }: { game: Game }) {
-  const hud = useHudSpray(game);
+  useHudSpray(game); // re-checks canSpray as the rider goes in / out
   const g = game.graffiti;
   const t = useTools(g);
   const fmScreen = useFm(game.fm).screen;
   const [open, setOpen] = useState(false);
   const [room, setRoom] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
-  const foot = hud.mode === 'foot';
 
   // Room below the strip's top before the stick's area (bottom 55% of the
   // screen) or the deck screen, whichever comes first: the opacity row only
   // shows when it fits
   useEffect(() => {
-    if (!open || !foot) return;
+    if (!open) return;
     const measure = () => {
       const el = ref.current;
       if (el === null) return;
@@ -335,10 +337,9 @@ export function SprayTouch({ game }: { game: Game }) {
       window.clearInterval(id);
       window.removeEventListener('resize', measure);
     };
-  }, [open, foot, fmScreen]);
+  }, [open, fmScreen]);
 
-  if (g === null || t === null || !foot) return null;
-  if (game.interiors.inside) return null; // no spraying indoors
+  if (g === null || t === null || !canSpray(game)) return null;
   const tap = (fn: () => void) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.stopPropagation();

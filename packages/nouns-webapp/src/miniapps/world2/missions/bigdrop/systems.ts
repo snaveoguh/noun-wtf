@@ -5,6 +5,7 @@
 
 import type { PeakSystemFactory } from './contract';
 
+import { createCourse } from './course';
 import { createLoops } from './loops';
 import { createRiders } from './riders';
 import { makeAtmosphere } from './scenery/atmosphere';
@@ -16,6 +17,7 @@ import { createTrackDressing } from './trackDressing';
 
 export const PEAK_SYSTEMS: PeakSystemFactory[] = [
   createTrackDressing,
+  createCourse,
   makeAtmosphere,
   makeForest,
   makeBasinLife,

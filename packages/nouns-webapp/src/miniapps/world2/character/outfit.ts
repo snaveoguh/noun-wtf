@@ -136,6 +136,15 @@ export function outfitFromSeed(seed: SeedLike): Outfit {
   return { pants, pantsColor: pt[pick(pt.length)], shoes, shoeColor: st[pick(st.length)] };
 }
 
+/**
+ * The outfit to keep when a Noun's traits change: an explicit pick stays,
+ * and a rider still in its seed's default is pinned to the default it wears
+ * now (`prevSeed`'s), so a new head doesn't redress the whole rider.
+ */
+export function keepOutfit(picked: Outfit | null, prevSeed: SeedLike): Outfit {
+  return picked ?? outfitFromSeed(prevSeed);
+}
+
 /** A random outfit (the select screen's dice). Colours from anywhere in the palettes. */
 export function randomOutfit(rand: () => number = Math.random): Outfit {
   const i = (n: number) => Math.min(n - 1, Math.floor(rand() * n));

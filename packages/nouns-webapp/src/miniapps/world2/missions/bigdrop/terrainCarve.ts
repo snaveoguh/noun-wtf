@@ -10,6 +10,9 @@
 //   berms    the outside of every slalom turn banked up 4–9 m
 //   kickers  kickerShape (track.ts): a ramp, a lip, a long landing
 //   loops    an exact plane under each loop (loopBase in track.ts)
+//   course   the SSX course's extras (courseSpec.ts): whoops across the
+//            lane, and THE SPLIT's shortcut, a second groomed lane with
+//            its rock bore's trough, a gap kicker and a crevasse
 //
 // It also says how much of the mountain's own detail (moguls, ridges)
 // survives there (`CARVED.keep`), so peakHeight can skip computing it on
@@ -20,6 +23,17 @@ import type { LineSample } from './track';
 import { smoothstep, vnoise } from '../../world/mountain/config';
 
 import {
+  BRANCH,
+  CAVE_TROUGH,
+  CAVES,
+  COURSE,
+  courseBulge,
+  courseBulgeSlope,
+  onBranch,
+  ROLLERS,
+} from './courseSpec';
+import {
+  branchKicker,
   CARVE,
   kickerProfile,
   kickerShape,
@@ -58,7 +72,13 @@ export function trackCarve(x: number, z: number, cone: number): number {
   const lat = (x - ln.cx) / Math.sqrt(1 + ln.dcx * ln.dcx);
   const a = lat < 0 ? -lat : lat;
   const half = ln.w * 0.5;
-  if (a > half + CARVE.reach) return NaN;
+  const main = a > half + CARVE.reach ? NaN : mainCarve(x, z, cone, lat, a, half);
+  if (z > COURSE.end || !onBranch(z)) return main;
+  return withBranch(x, z, main);
+}
+
+/** The main line's carving (trackCarve without THE SPLIT's shortcut). */
+function mainCarve(x: number, z: number, cone: number, lat: number, a: number, half: number) {
   CARVED.lateral = lat;
   CARVED.half = half;
   // Groomed lane, then the mountain's detail back in over the shoulder
@@ -125,6 +145,78 @@ export function trackCarve(x: number, z: number, cone: number): number {
       keep *= 1 - w;
     }
   }
+  // The SSX course's whoops
+  if (z < COURSE.end)
+    for (const r of ROLLERS) {
+      if (r.line !== 'main' || z <= r.s0 || z >= r.s1) continue;
+      const along = smoothstep(r.s0, r.s0 + r.wave, z) * (1 - smoothstep(r.s1 - r.wave, r.s1, z));
+      const lane = 1 - smoothstep(half - 2, half + 8, a);
+      off += r.amp * along * lane * 0.5 * (1 - Math.cos((2 * Math.PI * (z - r.s0)) / r.wave));
+    }
   CARVED.keep = keep;
+  return off;
+}
+
+/**
+ * Signed lateral offset (m) of (x, z) from THE SPLIT's shortcut, given the
+ * main line there (`l` = lineAt(z)). Only meaningful while onBranch(z).
+ */
+export function branchLateral(x: number, z: number, l: LineSample): number {
+  const dxB = l.dcx - courseBulgeSlope(z);
+  return (x - (l.cx - courseBulge(z))) / Math.sqrt(1 + dxB * dxB);
+}
+
+/** Whether (x, z) is in THE SPLIT's crevasse (across the shortcut). */
+export function inCrevasse(z: number, aB: number): boolean {
+  const k = branchKicker();
+  const g0 = k.s + k.lip + BRANCH.gapFrom;
+  return z > g0 && z < g0 + BRANCH.gapLen && aB < BRANCH.half + 8;
+}
+
+/**
+ * Blend THE SPLIT's shortcut lane into the main carving `main` (NaN where
+ * the main line doesn't reach): inside the shortcut and over its shoulder
+ * the ground is the shortcut's own groomed lane (plus its rock bore's
+ * trough and the crevasse), then its gap kicker on top.
+ */
+function withBranch(x: number, z: number, main: number): number {
+  const latB = branchLateral(x, z, ln);
+  const aB = latB < 0 ? -latB : latB;
+  const halfB = BRANCH.half;
+  const k = branchKicker();
+  const ku = z - k.s;
+  const kq = ku > 0 && ku < k.end ? 1 - smoothstep(k.halfW, k.halfW + k.shoulder, aB) : 0;
+  // (taking over from the main line's shape over the first and last 80 m)
+  const w =
+    (1 - smoothstep(halfB, halfB + CARVE.shoulder, aB)) *
+    smoothstep(BRANCH.s0, BRANCH.s0 + 80, z) *
+    (1 - smoothstep(BRANCH.s1 - 80, BRANCH.s1, z));
+  const g0 = k.s + k.lip + BRANCH.gapFrom;
+  const g1 = g0 + BRANCH.gapLen;
+  const across = z > g0 && z < g1 ? 1 - smoothstep(halfB, halfB + 40, aB) : 0;
+  if (w <= 0 && kq <= 0 && across <= 0) return main;
+  const m = main === main ? main : 0;
+  const mk = main === main ? CARVED.keep : 1;
+  // The shortcut's own lane
+  let lane = -CARVE.sink * (1 - smoothstep(halfB, halfB + CARVE.shoulder, aB));
+  for (const cv of CAVES) {
+    if (cv.line !== 'branch' || !cv.trough || z <= cv.s0 - 40 || z >= cv.s1 + 40) continue;
+    const along = smoothstep(cv.s0 - 40, cv.s0, z) * (1 - smoothstep(cv.s1, cv.s1 + 40, z));
+    const t = Math.min(1, aB / cv.R);
+    lane -= CAVE_TROUGH * along * (1 - t * t);
+  }
+  let off = m + (lane - m) * w;
+  CARVED.keep = mk * (1 - w);
+  // The crevasse after the gap kicker's lip: a steep drop (you're in the
+  // air over it), a gentle climb out, sides you can ride out over
+  if (across > 0) {
+    const d = smoothstep(g0, g0 + 15, z) * (1 - smoothstep(g1 - 22, g1, z));
+    off -= BRANCH.gapDepth * d * across;
+    CARVED.keep *= 1 - across;
+  }
+  if (kq > 0) {
+    off += kickerProfile(k, ku) * kq;
+    CARVED.keep *= 1 - kq;
+  }
   return off;
 }

@@ -189,6 +189,10 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
 - **Shelf covers:** portrait posters in `public/home/covers/*.webp`, wired in `home/rows.ts`. Pages without one get generated box art (`boxArt.ts`).
 - Brand lettering (hero titles, header wordmark) carries `data-keep-font` so the site font switcher can't replace Pip3 there.
 
+### Plaza ring infill
+
+The baked plaza left a 4.5 m dead-end slot between neighbouring blocks on each side of the ring, and on two sides a 1 m notch behind it; from a roof you looked straight down to the street. `world/infill.ts` finds those slots from the seated COL_Buildings roofs (`findInfills`, pure) and fills each with a narrow building: roof flush with the block behind, parapet + windowed wall on the plaza side, solid colliders (`COL_BuildingsInfill`). `world/infill.test.ts` ray-casts down along every seam on the facade line (render and collision) and fails on any hole. NORTH ROOFS used the north slot as its alley jump; it now runs across the infill roof and up block A's wall off the sill.
+
 ### Noun World on weak phones (texture diet)
 
 A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Android) goes on the texture diet (`render/textureDiet.ts`, `textureDiet.on`): every upload is capped at 512 px, static textures are shrunk to 256 px on the CPU before upload (`shrinkTexture`: the plaza GLB's materials, nature, skyline; shirts and heads paint smaller), the env map bakes at 64 px, the shadow map is 512, only the mural plays a Giphy video, and a lost WebGL context reloads once. New features that add textures should shrink them under `textureDiet.on` too; dev builds warn when the weak-device estimate passes 50 MB (`checkTextureBudget`). Desktop and normal phones never diet. Measured 2026-10-27 (emulated Moto G06, production build): GL textures ~130 → ~36 MB.
@@ -233,6 +237,10 @@ A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews 
 - `net/` `PoolMode` (Game hook, owns the frame while `active`), `PoolUi` (menu, HUD: drag to aim, pull the power bar, spin ball), lockstep sync (`session.ts`: only shots travel, every client plays them with the same sim, the host judges and sends the rounded state), `pool:*` relayed by `packages/nouns-party/src/poolRelay.ts` (online play needs the worker redeployed; an old worker drops `pool:*`, so VS CPU still works).
 - Gamepad: stick aims, RT pull-and-release, right stick spin, RB + stick ball in hand. Wins add respect.
 
+### Seeing each other indoors
+
+A room is built 4 km over its door (`POCKET_Y`, origin `(door.x, POCKET_Y, door.z)`), the same on every client, so positions inside are already a shared frame. The pose blob carries `in: [doorId, level, seat]` only while inside (`interiors/roomNet.ts`). `Game.updateNetwork` draws only riders in the same space (`sameSpace`): street riders in the street, and riders in the same room and on the same floor indoors, with their name tags (`data-room` gets past `[data-away]`). A seated rider is put on their seat by `InteriorSystem.poseRemote`. A window's view of the street shows only street riders. Older clients ignore `in`, so they still draw indoor riders 4 km up. No worker change is needed.
+
 ### Respect
 
 One score for how you act (`world2/respect/`, contract in `interiors/contract.ts` `RespectApi`, on `game.respect`). Rules in `respect/rules.ts` (pure, shared with `netlify/functions/world-respect.ts`): gifts, eating/thanks, buying local, helping, clean big combos, graffiti pieces, serving, hoops/break wins up; stealing, bailing into people, tagging homes, refusing food, overstaying down. Per-kind rate limits + ±minute caps; tiers outcast / stranger / local (50) / regular (200) / legend (600) with hysteresis; slow drift above the tier floor. The client sends events only; the server re-scores them (Blobs store `noun-world-respect`). HUD meter top-right, tier banners, legend noggles badge on name labels.
@@ -257,6 +265,13 @@ The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,
   - sky, sun, cloud sea, ranges, giant Noun, forests and creatures: `scenery/` (`journey.ts` maps depth to time of day: storm, blue, golden, sunset, aurora);
   - NPC hoverboarders: `riders.ts` / `riderSim.ts`; built Nouns are kept between visits, because a build is a hitch;
   - snow spray, wind streaks and sonic booms: `spray.ts` / `sprayRules.ts`.
+- **The SSX course** (the first ~5 km of the track; `bigdrop/courseSpec.ts` is the layout in track terms, s = peak z):
+  - START gate (s 40) → DROP-IN, S-CURVES, BIG AIR, ICE CAVE, THE SPLIT, RAIL YARD, FINAL DROP → FINISH (s 4980), four checkpoints; then the random track as before. About 3 min.
+  - **Governed:** on the course's snow a grounded board is held to `courseCap(s)` (94 → 195 km/h, ×1.45 boosting; the excess bleeds off, `governSpeed`). `trackSpeed.ts` integrates the same cap, so `designKicker` cuts the course's kickers for the real speed (snappier: `hangK` 0.7). Change the cap and the kickers follow.
+  - **THE SPLIT:** the main (safe) line bulges round the shortcut (`courseBulge`); the shortcut is a second lane carved in `terrainCarve.ts` (`withBranch`: lane, rock-bore trough, gap kicker `branchKicker()`, crevasse). Trees stay clear (`courseClearLat`).
+  - **Props** (`courseProps.ts`, built in ~2 ms slices): arches, gates, boost pads, rails in the game's RailSet (local coordinates, re-added on rebase), the caves (mesh + `ctx.setCollider`), rock arches, signs.
+  - **Play** (`course.ts`): boost meter (`boostMeter.ts`; Tab / gamepad X / a touch button, `InputFrame.boostPressed`), magnet rails, the timed run + splits + a local best (`courseRun.ts`, `noun-bigdrop-ssx-v1`), DOM HUD (`courseHud.ts`), `SkateCamera.fovKick`. Nothing counts (stats stay suspended).
+  - Tests: `course.test.ts` (layout, the split, caves, flights clear of props at 0.75–1.45× speed), `boostMeter.test.ts`, `courseRun.test.ts`; `kickerFlight.ts` flies a kicker like the board does. Browser shots: `.claude/ssx-shots/`.
 - In dev: `window.__w2.missions.enterUpsideDown()` / `leaveUpsideDown()`.
 
 ### Books (Meme Value)

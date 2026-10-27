@@ -1,7 +1,7 @@
 // ── NOUN PARKOUR routes ──────────────────────────────────────────────────
 //
 // Laid on the city as it is: the plaza's props and the ring of blocks round
-// it (roofs at 6.8 / 10.2 / 13.6 / 17 / 20.4 m, alleys between them). Each
+// it (roofs at 6.8 / 10.2 / 13.6 / 17 / 20.4 m, steps between them). Each
 // route can add a few course props (planks, poles, ledges, bars) that only
 // exist while it runs, so free roam and other features never see them.
 // Checkpoint y is roughly chest height where you pass.
@@ -77,20 +77,21 @@ const GAUNTLET: Route = {
 
 /**
  * NORTH ROOFS: the north side of the ring. Up the 6.8 m block on two sills,
- * up the 3.4 m steps between blocks, across the 4.5 m alley onto a sill on
- * the far wall, then off the plaza edge onto a pole and down to the street.
+ * up the 3.4 m step, over the parapet onto the infill roof (world/infill.ts;
+ * this was an open alley), up block A's wall off a sill, then off the plaza
+ * edge onto a pole and down to the street.
  */
 const NORTH: Route = {
   id: 'north',
   name: 'NORTH ROOFS',
-  blurb: 'Up the facade, up the steps, over the alley, down the pole.',
+  blurb: 'Up the facade, up the steps, up the wall, down the pole.',
   color: '#20d6ff',
   start: { x: -20, y: 0, z: -68.5, yaw: Math.PI },
   props: [
     // Sills up the 6.8 m block (face at z −75.9)
     { k: 'box', x: -20, y: 3.55, z: -75.75, sx: 2.4, sy: 0.14, sz: 0.3, color: WALL },
     { k: 'box', x: -20, y: 5.45, z: -75.75, sx: 2.4, sy: 0.14, sz: 0.3, color: WALL },
-    // A sill on the far wall of the alley (block A's east face, x −41.2)
+    // A sill on block A's east face (x −41.2), 2.35 m over the infill roof
     { k: 'box', x: -41.05, y: 12.55, z: -78, sx: 0.3, sy: 0.14, sz: 3, color: WALL },
     // The pole down to the street, off the plaza edge of block A
     { k: 'pole', x: -50, z: -72.6, y0: 0, y1: 13.4, r: 0.1 },
@@ -98,7 +99,7 @@ const NORTH: Route = {
   checkpoints: [
     { x: -20, y: 7.7, z: -78, r: 1.8, hint: 'JUMP AT THE WALL, LEAP UP THE SILLS' },
     { x: -30, y: 11.1, z: -77.4, r: 2.4, hint: 'RUN UP THE STEP' },
-    { x: -46, y: 14.5, z: -77.4, r: 2.4, hint: 'SPRINT + JUMP THE ALLEY, GRAB THE SILL' },
+    { x: -46, y: 14.5, z: -77.4, r: 2.4, hint: 'VAULT THE LIP, JUMP AT THE WALL, GRAB THE SILL' },
     { x: -50, y: 12.6, z: -72.6, r: 1.8, hint: 'OFF THE EDGE: CATCH THE POLE' },
     { x: -50, y: 1.2, z: -68.5, r: 2.2, hint: 'SLIDE DOWN · FINISH' },
   ],

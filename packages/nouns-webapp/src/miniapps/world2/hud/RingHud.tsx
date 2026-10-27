@@ -2,15 +2,17 @@
 //
 //   top-right     the round minimap (a speed arc round it) is the anchor.
 //                 Badges sit on its left rim: COIN, respect, score / best,
-//                 the van cargo. The speed sits just under it, then the
-//                 utility icons (mic, radio, time of day, missions, replays,
-//                 stats, chat, help, NOUN FM, settings): one row on desktop,
+//                 the van cargo. On foot the speed sits just under it, then the
+//                 utility icons (mic, radio, time of day, spray paint (desktop),
+//                 missions, replays, stats, chat, help, NOUN FM, settings): one row on desktop,
 //                 one column down the right edge on phones
 //   modes         HIDE & SEEK, FREESTYLE, leave-game chips: one row (under
 //                 the icons on desktop, the top-left corner on phones)
 //   top-centre    one stack of toasts that fade: "E: …" prompts, trick
 //                 names, records, mission updates, hide & seek status
 //   bottom-left   chat
+//   under rider   the speedometer (on the board; drag it anywhere) and,
+//                 out on the mountain, the ride streak's time
 // Panels (stats, the missions tracker, replays) open under the ring.
 //
 // Other UIs render into these places through hud/slots.tsx. Positions come
@@ -24,7 +26,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { nounFm } from '@/components/NounFm/NounFmStation';
 
-import { SprayPanel } from '../graffiti/SprayPanel';
+import { canSpray, SprayPanel, sprayPanel, useSprayOpen } from '../graffiti/SprayPanel';
 import { RespectBanner, RespectMeter } from '../respect/RespectHud';
 import { SettingsCog } from '../settings/SettingsPanel';
 import { ControlsHelp } from '../ui/ControlsHelp';
@@ -139,6 +141,20 @@ export function RingHud({
       {/* Speed lines once a mountain run outpaces the plaza (CSS only) */}
       {hud.mode === 'board' && hud.speed > 20 && (
         <div className="w2-speedlines" style={{ opacity: Math.min(0.75, (hud.speed - 20) / 45) }} />
+      )}
+      {/* Speedometer: just under the rider by default, drag it anywhere */}
+      {hud.mode === 'board' && (
+        <HudDrag id="speed" className="absolute left-1/2 top-[64%] -translate-x-1/2">
+          <div className="w2-speedo">
+            <b>{Math.round(hud.speed * 3.6)}</b>
+            <span>km/h</span>
+          </div>
+          {hud.mountain !== null && (
+            <span className="w2-speedo-streak" title="Ride streak: time riding fast without a bail">
+              STREAK {streakTime(hud.mountain.streak)}
+            </span>
+          )}
+        </HudDrag>
       )}
       <RespectBanner respect={game.respect} sfx={game.sfx} />
 
@@ -302,6 +318,29 @@ export function RingHud({
   );
 }
 
+/** The ride streak's time: "42s", then "1:05". */
+export function streakTime(s: number): string {
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** Opens / closes the desktop spray panel (phones have the can in the touch column). */
+function SprayButton({ game }: { game: Game }) {
+  const open = useSprayOpen();
+  if (!canSpray(game) || game.van2.driving) return null;
+  return (
+    <IconButton
+      icon="spray"
+      on={open}
+      label={
+        open ? 'Close the spray panel' : 'Spray paint: colours and nozzles (G / drag to spray)'
+      }
+      onClick={() => sprayPanel.toggle()}
+      data={{ 'data-spray': 'toggle' }}
+    />
+  );
+}
+
 /** Where the panels column opens. */
 function panelsPos(L: HudLayout): React.CSSProperties {
   if (L.kind === 'desk')
@@ -461,6 +500,7 @@ function Ring({
         label={`Time of day: ${TIME_NAME[hud.timeOfDay] ?? hud.timeOfDay} (P)`}
         onClick={() => game.cycleTimeOfDay()}
       />
+      {!touch && <SprayButton game={game} />}
       {/* Missions and replays (MissionsUi, RecordsUi) */}
       <span ref={utilRef} className="contents" />
       <StatsButton stats={hud.stats} open={statsOpen} onToggle={onStats} />
@@ -585,7 +625,7 @@ function Ring({
           </div>
         )}
 
-        {/* Speed, small, just under the map */}
+        {/* Distance out, players, and the speed on foot, just under the map */}
         <div
           className="w2h-speedline absolute flex items-center justify-end gap-1.5"
           style={{ right: 0, top: size, height: L.speedH, width: L.speedW }}
@@ -607,15 +647,14 @@ function Ring({
               <i className={`w2h-dot ${hud.connected ? 'w2h-up' : ''}`} />
             </span>
           )}
-          <span
-            className="w2h-stat w2h-speed"
-            data-w2hud="speed"
-            title={board ? 'Speed' : 'On foot'}
-          >
-            {!touch && <HudIcon name={board ? 'board' : 'walk'} size={16} />}
-            <b className="w2h-num">{kmh}</b>
-            <span className="w2h-small">KM/H</span>
-          </span>
+          {/* On the board the speedometer under the rider has the number */}
+          {!board && (
+            <span className="w2h-stat w2h-speed" data-w2hud="speed" title="On foot">
+              {!touch && <HudIcon name="walk" size={16} />}
+              <b className="w2h-num">{kmh}</b>
+              <span className="w2h-small">KM/H</span>
+            </span>
+          )}
         </div>
 
         {L.icons.at === 'ring' && icons}

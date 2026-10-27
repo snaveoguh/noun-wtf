@@ -16,8 +16,9 @@ import * as THREE from 'three';
 
 import { smoothstep } from '../../world/mountain/config';
 
+import { BRANCH, COURSE, onBranch } from './courseSpec';
 import { basinKickerPaint, basinWeight } from './terrainBasin';
-import { pillowAt } from './terrainCarve';
+import { branchLateral, inCrevasse, pillowAt } from './terrainCarve';
 import { PEAK } from './terrainPeak';
 import { CARVE, kickerShape, lineAt, lineNear, TRACK, X_BAND } from './track';
 
@@ -76,6 +77,19 @@ export function snowColor(x: number, z: number, ny: number, out: THREE.Color): T
   const half = ln.w * 0.5;
   // Steep faces on the track (kicker backs, gully walls) are ice, not rock
   if (ny < 0.62) out.lerp(ICE, Math.min(1, (0.62 - ny) / 0.08) * 0.8);
+  // THE SPLIT's shortcut: groomed, dyed edges, the crevasse in ice
+  if (z < COURSE.end && onBranch(z)) {
+    const latB = branchLateral(x, z, ln);
+    const aB = latB < 0 ? -latB : latB;
+    if (aB < BRANCH.half + 3 && a > half) {
+      if (inCrevasse(z, aB)) return out.lerp(ICE, 0.75);
+      out.lerp(GROOMED, 0.7);
+      const d = Math.abs(aB - BRANCH.half);
+      if (d < 1.6) out.lerp(DYE_RED, 0.9 * (1 - smoothstep(0.8, 1.6, d)));
+      return out;
+    }
+    if (inCrevasse(z, aB)) out.lerp(ICE, 0.6);
+  }
   if (a > half + CARVE.shoulder + 30) {
     // Powder: the whitest snow on the mountain
     return out.lerp(POWDER, 0.55 * smoothstep(0.55, 0.8, ny));

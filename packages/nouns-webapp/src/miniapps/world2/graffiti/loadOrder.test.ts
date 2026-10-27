@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { inParallel, nearestFirst, wallCentre } from './loadOrder';
+import { inParallel, nearestFirst, retry, wallCentre } from './loadOrder';
 
 const W = 6;
 const H = 3;
@@ -51,5 +51,32 @@ describe('inParallel', () => {
     });
     expect(peak).toBeLessThanOrEqual(3);
     expect(done.sort()).toEqual([1, 2, 3, 5, 6, 7]);
+  });
+});
+
+describe('retry', () => {
+  const now = () => Promise.resolve();
+
+  it('goes again after a miss or a throw, and stops at the first value', async () => {
+    const seen: number[] = [];
+    let n = 0;
+    const v = await retry(
+      async () => {
+        n++;
+        if (n === 1) throw new Error('down');
+        return n === 2 ? null : 'ok';
+      },
+      5,
+      async a => void seen.push(a),
+    );
+    expect(v).toBe('ok');
+    expect(n).toBe(3);
+    expect(seen).toEqual([0, 1]);
+  });
+
+  it('gives up after `tries` and returns null', async () => {
+    let n = 0;
+    expect(await retry(async () => (n++, null), 3, now)).toBeNull();
+    expect(n).toBe(3);
   });
 });
