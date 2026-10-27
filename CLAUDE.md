@@ -189,6 +189,10 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
 - **Shelf covers:** portrait posters in `public/home/covers/*.webp`, wired in `home/rows.ts`. Pages without one get generated box art (`boxArt.ts`).
 - Brand lettering (hero titles, header wordmark) carries `data-keep-font` so the site font switcher can't replace Pip3 there.
 
+### Plaza ring infill
+
+The baked plaza left a 4.5 m dead-end slot between neighbouring blocks on each side of the ring, and on two sides a 1 m notch behind it; from a roof you looked straight down to the street. `world/infill.ts` finds those slots from the seated COL_Buildings roofs (`findInfills`, pure) and fills each with a narrow building: roof flush with the block behind, parapet + windowed wall on the plaza side, solid colliders (`COL_BuildingsInfill`). `world/infill.test.ts` ray-casts down along every seam on the facade line (render and collision) and fails on any hole. NORTH ROOFS used the north slot as its alley jump; it now runs across the infill roof and up block A's wall off the sill.
+
 ### Noun World on weak phones (texture diet)
 
 A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Android) goes on the texture diet (`render/textureDiet.ts`, `textureDiet.on`): every upload is capped at 512 px, static textures are shrunk to 256 px on the CPU before upload (`shrinkTexture`: the plaza GLB's materials, nature, skyline; shirts and heads paint smaller), the env map bakes at 64 px, the shadow map is 512, only the mural plays a Giphy video, and a lost WebGL context reloads once. New features that add textures should shrink them under `textureDiet.on` too; dev builds warn when the weak-device estimate passes 50 MB (`checkTextureBudget`). Desktop and normal phones never diet. Measured 2026-10-27 (emulated Moto G06, production build): GL textures ~130 → ~36 MB.
