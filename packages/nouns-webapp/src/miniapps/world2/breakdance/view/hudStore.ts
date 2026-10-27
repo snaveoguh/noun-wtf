@@ -36,6 +36,8 @@ export interface GradeFlash {
   /** The local player's hit (big, centre) or the dancer up's (small). */
   local: boolean;
   at: number;
+  /** A wrong key: the one the chart wanted. */
+  wrong?: BreakKey;
 }
 
 export interface Banner {

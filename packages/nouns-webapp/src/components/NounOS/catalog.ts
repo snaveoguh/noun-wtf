@@ -25,12 +25,36 @@ export const CATALOG: Section[] = [
     tag: 'the actual point',
     entries: [
       {
+        path: '/books/meme-value',
+        name: 'MEME VALUE',
+        blurb: 'the book by lil 67. memes, nouns, daos and value. read it as a flipbook.',
+      },
+      {
         path: '/pip3',
         name: 'PIP3',
         blurb: '60r90 animations. low-res, high-signal.',
         app: 'pip3',
         hot: true,
       },
+      {
+        path: '/icecreamvan',
+        name: 'ICE CREAM VAN',
+        blurb: 'icecreamvan.eth. walk round the van.',
+      },
+      {
+        path: '/world/voice',
+        name: 'VOICE BOOTH',
+        blurb: "record your rider's voice lines, or train your own voice model.",
+      },
+      {
+        path: '/cc0',
+        name: 'CC0 LIBRARY',
+        blurb: 'free nouns art, voxels, sounds and 3d. take it. add yours.',
+        hot: true,
+      },
+      { path: '/playground', name: 'PLAYGROUND', blurb: 'mix traits, make a noun, dream one up.' },
+      { path: '/studio', name: 'STUDIO', blurb: 'make things with noun parts.' },
+      { path: '/terraforms', name: 'TERRAFORMS', blurb: 'on-chain land, rendered.' },
       {
         path: '/world',
         name: 'NOUN WORLD',
@@ -43,31 +67,7 @@ export const CATALOG: Section[] = [
         blurb: 'paintball arena shooter. red noggles vs blue noggles.',
         hot: true,
       },
-      {
-        path: '/world/voice',
-        name: 'VOICE BOOTH',
-        blurb: "record your rider's voice lines, or train your own voice model.",
-      },
-      {
-        path: '/icecreamvan',
-        name: 'ICE CREAM VAN',
-        blurb: 'icecreamvan.eth. walk round the van.',
-      },
-      {
-        path: '/books/meme-value',
-        name: 'MEME VALUE',
-        blurb: 'the book by lil 67. memes, nouns, daos and value. read it as a flipbook.',
-      },
-      { path: '/playground', name: 'PLAYGROUND', blurb: 'mix traits, make a noun, dream one up.' },
-      { path: '/studio', name: 'STUDIO', blurb: 'make things with noun parts.' },
       { path: '/traits', name: 'TRAITS', blurb: 'every head, body, accessory, glasses.' },
-      {
-        path: '/cc0',
-        name: 'CC0 LIBRARY',
-        blurb: 'free nouns art, voxels, sounds and 3d. take it. add yours.',
-        hot: true,
-      },
-      { path: '/terraforms', name: 'TERRAFORMS', blurb: 'on-chain land, rendered.' },
       {
         path: '/nonsense',
         name: 'NONSENSE',

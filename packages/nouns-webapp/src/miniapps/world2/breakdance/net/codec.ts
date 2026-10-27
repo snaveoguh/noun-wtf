@@ -99,6 +99,7 @@ export function readConfig(v: unknown): BattleConfig | null {
     turnBars: num(v.turnBars) ? clamp(Math.round(v.turnBars), 1, 16) : 4,
     bpm: num(v.bpm) ? clamp(v.bpm, 60, 200) : 100,
   };
+  if (v.chart === 'strict') cfg.chart = 'strict';
   if (typeof v.track === 'string' && /^[\da-z][\d_a-z-]{0,39}$/.test(v.track)) cfg.track = v.track;
   const w = v.windows;
   if (isObj(w) && num(w.perfect) && num(w.great) && num(w.ok))

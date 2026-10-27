@@ -21,7 +21,7 @@ import {
   detectProposalDraftIntent,
 } from '@/components/TerminalFeed/TerminalPrompt';
 
-import { GAMES } from './rows';
+import { game } from './rows';
 
 const apiBaseEnv = import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined;
 const API_BASE =
@@ -110,9 +110,9 @@ export function useNounIRL(h: AgentHandlers) {
       if (text === '') return true;
       const { onEnterWorld, onEnterHoops, onEnterWarfare, onOpen, onNavigate } = hr.current;
       const cmd = text.toLowerCase().replace(/^\//, '');
-      const world = GAMES[0]!.loading;
-      const hoops = GAMES[1]!.loading;
-      const war = GAMES[2]!.loading;
+      const world = game('world').loading;
+      const hoops = game('hoops').loading;
+      const war = game('warfare').loading;
       const local: Record<string, [() => void, string?]> = {
         play: [onEnterWorld, world],
         skate: [onEnterWorld, world],

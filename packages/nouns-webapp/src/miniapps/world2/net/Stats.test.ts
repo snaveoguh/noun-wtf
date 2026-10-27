@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { StatsTracker } from './Stats';
+import { beatsShown, StatsTracker } from './Stats';
 
 const BEST_KEY = 'noun-world-stats-best';
 const PENDING_KEY = 'noun-world-stats-pending';
@@ -220,5 +220,20 @@ describe('StatsTracker: missions ride along, the Upside Down never counts', () =
     p.speed = 0;
     ride(t, p, 2, 3);
     expect(t.mine.best.kmh).toBeLessThan(30);
+  });
+});
+
+describe('beatsShown (a record has to read higher)', () => {
+  it('471.31 over 471.29 km/h is not a record; 472 is', () => {
+    expect(beatsShown('kmh', 471.31, 471.29)).toBe(false);
+    expect(beatsShown('kmh', 471.6, 471.29)).toBe(true);
+  });
+  it('the first best, and real gains at each stat precision, count', () => {
+    expect(beatsShown('kmh', 12, undefined)).toBe(true);
+    expect(beatsShown('airM', 4.04, 4.0)).toBe(false);
+    expect(beatsShown('airM', 4.1, 4.0)).toBe(true);
+    expect(beatsShown('airS', 1.234, 1.23)).toBe(false);
+    expect(beatsShown('airS', 1.24, 1.23)).toBe(true);
+    expect(beatsShown('kmh', 400, 471)).toBe(false);
   });
 });

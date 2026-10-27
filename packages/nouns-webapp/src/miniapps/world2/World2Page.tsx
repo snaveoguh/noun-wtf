@@ -41,6 +41,7 @@ import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
 import { bootQuality } from './settings/store';
 import { TradeUi } from './trade/TradeUi';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
+import { ControlsHelp } from './ui/ControlsHelp';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
 import { HudDrag } from './ui/HudDrag';
@@ -52,73 +53,13 @@ import { VanHud } from './van/VanHud';
 import { worldPause } from './worldPause';
 
 /** The Grand Exchange, hidden under the Noggles Fountain (a lazy chunk). */
+
 const UnderFountain = lazy(() => import('../exchange3d/world/UnderFountain'));
 
 /** The radio stations in M-cycle order, for the HUD's station strip. */
 const RADIO_STATIONS: { mode: 'fm' | 'beats'; name: string }[] = [
   { mode: 'fm', name: 'COMMUNITY RADIO' },
   { mode: 'beats', name: 'NOUN BEATS (hip-hop)' },
-];
-
-const CONTROLS: { k: string; v: string }[] = [
-  { k: 'W', v: 'push' },
-  { k: 'A / D', v: 'carve, spin in air' },
-  { k: 'S', v: 'brake, powerslide' },
-  { k: 'SPACE', v: 'hold to crouch, release to ollie' },
-  { k: 'J / L / K / U', v: 'kickflip, heelflip, shove-it, 360 flip' },
-  { k: 'RMB drag', v: 'flick-it: pull down, flick up (diagonals = flips)' },
-  { k: 'SHIFT / Q', v: 'manual, nose manual (hold, W/S to keep the balance dot centred)' },
-  { k: 'I / O', v: 'grab' },
-  { k: 'F', v: 'get on / off board' },
-  {
-    k: 'CLIMB',
-    v: 'walk / jump into any building (or hold W mid-air), W/S up/down, A/D along, SHIFT faster, SPACE wall-jump, F let go',
-  },
-  { k: 'C', v: 'camera' },
-  { k: 'P', v: 'time of day' },
-  { k: 'B', v: 'map' },
-  { k: 'M', v: 'radio station: COMMUNITY RADIO → NOUN BEATS (hip-hop) → off' },
-  { k: '.', v: 'next track (NOUN BEATS: a fresh beat)' },
-  { k: 'E (in the van)', v: 'COMMUNITY RADIO decks: queue a track, book a DJ set' },
-  {
-    k: 'E (cab door)',
-    v: 'drive the ice cream van: W/S gas, brake, A/D steer, SPACE drift, SHIFT boost, H horn, R flip, E out',
-  },
-  {
-    k: 'ALT hold',
-    v: 'free the mouse: drag the HUD (speedometer, chips) anywhere, double-click resets',
-  },
-  { k: 'V', v: 'mic' },
-  { k: 'CLICK+DRAG / G', v: 'spray where the mouse points (on foot)' },
-  {
-    k: 'SPRAY TOOLS',
-    v: 'T / ⇧T colour, 1–0 swatch (aiming at a wall), [ ] or wheel while spraying nozzle, ⇧click straight line, Ctrl/⌘Z undo, ALT+click pick colour',
-  },
-  { k: 'RIGHT-DRAG', v: 'look around (on foot)' },
-  {
-    k: 'MOUNTAIN',
-    v: 'ride out any of the three arched alleys: the city is a peak with endless downhill all round it, and the longer you keep riding fast (30 km/h+) the faster you go (a bail resets it)',
-  },
-  { k: 'R', v: 'respawn at the fountain or ice cream van (back up from the mountain)' },
-  { k: 'E (by a character)', v: 'talk: the Oracle by the fountain hands out missions' },
-  { k: 'X', v: 'missions journal' },
-  { k: 'Y', v: 'replay your last run in slow motion (Esc to come back)' },
-  { k: 'ENTER', v: 'chat' },
-];
-
-const PAD: { k: string; v: string }[] = [
-  { k: 'L stick', v: 'carve, spin' },
-  { k: 'R stick', v: 'flick-it tricks (down → up = ollie)' },
-  { k: 'A / X', v: 'push' },
-  { k: 'B', v: 'brake' },
-  { k: 'LT / RT', v: 'grabs' },
-  { k: 'Y', v: 'board on / off' },
-  { k: 'Climb', v: 'walk or jump into any wall, L stick climbs, A wall-jump, Y let go' },
-  { k: 'RT (on foot)', v: 'spray paint, R3 colour' },
-  {
-    k: 'Mountain',
-    v: 'the arched alleys lead out to endless downhill, stay on to keep speeding up, B brakes',
-  },
 ];
 
 export interface World2PageProps {
@@ -871,16 +812,7 @@ function Hud({
       {!touch && !game.van2.driving && <SprayPanel game={game} />}
 
       {/* Controls */}
-      {showHelp && hud.inputMode !== 'touch' && (
-        <div className="absolute bottom-4 left-[292px] hidden rounded-xl bg-black/45 p-3 text-xs backdrop-blur md:block">
-          {(pad ? PAD : CONTROLS).map(c => (
-            <div key={c.k} className="flex gap-3">
-              <span className="w-24 text-right font-bold text-[#ffd400]">{c.k}</span>
-              <span className="opacity-85">{c.v}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {showHelp && hud.inputMode !== 'touch' && <ControlsHelp pad={pad} />}
     </div>
   );
 }

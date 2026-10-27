@@ -167,10 +167,10 @@ export const GAMES: Game[] = [
   },
 ];
 
-/** A game by id (the slides borrow their copy; GAMES' order is the shelf's). */
-export function gameOf(id: GameId): Game {
+/** A game by id. Never index GAMES: inserting a game shifts every slot. */
+export function game(id: GameId): Game {
   const g = GAMES.find(x => x.id === id);
-  if (g === undefined) throw new Error(`no game ${id}`);
+  if (!g) throw new Error(`no game ${id}`);
   return g;
 }
 
@@ -251,7 +251,7 @@ export const HERO_SLIDES: Slide[] = [
     clip: CLIPS.bigDrop,
     focus: '50% 50%',
     game: 'drop',
-    ms: 12000,
+    ms: 12830,
   },
   {
     key: 'breaks',
@@ -264,7 +264,7 @@ export const HERO_SLIDES: Slide[] = [
     clip: CLIPS.breaks,
     focus: '50% 50%',
     game: 'breaks',
-    ms: 12000,
+    ms: 11570,
   },
   {
     key: 'exchange',
@@ -278,14 +278,14 @@ export const HERO_SLIDES: Slide[] = [
     focus: '50% 50%',
     href: '/exchange',
     cta: 'ENTER THE FLOOR',
-    ms: 12000,
+    ms: 10630,
   },
   {
     key: 'world-vhs',
     title: 'Noun World',
     eyebrow: 'FEATURED GAME · FOUND TAPE, OCT 1996',
     tagline: 'SKATE · SPRAY · TALK',
-    teaser: gameOf('world').teaser,
+    teaser: game('world').teaser,
     accent: '#ffd400',
     clip: CLIPS.worldVhs,
     focus: '50% 50%',
@@ -296,8 +296,8 @@ export const HERO_SLIDES: Slide[] = [
     key: 'hoops',
     title: 'Noun Hoops',
     eyebrow: 'FEATURED GAME',
-    tagline: gameOf('hoops').tagline,
-    teaser: gameOf('hoops').teaser,
+    tagline: game('hoops').tagline,
+    teaser: game('hoops').teaser,
     accent: '#ff9a1f',
     clip: CLIPS.hoops,
     focus: '50% 50%',
@@ -309,11 +309,11 @@ export const HERO_SLIDES: Slide[] = [
     key: 'warfare',
     title: 'Noun Warfare',
     eyebrow: 'FEATURED GAME',
-    tagline: gameOf('warfare').tagline,
-    teaser: gameOf('warfare').teaser,
+    tagline: game('warfare').tagline,
+    teaser: game('warfare').teaser,
     accent: '#3dff8a',
-    still: gameOf('warfare').cover,
-    focus: gameOf('warfare').focus,
+    still: game('warfare').cover,
+    focus: game('warfare').focus,
     game: 'warfare',
     ms: 9000,
   },
@@ -413,7 +413,7 @@ export function coverForPath(path: string): string | undefined {
 }
 
 /** Extra things to play, from the catalog, after the three games. */
-const PLAY_PATHS = ['/world/voice', '/icecreamvan', '/playground', '/crystal-ball', '/pip3'];
+const PLAY_PATHS = ['/exchange', '/world/voice', '/playground', '/crystal-ball'];
 
 export type Action =
   | { t: 'game'; id: GameId }

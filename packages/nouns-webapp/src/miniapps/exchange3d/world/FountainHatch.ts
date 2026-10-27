@@ -70,6 +70,10 @@ export class FountainHatch {
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     this.hit.position.copy(this.tile.position);
+    // Hidden as an object, not only by its material: the ink outline's
+    // normal pass renders with its own material and drew this box as a
+    // black square in the fountain. Raycasts still hit invisible meshes.
+    this.hit.visible = false;
     this.group.add(this.hit);
 
     const glow = glowTexture();

@@ -78,6 +78,8 @@ export class RecordsHub {
   /** The server answered a record (StatsTracker.onRecord). */
   onRecord(e: RecordEvent) {
     void saveRun(e.run);
+    // A gain too small to show (the same top speed again) is saved quietly
+    if (e.quiet === true) return;
     // A refusal still waiting on the rider isn't covered by good news from the same post
     const c = this.card;
     const open = c?.kind === 'refused' && !c.appeal && performance.now() - c.at < 120_000;
