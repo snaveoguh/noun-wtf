@@ -78,6 +78,7 @@ export const CLIPS = {
     webm: '/home/hero-parkour.webm',
     mp4: '/home/hero-parkour.mp4',
     poster: '/home/hero-parkour-poster.jpg',
+    audio: true,
   },
   pool: {
     webm: '/home/hero-pool.webm',

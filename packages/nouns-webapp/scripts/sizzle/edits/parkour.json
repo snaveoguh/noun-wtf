@@ -3,6 +3,7 @@
   "poster": 4.6,
   "maxrate": 2.2,
   "grade": "eq=contrast=1.06:saturation=1.12,unsharp=5:5:0.4",
+  "music": { "file": "scripts/sizzle/music/beat-your-ghost.mp3", "in": 0 },
   "cuts": [
     { "shot": "pk-facade", "in": 0.8, "dur": 2.0 },
     { "shot": "pk-wallrun", "in": 0.3, "dur": 2.0 },
