@@ -69,6 +69,7 @@ export default function AgentHome({
   onEnterWorld,
   onEnterHoops,
   onEnterBreaks,
+  onEnterParkour,
   onEnterHideSeek,
   onEnterDrive,
   onEnterWarfare,
@@ -83,6 +84,7 @@ export default function AgentHome({
   onEnterWorld: () => void;
   onEnterHoops: () => void;
   onEnterBreaks: () => void;
+  onEnterParkour: () => void;
   onEnterHideSeek: () => void;
   /** Noun World in a car (`?play=drive`) */
   onEnterDrive: () => void;
@@ -142,6 +144,7 @@ export default function AgentHome({
     (id: GameId) => {
       if (id === 'hoops') onEnterHoops();
       else if (id === 'breaks') onEnterBreaks();
+      else if (id === 'parkour') onEnterParkour();
       else if (id === 'hideseek') onEnterHideSeek();
       else if (id === 'drive') onEnterDrive();
       else if (id === 'warfare') onEnterWarfare();
@@ -154,7 +157,16 @@ export default function AgentHome({
         }
       } else onEnterWorld();
     },
-    [onEnterHoops, onEnterBreaks, onEnterHideSeek, onEnterDrive, onEnterWarfare, onEnterWorld, onEnterDrop],
+    [
+      onEnterHoops,
+      onEnterBreaks,
+      onEnterParkour,
+      onEnterHideSeek,
+      onEnterDrive,
+      onEnterWarfare,
+      onEnterWorld,
+      onEnterDrop,
+    ],
   );
 
   const activate = useCallback(

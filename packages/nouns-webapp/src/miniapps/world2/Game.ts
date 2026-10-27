@@ -52,6 +52,7 @@ import { setSkyGroundFog } from './nature/TimeOfDay';
 import { CALLOUT_CODES, Net, type NetPose, type RemoteCallout } from './net/Net';
 import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { JerseyCrew } from './npc/JerseyCrew';
+import { ParkourSystem } from './parkour/ParkourSystem';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { FmSpots } from './radio/FmSpots';
@@ -328,6 +329,8 @@ export class Game {
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
   readonly breaks: BreakMode = new BreakMode(this);
+  /** Parkour (parkour/): wall runs, ledges, poles… on foot, and NOUN PARKOUR's routes. */
+  readonly parkour: ParkourSystem = new ParkourSystem(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
   readonly freestyle: FreestyleMode = new FreestyleMode(this);
   /** Noun Hide & Seek (hideseek/net/HideSeekMode.ts): played in the normal game; hides hiders' tags. */
@@ -991,6 +994,7 @@ export class Game {
               pushPressed: false,
               respawnPressed: false,
               emotePressed: 0,
+              duckPressed: false,
             };
       this.player.backSkate = this.boardType === 'blades';
       this.player.update(h, f, this.cam.controlYaw, now);
@@ -1005,6 +1009,7 @@ export class Game {
     else {
       this.cam.update(dt, this.player, input.lookX, input.lookY, now);
       this.updateMyCharacter(dt);
+      this.parkour.frame(dt, input);
     }
     this.updateAudio(dt);
     {
@@ -1617,6 +1622,8 @@ export class Game {
     const p = this.player;
     // In the saddle: sat still (the rig has no seated clip; idle beats legs sprinting in the air)
     if (this.dragon.riding || this.cars.inCar) return { clip: 'idle', fade: 0.3 };
+    const pk = this.parkour.clip();
+    if (pk !== null) return pk;
     if (p.climb !== null) {
       // No climb clip in the rig: the walk cycle's legs read as stepping up
       // the wall; NounCharacter overrides the arms into an overhead reach.
@@ -1815,6 +1822,7 @@ export class Game {
     r.label?.remove();
     r.pointer?.remove();
     this.remotes.delete(id);
+    this.parkour.dropRemote(id);
   }
 
   /** How a sound at `pos` reaches the listener (the camera): distance gain + stereo pan. */
@@ -1910,6 +1918,7 @@ export class Game {
               ? 'dragon'
               : undefined,
         car: this.cars.netKey,
+        pk: this.parkour.netKey(),
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
@@ -1944,6 +1953,7 @@ export class Game {
         travelled: c.mode === 'board' ? travelled : 0,
         riding: c.mode === 'board' && !c.anim.includes('bail'),
       });
+      this.parkour.remote(id, ch, c.pk, dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
       const show = this.hideseek.labelFor(id);
@@ -2302,6 +2312,7 @@ export class Game {
     this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
+    this.parkour.dispose();
     this.freestyle.dispose();
     this.hideseek.dispose();
     this.van2.dispose();

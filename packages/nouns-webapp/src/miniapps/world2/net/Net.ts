@@ -19,6 +19,8 @@
 //       without it, listeners speak their chat lines in the house voice
 // Respect (respect/): `rs: 'L'` only while the rider is a legend (the
 // noggles badge on their name tag; cosmetic, not checked by the server).
+// Parkour (parkour/net/pk.ts): `pk: [code, phase, side, amt]` only while a
+// parkour pose shows (wall run, ledge hang, pole…), so others see it.
 // Freestyle (breakdance/freestyle/wire.ts): `fs: [move, seq, beat, n, bpm]`
 // only while the rider is breakdancing on the spot.
 // Outfit (character/outfit.ts): `of`, four base-36 chars (trousers, their
@@ -71,6 +73,8 @@ export interface NetPose {
    * dragon itself is placed from those, see dragon/mesh.ts).
    */
   vehicle?: Vehicle;
+  /** Parkour pose key (parkour/net/pk.ts), raw: decoded where it's drawn. */
+  pk?: unknown;
   /** Driving a car (cars/netCar.ts): its id + flags, e.g. "toro.2.0". */
   car?: string;
 }
@@ -346,6 +350,7 @@ export class Net {
     pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.vehicle = parseVehicle(blob.vh);
+    pose.pk = Array.isArray(blob.pk) ? blob.pk : undefined;
     if (typeof blob.cr === 'string') pose.car = blob.cr.slice(0, 20);
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     const co = parseCallout(blob.co);
@@ -438,6 +443,7 @@ export class Net {
       c.name = b.pose.name;
       c.seedKey = b.pose.seedKey;
       c.vehicle = b.pose.vehicle;
+      c.pk = b.pose.pk;
       c.car = b.pose.car;
     }
     void dt;
@@ -477,6 +483,7 @@ export class Net {
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
       ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
+      ...(pose.pk !== undefined ? { pk: pose.pk } : {}),
       ...(this.freestyle !== null ? { fs: this.freestyle } : {}),
       ...(this.outfit !== '' ? { of: this.outfit } : {}),
       ...(this.ride !== null ? { rd: this.ride } : {}),

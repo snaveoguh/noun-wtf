@@ -7,7 +7,15 @@ import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
 
 import { hostOf, KIND_LABEL, type CommunityEntry } from './community';
 
-export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'hideseek' | 'drop' | 'drive';
+export type GameId =
+  | 'world'
+  | 'hoops'
+  | 'warfare'
+  | 'breaks'
+  | 'hideseek'
+  | 'drop'
+  | 'drive'
+  | 'parkour';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -166,6 +174,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'DROP IN',
     loading: 'off to the summit. wrap up warm',
+  },
+  {
+    id: 'parkour',
+    name: 'Noun Parkour',
+    cover: '/world2/parkour-cover.webp',
+    card: '/home/covers/parkour.webp',
+    focus: '50% 55%',
+    teaser:
+      'Run the roofs of Noun World against the clock. Wall runs, tic-tacs, ledge leaps, lamp-post swings and rolls, checkpoint to checkpoint, chasing your own ghost.',
+    tagline: 'RUN · CLIMB · FLOW',
+    facts: [
+      'Time trials with gold, silver, bronze',
+      'Race the ghost of your best run',
+      'Runs inside Noun World',
+    ],
+    cta: 'RUN',
+    loading: 'chalking up. off to the rooftops',
   },
   {
     id: 'drive',

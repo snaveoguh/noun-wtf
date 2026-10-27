@@ -25,6 +25,7 @@ export const GAME_ACCENT: Record<GameId, string> = {
   hideseek: '#b26bff',
   warfare: '#3dff8a',
   drop: '#9fe8ff',
+  parkour: '#20d6ff',
   drive: '#7fe9ff',
 };
 
