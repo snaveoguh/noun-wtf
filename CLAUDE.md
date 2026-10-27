@@ -188,6 +188,10 @@ Hosted PartyKit shut down on 2026-10-23. The same rooms (Noun World, the hoops r
 - **Shelf covers:** portrait posters in `public/home/covers/*.webp`, wired in `home/rows.ts`. Pages without one get generated box art (`boxArt.ts`).
 - Brand lettering (hero titles, header wordmark) carries `data-keep-font` so the site font switcher can't replace Pip3 there.
 
+### Noun World on weak phones (texture diet)
+
+A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Android) goes on the texture diet (`render/textureDiet.ts`, `textureDiet.on`): every upload is capped at 512 px, static textures are shrunk to 256 px on the CPU before upload (`shrinkTexture`: the plaza GLB's materials, nature, skyline; shirts and heads paint smaller), the env map bakes at 64 px, the shadow map is 512, only the mural plays a Giphy video, and a lost WebGL context reloads once. New features that add textures should shrink them under `textureDiet.on` too; dev builds warn when the weak-device estimate passes 50 MB (`checkTextureBudget`). Desktop and normal phones never diet. Measured 2026-10-27 (emulated Moto G06, production build): GL textures ~130 → ~36 MB.
+
 ### Noun World audio
 
 - **Radio stations** (`world2/audio/GameRadio.ts`): COMMUNITY RADIO (the shared ice-cream-van station: real music from `public/fm/playlist.json` plus jingles), NOUN BEATS (generated hip hop, an AudioWorklet) and optional live streams. The site-wide player outside the game is NOUN FM (`src/components/NounFm`).
