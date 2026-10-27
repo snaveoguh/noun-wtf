@@ -6,7 +6,7 @@
 // snap into grinds, and landings are judged on flip completion + alignment.
 
 import type { InputFrame, TrickInput } from '../core/Input';
-import type { CollisionWorld } from '../physics/Collision';
+import type { CollisionWorld, RayHit } from '../physics/Collision';
 import type { Rail, RailSet } from '../physics/Rails';
 
 import * as THREE from 'three';
@@ -116,6 +116,13 @@ const _wd = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 
 const BODY_RADIUS = 0.32;
+/**
+ * Speed into a wall (m/s) that bails you. On the mountain it grows with
+ * speed (`WALL_BAIL_GLANCE` of it), so a glancing scrape along a rock at
+ * 80 m/s deflects you while a tree hit head on still takes you out.
+ */
+const WALL_BAIL_IMPACT = 6.5;
+const WALL_BAIL_GLANCE = 0.35;
 const PUSH_CYCLE = 0.9;
 
 // ── Climbing ──
@@ -432,13 +439,36 @@ export class Player {
 
     this.clampBounds();
     if (!driven) this.terrainRescue();
-    // Fell out of the world, or wedged in geometry mid-fall → respawn
-    if (this.fellOut() || this.wedged(dt)) this.respawnSafe();
+    // Fell out of the world → respawn; wedged in geometry mid-fall → back
+    // on the ground right here if there is some
+    if (this.fellOut()) this.respawnSafe();
+    else if (this.wedged(dt)) this.unwedge();
     if (input.respawnPressed) this.respawnHome();
   }
 
   private wedgedFor = 0;
   private wedgePos = new THREE.Vector3();
+  /** Seconds since the last in-place unwedge (a second one soon after gives up). */
+  private sinceUnwedge = Infinity;
+
+  /**
+   * Wedged: stand the rider on the ground under where they're stuck (a
+   * crash shouldn't throw you back to a safe spot that may be far behind),
+   * unless that already failed a moment ago or there's no floor there.
+   */
+  private unwedge() {
+    const again = this.sinceUnwedge < 4;
+    this.sinceUnwedge = 0;
+    const hit = again
+      ? null
+      : this.world.raycast(_v.copy(this.pos).addScaledVector(UP, 2), _v2.set(0, -1, 0), 6);
+    if (hit !== null && hit.normal.y > 0.55) {
+      this.safePos.copy(hit.point);
+      const f = _v.set(this.fwd.x, 0, this.fwd.z);
+      if (f.lengthSq() > 1e-4) this.safeFwd.copy(f.normalize());
+    }
+    this.respawnSafe();
+  }
 
   /**
    * Stuck falling: in the air but going nowhere, because collision (or the
@@ -447,6 +477,7 @@ export class Player {
    * alone moves you metres a second); 1.5 s of this is a glitch.
    */
   private wedged(dt: number) {
+    this.sinceUnwedge += dt;
     if (this.state !== 'air') {
       this.wedgedFor = 0;
       this.wedgePos.copy(this.pos);
@@ -1120,7 +1151,22 @@ export class Player {
     c.moving = THREE.MathUtils.lerp(c.moving, moved > 1e-4 ? 1 : 0, 1 - Math.exp(-10 * dt));
   }
 
-  /** Capsule pushout against walls. Returns the wall normal hit (if any). */
+  /** Speed into the wall `resolveBody` last hit, before it was cancelled. */
+  private wallImpact = 0;
+
+  /** Does that wall hit (at `speed`) bail you? */
+  private wallBails(speed: number) {
+    const mountain = this.terrain !== null && this.terrain.inDomain(this.pos.x, this.pos.z);
+    const limit = mountain
+      ? Math.max(WALL_BAIL_IMPACT, speed * WALL_BAIL_GLANCE)
+      : WALL_BAIL_IMPACT;
+    return this.wallImpact > limit;
+  }
+
+  /**
+   * Capsule pushout against walls. Returns the wall normal hit (if any);
+   * the speed you hit it at is left in `wallImpact`.
+   */
   private resolveBody(height: number): THREE.Vector3 | null {
     const up = this.mode === 'board' ? this.up : UP;
     const a = _v.copy(this.pos).addScaledVector(up, BODY_RADIUS + 0.28);
@@ -1132,6 +1178,7 @@ export class Player {
       if (Math.abs(n.dot(up)) > 0.7) return null;
       this.pos.add(corr);
       const into = this.vel.dot(n);
+      this.wallImpact = Math.max(0, -into);
       if (into < 0) this.vel.addScaledVector(n, -into);
       return n;
     }
@@ -1341,14 +1388,12 @@ export class Player {
     // Integrate
     this.pos.addScaledVector(this.vel, dt);
 
-    // Walls — slam into them fast and you bail
+    // Walls — slam into them fast and you bail (resolveBody has already
+    // cancelled the speed into the wall, so judge the speed it measured)
     const wall = this.resolveBody(1.45);
-    if (wall) {
-      const impact = -this.vel.dot(wall);
-      if (impact > 6.5) {
-        this.doBail(now, impact);
-        return;
-      }
+    if (wall !== null && this.wallBails(speed)) {
+      this.doBail(now, this.wallImpact);
+      return;
     }
 
     // Pop
@@ -1359,8 +1404,10 @@ export class Player {
       }
     }
 
-    // Safe spot for respawn (on the mountain at any speed: it's all safe ground)
-    if (this.up.y > 0.95 && (speed < 9 || onMountain)) {
+    // Safe spot for respawn (on the mountain at any speed and on its steep
+    // faces too: it's all safe ground, and a spot only refreshed on the
+    // flats can be kilometres back up the hill, or in the plaza)
+    if (this.up.y > (onMountain ? 0.6 : 0.95) && (speed < 9 || onMountain)) {
       this.safePos.copy(this.pos);
       this.safeFwd.copy(this.fwd).setY(0).normalize();
     }
@@ -1517,6 +1564,11 @@ export class Player {
       this.tryStartClimb(wall);
       return;
     }
+    // Fly into a wall (or a tree) fast and you bail where you hit it
+    if (wall !== null && this.wallBails(Math.hypot(this.speed, this.wallImpact))) {
+      this.doBail(now, this.wallImpact);
+      return;
+    }
 
     // Grind snap (falling or level, near a rail)
     if (this.grindCooldown <= 0 && this.vel.y < 2.5 && this.tryStartGrind(now)) return;
@@ -1533,16 +1585,18 @@ export class Player {
             .normalize()
         : null;
     let hit = downDir ? this.world.raycast(from, downDir, dist + 0.3) : null;
-    if (!hit && this.vel.dot(this.up) <= 0.5) {
+    // The sweep can hit a wall you're sliding down (a tree trunk you flew
+    // into): that's no landing, but the ground right under you still is
+    const landable = (h: RayHit | null) =>
+      h !== null && h.normal.dot(this.vel) < 0 && h.normal.y > -0.2;
+    if (!landable(hit) && this.vel.dot(this.up) <= 0.5) {
       hit = this.world.raycast(
         _v2.copy(this.pos).addScaledVector(this.up, 0.3),
         _v3.copy(this.up).negate(),
         0.32,
       );
     }
-    if (hit && hit.normal.dot(this.vel) < 0 && hit.normal.y > -0.2) {
-      this.land(hit.point, hit.normal, now);
-    }
+    if (hit !== null && landable(hit)) this.land(hit.point, hit.normal, now);
   }
 
   /**

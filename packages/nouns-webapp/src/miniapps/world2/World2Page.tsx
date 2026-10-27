@@ -577,6 +577,11 @@ function Splash({
 const CSS = `
 .w2-speedlines{position:absolute;inset:-10%;background:repeating-conic-gradient(from 0deg at 50% 52%,rgba(255,255,255,0) 0deg 5deg,rgba(255,255,255,.55) 5deg 5.4deg,rgba(255,255,255,0) 5.4deg 9deg,rgba(255,255,255,.35) 9deg 9.25deg);-webkit-mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);animation:w2lines .24s steps(3) infinite;transition:opacity .3s}
 @keyframes w2lines{0%{transform:rotate(0)}100%{transform:rotate(3deg)}}
+.w2-speedo{display:flex;align-items:baseline;gap:6px;padding:4px 14px 6px;border-radius:14px;background:rgba(10,12,20,.45);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);font-family:system-ui,sans-serif;cursor:grab;user-select:none}
+.w2-speedo b{font-size:30px;font-weight:900;font-style:italic;line-height:1;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.5)}
+.w2-speedo span{font-size:11px;font-weight:700;letter-spacing:.12em;opacity:.7}
+@media (pointer:coarse){.w2-speedo b{font-size:22px}}
+.w2-speedo-streak{display:block;margin-top:2px;font:800 10px/1 system-ui,sans-serif;letter-spacing:.12em;text-align:center;color:#ffd400;text-shadow:0 1px 2px #000;user-select:none;cursor:grab}
 /* (one rule, not a media block: an unclosed @media here once swallowed every HUD style after it on desktop) */
 .w2-chip{background:rgba(10,12,20,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-family:system-ui,sans-serif;white-space:nowrap}
 .w2-on{border-color:#3ddc84}
@@ -604,7 +609,7 @@ body[data-w2select] [data-beats="screen"],body[data-w2select] [data-nounfm]{visi
 .w2-nametag{position:absolute;left:0;top:0;text-align:center;font-family:system-ui,sans-serif;font-size:12px;white-space:nowrap}
 .w2-nametag span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .w2-panel{background:rgba(10,12,20,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;font-family:system-ui,sans-serif;white-space:normal;box-shadow:0 12px 40px rgba(0,0,0,.45)}
-[data-away] .w2-nametag,[data-away] .w2-pointer{display:none!important}
+[data-away] .w2-nametag:not([data-room]),[data-away] .w2-pointer{display:none!important}
 .w2-pointer{position:absolute;left:0;top:0;display:none;text-align:center;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;white-space:nowrap;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8)}
 .w2-pointer i{display:block;font-style:normal;color:#ffd400;font-size:14px;line-height:1}
 .w2-pointer span{background:rgba(0,0,0,.55);padding:1px 7px;border-radius:999px}

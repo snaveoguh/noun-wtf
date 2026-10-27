@@ -21,6 +21,13 @@
 // landing there is (the flight is symmetric about the slope, so you come
 // down at a shallower angle than you left).
 //
+// ── The SSX course ──
+//
+// The first ~5 km is the designed SSX course (courseSpec.ts): its sections
+// are laid in order with their own widths and weaves, the SPLIT's main line
+// bulges round the shortcut (courseBulge), and the ICE CAVE's gully gets an
+// exit kicker. The random track starts at its end.
+//
 // ── Fast path ──
 //
 // peakHeight asks about the line ~25k times a frame. lineAt(s) reads a
@@ -32,6 +39,14 @@ import type { Feature, Section, SectionKind, TrackPoint } from './contract';
 
 import { hashInts, smoothstep, vnoise } from '../../world/mountain/config';
 
+import {
+  CAVE_KICKER,
+  COURSE,
+  COURSE_SECTIONS,
+  type CourseSection,
+  BRANCH,
+  courseBulge,
+} from './courseSpec';
 import { coneHeight, PEAK } from './terrainPeak';
 import {
   expectedSpeed,
@@ -127,6 +142,8 @@ interface TrackSection extends Section {
   r0: number;
   /** …and at its end boundary. */
   r1: number;
+  /** One of the SSX course's designed sections (with its overrides). */
+  course?: CourseSection;
 }
 
 /** Uniform [0, 1) from integers. */
@@ -137,14 +154,29 @@ function rand(a: number, b: number): number {
 function buildSections(): TrackSection[] {
   const out: TrackSection[] = [];
   let s: number = TRACK.start;
-  let i = 0;
-  // A clean run off the summit, then the first jump line
-  const opening: SectionKind[] = ['cruise', 'jumps', 'slalom', 'loop'];
-  let prev: SectionKind | null = null;
+  // The SSX course first, as designed
+  for (const [k, c] of COURSE_SECTIONS.entries()) {
+    out.push({
+      kind: c.kind,
+      s0: s,
+      s1: c.s1,
+      seed: Math.floor(rand(k, 3) * 4294967296),
+      scale: trackScale(s),
+      r0: TRACK.ramp,
+      r1: TRACK.ramp,
+      course: c,
+    });
+    s = c.s1;
+  }
+  let i = out.length;
+  // Then a clean cruise and a loop, and the random rounds
+  const opening: SectionKind[] = ['cruise', 'loop'];
+  let prev: SectionKind | null = out[out.length - 1]!.kind;
   let deck: SectionKind[] = [];
   while (s < TRACK.end - 1) {
     let kind: SectionKind;
-    if (i < opening.length) kind = opening[i]!;
+    const o = i - COURSE_SECTIONS.length;
+    if (o < opening.length) kind = opening[o]!;
     else {
       // Then rounds of six, shuffled: every kind, jump lines twice, never
       // the same kind twice running
@@ -165,7 +197,9 @@ function buildSections(): TrackSection[] {
     const scale = trackScale(s);
     // Jump lines run longer: the airs eat the distance
     const base = (1200 + Math.floor(rand(i, 2) * 1400)) * (kind === 'jumps' ? 2.2 : 1);
-    const len = i === 0 ? 700 : base * scale;
+    // (and always long enough for one kicker's air, even 30% fast)
+    const len =
+      kind === 'jumps' ? Math.max(base * scale, 2.2 * flightZ(s) + 600 * scale) : base * scale;
     let s1 = Math.min(TRACK.end, s + len);
     // Never leave a scrap at the bottom
     if (TRACK.end - s1 < 600 * scale) s1 = TRACK.end;
@@ -187,12 +221,34 @@ function buildSections(): TrackSection[] {
   for (let k = 1; k < out.length; k++) {
     const a = out[k - 1]!;
     const b = out[k]!;
-    const r = Math.min(TRACK.ramp * b.scale, 0.4 * (a.s1 - a.s0), 0.4 * (b.s1 - b.s0));
+    // (the SSX course's sections turn over quicker: they're short and designed)
+    const r = Math.min(
+      b.course !== undefined ? COURSE_RAMP : TRACK.ramp * b.scale,
+      0.4 * (a.s1 - a.s0),
+      0.4 * (b.s1 - b.s0),
+    );
     a.r1 = r;
     b.r0 = r;
   }
   return out;
 }
+
+const DEG = Math.PI / 180;
+
+/** How far (m of z) a kicker designed at `s` throws you, roughly (designKicker's flight). */
+function flightZ(s: number): number {
+  const v = expectedSpeed(s);
+  const hang = Math.min(14, Math.max(6, 6 + 0.016 * v)) * 1.15;
+  const alpha = Math.min(
+    22 * DEG,
+    Math.max(1.5 * DEG, Math.asin(Math.min(1, (hang * G_NORMAL) / (2 * v)))),
+  );
+  const T = (2 * v * Math.sin(alpha)) / G_NORMAL;
+  return (v * Math.cos(alpha) * T + 0.5 * G_ALONG * T * T) * Math.cos(SLOPE_ANGLE);
+}
+
+/** Envelope ramps between the SSX course's sections (m). */
+const COURSE_RAMP = 70;
 
 const SEC: TrackSection[] = buildSections();
 
@@ -255,18 +311,18 @@ function rawCenter(s: number): number {
     if (c.kind === 'slalom')
       weave +=
         e *
-        TRACK.slalomAmp *
+        (c.course?.amp ?? TRACK.slalomAmp) *
         c.scale *
-        Math.sin((2 * Math.PI * (s - c.s0)) / (TRACK.slalomWave * c.scale));
+        Math.sin((2 * Math.PI * (s - c.s0)) / ((c.course?.wave ?? TRACK.slalomWave) * c.scale));
     else
       weave +=
         e *
-        WEAVE[c.kind] *
+        (c.course?.weave ?? WEAVE[c.kind]) *
         TRACK.cruiseAmp *
         c.scale *
         Math.sin((2 * Math.PI * D) / TRACK.cruiseWave);
   }
-  return free * (wander + weave);
+  return free * (wander + weave) + courseBulge(s);
 }
 
 /**
@@ -296,7 +352,7 @@ function chordsOf(i: number): Chord[] {
     const f = loopFeatureOf(i);
     const lead = 120 * c.scale;
     add(f.s - lead, f.s, f.s + f.len, f.s + f.len + lead);
-  } else if (c.kind === 'jumps') {
+  } else if (c.kind === 'jumps' || c.course !== undefined) {
     for (const f of sectionFeatures(i))
       if (f.kind === 'kicker')
         add(f.s - 260 * c.scale, f.s - 60 * c.scale, f.s + f.len, f.s + f.len + 150 * c.scale);
@@ -308,19 +364,24 @@ function chordsOf(i: number): Chord[] {
 /** Centre line x at track distance `s` (peak coordinates). */
 export function centerX(s: number): number {
   const raw = rawCenter(s);
-  const list = chordsOf(sectionIndexAt(s));
-  for (let k = 0; k < list.length; k++) {
-    const ch = list[k]!;
-    if (s <= ch.a || s >= ch.b) continue;
-    // Dead straight, eased in and out
-    const w = smoothstep(ch.a, ch.s, s) * (1 - smoothstep(ch.e, ch.b, s));
-    const chord = ch.xa + ((ch.xb - ch.xa) * (s - ch.a)) / (ch.b - ch.a);
-    return raw + (chord - raw) * w;
+  // (a chord can start in the section before its kicker's, or run on past it)
+  const i = sectionIndexAt(s);
+  for (let j = Math.max(0, i - 1); j <= Math.min(SEC.length - 1, i + 1); j++) {
+    const list = chordsOf(j);
+    for (let k = 0; k < list.length; k++) {
+      const ch = list[k]!;
+      if (s <= ch.a || s >= ch.b) continue;
+      // Dead straight, eased in and out
+      const w = smoothstep(ch.a, ch.s, s) * (1 - smoothstep(ch.e, ch.b, s));
+      const chord = ch.xa + ((ch.xb - ch.xa) * (s - ch.a)) / (ch.b - ch.a);
+      return raw + (chord - raw) * w;
+    }
   }
   return raw;
 }
 
 function widthOf(c: TrackSection): number {
+  if (c.course?.width !== undefined) return c.course.width;
   return c.kind === 'gully' ? WIDTH.gully : WIDTH[c.kind] * Math.min(1.8, Math.sqrt(c.scale));
 }
 
@@ -429,7 +490,6 @@ export interface KickerShape {
   landAt: number;
 }
 
-const DEG = Math.PI / 180;
 const kickers = new Map<string, KickerShape>();
 
 /** Height (m above the cone) of a kicker at u = z − shape.s, 0 off it. */
@@ -444,14 +504,23 @@ export function kickerProfile(k: KickerShape, u: number): number {
   return Math.max(0, k.h - k.pb1 * k.lb1 - k.pb2 * (b - k.lb1));
 }
 
-/** Design a kicker starting at `s` for the speed a rider gets there. */
-function designKicker(s: number, size: number, rnd: number, laneHalf: number): KickerShape {
+/**
+ * Design a kicker starting at `s` for the speed a rider gets there. `hangK`
+ * scales the hang time (the SSX course's kickers are snappier: ~4–5 s).
+ */
+export function designKicker(
+  s: number,
+  size: number,
+  rnd: number,
+  laneHalf: number,
+  hangK = 1,
+): KickerShape {
   const v = expectedSpeed(s);
   const sc = trackScale(s);
   const G = PEAK.grade;
   const th = SLOPE_ANGLE;
   // Hang time: 6 s up top to 14 s at speed, ±15% per kicker
-  const hang = Math.min(14, Math.max(6, 6 + 0.016 * v)) * (0.85 + 0.3 * rnd);
+  const hang = Math.min(14, Math.max(6, 6 + 0.016 * v)) * (0.85 + 0.3 * rnd) * hangK;
   // Flight relative to the slope: T = 2 v sin(alpha) / g_normal
   const alpha = Math.min(
     22 * DEG,
@@ -625,25 +694,35 @@ export function sectionFeatures(index: number): Feature[] {
   if (hit !== undefined) return hit;
   const sec = SEC[index]!;
   const out: Feature[] = [];
-  // A gate over the line where every section starts
-  out.push({
-    id: `g${index}`,
-    kind: 'gate',
-    s: sec.s0 + 30,
-    len: 6,
-    size: widthAt(sec.s0 + 30),
-    side: 1,
-  });
+  // A gate over the line where every section starts (the course's first
+  // has its own START arch)
+  if (index > 0)
+    out.push({
+      id: `g${index}`,
+      kind: 'gate',
+      s: sec.s0 + 30,
+      len: 6,
+      size: widthAt(sec.s0 + 30),
+      side: 1,
+    });
   if (sec.kind === 'jumps') {
     // One after another: each one's foot a run-in past where the last lands
-    let s = sec.s0 + sec.r0 + 150 * sec.scale;
+    // (the SSX course's come round faster: snappier airs, shorter run-ins)
+    const course = sec.course !== undefined;
+    let s = sec.s0 + sec.r0 + (course ? 80 : 150 * sec.scale);
     for (let k = 0; k < 6; k++) {
       const size = 6 + Math.floor(rand(index, 10 + k) * 5);
-      const shape = designKicker(s, size, rand(index, 30 + k), widthAt(s) / 2);
       // Even 30% faster than it's built for, the air comes down on
-      // this section's own fall line (flights grow with the speed squared)
-      const far = s + shape.lip + 1.75 * (shape.landAt - s - shape.lip);
-      if (k > 0 && far > sec.s1 - sec.r1) break;
+      // this section's own fall line (flights grow with the speed squared);
+      // the first always goes in, with a shorter hang if that's what fits
+      let hk = course ? 0.7 : 1;
+      let shape = designKicker(s, size, rand(index, 30 + k), widthAt(s) / 2, hk);
+      const farOf = (sh: KickerShape) => s + sh.lip + 1.75 * (sh.landAt - s - sh.lip);
+      if (k > 0 && farOf(shape) > sec.s1 - sec.r1) break;
+      while (farOf(shape) > sec.s1 - sec.r1 && hk > 0.4) {
+        hk *= 0.85;
+        shape = designKicker(s, size, rand(index, 30 + k), widthAt(s) / 2, hk);
+      }
       const f: Feature = {
         id: `k${index}.${k}`,
         kind: 'kicker',
@@ -655,32 +734,76 @@ export function sectionFeatures(index: number): Feature[] {
       kickers.set(f.id, shape);
       out.push(f);
       const vLand = shape.speed * Math.cos(shape.alpha) + G_ALONG * shape.hang;
-      s = Math.max(shape.landAt, s + shape.end) + Math.max(200, vLand);
+      s = Math.max(shape.landAt, s + shape.end) + (course ? 120 : Math.max(200, vLand));
     }
   } else if (sec.kind === 'loop') {
     out.push(loopFeatureOf(index));
+  } else if (sec.kind === 'gully' && sec.course !== undefined) {
+    // The ice cave's exit kicks you out of the tunnel
+    const k = CAVE_KICKER;
+    // (narrow, so its shoulders stay off the gully's walls)
+    const shape = designKicker(k.s, k.size, rand(index, 30), 11, 0.7);
+    const f: Feature = {
+      id: `k${index}.cave`,
+      kind: 'kicker',
+      s: k.s,
+      len: shape.end,
+      size: Math.round(shape.h * 10) / 10,
+      side: 1,
+    };
+    kickers.set(f.id, shape);
+    out.push(f);
   } else if (sec.kind === 'slalom') {
     // A berm on the outside of every turn of the weave
-    const w = TRACK.slalomWave * sec.scale;
+    const w = (sec.course?.wave ?? TRACK.slalomWave) * sec.scale;
+    const edge = sec.course !== undefined ? 20 : 60 * sec.scale;
     for (let k = 0; ; k++) {
       const apex = sec.s0 + (k / 2 + 1 / 4) * w;
-      if (apex > sec.s1 - sec.r1 - 60 * sec.scale) break;
-      if (apex < sec.s0 + sec.r0 + 60 * sec.scale) continue;
+      if (apex > sec.s1 - sec.r1 - edge) break;
+      if (apex < sec.s0 + sec.r0 + edge) continue;
       const len = 80 * sec.scale;
       out.push({
         id: `b${index}.${k}`,
         kind: 'berm',
         s: apex - len / 2,
         len,
-        size: Math.round(3.5 + sec.scale),
+        // (the SSX course's banks are bigger: rail them at speed)
+        size: sec.course !== undefined ? 7 : Math.round(3.5 + sec.scale),
         // x = A·sin(2π(s − s0)/w): at this apex sin = (−1)^k, and the line
         // bends back the other way, so the outside of the turn is that side
         side: k % 2 === 0 ? 1 : -1,
       });
     }
   }
+  if (sec.course !== undefined && sec.s0 < BRANCH.s1 && sec.s1 > BRANCH.s0) {
+    // THE SPLIT's safe line: one long banked sweep round the outside of its bulge
+    const apex = (BRANCH.s0 + BRANCH.s1) / 2;
+    const len = 260;
+    out.push({
+      id: `b${index}.split`,
+      kind: 'berm',
+      s: apex - len / 2,
+      len,
+      size: 6,
+      side: BRANCH.side,
+    });
+  }
   featureCache.set(index, out);
   return out;
+}
+
+let branchK: KickerShape | null = null;
+
+/** THE SPLIT shortcut's gap kicker (on the branch line, so not a track feature). */
+export function branchKicker(): KickerShape {
+  if (branchK === null)
+    branchK = designKicker(BRANCH.kickerS, BRANCH.kickerSize, 0.5, BRANCH.half, 0.65);
+  return branchK;
+}
+
+/** Whether `s` is on the SSX course (summit pad to the end of its last section). */
+export function onCourse(s: number): boolean {
+  return s >= TRACK.start && s <= COURSE.end;
 }
 
 /** Every feature overlapping [s0, s1] (track distance), plus the km markers. */
@@ -753,7 +876,9 @@ function buildChunk(key: number): Chunk {
   for (let j = 0; j < NS; j++) {
     const o = j * STRIDE;
     // The weave's slope stretches lateral reach in x by up to √(1 + dcx²)
-    const r = (data[o + 2]! / 2 + CARVE.reach) * Math.sqrt(1 + data[o + 1]! ** 2) + 2 * SP;
+    let r = (data[o + 2]! / 2 + CARVE.reach) * Math.sqrt(1 + data[o + 1]! ** 2) + 2 * SP;
+    // The SPLIT's shortcut runs up to the bulge away from the main line
+    r += Math.abs(courseBulge(s0 + j * SP));
     // A sample on a block edge counts for both blocks
     const b0 = Math.max(0, Math.ceil((j * SP) / BLOCK) - 1);
     const b1 = Math.min(nb - 1, Math.floor((j * SP) / BLOCK));

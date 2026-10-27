@@ -28,6 +28,14 @@ export const HUD_CSS = `
 .w2h-left .w2h-bubble{right:auto;left:0}
 /* The phone's icon column: tips open to the left of it */
 .w2h-icons.flex-col .w2h-bubble{top:50%;right:calc(100% + 8px);transform:translateY(-50%)}
+/* Tips sit over everything near the row. The mode chips (backdrop-filter:
+   their own stacking contexts, later in the DOM) would paint over a tip
+   whose z-index only counts inside its button; the panels column (z-40)
+   would cover the phone column's side tips */
+.w2h-icons{z-index:6}
+.w2h-modes{z-index:4}
+.w2h-ib:hover,.w2h-ib:has(.w2h-bubble){z-index:1}
+.w2h-ringbox:has(.w2h-ib:hover),.w2h-ringbox:has(.w2h-bubble){z-index:45!important}
 
 /* ── The ring: map, speed arc, rim badges ── */
 .w2h-ring{position:relative;flex:none}

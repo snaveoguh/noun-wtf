@@ -14,6 +14,7 @@ import type { Quality } from '../../../render/Graphics';
 import type { Feature } from '../contract';
 
 import { smoothstep, vnoise } from '../../../world/mountain/config';
+import { courseClearLat } from '../courseSpec';
 import { centerX, featuresIn, nearestTrack, TRACK, widthAt } from '../track';
 
 export const FOREST = {
@@ -113,6 +114,8 @@ export function clearAt(x: number, z: number, r: number, feats: readonly Feature
   const n = nearestTrack(x, z, _n);
   const halfW = widthAt(n.s) / 2;
   if (n.dist < halfW + FOREST.margin + r) return false;
+  // The SSX course's shortcut, caves and arches
+  if (n.dist < courseClearLat(n.s) + r) return false;
   for (const f of feats) {
     const c = featureClear(f, halfW);
     if (n.s >= c.s0 && n.s <= c.s1 && n.dist < c.lat + r) return false;
@@ -169,7 +172,7 @@ export class LineTable {
       this.cx[i] = centerX(s);
       const hw = widthAt(s) / 2;
       this.halfW[i] = hw;
-      let c = hw + FOREST.margin;
+      let c = Math.max(hw + FOREST.margin, courseClearLat(s));
       for (const f of this.feats) {
         const z = featureClear(f, hw);
         // Pad by a step either side: the samples bracket the zone's ends

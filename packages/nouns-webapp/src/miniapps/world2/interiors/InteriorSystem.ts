@@ -70,6 +70,7 @@ import { plazaDoors } from './plazaDoors';
 import { handPos, poseEat, poseSit } from './pose';
 import { residentsFor, type ResidentDef } from './residents';
 import { hash32, mulberry32, pick, type Rng } from './rng';
+import { seatSpot, type RoomKey } from './roomNet';
 import { storeyHeight, upperUse, USE_LABEL } from './storeys';
 import { njDoors, townDoors } from './townDoors';
 import {
@@ -905,7 +906,6 @@ export class InteriorSystem implements InteriorsApi {
     g.cam.snap(p);
     g.cam.pitch = this.savedPitch;
     g.stats.suspended = false;
-    for (const r of g.remotes.values()) r.character.root.visible = true;
     if (L.outWhy === 'caught') this.banned.set(d.id, Date.now() + BAN_MS);
     if (L.outWhy !== null)
       this.toast(
@@ -941,9 +941,15 @@ export class InteriorSystem implements InteriorsApi {
     const hemiC = _hemiC.copy(gfx.hemi.color);
     const hemiG = _hemiG.copy(gfx.hemi.groundColor);
     const hemiI = gfx.hemi.intensity;
-    const remotes = [...g.remotes.values()].map(q => q.character.root);
+    // Only the riders out in the street are out there (Game.updateNetwork
+    // draws just the ones in here, and the room is hidden for this render)
+    const remotes: { o: THREE.Object3D; was: boolean }[] = [];
+    for (const [id, q] of g.remotes) {
+      const o = q.character.root;
+      remotes.push({ o, was: o.visible });
+      o.visible = (g.net.players.get(id)?.room ?? null) === null;
+    }
     for (const o of s.hidden) o.visible = true;
-    for (const o of remotes) o.visible = true;
     const shown = L.floors.map(f => f.built?.group.visible ?? false);
     for (const f of L.floors) if (f.built !== null) f.built.group.visible = false;
     gfx.scene.fog = s.fog;
@@ -965,7 +971,7 @@ export class InteriorSystem implements InteriorsApi {
       r.setRenderTarget(prev);
       r.shadowMap.autoUpdate = auto;
       for (const o of s.hidden) o.visible = false;
-      for (const o of remotes) o.visible = false;
+      for (const q of remotes) q.o.visible = q.was;
       L.floors.forEach((f, i) => {
         if (f.built !== null) f.built.group.visible = shown[i]!;
       });
@@ -990,6 +996,38 @@ export class InteriorSystem implements InteriorsApi {
     f.ch.root.traverse(o => (o as THREE.SkinnedMesh).skeleton?.dispose());
   }
 
+  // ── Others in here (multiplayer: interiors/roomNet.ts) ──
+
+  /** The room I'm in, for the pose blob's `in` (null in the street). */
+  roomKey(): RoomKey | null {
+    const L = this.live;
+    if (L === null) return null;
+    return { door: L.door.id, level: L.level, seat: L.sit?.seat ?? -1 };
+  }
+
+  private remoteSit = new Map<string, number>();
+
+  /**
+   * A rider in here with me, after their own update: on the seat they're sat
+   * on (the blob's position is where they stood to sit), eased down onto it.
+   */
+  poseRemote(id: string, ch: NounCharacter, room: RoomKey | null, dt: number) {
+    const L = this.live;
+    const here = L !== null && room !== null && room.door === L.door.id && room.seat >= 0;
+    const seat = here ? L.layout.seats[room.seat] : undefined;
+    if (L === null || seat === undefined) {
+      this.remoteSit.delete(id);
+      return;
+    }
+    const k = Math.min(1, (this.remoteSit.get(id) ?? 0) + dt * 4);
+    this.remoteSit.set(id, k);
+    const at = seatSpot(seat);
+    ch.root.position.set(L.origin.x + at.x, L.origin.y, L.origin.z + at.z);
+    ch.root.quaternion.setFromAxisAngle(Y, at.yaw);
+    ch.play({ clip: 'idle', fade: 0.3 });
+    poseSit(ch, L.origin.y, L.origin.y + seat.h, k);
+  }
+
   // ── Inside ──
 
   private toRoom(w: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
@@ -1009,12 +1047,7 @@ export class InteriorSystem implements InteriorsApi {
     if (p.mode === 'board') p.toggleBoard();
     if (p.climb !== null) p.climb = null;
     (p as unknown as { climbCooldown: number }).climbCooldown = 1;
-    // The others are in the world outside
-    for (const r of g.remotes.values()) {
-      r.character.root.visible = false;
-      if (r.label) r.label.style.display = 'none';
-      if (r.pointer) r.pointer.style.display = 'none';
-    }
+    // (The others: Game.updateNetwork draws only those in here, on this floor)
     const me = this.toRoom(p.pos, this._rp);
     this.updateFloors(L, dt);
     const here = L.floors[L.level]!;
@@ -1035,12 +1068,9 @@ export class InteriorSystem implements InteriorsApi {
         L.sit.k = Math.min(1, L.sit.k + dt * 4);
         if (g.me !== null) {
           const r = g.me.root;
-          r.position.set(
-            L.origin.x + seat.x - Math.sin(seat.yaw) * 0.08,
-            L.origin.y,
-            L.origin.z + seat.z - Math.cos(seat.yaw) * 0.08,
-          );
-          r.quaternion.setFromAxisAngle(Y, seat.yaw);
+          const at = seatSpot(seat);
+          r.position.set(L.origin.x + at.x, L.origin.y, L.origin.z + at.z);
+          r.quaternion.setFromAxisAngle(Y, at.yaw);
           g.me.play({ clip: 'idle', fade: 0.3 });
           poseSit(g.me, L.origin.y, L.origin.y + seat.h, L.sit.k);
         }

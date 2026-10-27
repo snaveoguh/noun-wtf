@@ -42,6 +42,8 @@ export class SkateCamera {
   private shake = 0;
   mode: CamMode = 'follow';
   fov = 70;
+  /** Degrees added to the board's speed FOV (the Big Drop's boost kick). */
+  fovKick = 0;
   /** 0..1 blend into the climbing framing (pulled back, low, looking up the wall). */
   private climbK = 0;
   /** Rider position last frame (camera feed-forward at speed). */
@@ -219,9 +221,18 @@ export class SkateCamera {
     // 5.6 m above you. The obstruction check then yanked it in to skim the
     // surface right behind the board (too close, and the snow's edge drawn
     // across the bottom of the screen). Sit above the slope behind instead.
+    // (the snow itself, not set pieces over it: a cave's roof would put the
+    // camera on top of the cave)
     if (onBoard && this.zoom > 1) {
-      const gb = this.world.raycast(_probe.copy(desired).addScaledVector(UP, 80), DOWN, 160);
-      if (gb && desired.y < gb.point.y + SLOPE_CLEAR) desired.y = gb.point.y + SLOPE_CLEAR;
+      const terr = this.world.terrain;
+      const o = _probe.copy(desired).addScaledVector(UP, 80);
+      if (terr !== null) {
+        const t = terr.raycast(o.x, o.y, o.z, 0, -1, 0, 160);
+        if (t >= 0 && desired.y < o.y - t + SLOPE_CLEAR) desired.y = o.y - t + SLOPE_CLEAR;
+      } else {
+        const gb = this.world.raycast(o, DOWN, 160);
+        if (gb && desired.y < gb.point.y + SLOPE_CLEAR) desired.y = gb.point.y + SLOPE_CLEAR;
+      }
     }
 
     // Collision: pull in toward the target
@@ -285,6 +296,7 @@ export class SkateCamera {
     let targetFov = onBoard
       ? 68 + Math.min(14, p.speed * 0.9) + 28 * (1 - Math.exp(-fast / 45))
       : 62 + (pk?.fov ?? 0);
+    if (onBoard) targetFov += this.fovKick;
     // These are vertical FOVs tuned on landscape screens. On a portrait phone
     // the same vertical FOV leaves a sliver of the world either side, so
     // keep at least the horizontal view a 1.4:1 screen would get (capped)
