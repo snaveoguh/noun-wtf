@@ -7,6 +7,7 @@ import type { Difficulty } from './lobby';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
+import { HudSlot } from '../../hud/slots';
 import { BreakHud } from '../view/BreakHud';
 
 import {
@@ -101,13 +102,15 @@ export function BreakUi({ game }: { game: Game }) {
       />
 
       {ui.near && ui.phase === 'idle' && ui.incoming === null && (
-        <button
-          type="button"
-          className="bk-prompt pointer-events-auto absolute left-1/2 top-[30%] -translate-x-1/2"
-          onClick={() => b.promptAction()}
-        >
-          🕺 BREAK BATTLE — press E / tap
-        </button>
+        <HudSlot name="toasts">
+          <button
+            type="button"
+            className="bk-prompt pointer-events-auto absolute left-1/2 top-[30%] -translate-x-1/2"
+            onClick={() => b.promptAction()}
+          >
+            🕺 BREAK BATTLE — press E / tap
+          </button>
+        </HudSlot>
       )}
 
       {ui.phase === 'menu' && <Menu b={b} ui={ui} />}

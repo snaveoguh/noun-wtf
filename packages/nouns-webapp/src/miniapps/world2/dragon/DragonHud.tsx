@@ -10,6 +10,8 @@ import type { Game } from '../Game';
 
 import { useEffect } from 'react';
 
+import { HudSlot } from '../hud/slots';
+
 import { DRAGON_COST } from './pay';
 import { fmtRaceMs } from './race';
 import { useDragonUi } from './useDragon';
@@ -45,33 +47,41 @@ export function DragonHud({ game, touch }: { game: Game; touch: boolean }) {
     <>
       <style>{DRAGON_CSS}</style>
       {ui.notice !== null && (
-        <div className="w2-dragon-notice pointer-events-none absolute left-1/2 top-[22%] -translate-x-1/2">
-          {ui.notice}
-        </div>
+        <HudSlot name="toasts">
+          <div className="w2-dragon-notice pointer-events-none absolute left-1/2 top-[22%] -translate-x-1/2">
+            {ui.notice}
+          </div>
+        </HudSlot>
       )}
       {ui.atShop && (
-        <button
-          type="button"
-          data-dragon="buy"
-          className="w2-dragon-buy pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2"
-          onClick={() => d.requestBuy()}
-        >
-          🐉 BUY A DRAGON · {DRAGON_COST} 🪙 <span>{touch ? 'TAP' : 'E'}</span>
-          {ui.coin !== null && <em>you have {ui.coin}</em>}
-        </button>
+        <HudSlot name="toasts">
+          <button
+            type="button"
+            data-dragon="buy"
+            className="w2-dragon-buy pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2"
+            onClick={() => d.requestBuy()}
+          >
+            🐉 BUY A DRAGON · {DRAGON_COST} 🪙 <span>{touch ? 'TAP' : 'E'}</span>
+            {ui.coin !== null && <em>you have {ui.coin}</em>}
+          </button>
+        </HudSlot>
       )}
       {ui.owned && !ui.riding && !touch && (
-        <div className="w2-dragon-chip pointer-events-none absolute">Z · CALL DRAGON</div>
+        <HudSlot name="modes">
+          <div className="w2-dragon-chip pointer-events-none absolute">Z · CALL DRAGON</div>
+        </HudSlot>
       )}
       {ui.owned && touch && (
-        <button
-          type="button"
-          data-dragon="call"
-          className="w2-dragon-call pointer-events-auto absolute"
-          onClick={() => d.requestCall()}
-        >
-          {ui.riding ? 'OFF' : '🐉'}
-        </button>
+        <HudSlot name="modes">
+          <button
+            type="button"
+            data-dragon="call"
+            className="w2-dragon-call pointer-events-auto absolute"
+            onClick={() => d.requestCall()}
+          >
+            {ui.riding ? 'OFF' : '🐉'}
+          </button>
+        </HudSlot>
       )}
       {ui.riding && ui.race !== null && (ui.race.on || ui.race.hint) && (
         <div

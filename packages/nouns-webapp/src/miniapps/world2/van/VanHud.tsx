@@ -9,6 +9,8 @@ import type { Game } from '../Game';
 
 import { useEffect } from 'react';
 
+import { HudSlot } from '../hud/slots';
+
 import { useVanUi } from './useVan';
 
 export function VanHud({ game, touch }: { game: Game; touch: boolean }) {
@@ -43,17 +45,19 @@ export function VanHud({ game, touch }: { game: Game; touch: boolean }) {
     return (
       <>
         <style>{VAN_CSS}</style>
-        <button
-          type="button"
-          data-van="enter"
-          className="w2-van-enter pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2"
-          onClick={() => {
-            game.unlockAudio();
-            van.requestToggle();
-          }}
-        >
-          🍦 GET IN THE VAN <span>{touch ? 'TAP' : 'E'}</span>
-        </button>
+        <HudSlot name="toasts">
+          <button
+            type="button"
+            data-van="enter"
+            className="w2-van-enter pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2"
+            onClick={() => {
+              game.unlockAudio();
+              van.requestToggle();
+            }}
+          >
+            🍦 GET IN THE VAN <span>{touch ? 'TAP' : 'E'}</span>
+          </button>
+        </HudSlot>
       </>
     );
   }
@@ -76,9 +80,11 @@ export function VanHud({ game, touch }: { game: Game; touch: boolean }) {
     <div className="pointer-events-none absolute inset-0" data-van="hud">
       <style>{VAN_CSS}</style>
       {status !== null && (
-        <div key={status} className="w2-van-status absolute left-1/2 -translate-x-1/2">
-          {status}
-        </div>
+        <HudSlot name="toasts">
+          <div key={status} className="w2-van-status absolute left-1/2 -translate-x-1/2">
+            {status}
+          </div>
+        </HudSlot>
       )}
       <div
         className={`w2-van-speedo absolute left-1/2 -translate-x-1/2 ${touch ? 'w2-van-touch' : ''}`}

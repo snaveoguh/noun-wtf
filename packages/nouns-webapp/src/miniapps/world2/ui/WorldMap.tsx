@@ -54,7 +54,7 @@ export function WorldMap({
 }: {
   game: Game;
   touch: boolean;
-  /** Round, inside the HUD's map cluster (hud/GtaHud), which places it. */
+  /** Round, inside the ring HUD (hud/RingHud), which places it. */
   docked?: boolean;
 }) {
   const [open, setOpen] = useState(false);

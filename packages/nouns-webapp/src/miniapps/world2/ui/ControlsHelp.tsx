@@ -133,7 +133,7 @@ export const GAMEPAD: ControlGroup[] = [
 export function ControlsHelp({ pad }: { pad: boolean }) {
   const groups = pad ? GAMEPAD : KEYBOARD;
   return (
-    <div className="w2-help pointer-events-auto absolute bottom-[76px] left-[292px] right-4 hidden max-w-[980px] md:block">
+    <div className="w2-help pointer-events-auto absolute bottom-[76px] left-[calc(34vw+32px)] right-4 hidden max-w-[980px] md:block">
       <style>{HELP_CSS}</style>
       <div className="w2-help-head">
         <b>CONTROLS</b>
