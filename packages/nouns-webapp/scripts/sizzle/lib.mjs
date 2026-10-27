@@ -9,11 +9,12 @@ import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 
 /**
- * Render size. SwiftShader's cost is per pixel, so frames render at
- * 960×540 and cut.mjs scales them to 1280×720 (SIZZLE_W / SIZZLE_H to change).
+ * Render size: 1920×1080, what the clips ship at. SwiftShader's cost is per
+ * pixel, so SIZZLE_W / SIZZLE_H can drop it for quick previews (cut.mjs
+ * scales whatever it gets to 1920×1080).
  */
-export const W = Number(process.env.SIZZLE_W ?? 960);
-export const H = Number(process.env.SIZZLE_H ?? 540);
+export const W = Number(process.env.SIZZLE_W ?? 1920);
+export const H = Number(process.env.SIZZLE_H ?? 1080);
 export const FPS = 30;
 
 /** Headless Chromium with software WebGL (works without a GPU). */

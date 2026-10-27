@@ -99,6 +99,23 @@ function bdShot(o) {
     z = k.z - k.dz * back;
     dx = k.dx;
     dz = k.dz;
+  } else if (at === 'herd') {
+    // Out on the basin, let the herds spawn round the rider, then line up
+    // through the nearest herd of `kind` so it bolts as the rider comes through
+    place(o.x ?? 150, 24 + B.BASIN.start + (o.ds ?? 25000), 30);
+    sz.run(240);
+    const life = window.__bd.ud.systems.find(y => Array.isArray(y.herds));
+    const q = peakOf();
+    const hs = (life?.herds ?? []).filter(h => h.kind === (o.kind ?? 'yak') && h.members.length > 0);
+    hs.sort((a, b) => Math.hypot(a.x - q.x, a.z - q.z) - Math.hypot(b.x - q.x, b.z - q.z));
+    const h = hs[0];
+    if (h === undefined) throw new Error(`no ${o.kind ?? 'yak'} herd`);
+    const yaw = o.yaw ?? 0.5;
+    dx = Math.sin(yaw);
+    dz = Math.cos(yaw);
+    x = h.x - dx * (o.back ?? 70);
+    z = h.z - dz * (o.back ?? 70);
+    window.__bdHerd = { kind: h.kind, n: h.members.length };
   } else {
     z = at.s;
     x = at.x ?? T.centerX(z);
@@ -119,7 +136,7 @@ function bdShot(o) {
   void g;
 }
 
-const bd = (frames, arg) => ({ scene: 'bigdrop', frames, setup: bdShot, arg });
+const bd = (frames, arg, extra = {}) => ({ scene: 'bigdrop', frames, setup: bdShot, arg, ...extra });
 
 // ── Noun World (scene: world; window.__sz, scenes.mjs) ──
 
@@ -226,18 +243,28 @@ function gxShot(o) {
     window.__gxTrade = pick ? { meet: m, good: pick.a.job.good, real: pick.a.job.real } : null;
     gx.orbit = t => ({ tx: m.x, ty: 1.5, tz: m.z, r: (o.r ?? 8) - (o.push ?? 1.5) * ease(t / 4), az: (o.az0 ?? 0.9) + (o.w ?? 0.15) * t, el: o.el ?? 0.3 });
   } else if (o.kind === 'pullout') {
+    // From a pit's crowd out to VAST. The target glides from the pit to the
+    // hall's centre and the camera climbs early, so it clears the hall walls
+    // (no camera collision here) before the rings of halls come in.
+    s.mode = 'wide';
+    s.pitIx = o.pit ?? 0;
+    s.setMode('floor');
+    const c = { tx: s.want.tx, tz: s.want.tz };
     const T = o.secs ?? 5;
     const r0 = o.r0 ?? 12;
     const r1 = o.r1 ?? 720;
+    const el0 = o.el0 ?? 0.2;
+    const el1 = o.el1 ?? 0.5;
     gx.orbit = t => {
       const k = ease(t / T);
+      const up = Math.sqrt(ease(t / (T * 0.55)));
       return {
-        tx: 0,
+        tx: c.tx * (1 - k),
         ty: 1.5 * (1 - k),
-        tz: 0,
+        tz: c.tz * (1 - k),
         r: Math.exp(Math.log(r0) + (Math.log(r1) - Math.log(r0)) * k),
         az: (o.az0 ?? 2.4) + (o.w ?? 0.12) * t,
-        el: (o.el0 ?? 0.18) + ((o.el1 ?? 0.42) - (o.el0 ?? 0.18)) * k,
+        el: el0 + ((o.elMid ?? 0.8) - el0) * up - ((o.elMid ?? 0.8) - el1) * ease((t / T - 0.55) / 0.45),
       };
     };
   } else if (o.kind === 'descent') {
@@ -264,12 +291,15 @@ export const SHOTS = {
   'brk-judges': brk(70, brkScripted, { phase: 'judging', n: 1, dt: 2.2 }),
   'brk-winner': brk(50, brkScripted, { phase: 'done', dt: 1 }),
 
-  'bd-summit': bd(75, { at: 'summit', speed: 4, cam: ['side', { side: 0.6, up: 0.9, ahead: 9, lead: -4, smooth: 4, fov: 70 }] }),
-  'bd-speed': bd(75, { at: { s: 30000 }, speed: 420, carve: 0.8, cam: ['side', { side: 4.5, up: 1.1, ahead: -1, lead: 8, smooth: 10, fov: 72 }] }),
+  'bd-summit': bd(75, { at: 'summit', speed: 6, cam: ['side', { side: 1.5, up: 0.8, ahead: 3.8, lead: -2, lookUp: 1.3, smooth: 4, fov: 64 }] }),
+  'bd-speed': bd(75, { at: { s: 30000 }, speed: 420, carve: 0.8, cam: ['side', { side: 4, up: 0.5, lead: 1.5, lookUp: 0.6, fov: 76 }] }),
   'bd-chase': bd(75, { at: { s: 45000 }, speed: 520, carve: 0.6 }),
-  'bd-kicker': bd(90, { at: 'kicker', from: 20000, minH: 8, back: 50, cam: ['fixed', { side: 28, up: 6, ahead: 70, lookUp: 0.8, fov: 60 }] }),
-  'bd-loop': bd(90, { at: 'loop', n: 0, back: 110, speed: 70 }),
+  'bd-kicker': bd(90, { at: 'kicker', from: 20000, minH: 8, back: 50, cam: ['side', { side: 6, up: 1.2, lead: 1.5, flat: true, fov: 60 }] }),
   'bd-basin': bd(90, { at: 'basin', ds: 25000, x: 150, speed: 55, carve: 0.5, cam: ['orbit', { r: 7, h: 1.6, a0: -1.2, w: 0.35, smooth: 0 }] }),
+  'bd-basin-air': bd(90, { at: 'basinKicker', ds: 25000, minH: 8, back: 60, cam: ['side', { side: 8, up: 1.5, lead: 2, flat: true, fov: 60 }] }),
+  'bd-herd': bd(90, { at: 'herd', kind: 'yak', ds: 25000, back: 60, speed: 35, cam: ['side', { side: 5, up: 1.2, ahead: -2, lead: 10, smooth: 6, fov: 64 }] }),
+  // Last in its scene: the loop's ride hook keeps hold of the rider afterwards
+  'bd-loop': bd(150, { at: 'loop', n: 0, back: 110, speed: 70 }, { last: true }),
   'w-skate': world(60, { kind: 'skate', jump: 1.6, pre: 0.6, cam: ['side', { side: 3.2, up: 0.6, ahead: 1.5, lead: 2, smooth: 6, fov: 62 }] }),
   'w-skate2': world(60, { kind: 'skate', jump: 1.2, pre: 1.6, steer: 0.4, cam: ['orbit', { r: 5, h: 1.2, a0: 2.4, w: 0.6 }] }),
   'w-cafe': world(60, { kind: 'interior', door: ['cafe', 'bar'], inside: 0.6, cam: ['orbit', { r: 4.5, h: 1.7, a0: 0.4, w: 0.25, lookUp: 1.2 }] }),
@@ -277,8 +307,7 @@ export const SHOTS = {
   'w-fountain': world(84, { kind: 'fountain' }, { last: true }),
   'gx-shout': gx(75, { kind: 'pit', pit: 0, r: 10, el: 0.2, az0: 0.5, w: 0.14, warm: 2 }),
   'gx-shout2': gx(60, { kind: 'pit', pit: 3, r: 9, el: 0.16, az0: 2.2, w: -0.16 }),
-  'gx-trade': gx(120, { kind: 'trade', r: 8, el: 0.28, w: 0.16 }),
-  'gx-pullout': gx(165, { kind: 'pullout', secs: 5.2, r0: 12, r1: 760 }),
+  'gx-trade': gx(120, { kind: 'trade', r: 11, push: 2.5, el: 0.55, w: 0.16 }),
+  'gx-pullout': gx(165, { kind: 'pullout', pit: 0, secs: 5.2, r0: 12, r1: 760, el0: 0.25, elMid: 0.85, el1: 0.5 }),
   'gx-descent': gx(60, { kind: 'descent' }),
-  'bd-basin-air': bd(90, { at: 'basinKicker', ds: 25000, minH: 8, back: 60, cam: ['fixed', { side: 22, up: 4, ahead: 75, fov: 60 }] }),
 };

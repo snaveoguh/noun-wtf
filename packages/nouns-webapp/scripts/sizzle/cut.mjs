@@ -23,6 +23,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FPS = 30;
+/** Output size (the hero is full-bleed; phones get the same file). */
+const OUT_W = 1920;
+const OUT_H = 1080;
 
 const args = process.argv.slice(2);
 const opt = (k, d) => {
@@ -51,7 +54,7 @@ edit.cuts.forEach((c, i) => {
     if (!existsSync(file)) throw new Error(`no video ${file}`);
     inputs.push('-ss', String(c.in ?? 0), '-i', file);
     chains.push(
-      `[${i}:v]fps=${FPS},trim=end_frame=${n},setpts=PTS-STARTPTS,scale=1280:720:flags=lanczos,setsar=1,format=yuv420p[c${i}]`,
+      `[${i}:v]fps=${FPS},trim=end_frame=${n},setpts=PTS-STARTPTS,scale=${OUT_W}:${OUT_H}:flags=lanczos,setsar=1,format=yuv420p[c${i}]`,
     );
   } else {
     const dir = join(framesDir, c.shot);
@@ -61,7 +64,7 @@ edit.cuts.forEach((c, i) => {
     if (a + n > have) throw new Error(`${c.shot}: wants frames ${a}..${a + n} but has ${have}`);
     inputs.push('-framerate', String(FPS), '-start_number', String(a), '-i', join(dir, 'f%04d.jpg'));
     chains.push(
-      `[${i}:v]trim=end_frame=${n},setpts=PTS-STARTPTS,scale=1280:720:flags=lanczos,setsar=1,format=yuv420p[c${i}]`,
+      `[${i}:v]trim=end_frame=${n},setpts=PTS-STARTPTS,scale=${OUT_W}:${OUT_H}:flags=lanczos,setsar=1,format=yuv420p[c${i}]`,
     );
   }
   if (i === 0) {
@@ -96,8 +99,12 @@ function ff(extra, file) {
 
 const base = join(outDir, edit.name);
 const crf = edit.crf ?? {};
-ff(['-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf.mp4 ?? 23), '-pix_fmt', 'yuv420p', '-movflags', '+faststart'], `${base}.mp4`);
-ff(['-an', '-c:v', 'libvpx-vp9', '-crf', String(crf.webm ?? 36), '-b:v', '0', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-pix_fmt', 'yuv420p'], `${base}.webm`);
+// Quality first (crf), with a bitrate ceiling so a busy reel stays under
+// ~4 MB: 2.4 Mbit/s is 3.6 MB for 12 s (`edit.maxrate` in Mbit/s to change)
+const cap = edit.maxrate ?? 2.4;
+ff(['-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf.mp4 ?? 23), '-maxrate', `${cap}M`, '-bufsize', `${cap * 2}M`, '-pix_fmt', 'yuv420p', '-movflags', '+faststart'], `${base}.mp4`);
+// VP9 constrained quality: crf, with -b:v as the ceiling
+ff(['-an', '-c:v', 'libvpx-vp9', '-crf', String(crf.webm ?? 34), '-b:v', `${cap * 0.9}M`, '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-pix_fmt', 'yuv420p'], `${base}.webm`);
 const pr = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(edit.poster ?? 0), '-i', `${base}.mp4`, '-frames:v', '1', '-q:v', '3', `${base}-poster.jpg`], { stdio: 'inherit' });
 if (pr.status !== 0) throw new Error('poster failed');
 console.log(`${edit.name}: ${length.toFixed(2)} s (cuts ${total.toFixed(2)} s) -> ${base}.{mp4,webm}, -poster.jpg`);

@@ -240,6 +240,28 @@ export async function openBreaks(p, base) {
 export async function openExchange(p, base) {
   await p.goto(`${base}/exchange?offline=1&skip=1`, { timeout: 1_200_000, waitUntil: 'commit' });
   await p.waitForFunction(() => window.__gx3d, null, { timeout: 900_000, polling: 2000 });
+  // /exchange opens inside the NounOS page window, smaller than the
+  // viewport and transformed (so even position:fixed is clipped to it).
+  // Move the floor onto <body> and pin it to the whole frame; the scene
+  // follows its host through a ResizeObserver. Then check it really fills
+  // the frame, corner to corner.
+  await p.addStyleTag({
+    content:
+      '.gx3d-root{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:2147483000!important;border-radius:0!important;transform:none!important}',
+  });
+  await p.evaluate(() => document.body.appendChild(document.querySelector('.gx3d-root')));
+  await p.waitForFunction(
+    () => {
+      const c = window.__gx3d.renderer.domElement;
+      const r = c.getBoundingClientRect();
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const corner = document.elementFromPoint(W - 2, H - 2);
+      return r.left === 0 && r.top === 0 && r.width === W && r.height === H && !!corner && c.closest('.gx3d-root').contains(corner);
+    },
+    null,
+    { timeout: 30_000, polling: 250 },
+  );
   await p.evaluate(installExchange);
   // Let the crowd spread out and the first trades start
   await p.evaluate(() => window.__gx.run(20));

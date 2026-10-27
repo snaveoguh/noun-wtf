@@ -7,7 +7,8 @@
 // Renders every shot an edit list uses (or the ones named) into
 // <frames>/<shot>/f0000.jpg…, opening each scene once for all its shots.
 // --preview renders every 6th frame only (for contact sheets); --skip-done
-// leaves shots that already have all their frames.
+// leaves shots that already have all their frames; --limit N renders only
+// each shot's first N frames.
 
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -26,6 +27,8 @@ const base = opt('--base', process.env.SIZZLE_BASE ?? 'http://127.0.0.1:5318');
 const framesDir = resolve(opt('--frames', process.env.SIZZLE_FRAMES ?? join(HERE, '.frames')));
 const preview = args.includes('--preview');
 const skipDone = args.includes('--skip-done');
+// --limit N: only the first N frames of each shot (a quick look at framing)
+const limit = Number(opt('--limit', 0)) || Infinity;
 
 let ids = opt('--shots', '')
   .split(',')
@@ -66,7 +69,7 @@ try {
       await p.evaluate(shot.setup, shot.arg ?? null);
       // Node-side waits (models, textures) after the setup
       if (shot.settle) await p.waitForTimeout(shot.settle);
-      const r = await shoot(p, dir, shot.frames, { every: preview ? 6 : 1, log });
+      const r = await shoot(p, dir, Math.min(shot.frames, limit), { every: preview ? 6 : 1, log });
       log(`shot ${id}: ${shot.frames} frames in ${r.secs} s`);
     }
     await p.close();
