@@ -137,6 +137,13 @@ export function mergeRects<T extends Rect & { top: number }>(rs: T[]): T[] {
   return out;
 }
 
+/** Every block's roof rectangle (and height) in a COL_Buildings-style mesh. */
+export function blockRoofs(mesh: THREE.Mesh): (Rect & { top: number })[] {
+  return mergeRects(roofRects(roofTris(mesh, MIN_ROOF))).filter(
+    r => r.maxX - r.minX > 2.5 && r.maxZ - r.minZ > 2.5,
+  );
+}
+
 /** Footprints of the plaza's buildings from its collision meshes. */
 export function plazaFootprints(meshes: readonly THREE.Mesh[]): Footprint[] {
   const tris: Tri[] = [];

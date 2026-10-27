@@ -5,6 +5,7 @@ import type { RailDef } from '../physics/Rails';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import { blockRoofs } from '../interiors/plazaDoors';
 import {
   MINOR_CAP,
   UPLOAD_CAP,
@@ -14,6 +15,7 @@ import {
 } from '../render/textureDiet';
 
 import { buildFallbackPark } from './FallbackPark';
+import { buildInfills, findInfills } from './infill';
 import {
   alleyCutBoxes,
   buildAlleys,
@@ -234,6 +236,10 @@ export async function loadLevel(
         });
         const parapets = seatRoofs(roofs, blocks);
         if (parapets !== null) collisionMeshes.push(parapets);
+        // The slots the bake left between neighbouring blocks: fill them
+        const infill = buildInfills(findInfills(blockRoofs(roofs)));
+        if (infill.mesh !== null) scene.add(infill.mesh);
+        collisionMeshes.push(...infill.collision);
       }
       const skyline = buildSkyline(roofs);
       scene.add(skyline.group);
