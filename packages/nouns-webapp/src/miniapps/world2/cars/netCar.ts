@@ -42,3 +42,49 @@ export function decodeCar(v: unknown): NetCar | null {
     boosting: (f & BOOST) !== 0,
   };
 }
+
+// ── Riding together (see seats.ts) ──
+//
+// A passenger's blob carries `rd: [driverId, seat]`; the driver's carries
+// `ps`, their passenger list by seat (`ps[i]` holds seat i+1, '' = empty),
+// whenever they drive a car with passenger seats, so a client knows the
+// driver can take passengers at all (older drivers never send it).
+
+/** Net ids are the relay's connection ids. */
+const NET_ID_RE = /^[\w-]{1,64}$/;
+/** Passenger seats a blob may list (more than any car has: the DIP takes three). */
+const MAX_CREW = 7;
+
+export interface NetRide {
+  driver: string;
+  seat: number;
+}
+
+export function encodeRide(r: NetRide): [string, number] {
+  return [r.driver, r.seat];
+}
+
+export function decodeRide(v: unknown): NetRide | null {
+  if (!Array.isArray(v) || v.length !== 2) return null;
+  const [driver, seat] = v as unknown[];
+  if (typeof driver !== 'string' || !NET_ID_RE.test(driver)) return null;
+  if (typeof seat !== 'number' || !Number.isInteger(seat) || seat < 1 || seat > MAX_CREW)
+    return null;
+  return { driver, seat };
+}
+
+export function encodeCrew(crew: readonly string[]): string[] {
+  return crew.slice(0, MAX_CREW).map(x => (NET_ID_RE.test(x) ? x : ''));
+}
+
+/** A blob's `ps` → the passenger list (null when absent or malformed). */
+export function decodeCrew(v: unknown): string[] | null {
+  if (!Array.isArray(v) || v.length > MAX_CREW) return null;
+  const out: string[] = [];
+  for (const x of v as unknown[]) {
+    if (x === '' || x === 0 || x === null) out.push('');
+    else if (typeof x === 'string' && NET_ID_RE.test(x)) out.push(x);
+    else return null;
+  }
+  return out;
+}
