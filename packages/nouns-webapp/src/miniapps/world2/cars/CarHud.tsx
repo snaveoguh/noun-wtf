@@ -11,6 +11,8 @@ import type { Game } from '../Game';
 
 import { useEffect } from 'react';
 
+import { HudSlot } from '../hud/slots';
+
 import { useCarUi } from './useCars';
 
 const SPECIAL_LABEL: Record<string, { key: string; pad: string }> = {
@@ -52,21 +54,23 @@ export function CarHud({ game, touch }: { game: Game; touch: boolean }) {
     return (
       <>
         <style>{CAR_CSS}</style>
-        <div className="w2-car-enter-wrap pointer-events-none absolute left-1/2 top-[34%] -translate-x-1/2">
-          <button
-            type="button"
-            data-car="enter"
-            className="w2-car-enter pointer-events-auto"
-            onClick={() => {
-              game.unlockAudio();
-              cars.requestToggle();
-            }}
-          >
-            🚗 TAKE THE {ui.near.name} <span>{touch ? 'TAP' : 'E'}</span>
-          </button>
-          <div className="w2-car-tag">{ui.near.tagline}</div>
-          {ui.near.credit !== '' && <div className="w2-car-credit">{ui.near.credit}</div>}
-        </div>
+        <HudSlot name="toasts">
+          <div className="w2-car-enter-wrap pointer-events-none absolute left-1/2 top-[34%] -translate-x-1/2">
+            <button
+              type="button"
+              data-car="enter"
+              className="w2-car-enter pointer-events-auto"
+              onClick={() => {
+                game.unlockAudio();
+                cars.requestToggle();
+              }}
+            >
+              🚗 TAKE THE {ui.near.name} <span>{touch ? 'TAP' : 'E'}</span>
+            </button>
+            <div className="w2-car-tag">{ui.near.tagline}</div>
+            {ui.near.credit !== '' && <div className="w2-car-credit">{ui.near.credit}</div>}
+          </div>
+        </HudSlot>
       </>
     );
   }
@@ -99,9 +103,11 @@ export function CarHud({ game, touch }: { game: Game; touch: boolean }) {
     <div className="pointer-events-none absolute inset-0" data-car="hud">
       <style>{CAR_CSS}</style>
       {status !== null && (
-        <div key={status} className="w2-car-status absolute left-1/2 -translate-x-1/2">
-          {status}
-        </div>
+        <HudSlot name="toasts">
+          <div key={status} className="w2-car-status absolute left-1/2 -translate-x-1/2">
+            {status}
+          </div>
+        </HudSlot>
       )}
       <div
         className={`w2-car-speedo absolute left-1/2 -translate-x-1/2 ${touch ? 'w2-car-touch' : ''}`}

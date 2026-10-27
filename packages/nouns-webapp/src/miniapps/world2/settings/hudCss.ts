@@ -15,15 +15,13 @@ export const SETTINGS_CSS = `
 
 /** HUD blocks that scale as one piece, and the corner each grows from. */
 const SCALED: [string, string][] = [
-  // The map cluster carries the minimap, speed and players online
-  ['[data-w2hud="cluster"]', 'bottom left'],
-  // The top-right corner carries the score too
-  ['[data-w2hud="system"]', 'top right'],
+  // The ring carries the minimap, its rim badges, speed, the icons and the
+  // mode chips (everything top-right)
+  ['[data-w2hud="ring"]', 'top right'],
   ['[data-w2hud="compass"]', 'top center'],
   ['[data-w2hud="chat"]', 'bottom left'],
-  ['[data-w2hud="combo"]', 'bottom center'],
-  ['[data-w2hud="toasts"]', 'top center'],
-  ['[data-w2hud="missions"]', 'top left'],
+  // Toasts, trick names and prompts share the top-centre stack
+  ['.w2h-toasts', 'top center'],
 ];
 
 /** The stylesheet that applies the HUD settings. */
@@ -41,10 +39,9 @@ export function hudCss(s: WorldSettings): string {
     'missions',
   ] as const)
     if (!s.hud[id]) hide(`[data-w2hud="${id}"]`);
-  if (!s.hud.minimap) hide('.w2-minimap,.w2h-void');
+  if (!s.hud.minimap) hide('.w2-minimap,.w2h-void,.w2h-mapdisc');
   // The cog itself always stays
-  if (!s.hud.system)
-    hide('[data-w2hud="system"]>:not([data-w2cogrow]),[data-w2cogrow]>:not([data-w2cog])');
+  if (!s.hud.system) hide('[data-w2hud="system"]>:not([data-w2cog])');
   if (!s.hud.nametags) hide('.w2-nametag>span,.w2-pointer');
   if (s.reduceMotion) hide('.w2-speedlines');
   if (s.hudScale !== 1) {

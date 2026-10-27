@@ -5,6 +5,7 @@ import type { Game } from '../Game';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { IconButton } from '../hud/IconButton';
+import { HudSlot } from '../hud/slots';
 import { appealsAdmin, type AppealInfo } from '../net/Appeals';
 import { fetchStats, type RideRun } from '../net/Stats';
 
@@ -57,14 +58,21 @@ export function RecordsUi({ game, admin }: { game: Game; admin: boolean }) {
     <>
       {!replaying && <RecordCardView game={game} />}
       {!replaying && (
+        // The icon sits in the ring HUD's row, the menu opens under the ring
         <div className="w2h-left w2h-replay pointer-events-auto absolute z-10 flex flex-col items-start gap-1">
-          <IconButton
-            icon="replay"
-            on={menu}
-            label="Replays: your last run in slow motion (Y)"
-            onClick={() => setMenu(m => !m)}
-          />
-          {menu && <ReplayMenu game={game} onClose={() => setMenu(false)} />}
+          <HudSlot name="util">
+            <IconButton
+              icon="replay"
+              on={menu}
+              label="Replays: your last run in slow motion (Y)"
+              onClick={() => setMenu(m => !m)}
+            />
+          </HudSlot>
+          {menu && (
+            <HudSlot name="panels">
+              <ReplayMenu game={game} onClose={() => setMenu(false)} />
+            </HudSlot>
+          )}
         </div>
       )}
       {replaying && <ReplayOverlay game={game} />}
@@ -82,7 +90,7 @@ const TOAST_MS = { saved: 3500, appeal: 6000, refused: 9000 } as const;
 const FADE_MS = 600;
 
 /**
- * Record news as a small toast bottom-left that fades on its own: it never
+ * Record news as a small toast (in the HUD's top-centre stack) that fades on its own: it never
  * covers the road or needs closing (a dialogue on every new top speed made
  * phones unplayable). A newer record replaces it. Refused rides keep tiny
  * REPLAY / APPEAL taps; every kept ride is also in the ⟲ REPLAY menu.
@@ -108,41 +116,43 @@ function RecordCardView({ game }: { game: Game }) {
   const what = fmtRecord(card.key, card.value);
   const tag = card.kind === 'saved' ? '★ NEW RECORD' : refused ? '⚠ NOT SAVED' : '⚖ APPEAL';
   return (
-    <div
-      key={card.id}
-      data-testid="record-card"
-      style={{ opacity, transition: 'opacity 200ms linear' }}
-      className={`pointer-events-none absolute z-20 rounded-lg border-2 border-black px-2.5 py-1.5 text-xs text-black shadow-[3px_3px_0_#000] ${
-        touch ? 'bottom-[156px] left-3 max-w-[180px]' : 'bottom-[60px] left-[292px] max-w-[300px]'
-      } ${bad ? 'bg-[#ff5a4a]' : 'bg-[#ffd400]'}`}
-    >
-      <div className="font-black leading-tight">
-        <span className="tracking-wider">{tag}</span> <span className="italic">{what}</span>
-        {card.reason ? <span className="font-bold">: {card.reason}</span> : null}
-      </div>
-      {card.appeal && <div className="mt-0.5 font-bold leading-tight">{card.appeal.text}</div>}
-      {refused && card.run && (
-        <div className="mt-1 flex gap-1.5">
-          <button
-            type="button"
-            className="pointer-events-auto rounded bg-black px-2 py-0.5 font-black italic text-[#ffd400]"
-            onClick={() => game.records.replayCard()}
-          >
-            ▶ REPLAY
-          </button>
-          {(!card.appeal || card.appeal.state === 'error') && (
+    <HudSlot name="toasts">
+      <div
+        key={card.id}
+        data-testid="record-card"
+        style={{ opacity, transition: 'opacity 200ms linear' }}
+        className={`pointer-events-none absolute z-20 rounded-lg border-2 border-black px-2.5 py-1.5 text-xs text-black shadow-[3px_3px_0_#000] ${
+          touch ? 'bottom-[156px] left-3 max-w-[180px]' : 'bottom-[60px] left-[292px] max-w-[300px]'
+        } ${bad ? 'bg-[#ff5a4a]' : 'bg-[#ffd400]'}`}
+      >
+        <div className="font-black leading-tight">
+          <span className="tracking-wider">{tag}</span> <span className="italic">{what}</span>
+          {card.reason ? <span className="font-bold">: {card.reason}</span> : null}
+        </div>
+        {card.appeal && <div className="mt-0.5 font-bold leading-tight">{card.appeal.text}</div>}
+        {refused && card.run && (
+          <div className="mt-1 flex gap-1.5">
             <button
               type="button"
-              className="pointer-events-auto rounded bg-white px-2 py-0.5 font-black italic text-black"
-              title="Send it again with its ride; if it's still refused, an admin reviews it"
-              onClick={() => void game.records.appeal()}
+              className="pointer-events-auto rounded bg-black px-2 py-0.5 font-black italic text-[#ffd400]"
+              onClick={() => game.records.replayCard()}
             >
-              ⚖ APPEAL
+              ▶ REPLAY
             </button>
-          )}
-        </div>
-      )}
-    </div>
+            {(!card.appeal || card.appeal.state === 'error') && (
+              <button
+                type="button"
+                className="pointer-events-auto rounded bg-white px-2 py-0.5 font-black italic text-black"
+                title="Send it again with its ride; if it's still refused, an admin reviews it"
+                onClick={() => void game.records.appeal()}
+              >
+                ⚖ APPEAL
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </HudSlot>
   );
 }
 

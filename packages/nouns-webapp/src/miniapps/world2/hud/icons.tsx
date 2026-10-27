@@ -56,6 +56,10 @@ export type IconName =
   | 'cargo'
   | 'shop'
   | 'decks'
+  | 'chat'
+  | 'fm'
+  | 'dance'
+  | 'hide'
   | 'cog';
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -301,6 +305,45 @@ const PATHS: Record<IconName, ReactNode> = {
       <rect x="2.5" y="6" width="19" height="12" rx="2" fill={CYAN} {...S} />
       <circle cx="8" cy="12" r="3" fill={YELLOW} {...S} />
       <circle cx="16" cy="12" r="3" fill={YELLOW} {...S} />
+    </>
+  ),
+  chat: (
+    <>
+      <path
+        d="M3 5.5a2.5 2.5 0 0 1 2.5-2.5h13A2.5 2.5 0 0 1 21 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-5 4.5V16h-.5A2.5 2.5 0 0 1 3 13.5z"
+        fill={WHITE}
+        {...S}
+      />
+      <path d="M7.5 8h9M7.5 11.5h6" fill="none" {...S} strokeWidth={2} />
+    </>
+  ),
+  fm: (
+    <>
+      <rect x="2.5" y="7" width="19" height="13.5" rx="2.5" fill={PINK} {...S} />
+      <path d="M7 7l5-4.5L17 7" fill="none" {...S} />
+      <path d="M6.5 11.5h5M6.5 15.5h5" fill="none" {...S} strokeWidth={2} />
+      <circle cx="16.5" cy="13.5" r="2.5" fill={YELLOW} {...S} strokeWidth={2} />
+    </>
+  ),
+  dance: (
+    <>
+      <circle cx="13" cy="4.5" r="2.5" fill={YELLOW} {...S} />
+      <path
+        d="M12.5 8l-1.5 6 4 3 1 5M11 14l-4.5 4M12.5 8.5l5.5-2M12.5 8.5L7 10.5l-2-3"
+        fill="none"
+        {...S}
+      />
+    </>
+  ),
+  hide: (
+    <>
+      <path
+        d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"
+        fill={WHITE}
+        {...S}
+      />
+      <circle cx="12" cy="12" r="3" fill={PINK} {...S} />
+      <path d="M4 20L20 4" fill="none" {...S} />
     </>
   ),
   cog: (

@@ -19,8 +19,8 @@ import { DragonHud } from './dragon/DragonHud';
 import { Game, type HudState } from './Game';
 import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
-import { GtaHud, initialHelp } from './hud/GtaHud';
 import { HUD_CSS } from './hud/hudStyle';
+import { initialHelp, RingHud } from './hud/RingHud';
 import { InteriorsUi } from './interiors/InteriorsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import { DROP_PARAM } from './missions/unlocks';
@@ -353,12 +353,13 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && !hoopsOn && !replaying && (
-        <GtaHud
+        <RingHud
           game={game}
           showHelp={showHelp}
           onHelp={() => setShowHelp(s => !s)}
           onShop={openDeck}
           onFm={() => setFmOpen(true)}
+          onChat={() => setChatOpen(true)}
         />
       )}
       {/* NOUN FM from PRESS START: its screen and the intro's skip chip show over character select too */}

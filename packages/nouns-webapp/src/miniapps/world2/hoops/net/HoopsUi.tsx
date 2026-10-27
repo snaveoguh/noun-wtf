@@ -6,6 +6,7 @@ import type { HoopsMode, HoopsUiState } from './HoopsMode';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import { HudSlot } from '../../hud/slots';
 const NOOP = () => () => {};
 const MODES: TeamSize[] = [1, 2, 3, 5];
 const DIFF = ['', 'easy', 'normal', 'hard'] as const;
@@ -66,17 +67,19 @@ export function HoopsUi({ game }: { game: Game }) {
       />
 
       {ui.prompt !== null && ui.phase === 'idle' && ui.invite === null && (
-        <button
-          type="button"
-          className="hp-prompt pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2"
-          onClick={() => h.promptAction()}
-        >
-          🏀{' '}
-          {ui.prompt.kind === 'play'
-            ? 'PLAY BALL'
-            : `${ui.prompt.kind === 'join' ? 'JOIN' : 'WATCH'} ${ui.prompt.hostName.toUpperCase()}'S ${ui.prompt.size}v${ui.prompt.size}`}{' '}
-          — E / tap
-        </button>
+        <HudSlot name="toasts">
+          <button
+            type="button"
+            className="hp-prompt pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2"
+            onClick={() => h.promptAction()}
+          >
+            🏀{' '}
+            {ui.prompt.kind === 'play'
+              ? 'PLAY BALL'
+              : `${ui.prompt.kind === 'join' ? 'JOIN' : 'WATCH'} ${ui.prompt.hostName.toUpperCase()}'S ${ui.prompt.size}v${ui.prompt.size}`}{' '}
+            — E / tap
+          </button>
+        </HudSlot>
       )}
 
       {ui.phase === 'lobby' && ui.lobby !== null && <Lobby h={h} ui={ui} />}

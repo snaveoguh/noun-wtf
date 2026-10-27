@@ -13,6 +13,7 @@ import type { TradeClient } from './TradeClient';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { HudIcon } from '../hud/icons';
+import { HudSlot } from '../hud/slots';
 
 import { GOOD_ICON, GOOD_IDS, GOODS } from './goods';
 import { maxBuy, RULES, usedSlots } from './ledger';
@@ -108,29 +109,36 @@ export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
         data-trade="chip"
         className={`pointer-events-none absolute flex flex-wrap items-center gap-1.5 ${touch ? 'left-[86px] top-12 max-w-[38vw]' : 'left-[96px] top-3 max-w-[40vw]'}`}
       >
+        {/* The van cargo is a badge on the ring HUD's rim; notices join the toasts */}
         {st !== null && (
-          <CargoChip st={st} town={town} short={touch} onMarket={() => setOpen('market')} />
+          <HudSlot name="rim">
+            <CargoChip st={st} town={town} short={touch} onMarket={() => setOpen('market')} />
+          </HudSlot>
         )}
         {notice !== null && (
-          <div
-            className={`w2-chip text-xs ${notice.ok ? 'w2-on' : ''}`}
-            style={notice.ok ? undefined : { borderColor: '#ff4d3d' }}
-          >
-            {notice.ok ? '✓' : '✗'} {notice.text}
-          </div>
+          <HudSlot name="toasts">
+            <div
+              className={`w2-chip text-xs ${notice.ok ? 'w2-on' : ''}`}
+              style={notice.ok ? undefined : { borderColor: '#ff4d3d' }}
+            >
+              {notice.ok ? '✓' : '✗'} {notice.text}
+            </div>
+          </HudSlot>
         )}
       </div>
       {stall && open === null && town !== null && (
-        <button
-          type="button"
-          className="w2-prompt w2-prompt-at"
-          data-trade="stall"
-          onClick={() => setOpen('market')}
-        >
-          <kbd>{touch ? 'TAP' : 'E'}</kbd>
-          <HudIcon name="shop" size={18} />
-          {TOWN_SPECS[town].name.toUpperCase()} MARKET
-        </button>
+        <HudSlot name="toasts">
+          <button
+            type="button"
+            className="w2-prompt w2-prompt-at"
+            data-trade="stall"
+            onClick={() => setOpen('market')}
+          >
+            <kbd>{touch ? 'TAP' : 'E'}</kbd>
+            <HudIcon name="shop" size={18} />
+            {TOWN_SPECS[town].name.toUpperCase()} MARKET
+          </button>
+        </HudSlot>
       )}
       {open !== null && town !== null && st !== null && (
         <MarketPanel

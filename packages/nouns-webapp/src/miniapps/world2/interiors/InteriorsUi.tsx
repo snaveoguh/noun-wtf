@@ -11,6 +11,7 @@ import type { InteriorSystem, InteriorsView, UiAction } from './InteriorSystem';
 
 import { useSyncExternalStore, type ReactNode } from 'react';
 
+import { HudSlot } from '../hud/slots';
 function useInteriors(sys: InteriorSystem): InteriorsView {
   return useSyncExternalStore(sys.subscribe, sys.getView);
 }
@@ -26,17 +27,19 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-0 z-30 select-none" data-interiors="hud">
       {v.prompt !== null && (
-        <button
-          type="button"
-          data-interiors="prompt"
-          className="pointer-events-auto absolute left-1/2 top-[30%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-center text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
-          onClick={() => act({ a: v.prompt!.kind })}
-        >
-          {v.prompt.text} — {touch ? 'TAP' : 'E'}
-          {v.prompt.sub !== undefined && (
-            <span className="block text-xs font-bold not-italic">{v.prompt.sub}</span>
-          )}
-        </button>
+        <HudSlot name="toasts">
+          <button
+            type="button"
+            data-interiors="prompt"
+            className="pointer-events-auto absolute left-1/2 top-[30%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-center text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
+            onClick={() => act({ a: v.prompt!.kind })}
+          >
+            {v.prompt.text} — {touch ? 'TAP' : 'E'}
+            {v.prompt.sub !== undefined && (
+              <span className="block text-xs font-bold not-italic">{v.prompt.sub}</span>
+            )}
+          </button>
+        </HudSlot>
       )}
 
       {v.inside !== null && (
@@ -56,13 +59,15 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
       )}
 
       {v.note !== null && (
-        <div
-          key={v.note.at}
-          className="absolute left-1/2 top-[18%] -translate-x-1/2 bg-[#ffd400] px-4 py-2 text-sm font-black italic text-black shadow-[4px_4px_0_#d22209]"
-          data-interiors="note"
-        >
-          {v.note.text}
-        </div>
+        <HudSlot name="toasts">
+          <div
+            key={v.note.at}
+            className="absolute left-1/2 top-[18%] -translate-x-1/2 bg-[#ffd400] px-4 py-2 text-sm font-black italic text-black shadow-[4px_4px_0_#d22209]"
+            data-interiors="note"
+          >
+            {v.note.text}
+          </div>
+        </HudSlot>
       )}
 
       {v.eating !== null && (
