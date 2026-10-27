@@ -20,7 +20,9 @@ export interface RoomKey {
 
 export type RoomWire = [string, number, number];
 
-const DOOR_RE = /^[\w#./:\-]{1,80}$/;
+// Door ids are `area:footprintKey[#n]` (e.g. `plaza:-31.4,-85`); only ever
+// compared, never drawn, so anything printable without quotes or brackets
+const DOOR_RE = /^[^\u0000-\u001f"'<>\\]{1,96}$/;
 const MAX_LEVEL = 40;
 const MAX_SEAT = 255;
 

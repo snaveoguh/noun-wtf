@@ -9,6 +9,9 @@ describe('room wire key', () => {
     const k: RoomKey = { door: 'town:north#12', level: 2, seat: 3 };
     expect(decodeRoom(JSON.parse(JSON.stringify(encodeRoom(k))))).toEqual(k);
     expect(decodeRoom(encodeRoom(cafe0))).toEqual(cafe0);
+    // real door ids (interiors/doors.ts, townDoors.ts)
+    for (const door of ['plaza:-31.4,-85', 'plaza:-31.4,-85#2', 'jersey:b12', 'n1:12.5,-3#roof'])
+      expect(decodeRoom([door, 0, -1])?.door).toBe(door);
   });
 
   it('reads no key, or a malformed one, as the street', () => {
@@ -20,7 +23,7 @@ describe('room wire key', () => {
       ['cafe'],
       [42, 0, -1],
       ['', 0, -1],
-      ['x'.repeat(81), 0, -1],
+      ['x'.repeat(97), 0, -1],
       ['<img onerror=1>', 0, -1],
       ['cafe', -1, -1],
       ['cafe', 1.5, -1],
