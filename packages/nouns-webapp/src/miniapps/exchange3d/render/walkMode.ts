@@ -17,6 +17,7 @@ import type { Trader } from '../sim/crowd';
 import * as THREE from 'three';
 
 import { seedKey } from '../../world2/character/NounAppearance';
+import { encodeOutfit, type Outfit } from '../../world2/character/outfit';
 import { ExchangeNet } from '../net/exchangeNet';
 import { PERSONAL } from '../sim/crowd';
 import { NO_INPUT, spawnWalker, stepWalker, walkerClip, type WalkInput } from '../sim/walker';
@@ -28,6 +29,8 @@ export interface MeLook {
   seed: NounSeed;
   name: string;
   weight: number;
+  /** Trousers + shoes as picked in Noun World (null: the Noun's default). */
+  outfit: Outfit | null;
 }
 
 /** A remote player drawn this frame (for labels, taps and trades). */
@@ -68,12 +71,15 @@ export class WalkMode {
   private run = false;
   private stick = { side: 0, fwd: 0 };
   look: MeLook;
+  /** My outfit's wire key ('' = my Noun's default). */
+  private readonly outfitKey: string;
   peers: PeerView[] = [];
 
   /** `tag`: my public exchange tag (what the other players offer deals to). */
   constructor(look: MeLook, tag: () => string, online: boolean) {
     this.look = look;
-    this.walkers.setMyLook({ seed: look.seed, weight: look.weight });
+    this.outfitKey = look.outfit !== null ? encodeOutfit(look.outfit) : '';
+    this.walkers.setMyLook({ seed: look.seed, weight: look.weight, outfit: this.outfitKey });
     this.net = online ? new ExchangeNet(tag) : null;
     this.net?.connect();
     window.addEventListener('keydown', this.onKey);
@@ -177,6 +183,7 @@ export class WalkMode {
       name: this.look.name,
       seedKey: seedKey(this.look.seed),
       weight: this.look.weight,
+      outfit: this.outfitKey,
     });
     net.tick();
     const t = performance.now() - INTERP_MS;
@@ -187,7 +194,7 @@ export class WalkMode {
       const p = peer.buf.sample(t);
       if (p === null) continue;
       keep.add(peer.id);
-      const rig = this.walkers.peer(peer.id, p.seedKey, p.weight);
+      const rig = this.walkers.peer(peer.id, p.seedKey, p.weight, p.outfit);
       rig?.pose(p.x, p.y, p.z, p.yaw, p.anim, p.speed, dt);
       out.push({
         id: peer.id,

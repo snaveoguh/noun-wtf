@@ -14,7 +14,17 @@ describe('exchange3d: your rider from the character select', () => {
       seed: { background: 1, body: 4, accessory: 9, head: 200, glasses: 3 },
       name: 'big noun',
       weight: 1,
+      outfit: null,
     });
+  });
+
+  it('reads the saved outfit (bad fields fall back to the Noun default)', () => {
+    const seed = { background: 1, body: 4, accessory: 9, head: 200, glasses: 3 };
+    const outfit = { pants: 'shorts', pantsColor: 7, shoes: 'slide', shoeColor: 3 };
+    expect(parseSaved(JSON.stringify({ seed, outfit }))?.outfit).toEqual(outfit);
+    const junk = parseSaved(JSON.stringify({ seed, outfit: { ...outfit, pants: 'kilt' } }));
+    expect(junk?.outfit).toMatchObject({ pantsColor: 7, shoes: 'slide' });
+    expect(['baggy', 'cargo', 'track', 'shorts', 'skinny']).toContain(junk?.outfit?.pants);
   });
 
   it('falls back on missing or junk saves', () => {

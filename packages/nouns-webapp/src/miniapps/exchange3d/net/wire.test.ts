@@ -12,6 +12,7 @@ const pose = (o: Partial<PeerPose> = {}): PeerPose => ({
   name: 'noun 42',
   seedKey: '0-12-40-123-7',
   weight: 0.25,
+  outfit: '0315',
   tag: 'r:0a1b2c3',
   ping: null,
   ...o,
@@ -122,5 +123,10 @@ describe('exchange3d wire format', () => {
     expect(b.sample(0)!.x).toBe(0);
     for (let i = 0; i < 20; i++) b.push(2000 + i, pose());
     expect(b.latest).not.toBeNull();
+  });
+  it("carries the rider's outfit key (Noun World's `of`); junk is dropped", () => {
+    expect(parseMove(relay(packMove(pose())))?.outfit).toBe('0315');
+    expect(JSON.parse(JSON.parse(packMove(pose({ outfit: '' }))).state).of).toBeUndefined();
+    expect(parseMove(relay(packMove(pose({ outfit: 'WAY TOO LONG' }))))?.outfit).toBe('');
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { floorHeight, HALL_D, HALL_W, PITS, TOWER_CLEAR } from './layout';
-import { inputDir, NO_INPUT, spawnWalker, stepWalker, WALK, walkerClip } from './walker';
+import { inputDir, inTheWay, NO_INPUT, spawnWalker, stepWalker, WALK, walkerClip } from './walker';
 
 const run = (w = spawnWalker(), i = NO_INPUT, az = Math.PI, secs = 2) => {
   for (let k = 0; k < secs * 60; k++) stepWalker(w, i, az, 1 / 60);
@@ -59,5 +59,13 @@ describe('exchange3d walker', () => {
     run(w, { fwd: 1, side: 0, run: false }, Math.PI, 2.4);
     expect(w.y).toBeCloseTo(floorHeight(w.x, w.z), 1);
     expect(w.y).toBeGreaterThan(0);
+  });
+  it("finds who's in the way of the walk camera (not the people beside you)", () => {
+    // Camera at z = -6 looking at you at the origin
+    expect(inTheWay(0, -6, 0, 0, 0.3, -3)).toBe(true);
+    expect(inTheWay(0, -6, 0, 0, 2, -3)).toBe(false); // off to the side
+    expect(inTheWay(0, -6, 0, 0, 0, -0.6)).toBe(false); // right beside you
+    expect(inTheWay(0, -6, 0, 0, 0, 2)).toBe(false); // in front of you
+    expect(inTheWay(0, -6, 0, 0, 0, -8)).toBe(false); // behind the camera
   });
 });

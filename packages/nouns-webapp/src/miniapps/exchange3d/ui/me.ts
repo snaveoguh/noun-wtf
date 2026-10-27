@@ -10,6 +10,7 @@ import type { MeLook } from '../render/walkMode';
 
 import { riderId } from '../../exchange/client';
 import { BUILDS } from '../../world2/character/NounCharacter';
+import { outfitFromSeed, parseOutfit } from '../../world2/character/outfit';
 import { ART } from '../render/crowdMesh';
 import { seedFromId } from '../sim/looks';
 
@@ -26,6 +27,7 @@ export function parseSaved(raw: string | null): MeLook | null {
       seed?: Record<string, unknown>;
       name?: unknown;
       build?: unknown;
+      outfit?: unknown;
     };
     const s = v.seed ?? {};
     const seed = {
@@ -37,10 +39,13 @@ export function parseSaved(raw: string | null): MeLook | null {
     };
     if (Object.values(seed).some(x => x === null)) return null;
     const build = int(v.build) ?? 2;
+    const s5 = seed as MeLook['seed'];
     return {
-      seed: seed as MeLook['seed'],
+      seed: s5,
       name: typeof v.name === 'string' && v.name.trim() !== '' ? v.name.slice(0, 24) : 'YOU',
       weight: BUILDS[build]?.w ?? 0,
+      // Bad fields fall back to the Noun's default, as the select screen does
+      outfit: v.outfit !== undefined ? parseOutfit(v.outfit, outfitFromSeed(s5)) : null,
     };
   } catch {
     return null;
@@ -54,5 +59,7 @@ export function myLook(): MeLook {
   } catch {
     // storage blocked
   }
-  return parseSaved(raw) ?? { seed: seedFromId(riderId(), ART), name: 'YOU', weight: 0 };
+  return (
+    parseSaved(raw) ?? { seed: seedFromId(riderId(), ART), name: 'YOU', weight: 0, outfit: null }
+  );
 }

@@ -1,64 +1,35 @@
 // ── 3D Grand Exchange: trouser and shoe colours (pure) ───────────────────
 //
 // The crowd's legs are coloured per trader so the floor doesn't look like
-// one Noun cloned three hundred times. `outfitFor` is the one place that
-// decides it: today it hashes the trader's id into a palette; when riders
-// get real outfit options (world2/character), pass them in as `real` and
-// they win, so a rider's legs on the floor match the ones they picked.
+// one Noun cloned three hundred times. It uses Noun World's outfit
+// contract (world2/character/outfit.ts): every Noun's default outfit is
+// `outfitFromSeed(seed)`, the same one a rigged NounCharacter dresses
+// itself in, so a trader's instanced legs and its full rig always match
+// across the LOD swap. A rider who picked an outfit passes it as `real`.
 
-import { hashStr } from './looks';
+import type { Seed } from './looks';
 
+import {
+  outfitFromSeed,
+  PANTS_COLORS,
+  SHOE_COLORS,
+  type Outfit as RiderOutfit,
+} from '../../world2/character/outfit';
+
+/** The crowd mesh's view of an outfit: two flat colours. */
 export interface Outfit {
   /** sRGB hex, '#rrggbb'. */
   trouser: string;
   shoe: string;
 }
 
-/** Trousers: denim, chinos, black, greys, a few loud ones (it's a trading floor). */
-export const TROUSERS: readonly string[] = [
-  '#2c3e66',
-  '#3b5b8c',
-  '#1f2a44',
-  '#22252b',
-  '#4a4f57',
-  '#6b6f76',
-  '#8a7552',
-  '#b59a6a',
-  '#5a3d2b',
-  '#3f5a3a',
-  '#7a2f2f',
-  '#d9c9a3',
-  '#e2e2e2',
-  '#c2486b',
-  '#e0a526',
-];
+const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
-export const SHOES: readonly string[] = [
-  '#151515',
-  '#f2f2f2',
-  '#5a3a22',
-  '#8b5a2b',
-  '#2b2b2b',
-  '#c0392b',
-  '#2e6fd8',
-  '#e8d24a',
-  '#7d7d7d',
-];
-
-const HEX = /^#[\da-f]{6}$/i;
-
-/**
- * A trader's trousers and shoes: `real` (their own outfit, when known)
- * wins, field by field; otherwise a stable pick from the id.
- */
-export function outfitFor(id: string, real?: Partial<Outfit> | null): Outfit {
-  const h = hashStr(`outfit:${id}`);
-  const pick = {
-    trouser: TROUSERS[h % TROUSERS.length]!,
-    shoe: SHOES[(h >>> 8) % SHOES.length]!,
-  };
+/** A trader's trouser and shoe colours: their own outfit if known, else their Noun's default. */
+export function outfitFor(seed: Seed, real?: RiderOutfit | null): Outfit {
+  const o = real ?? outfitFromSeed(seed);
   return {
-    trouser: real?.trouser !== undefined && HEX.test(real.trouser) ? real.trouser : pick.trouser,
-    shoe: real?.shoe !== undefined && HEX.test(real.shoe) ? real.shoe : pick.shoe,
+    trouser: hex((PANTS_COLORS[o.pantsColor] ?? PANTS_COLORS[0]!).hex),
+    shoe: hex((SHOE_COLORS[o.shoeColor] ?? SHOE_COLORS[0]!).hex),
   };
 }

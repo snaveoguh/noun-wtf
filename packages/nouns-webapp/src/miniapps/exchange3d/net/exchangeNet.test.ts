@@ -42,6 +42,7 @@ const pose = (o: Partial<PeerPose> = {}): PeerPose => ({
   name: 'BOB',
   seedKey: '1-2-3-4-5',
   weight: 0,
+  outfit: '',
   tag: 'r:0000bbb',
   ping: null,
   ...o,

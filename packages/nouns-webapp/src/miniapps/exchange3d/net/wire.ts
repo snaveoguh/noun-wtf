@@ -10,10 +10,14 @@
 //     a   anim ('idle' | 'walk' | 'run')   m 'foot'   sp speed   n name
 //     w   build weight (-1 … 1)            q yaw as a quaternion (Net.ts)
 //   and, new for the Exchange (older clients ignore unknown keys):
+//     of  your outfit, Noun World's 4-char key (world2/character/outfit.ts,
+//         the same key Net.ts sends); absent = your Noun's default
 //     gt  your public exchange tag ('r:…', the masked tag the order book
 //         and the floor feed already show; never the raw rider id)
 //     go  [seq, toTag]: "I just sent toTag an offer" (they refresh now)
 // No worker change is needed: the relay passes `state` through untouched.
+
+import { OUTFIT_KEY_RE } from '../../world2/character/outfit';
 
 export const EXCHANGE_ROOM = 'noun-world-v2-exchange';
 export const SEND_HZ = 10;
@@ -30,6 +34,8 @@ export interface PeerPose {
   name: string;
   seedKey: string;
   weight: number;
+  /** Their outfit's wire key ('' = their Noun's default). */
+  outfit: string;
   /** Their public exchange tag ('' when they didn't send one). */
   tag: string;
   /** Their last offer ping, if any. */
@@ -55,6 +61,7 @@ export function packMove(p: PeerPose): string {
     sp: r3(p.speed),
     n: p.name.slice(0, 24),
     w: r3(Math.max(-1, Math.min(1, p.weight))),
+    ...(OUTFIT_KEY_RE.test(p.outfit) ? { of: p.outfit } : {}),
     ...(isTag(p.tag) ? { gt: p.tag } : {}),
     ...(p.ping !== null && isTag(p.ping.to) ? { go: [p.ping.seq, p.ping.to] } : {}),
   };
@@ -105,6 +112,7 @@ export function parseMove(d: Record<string, unknown>): PeerPose | null {
       .slice(0, 24),
     seedKey,
     weight: Math.max(-1, Math.min(1, num(blob.w))),
+    outfit: typeof blob.of === 'string' && OUTFIT_KEY_RE.test(blob.of) ? blob.of : '',
     tag: isTag(blob.gt) ? blob.gt : '',
     ping,
   };

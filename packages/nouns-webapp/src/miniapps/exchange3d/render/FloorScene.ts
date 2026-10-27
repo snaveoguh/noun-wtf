@@ -56,6 +56,7 @@ import { copyRings, pickRigs, type Budget } from '../sim/lod';
 import { hashStr, seedFromArray, seedFromId, type Seed } from '../sim/looks';
 import { outfitFor } from '../sim/outfit';
 import { TIMING, TradeScheduler, type FillJob, type TradeEvent } from '../sim/trades';
+import { inTheWay } from '../sim/walker';
 import { FloorSource } from '../source';
 
 import { FloorAudio } from './audio';
@@ -181,6 +182,8 @@ export class FloorScene {
   private vastHalls = 0;
   readonly walk: WalkMode;
   private youI = -1;
+  /** Traders hidden this frame: in the way of the WALK camera. */
+  private blockers = new Set<number>();
   target: TradeTarget | null = null;
   /** Where VAST goes back to when toggled off (V again). */
   private vastBack: CamMode | null = null;
@@ -242,7 +245,7 @@ export class FloorScene {
     });
     for (const t of this.crowd.traders) {
       this.mesh.setLook(t.i, t.seed);
-      this.mesh.setOutfit(t.i, outfitFor(t.id));
+      this.mesh.setOutfit(t.i, outfitFor(t.seed));
     }
     // The regulars (real bots, real seeds) and you
     for (const b of ROSTER) this.realTrader(b.id, PIT_GOODS[hashStr(b.id) % PIT_GOODS.length]!);
@@ -263,7 +266,7 @@ export class FloorScene {
     this.mesh.commitLooks();
     this.scene.add(this.mesh.shadows, this.mesh.mesh);
 
-    this.rigs = new RigPool(Math.round(o.budget.rigs * 1.5), t => outfitFor(t.id));
+    this.rigs = new RigPool(Math.round(o.budget.rigs * 1.5));
     this.scene.add(this.rigs.group, this.fx.group, this.walk.walkers.group);
     this.labels = new Labels(layer, o.budget.bubbles + MAX_PEERS);
 
@@ -340,7 +343,7 @@ export class FloorScene {
     }
     const t = this.crowd.addReal(owner, kind, name, seed, pit, reuse);
     this.mesh.setLook(t.i, seed);
-    this.mesh.setOutfit(t.i, outfitFor(t.id));
+    this.mesh.setOutfit(t.i, outfitFor(seed, owner === 'you' ? this.walk?.look.outfit : null));
     this.mesh.commitLooks();
     this.bubbles[t.i] = null;
     this.hist.delete(t.i);
@@ -877,6 +880,17 @@ export class FloorScene {
       dt,
       this.budget.rigsPerFrame,
     );
+    // Walking: whoever stands between the camera and you steps out of view
+    this.blockers.clear();
+    if (this.mode === 'walk') {
+      const e = this.camera.position;
+      const w = this.walk.walker;
+      for (const t of ts) {
+        if (t.i === this.youI || !inTheWay(e.x, e.z, w.x, w.z, t.x, t.z)) continue;
+        this.blockers.add(t.i);
+        this.rigs.hide(t.i);
+      }
+    }
   }
 
   private rigAct(t: Trader): { act: RigAct; speed: number } {
@@ -897,7 +911,7 @@ export class FloorScene {
       p.y = t.y;
       p.z = t.z;
       p.yaw = t.heading;
-      p.hidden = this.rigSet.has(i) || i === this.youI;
+      p.hidden = this.rigSet.has(i) || i === this.youI || this.blockers.has(i);
       // Legs swing with the walk (crowdMesh's shader), a smaller bob on top
       p.phase = t.phase;
       p.stride = t.walk * Math.min(1, t.speed / 1.2 + 0.35);

@@ -2,7 +2,6 @@ import type { Ticker, YouView } from '../../exchange/engine/types';
 
 import { describe, expect, it } from 'vitest';
 
-import { outfitFor, SHOES, TROUSERS } from './outfit';
 import { defaultPrice, formAction, formProblem, openForm, type TradeTarget } from './tradeForm';
 
 const tick: Ticker = { good: 'FISH', last: 12, bid: 11, ask: 14, chg: 0, vol: 0, fair: 12.5 };
@@ -71,22 +70,5 @@ describe('exchange3d trade panel', () => {
       price: 13,
       kind: 'limit',
     });
-  });
-});
-
-describe('exchange3d outfits', () => {
-  it('gives each trader stable trousers and shoes from the palettes', () => {
-    const a = outfitFor('sim:1');
-    expect(outfitFor('sim:1')).toEqual(a);
-    expect(TROUSERS).toContain(a.trouser);
-    expect(SHOES).toContain(a.shoe);
-    const seen = new Set(Array.from({ length: 200 }, (_, i) => outfitFor(`sim:${i}`).trouser));
-    expect(seen.size).toBeGreaterThan(8);
-  });
-
-  it('lets a real outfit win, field by field, and ignores junk', () => {
-    expect(outfitFor('x', { trouser: '#123456' })).toMatchObject({ trouser: '#123456' });
-    expect(outfitFor('x', { shoe: 'red' }).shoe).toBe(outfitFor('x').shoe);
-    expect(outfitFor('x', null)).toEqual(outfitFor('x'));
   });
 });

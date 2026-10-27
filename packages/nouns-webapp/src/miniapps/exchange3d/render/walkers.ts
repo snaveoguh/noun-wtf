@@ -21,6 +21,8 @@ import { toonify } from '../../world2/render/Toon';
 export interface WalkerLook {
   seed: NounSeed;
   weight: number;
+  /** Outfit wire key (world2/character/outfit.ts); '' = the Noun's default. */
+  outfit: string;
 }
 
 /** One person's character: build once, then pose it every frame. */
@@ -38,13 +40,17 @@ export class WalkerRig {
   setLook(look: WalkerLook) {
     if (this.assets === null) return;
     const key = `${seedKey(look.seed)}|${look.weight.toFixed(2)}`;
-    if (key === this.key && this.ch !== null) return;
+    if (key === this.key && this.ch !== null) {
+      this.ch.setOutfitWire(look.outfit); // cheap when unchanged
+      return;
+    }
     this.key = key;
     this.drop();
     const ch = new NounCharacter(look.seed, this.assets);
     ch.setBoardType('skate');
     ch.board.visible = false;
     ch.setWeight(look.weight);
+    ch.setOutfitWire(look.outfit);
     toonify(ch.root);
     ch.root.traverse(o => {
       const m = o as THREE.Mesh;
@@ -121,7 +127,7 @@ export class Walkers {
   }
 
   /** A peer's rig (built on first use, once the GLB is in). */
-  peer(id: string, seedKeyStr: string, weight: number): WalkerRig | null {
+  peer(id: string, seedKeyStr: string, weight: number, outfit: string): WalkerRig | null {
     if (this.assets === null) return null;
     let r = this.peers.get(id);
     if (r === undefined) {
@@ -137,6 +143,7 @@ export class Walkers {
         glasses: 0,
       },
       weight,
+      outfit,
     });
     return r;
   }

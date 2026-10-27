@@ -107,3 +107,30 @@ export function walkerClip(w: Walker): 'idle' | 'walk' | 'run' {
   if (w.speed > 0.25) return 'walk';
   return 'idle';
 }
+
+/**
+ * Is someone at (px, pz) in the way of the WALK camera at (ex, ez) looking
+ * at you at (tx, tz)? Ground plane only: within `r` of the line between,
+ * and not right beside you (they stay, so the crowd round you doesn't
+ * blink). The scene hides them, as third-person games do.
+ */
+export function inTheWay(
+  ex: number,
+  ez: number,
+  tx: number,
+  tz: number,
+  px: number,
+  pz: number,
+  r = 0.9,
+): boolean {
+  const dx = tx - ex;
+  const dz = tz - ez;
+  const len2 = dx * dx + dz * dz;
+  if (len2 < 1e-6) return false;
+  const k = ((px - ex) * dx + (pz - ez) * dz) / len2;
+  const near = 1 - 1.1 / Math.sqrt(len2);
+  if (k <= 0 || k >= near) return false;
+  const qx = ex + dx * k - px;
+  const qz = ez + dz * k - pz;
+  return qx * qx + qz * qz < r * r;
+}
