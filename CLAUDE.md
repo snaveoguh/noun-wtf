@@ -287,6 +287,14 @@ The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,
 - **Page:** TREASURY NOW (holdings per holder) → WHERE IT CAME FROM / WHERE IT WENT (the reconciliation as a waterfall, `waterfallSteps` in `model.ts`) → WHAT WAS SPENT (IN / OUT / SOLD FOR USDC tiles, by-kind Sankey, years, recipients). The vote page's Treasury card and the `/stats` corridor HUD link here.
 - The 3D view (`Explore3D.tsx`) is an optional explore mode; `Scene.tsx` is the wallet explorer's renderer, not this page's.
 
+### Grand Exchange (3D floor, /exchange and under the Noggles Fountain)
+
+`src/miniapps/exchange3d/`: the order book is `netlify/functions/world-exchange.ts` (in-game COIN only, engine in `src/miniapps/exchange/engine/`).
+- **WALK** (default camera, `render/walkMode.ts`): you on foot as your Noun World rider (`ui/me.ts` reads the character select's save; under the fountain the game passes its rider). WASD / arrows, Shift runs, a thumb stick on phones (`ui/Stick.tsx`); the camera pulls in at walls (`fitInHall`). V toggles VAST and back.
+- **Multiplayer** (`net/`): its own room `noun-world-v2-exchange` on the PartyServer worker, plain `world:move` packets with the extras in the `state` blob (`gx: 1` marks an Exchange walker, `gt` = public exchange tag, `go: [seq, toTag]` = "I just sent you an offer, look now"). No worker change. `?offline=1` stays off the room unless `?mp=1`; `VITE_PARTYKIT_HOST` points it at a local `wrangler dev`.
+- **Trading** (`ui/TradePanel.tsx`, logic `sim/tradeForm.ts`): click / tap a player, rider or bot for a direct deal (`engine/deals.ts`: offer / accept / decline, 90 s); a simulated trader gets a limit order on the real book. Targets are masked tags only; the server resolves a tag to its account when offered (`toOwner`, never sent out) and only that account can accept. Accounts are opened (`join`) only once another player is in the room or you trade.
+- **Crowd**: instanced low-poly Nouns with swinging legs; trouser / shoe colours come from Noun World's `outfitFromSeed` (`sim/outfit.ts` `outfitFor`), the outfit a rig dresses itself in, so the LOD swap never changes clothes. A far LOD (one trouser block) in VAST and the hall copies. Your rider wears your saved outfit and sends it to other players as `of` (Net.ts's key).
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.

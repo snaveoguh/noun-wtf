@@ -3,5 +3,6 @@ export * from './types';
 export * from './goods';
 export * from './book';
 export * from './sim';
+export * from './deals';
 export { ROSTER, BOT_BY_ID, isBot } from './bots/roster';
 export type { BotDef } from './bots/types';

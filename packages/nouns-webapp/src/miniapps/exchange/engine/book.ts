@@ -184,7 +184,8 @@ function bump(list: Candle[], t: number, price: number, qty: number, keep: numbe
   if (list.length > keep) list.splice(0, list.length - keep);
 }
 
-function record(s: ExchangeState, f: GeFill) {
+/** Put a fill on the tape and the candles (also used by direct deals, deals.ts). */
+export function record(s: ExchangeState, f: GeFill) {
   s.fills.push(f);
   if (s.fills.length > KEEP_FILLS) s.fills.splice(0, s.fills.length - KEEP_FILLS);
   s.last[f.good] = f.price;

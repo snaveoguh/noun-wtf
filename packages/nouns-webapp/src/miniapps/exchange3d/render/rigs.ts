@@ -55,6 +55,12 @@ export class RigPool {
     return n;
   }
 
+  /** Hide trader i's rig this frame (it's in the way of the camera). */
+  hide(i: number) {
+    const r = this.rigs.get(i);
+    if (r !== undefined) r.ch.root.visible = false;
+  }
+
   /** Has trader i a visible rig this frame? */
   has(i: number) {
     const r = this.rigs.get(i);
@@ -81,7 +87,8 @@ export class RigPool {
     for (const i of want) {
       const t = traders[i];
       if (t === undefined) continue;
-      const key = seedKey(t.seed);
+      // Seed and id: a reused slot (a new rider) gets a fresh rig
+      const key = seedKey(t.seed) + '|' + t.id;
       let r = this.rigs.get(i);
       if (r !== undefined && r.key !== key) {
         this.drop(i);
