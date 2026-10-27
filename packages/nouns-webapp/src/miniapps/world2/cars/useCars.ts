@@ -12,10 +12,10 @@ export function useCarUi(game: Game): CarUi {
   );
 }
 
-/** True while the player drives a car (the skate touch controls hide). */
+/** True while the player drives a car or rides in one (the skate touch controls hide). */
 export function useCarDriving(game: Game | null): boolean {
   return useSyncExternalStore(
     cb => (game !== null ? game.cars.subscribe(cb) : () => undefined),
-    () => game?.cars.ui.driving ?? false,
+    () => (game?.cars.ui.driving ?? false) || (game?.cars.ui.ride ?? null) !== null,
   );
 }

@@ -17,6 +17,7 @@ import { SprayTouch } from '../graffiti/SprayPanel';
 import { HudIcon } from '../hud/icons';
 import { sideColumn, thumbPad } from '../hud/thumbLayout';
 import { useViewport } from '../hud/useViewport';
+import { useParkourLabels } from '../parkour/game/ParkourUi';
 
 const R = 56;
 /** The first-run steering hint fades after this (ms). */
@@ -41,6 +42,8 @@ const PAD: Record<PadId, { icon: IconName; label: string; cls: string }> = {
 
 export function TouchControls({ game }: { game: Game }) {
   const isTouch = useIsTouch();
+  // On foot the pad is parkour's: JUMP, RUN and a context DUCK (slide / drop / roll)
+  const footLabels = useParkourLabels(game);
   const vp = useViewport();
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -61,6 +64,7 @@ export function TouchControls({ game }: { game: Game }) {
 
   if (!isTouch) return null;
   const t = game.input.touch;
+  const foot = footLabels;
 
   const stickHandlers = (side: 'L' | 'R') => {
     const d = drag.current[side];
@@ -222,11 +226,20 @@ export function TouchControls({ game }: { game: Game }) {
       <div className="w2-tpad pointer-events-none absolute inset-0">
         {pad.map(b => {
           const p = PAD[b.id];
+          // On foot the pad is parkour's (JUMP, RUN, a context DUCK)
+          const label =
+            (b.id === 'stop'
+              ? foot?.duck
+              : b.id === 'push' && foot !== null
+                ? 'RUN'
+                : b.id === 'ollie'
+                  ? foot?.jump
+                  : undefined) ?? p.label;
           return (
             <button
               key={b.id}
               type="button"
-              aria-label={p.label}
+              aria-label={label}
               className={`w2-tbtn w2-tround ${p.cls}`}
               style={{
                 width: b.size,
@@ -237,7 +250,7 @@ export function TouchControls({ game }: { game: Game }) {
               {...handlers[b.id]}
             >
               <HudIcon name={p.icon} size={Math.round(b.size * 0.42)} />
-              <span>{p.label}</span>
+              <span>{label}</span>
             </button>
           );
         })}

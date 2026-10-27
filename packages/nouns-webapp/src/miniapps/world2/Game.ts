@@ -52,8 +52,10 @@ import { setSkyGroundFog } from './nature/TimeOfDay';
 import { CALLOUT_CODES, Net, type NetPose, type RemoteCallout } from './net/Net';
 import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { JerseyCrew } from './npc/JerseyCrew';
+import { ParkourSystem } from './parkour/ParkourSystem';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
+import { PoolMode } from './pool/net/PoolMode';
 import { FmSpots } from './radio/FmSpots';
 import { NounFm } from './radio/NounFm';
 import {
@@ -75,6 +77,12 @@ import {
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
+import {
+  capUploads,
+  checkTextureBudget,
+  textureDiet,
+  watchContextLoss,
+} from './render/textureDiet';
 import { inkExcluded, toonify } from './render/Toon';
 import { RecordsHub } from './replay/Records';
 import { ReplayView } from './replay/ReplayView';
@@ -322,6 +330,10 @@ export class Game {
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
   readonly breaks: BreakMode = new BreakMode(this);
+  /** Parkour (parkour/): wall runs, ledges, poles… on foot, and NOUN PARKOUR's routes. */
+  readonly parkour: ParkourSystem = new ParkourSystem(this);
+  /** Noun Pool (pool/net/PoolMode.ts, PoolApi): bar tables + the pool hall; owns the frame. */
+  readonly pool: PoolMode = new PoolMode(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
   readonly freestyle: FreestyleMode = new FreestyleMode(this);
   /** Noun Hide & Seek (hideseek/net/HideSeekMode.ts): played in the normal game; hides hiders' tags. */
@@ -359,8 +371,9 @@ export class Game {
   private lowFpsTime = 0;
   /** The low tier's step-down ladder (auto quality on 'low' only). */
   private ladder: FpsLadder | null = null;
-  /** A weak phone (booted at a lower render scale). */
+  /** A weak phone (booted at a lower render scale, on the texture diet). */
   weakDevice = false;
+  private unwatchLoss: (() => void) | null = null;
 
   constructor(opts: GameOptions) {
     this.opts = opts;
@@ -388,6 +401,13 @@ export class Game {
           ...this.gfx.lite,
           scale: Math.min(this.gfx.lite.scale, WEAK_BOOT_SCALE),
         });
+    }
+    // A weak phone also goes on the texture diet (render/textureDiet.ts)
+    textureDiet.on = this.weakDevice;
+    if (this.weakDevice) {
+      capUploads(this.gfx.renderer);
+      this.gfx.sun.shadow.mapSize.set(512, 512);
+      this.unwatchLoss = watchContextLoss(opts.canvas);
     }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
@@ -656,6 +676,9 @@ export class Game {
     void this.trade.load();
 
     this.setLoading(null);
+    // Dev: once the lazy systems are in, check the weak-phone texture budget
+    if (import.meta.env.DEV && this.weakDevice)
+      setTimeout(() => !this.disposed && checkTextureBudget(this.gfx.scene), 20_000);
     this.running = true;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
@@ -923,6 +946,16 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    // ── Noun Pool: at a table (a bar's, or the pool hall); the room stays, the skater waits ──
+    if (this.pool.active) {
+      this.input.poll(now);
+      this.pool.step(dt);
+      this.updateFm(dt);
+      this.animTime += dt;
+      this.updateNetwork(dt);
+      this.gfx.render(dt);
+      return;
+    }
     // ── Freestyle: breakdancing on the spot; skater parked, skate camera orbiting ──
     if (this.freestyle.active) {
       const fin = this.input.poll(now);
@@ -974,18 +1007,22 @@ export class Game {
               pushPressed: false,
               respawnPressed: false,
               emotePressed: 0,
+              duckPressed: false,
             };
       this.player.backSkate = this.boardType === 'blades';
       this.player.update(h, f, this.cam.controlYaw, now);
       this.handlePlayerEvents();
     }
 
+    // In a vehicle my character isn't stepped: keep a parked pose fresh for the room
+    if (driving) this.animTime += dt;
     if (this.van2.driving) this.van2.drive(dt, input, now);
-    else if (this.cars.driving) this.cars.drive(dt, input, now);
+    else if (this.cars.inCar) this.cars.drive(dt, input, now);
     else if (this.dragon.riding) this.dragon.fly(dt, input, now);
     else {
       this.cam.update(dt, this.player, input.lookX, input.lookY, now);
       this.updateMyCharacter(dt);
+      this.parkour.frame(dt, input);
     }
     this.updateAudio(dt);
     {
@@ -994,7 +1031,7 @@ export class Game {
         p.mode === 'board' &&
         p.state !== 'bail' &&
         !this.van2.driving &&
-        !this.cars.driving &&
+        !this.cars.inCar &&
         !this.dragon.riding;
       this.rider.tick(dt, p.speed, riding);
     }
@@ -1051,6 +1088,7 @@ export class Game {
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
+    this.pool.idle(dt);
     this.hideseek.update(dt);
   }
 
@@ -1597,7 +1635,9 @@ export class Game {
   } {
     const p = this.player;
     // In the saddle: sat still (the rig has no seated clip; idle beats legs sprinting in the air)
-    if (this.dragon.riding || this.cars.driving) return { clip: 'idle', fade: 0.3 };
+    if (this.dragon.riding || this.cars.inCar) return { clip: 'idle', fade: 0.3 };
+    const pk = this.parkour.clip();
+    if (pk !== null) return pk;
     if (p.climb !== null) {
       // No climb clip in the rig: the walk cycle's legs read as stepping up
       // the wall; NounCharacter overrides the arms into an overhead reach.
@@ -1796,6 +1836,7 @@ export class Game {
     r.label?.remove();
     r.pointer?.remove();
     this.remotes.delete(id);
+    this.parkour.dropRemote(id);
   }
 
   /** How a sound at `pos` reaches the listener (the camera): distance gain + stereo pan. */
@@ -1891,6 +1932,7 @@ export class Game {
               ? 'dragon'
               : undefined,
         car: this.cars.netKey,
+        pk: this.parkour.netKey(),
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
@@ -1925,6 +1967,7 @@ export class Game {
         travelled: c.mode === 'board' ? travelled : 0,
         riding: c.mode === 'board' && !c.anim.includes('bail'),
       });
+      this.parkour.remote(id, ch, c.pk, dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
       const show = this.hideseek.labelFor(id);
@@ -2271,6 +2314,7 @@ export class Game {
   }
 
   dispose() {
+    this.unwatchLoss?.();
     claimAudio('noun-world-radio', false);
     this.cutscene.abort();
     this.voice.stopAll();
@@ -2282,6 +2326,8 @@ export class Game {
     this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
+    this.parkour.dispose();
+    this.pool.dispose();
     this.freestyle.dispose();
     this.hideseek.dispose();
     this.van2.dispose();

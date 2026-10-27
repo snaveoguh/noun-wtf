@@ -19,11 +19,13 @@ import { DragonHud } from './dragon/DragonHud';
 import { Game, type HudState } from './Game';
 import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
-import { GtaHud, initialHelp } from './hud/GtaHud';
 import { HUD_CSS } from './hud/hudStyle';
+import { initialHelp, RingHud } from './hud/RingHud';
 import { InteriorsUi } from './interiors/InteriorsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import { DROP_PARAM } from './missions/unlocks';
+import { ParkourUi } from './parkour/game/ParkourUi';
+import { PoolUi, usePoolActive } from './pool/net/PoolUi';
 import { applyWorldManifest, registerWorldSw } from './pwa/install';
 import { InstallButton } from './pwa/InstallButton';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
@@ -162,7 +164,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
 
   // A Noun Breaks battle hides the skate HUD the same way hoops does
   const breakOn = useBreakActive(game);
-  const hoopsOn = useHoopsActive(game) || breakOn;
+  const poolOn = usePoolActive(game);
+  const hoopsOn = useHoopsActive(game) || breakOn || poolOn;
   // (flying the dragon keeps the skate stick: it turns and sets the speed)
   const vanDriving = useVanDriving(game);
   const carDriving = useCarDriving(game);
@@ -216,6 +219,20 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => window.clearInterval(t);
   }, [game, started, searchParams]);
 
+  // `?play=pool` (the homepage's NOUN POOL card): into the pool hall, menu open
+  const poolLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || poolLaunched.current || searchParams.get('play') !== 'pool') return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.pool.arrive()) return false;
+      poolLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   // `?play=hideseek` (the homepage's HIDE & SEEK card): at the lobby spot, menu open
   const hideseekLaunched = useRef(false);
   useEffect(() => {
@@ -238,6 +255,22 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     const tryLaunch = () => {
       if (game.me === null || game.hud.loading !== null || !game.cars.arrive()) return false;
       driveLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
+  // `?play=parkour` (the homepage's NOUN PARKOUR card): the route menu
+  const parkourLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || parkourLaunched.current || searchParams.get('play') !== 'parkour')
+      return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null) return false;
+      parkourLaunched.current = true;
+      game.parkour.course.open();
       return true;
     };
     if (tryLaunch()) return;
@@ -353,12 +386,13 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && !hoopsOn && !replaying && (
-        <GtaHud
+        <RingHud
           game={game}
           showHelp={showHelp}
           onHelp={() => setShowHelp(s => !s)}
           onShop={openDeck}
           onFm={() => setFmOpen(true)}
+          onChat={() => setChatOpen(true)}
         />
       )}
       {/* NOUN FM from PRESS START: its screen and the intro's skip chip show over character select too */}
@@ -380,6 +414,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
+      {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}
+      {game && started && <PoolUi game={game} />}
       {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <HideSeekUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && (
@@ -541,7 +577,8 @@ function Splash({
 const CSS = `
 .w2-speedlines{position:absolute;inset:-10%;background:repeating-conic-gradient(from 0deg at 50% 52%,rgba(255,255,255,0) 0deg 5deg,rgba(255,255,255,.55) 5deg 5.4deg,rgba(255,255,255,0) 5.4deg 9deg,rgba(255,255,255,.35) 9deg 9.25deg);-webkit-mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);animation:w2lines .24s steps(3) infinite;transition:opacity .3s}
 @keyframes w2lines{0%{transform:rotate(0)}100%{transform:rotate(3deg)}}
-@media (pointer:coarse){.w2-chip{background:rgba(10,12,20,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-family:system-ui,sans-serif;white-space:nowrap}
+/* (one rule, not a media block: an unclosed @media here once swallowed every HUD style after it on desktop) */
+.w2-chip{background:rgba(10,12,20,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-family:system-ui,sans-serif;white-space:nowrap}
 .w2-on{border-color:#3ddc84}
 .w2-live{border-color:#3ddc84;background:rgba(61,220,132,.35)}
 .w2-btn{pointer-events:auto;background:#d22209;color:#fff;font-size:22px;letter-spacing:.06em;padding:12px 28px;border-radius:14px;box-shadow:0 6px 0 #7a1405,0 10px 30px rgba(0,0,0,.4);transition:transform .08s}

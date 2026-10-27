@@ -15,11 +15,13 @@
 
 import type {
   BotPublic,
+  DealsView,
   ExchangeState,
   FloorEvent,
   GeFill,
   GoodId,
   Ticker,
+  YouView,
 } from '../../exchange/engine/types';
 
 import { remaining } from '../../exchange/engine/book';
@@ -89,6 +91,9 @@ export interface FloorFrame {
   orders: PublicOrder[];
   floor: FloorEvent[];
   bots: BotPublic[];
+  /** Your balances and your direct deals in / out (when the source knows you). */
+  you?: YouView | null;
+  deals?: DealsView;
 }
 
 export const fillKey = (f: GeFill) =>

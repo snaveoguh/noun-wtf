@@ -2,8 +2,11 @@
 //
 // Mounts FloorScene and draws the HUD: feed status and legend, camera
 // buttons, the followed trader's card, sound, and the way back to the flat
-// order book (as a side panel, or the whole flat view).
+// order book (as a side panel, or the whole flat view). Walking (the
+// default camera): the trade panel for whoever you clicked, your offers
+// in / out, and a thumb stick on phones.
 
+import type { MeLook } from '../render/walkMode';
 import type { CamMode } from '../sim/cameras';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -13,10 +16,21 @@ import { nounSvgDataUri } from '@/lib/marketplace/nouns-svg';
 import { isMobile, readDevice } from '../../world2/render/deviceTier';
 import { FloorScene, type HudState } from '../render/FloorScene';
 import { budgetFor } from '../sim/lod';
+import { formAction } from '../sim/tradeForm';
+
+import { myLook } from './me';
+import { Stick } from './Stick';
+import { Offers, TradePanel } from './TradePanel';
 
 import './exchange3d.css';
 
 const CAMS: { m: CamMode; label: string; key: string; hint: string }[] = [
+  {
+    m: 'walk',
+    label: 'WALK',
+    key: '6',
+    hint: 'You, on foot: WASD / arrows (Shift runs), drag to look, click someone to trade',
+  },
   {
     m: 'floor',
     label: 'FLOOR',
@@ -24,7 +38,12 @@ const CAMS: { m: CamMode; label: string; key: string; hint: string }[] = [
     hint: 'Walk-level orbit round a pit (press again for the next pit)',
   },
   { m: 'wide', label: 'WIDE', key: '2', hint: 'The whole hall' },
-  { m: 'vast', label: 'VAST', key: '3', hint: 'Pull right out: the floor goes on and on' },
+  {
+    m: 'vast',
+    label: 'VAST',
+    key: '3',
+    hint: 'Pull right out: the floor goes on and on (V toggles it, back to where you were)',
+  },
   { m: 'follow', label: 'FOLLOW', key: '4', hint: 'Lock onto a trader (or tap one)' },
   {
     m: 'free',
@@ -54,7 +73,10 @@ export default function Exchange3D({
   children,
   onExit,
   intro,
+  me,
 }: {
+  /** You, as your Noun World rider (default: the saved character select pick). */
+  me?: MeLook;
   /** Under the fountain in Noun World: the way back up (button and Esc). */
   onExit?: () => void;
   intro?: 'descent';
@@ -84,6 +106,9 @@ export default function Exchange3D({
         phone,
         onHud: setHud,
         intro,
+        me: me ?? myLook(),
+        // The Exchange's multiplayer room (?offline=1 stays off it unless ?mp=1)
+        online: q.get('offline') !== '1' || q.get('mp') === '1',
       });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'WebGL unavailable');
@@ -91,7 +116,14 @@ export default function Exchange3D({
     }
     sceneRef.current = scene;
     const cam = q.get('cam');
-    if (cam === 'floor' || cam === 'wide' || cam === 'vast' || cam === 'follow' || cam === 'free')
+    if (
+      cam === 'walk' ||
+      cam === 'floor' ||
+      cam === 'wide' ||
+      cam === 'vast' ||
+      cam === 'follow' ||
+      cam === 'free'
+    )
       scene.setMode(cam);
     return () => {
       scene.dispose();
@@ -99,9 +131,9 @@ export default function Exchange3D({
     };
   }, [phone]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Esc climbs back out (unless it's stopping a follow first)
+  // Esc climbs back out (unless it's stopping a follow or closing a trade first)
   const followingRef = useRef(false);
-  followingRef.current = hud?.follow != null;
+  followingRef.current = hud?.follow != null || hud?.target != null;
   useEffect(() => {
     if (onExit === undefined) return;
     const onKey = (e: KeyboardEvent) => {
@@ -199,13 +231,14 @@ export default function Exchange3D({
           ))}
           <div>
             {phone
-              ? 'Drag to orbit · two fingers to pan · pinch to zoom · tap a Noun to follow it.'
-              : 'Drag to orbit · right-drag or shift-drag to pan · scroll to zoom · click a Noun to follow it · [ ] change pit · Esc stop following.'}
+              ? 'WALK: thumb stick to walk (push all the way to run), drag to look, tap anyone to trade. Other cameras: drag to orbit · two fingers to pan · pinch to zoom · tap a Noun to follow it.'
+              : 'WALK: WASD / arrows, Shift runs, drag to look, scroll to zoom, click anyone to trade. Other cameras: drag to orbit · right-drag or shift-drag to pan · scroll to zoom · click a Noun to follow it · [ ] change pit · Esc stop following.'}
           </div>
           <div className="gx3d-muted">
             Gold bubbles and ★ names are the real Grand Exchange: its bots (real Nouns) and riders,
             their orders and fills. Everyone else is a simulated crowd trading at the real prices,
-            so the floor is never empty. In-game COIN only, never real money.
+            so the floor is never empty. Other players here walk the floor as their riders: click
+            one to offer them a trade. In-game COIN only, never real money.
           </div>
         </div>
       )}
@@ -240,6 +273,18 @@ export default function Exchange3D({
           </div>
           {f.blurb !== null && <div className="gx3d-muted gx3d-card-blurb">{f.blurb}</div>}
           <div className="gx3d-card-now">{f.now !== null ? `“${f.now}”` : '…'}</div>
+          {f.kind !== 'you' && (
+            <button
+              type="button"
+              className="gx3d-btn"
+              onClick={() => {
+                const t = s?.targetOf(f.i) ?? null;
+                if (t !== null) s?.setTarget(t);
+              }}
+            >
+              TRADE WITH {f.name}
+            </button>
+          )}
           {f.recent.length > 0 && (
             <ul>
               {f.recent.map(r => (
@@ -252,13 +297,45 @@ export default function Exchange3D({
         </aside>
       )}
 
+      {hud?.target != null && s !== null && (
+        <TradePanel
+          key={hud.target.key}
+          target={hud.target}
+          tickers={hud.tickers}
+          you={hud.you}
+          pit={hud.nearPit}
+          live={hud.feed === 'live'}
+          onSend={f => s.act(formAction(hud.target!, f))}
+          onClose={() => s.setTarget(null)}
+        />
+      )}
+
+      {hud !== null && s !== null && (
+        <Offers
+          deals={hud.deals}
+          now={hud.now}
+          nameOf={t => s.nameOf(t)}
+          onAnswer={(id, accept) =>
+            s.act(accept ? { t: 'accept', deal: id } : { t: 'decline', deal: id })
+          }
+        />
+      )}
+
+      {hud?.walking === true && phone && <Stick onMove={(x, y) => s?.setStick(x, y)} />}
+      {hud?.walking === true && !phone && hud.target === null && hud.follow === null && (
+        <div className="gx3d-walkhint">
+          WASD walk · Shift run · drag to look · click someone to trade · V vast
+          {hud.peers > 0 ? ` · ${hud.peers} other player${hud.peers === 1 ? '' : 's'} here` : ''}
+        </div>
+      )}
+
       <nav className="gx3d-cams" aria-label="cameras">
         {CAMS.map(c => (
           <button
             key={c.m}
             type="button"
             title={c.hint}
-            className={`gx3d-cam ${hud?.mode === c.m ? 'gx3d-on' : ''} ${c.m === 'vast' ? 'gx3d-cam-vast' : ''}`}
+            className={`gx3d-cam ${hud?.mode === c.m ? 'gx3d-on' : ''} ${c.m === 'vast' ? 'gx3d-cam-vast' : ''} ${c.m === 'walk' ? 'gx3d-cam-walk' : ''}`}
             onClick={() => s?.setMode(c.m)}
           >
             {!phone && <kbd>{c.key}</kbd>}
@@ -272,6 +349,7 @@ export default function Exchange3D({
       {hud !== null && (
         <div className="gx3d-perf" aria-hidden="true">
           {hud.fps} fps · {hud.frameMs} ms · {hud.rigs} rigs · {hud.bubbles} bubbles
+          {hud.online ? ` · online (${hud.peers})` : ''}
           {hud.vastHalls > 0 ? ` · ${hud.vastHalls + 1} halls` : ''}
         </div>
       )}

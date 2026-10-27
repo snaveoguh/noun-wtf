@@ -366,7 +366,8 @@ function Track({ hud, s, coarse }: { hud: BreakHudStore; s: BreakHudState; coars
   const crew = s.track?.crew ?? s.up?.crew ?? null;
   const f = s.flash;
   // Your own hits show on the lane; a wrong key is called out big, with the right one
-  const showFlash = f !== null && performance.now() - f.at < 700 && (!local || f.wrong !== undefined);
+  const showFlash =
+    f !== null && performance.now() - f.at < 700 && (!local || f.wrong !== undefined);
   return (
     <div className={`w2-brk-trackwrap ${local ? '' : 'w2-brk-spect'}`}>
       {showFlash && (

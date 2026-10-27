@@ -69,6 +69,8 @@ export default function AgentHome({
   onEnterWorld,
   onEnterHoops,
   onEnterBreaks,
+  onEnterParkour,
+  onEnterPool,
   onEnterHideSeek,
   onEnterDrive,
   onEnterWarfare,
@@ -83,6 +85,8 @@ export default function AgentHome({
   onEnterWorld: () => void;
   onEnterHoops: () => void;
   onEnterBreaks: () => void;
+  onEnterParkour: () => void;
+  onEnterPool?: () => void;
   onEnterHideSeek: () => void;
   /** Noun World in a car (`?play=drive`) */
   onEnterDrive: () => void;
@@ -142,6 +146,8 @@ export default function AgentHome({
     (id: GameId) => {
       if (id === 'hoops') onEnterHoops();
       else if (id === 'breaks') onEnterBreaks();
+      else if (id === 'parkour') onEnterParkour();
+      else if (id === 'pool') onEnterPool?.();
       else if (id === 'hideseek') onEnterHideSeek();
       else if (id === 'drive') onEnterDrive();
       else if (id === 'warfare') onEnterWarfare();
@@ -154,7 +160,17 @@ export default function AgentHome({
         }
       } else onEnterWorld();
     },
-    [onEnterHoops, onEnterBreaks, onEnterHideSeek, onEnterDrive, onEnterWarfare, onEnterWorld, onEnterDrop],
+    [
+      onEnterHoops,
+      onEnterBreaks,
+      onEnterParkour,
+      onEnterPool,
+      onEnterHideSeek,
+      onEnterDrive,
+      onEnterWarfare,
+      onEnterWorld,
+      onEnterDrop,
+    ],
   );
 
   const activate = useCallback(
@@ -265,8 +281,10 @@ export default function AgentHome({
           sound={sound}
           resumable={resumable}
           ctaFor={ctaFor}
+          lockedFor={id => id === 'drop' && !dropOpen}
           onToggleSound={() => void toggleSound()}
           onPlay={play}
+          onGo={onNavigate}
           onMore={id => setSheet(GAMES.find(g => g.id === id) ?? null)}
           onBrowse={() => jump('play')}
         />

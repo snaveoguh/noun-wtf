@@ -1,0 +1,15 @@
+{
+  "name": "hero-breaks",
+  "poster": 6.6,
+  "grade": "eq=contrast=1.06:saturation=1.15,unsharp=5:5:0.4",
+  "cuts": [
+    { "shot": "brk-intro", "in": 0, "dur": 1.6 },
+    { "shot": "brk-toprock", "in": 0.2, "dur": 1.4 },
+    { "shot": "brk-sixstep", "in": 0, "dur": 1.3 },
+    { "shot": "brk-windmill", "in": 0.2, "dur": 1.5 },
+    { "shot": "brk-headspin", "in": 0.3, "dur": 1.7 },
+    { "shot": "brk-airflare", "in": 0, "dur": 1.4 },
+    { "shot": "brk-freeze", "in": 0.1, "dur": 1.3 },
+    { "shot": "brk-judges", "in": 0.5, "dur": 1.6 }
+  ]
+}

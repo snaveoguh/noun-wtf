@@ -108,6 +108,53 @@ export interface ExchangeState {
   floor: FloorEvent[];
   /** Per-bot memory (cooldowns, town-leg budget). */
   bots: Record<string, BotMemory>;
+  /**
+   * Direct offers between two traders (deals.ts): "I'll sell you 3 FISH at
+   * 12". Nothing is escrowed; both sides are checked when it's accepted.
+   * Optional: blobs saved before deals existed don't have it.
+   */
+  deals?: Deal[];
+}
+
+/** A direct offer (server side: `from` is the proposer's raw rider id). */
+export interface Deal {
+  id: string;
+  from: string;
+  /** The proposer's public tag (what the target sees). */
+  fromTag: string;
+  /** The target: a rider's public tag ('r:…') or a bot id ('bot:…'). */
+  to: string;
+  /**
+   * The account `to` resolved to when it was offered (server-side only,
+   * never sent out). Only that account can accept, even if another one's
+   * tag ever collides. Deals saved before this field fall back to the tag.
+   */
+  toOwner?: string;
+  /** What the proposer does: 'sell' = sells to the target. */
+  side: Side;
+  good: GoodId;
+  qty: number;
+  price: number;
+  at: number;
+}
+
+/** A deal as one of its two sides sees it (never a raw rider id). */
+export interface PublicDeal {
+  id: string;
+  /** incoming: the proposer's tag; outgoing: the target's tag / bot id. */
+  who: string;
+  side: Side;
+  good: GoodId;
+  qty: number;
+  price: number;
+  at: number;
+  /** Expires at (ms). */
+  exp: number;
+}
+
+export interface DealsView {
+  incoming: PublicDeal[];
+  outgoing: PublicDeal[];
 }
 
 export interface BotMemory {

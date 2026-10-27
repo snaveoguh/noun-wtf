@@ -4,8 +4,14 @@
 // feed (real orders / fills / bot lines) plus the labelled simulated flow,
 // the trade scheduler and its effects, bubbles, cameras and input, sound.
 // React only mounts it and draws the HUD from `onHud` (4 Hz).
+//
+// WALK (walkMode.ts): you on foot as your Noun World rider, the other
+// players in the Exchange live, and click / tap anyone to trade with them
+// (sim/tradeForm.ts → source.act → the world-exchange function).
 
-import type { GoodId, Ticker } from '../../exchange/engine/types';
+import type { ActReply, ClientAction } from '../../exchange/client';
+import type { DealsView, GoodId, Ticker, YouView } from '../../exchange/engine/types';
+import type { TradeTarget } from '../sim/tradeForm';
 
 import * as THREE from 'three';
 
@@ -23,12 +29,15 @@ import {
 import {
   type CamMode,
   type Orbit,
+  chaseAz,
+  fitInHall,
   modeForKey,
   orbitEye,
   pan,
   preset,
   rotate,
   stepOrbit,
+  WALK_R,
   zoom,
 } from '../sim/cameras';
 import { Crowd, type Trader } from '../sim/crowd';
@@ -45,7 +54,9 @@ import {
 import { hallCopies, PIT_BY_GOOD, PIT_GOODS, PITS } from '../sim/layout';
 import { copyRings, pickRigs, type Budget } from '../sim/lod';
 import { hashStr, seedFromArray, seedFromId, type Seed } from '../sim/looks';
+import { outfitFor } from '../sim/outfit';
 import { TIMING, TradeScheduler, type FillJob, type TradeEvent } from '../sim/trades';
+import { inTheWay } from '../sim/walker';
 import { FloorSource } from '../source';
 
 import { FloorAudio } from './audio';
@@ -54,6 +65,7 @@ import { Fx } from './fx';
 import { buildGround, buildHall, liteHallGeometry, liteHallMaterial, type HallParts } from './hall';
 import { Labels, type LabelSpec } from './labels';
 import { RigPool, type RigAct } from './rigs';
+import { MAX_PEERS, WalkMode, type MeLook } from './walkMode';
 
 export interface FollowInfo {
   i: number;
@@ -86,6 +98,18 @@ export interface HudState {
   sound: boolean;
   news: string | null;
   vastHalls: number;
+  /** Walking: who you clicked to trade with, your balances, your offers in / out. */
+  walking: boolean;
+  target: TradeTarget | null;
+  you: YouView | null;
+  deals: DealsView;
+  tickers: Ticker[];
+  /** Other players here, and whether the multiplayer room is connected. */
+  peers: number;
+  online: boolean;
+  /** The good of the pit nearest you. */
+  nearPit: GoodId;
+  now: number;
 }
 
 export interface FloorSceneOpts {
@@ -96,6 +120,10 @@ export interface FloorSceneOpts {
   onHud: (h: HudState) => void;
   /** 'descent': open looking straight down through the roof (arriving from the fountain). */
   intro?: 'swoop' | 'descent';
+  /** You, as your Noun World rider (the WALK camera). */
+  me: MeLook;
+  /** Join the Exchange's multiplayer room (see net/). */
+  online: boolean;
 }
 
 /** Riders shown on the floor at once (older ones hand their slot on). */
@@ -152,6 +180,13 @@ export class FloorScene {
   private copyGeo: THREE.BufferGeometry | null = null;
   private copyMat: THREE.Material | null = null;
   private vastHalls = 0;
+  readonly walk: WalkMode;
+  private youI = -1;
+  /** Traders hidden this frame: in the way of the WALK camera. */
+  private blockers = new Set<number>();
+  target: TradeTarget | null = null;
+  /** Where VAST goes back to when toggled off (V again). */
+  private vastBack: CamMode | null = null;
 
   /** Dev / tests: the loop only renders; the caller steps (`step(dt)`). */
   paused = false;
@@ -208,17 +243,32 @@ export class FloorScene {
       floaters: 0.12,
       look: id => seedFromId(id, ART),
     });
-    for (const t of this.crowd.traders) this.mesh.setLook(t.i, t.seed);
+    for (const t of this.crowd.traders) {
+      this.mesh.setLook(t.i, t.seed);
+      this.mesh.setOutfit(t.i, outfitFor(t.seed));
+    }
     // The regulars (real bots, real seeds) and you
     for (const b of ROSTER) this.realTrader(b.id, PIT_GOODS[hashStr(b.id) % PIT_GOODS.length]!);
     this.source = new FloorSource(o.offline, o.speed ?? 1);
-    this.realTrader('you', 'ICECREAM');
+    // You: your own rider, walking (the floor's 'you' trader is pinned to you)
+    this.walk = new WalkMode(o.me, () => this.source.tag, o.online);
+    const net = this.walk.net;
+    if (net !== null) {
+      net.onPinged = () => this.pinged();
+      // Someone else is here, so they could offer you a deal: open your
+      // account on the live exchange (once). Not for every visitor on load:
+      // accounts are capped, and a spectator doesn't need one.
+      net.onPeers = () => {
+        if (net.peers.size > 0) void this.source.join();
+      };
+    }
+    this.youI = this.realTrader('you', 'ICECREAM')?.i ?? -1;
     this.mesh.commitLooks();
     this.scene.add(this.mesh.shadows, this.mesh.mesh);
 
     this.rigs = new RigPool(Math.round(o.budget.rigs * 1.5));
-    this.scene.add(this.rigs.group, this.fx.group);
-    this.labels = new Labels(layer, o.budget.bubbles);
+    this.scene.add(this.rigs.group, this.fx.group, this.walk.walkers.group);
+    this.labels = new Labels(layer, o.budget.bubbles + MAX_PEERS);
 
     this.sched = new TradeScheduler(
       {
@@ -246,7 +296,8 @@ export class FloorScene {
       o.intro === 'descent'
         ? { tx: 0, ty: 0, tz: 0, r: 70, az: ctx.az, el: 1.5 }
         : preset('vast', ctx);
-    this.want = preset('wide', ctx);
+    this.mode = 'walk';
+    this.want = preset('walk', { ...ctx, me: this.walk.walker });
 
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(host);
@@ -276,7 +327,7 @@ export class FloorScene {
     } else if (owner === 'you') {
       kind = 'you';
       name = 'YOU';
-      seed = seedFromId(this.source?.rider ?? 'you', ART);
+      seed = this.walk?.look.seed ?? seedFromId(this.source?.rider ?? 'you', ART);
     } else {
       kind = 'rider';
       name = `RIDER ${owner.replace(/^r:/, '').slice(0, 4).toUpperCase()}`;
@@ -292,6 +343,7 @@ export class FloorScene {
     }
     const t = this.crowd.addReal(owner, kind, name, seed, pit, reuse);
     this.mesh.setLook(t.i, seed);
+    this.mesh.setOutfit(t.i, outfitFor(seed, owner === 'you' ? this.walk?.look.outfit : null));
     this.mesh.commitLooks();
     this.bubbles[t.i] = null;
     this.hist.delete(t.i);
@@ -315,8 +367,11 @@ export class FloorScene {
 
   // ── Feed ──
 
+  private polling = false;
+
   private async poll() {
-    if (this.disposed) return;
+    if (this.disposed || this.polling) return;
+    this.polling = true;
     try {
       const f = await this.source.poll();
       if (!this.disposed) this.take(f);
@@ -324,11 +379,24 @@ export class FloorScene {
     } catch {
       // try again next poll
     }
+    this.polling = false;
     if (this.disposed) return;
+    if (this.pollTimer !== null) clearTimeout(this.pollTimer);
     this.pollTimer = window.setTimeout(() => {
       if (document.visibilityState === 'visible') void this.poll();
       else this.pollTimer = window.setTimeout(() => void this.poll(), 1000);
     }, this.source.pollMs);
+  }
+
+  /** A player here in person, by their public tag. */
+  private peerAt(tag: string) {
+    return tag.startsWith('r:') ? (this.walk.peers.find(p => p.tag === tag) ?? null) : null;
+  }
+
+  /** Where an owner stands, if they're you or a player here in person. */
+  private personAt(owner: string): { x: number; y: number; z: number } | null {
+    if (owner === 'you') return this.walk.walker;
+    return this.peerAt(owner);
   }
 
   private take(f: FloorFrame) {
@@ -346,6 +414,7 @@ export class FloorScene {
       180,
     );
     news.orders.forEach((o, k) => {
+      if (this.peerAt(o.owner) !== null) return; // they're here: no stand-in
       const t = this.realTrader(o.owner, o.good);
       if (t === null) return;
       this.pendingSay.push({
@@ -366,6 +435,7 @@ export class FloorScene {
         this.news = { text: e.text, at: now };
         continue;
       }
+      if (this.peerAt(e.who) !== null) continue;
       const t = this.realTrader(e.who, e.good ?? 'ICECREAM');
       if (t === null) continue;
       const text = e.text.length > 64 ? `${e.text.slice(0, 61)}…` : e.text;
@@ -381,6 +451,17 @@ export class FloorScene {
       win,
     );
     news.fills.forEach((x, k) => {
+      // A trade with a player who's here in person: it flies between the two of you
+      const pb = this.personAt(x.buyer);
+      const ps = this.personAt(x.seller);
+      if (
+        pb !== null &&
+        ps !== null &&
+        (this.peerAt(x.buyer) !== null || this.peerAt(x.seller) !== null)
+      ) {
+        this.handTrade(x.good, x.qty, x.price, ps, pb, x.buyer === 'you' || x.seller === 'you');
+        return;
+      }
       const b = this.realTrader(x.buyer, x.good);
       const s = this.realTrader(x.seller, x.good);
       if (b === null || s === null) return;
@@ -397,6 +478,40 @@ export class FloorScene {
         },
       });
     });
+  }
+
+  /** Goods fly seller → buyer, COIN back: a deal between people standing here. */
+  private handTrade(
+    good: GoodId,
+    qty: number,
+    price: number,
+    s: { x: number; y: number; z: number },
+    b: { x: number; y: number; z: number },
+    mine: boolean,
+  ) {
+    const head = (p: { x: number; y: number; z: number }) => ({
+      x: p.x,
+      y: p.y + LOW.top + 0.35,
+      z: p.z,
+    });
+    const size = Math.min(1.5, 0.7 + Math.log10(1 + qty) * 0.4);
+    this.fx.fly(good, head(s), head(b), 0.9, size);
+    this.fx.fly('COIN', head(b), head(s), 1, size * 0.85);
+    const prev = this.lastPx[good] ?? price;
+    this.lastPx[good] = price;
+    this.hall.boards[PIT_BY_GOOD[good].ix]!.ping(price >= prev, isBig({ good, qty, price }));
+    this.fillLog.push({ t: this.crowd.t, real: true });
+    if (mine && this.youI >= 0) {
+      const you = this.crowd.traders[this.youI]!;
+      this.say(you, {
+        kind: 'filled',
+        text: `DEAL! ${qty} ${good} @ ${price}`,
+        real: true,
+        at: this.crowd.t,
+        ttl: BUBBLE_TTL.fill,
+        pop: true,
+      });
+    }
   }
 
   // ── The simulated crowd ──
@@ -533,10 +648,15 @@ export class FloorScene {
       follow: f !== undefined ? { x: f.x, y: f.y, z: f.z } : null,
       aspect: this.aspect(),
       az: this.cur.az,
+      me: this.walk.walker,
     };
   }
 
   setMode(m: CamMode) {
+    // V toggles VAST: off again goes back to where you were (walking, say)
+    if (m === 'vast' && this.mode !== 'vast') this.vastBack = this.mode;
+    else if (m === 'vast' && this.mode === 'vast' && this.vastBack !== null) m = this.vastBack;
+    if (m !== 'vast') this.vastBack = null;
     if (m === 'floor' && this.mode === 'floor') this.pitIx = (this.pitIx + 1) % PITS.length;
     if (m === 'follow' && this.followI === null) this.followI = this.pickSomeone();
     if (m !== 'follow') this.followI = null;
@@ -578,6 +698,14 @@ export class FloorScene {
 
   private stepCamera(dt: number) {
     this.idle += dt;
+    if (this.mode === 'walk') {
+      const w = this.walk.walker;
+      this.want.tx = w.x;
+      this.want.ty = w.y + 1.5;
+      this.want.tz = w.z;
+      // Walking and not dragging the view: it swings round behind you
+      if (this.idle > 0.8 && w.speed > 0.5) this.want.az = chaseAz(this.want.az, w.heading, dt);
+    }
     if (this.mode === 'follow' && this.followI !== null) {
       const t = this.crowd.traders[this.followI];
       if (t !== undefined) {
@@ -590,7 +718,14 @@ export class FloorScene {
       if (this.mode === 'floor') this.want.az += dt * 0.07;
       else if (this.mode === 'vast' || this.mode === 'wide') this.want.az += dt * 0.025;
     }
-    this.cur = stepOrbit(this.cur, this.want, dt, this.mode === 'follow' ? 3.2 : 2.4);
+    this.cur = stepOrbit(
+      this.cur,
+      this.want,
+      dt,
+      this.mode === 'walk' ? 9 : this.mode === 'follow' ? 3.2 : 2.4,
+    );
+    // Walking: the camera comes in rather than through a wall or the tower
+    if (this.mode === 'walk') this.cur = fitInHall(this.cur);
     const eye = orbitEye(this.cur);
     this.camera.position.set(eye.x, eye.y, eye.z);
     this.camera.lookAt(this.cur.tx, this.cur.ty, this.cur.tz);
@@ -665,6 +800,11 @@ export class FloorScene {
     const crowd = this.crowd;
     crowd.step(dt);
     const now = crowd.t;
+    // You walk (only with the WALK camera on); the floor's 'you' stays on you
+    this.walk.step(dt, this.cur.az, this.mode === 'walk');
+    const you = this.crowd.traders[this.youI];
+    if (you !== undefined) this.walk.pin(you);
+    this.walk.shove(crowd.traders, this.youI);
     // Release real fills and lines as their spread delay comes up
     if (this.pending.length > 0) {
       const due = this.pending.filter(p => p.at <= now);
@@ -696,6 +836,7 @@ export class FloorScene {
     this.stepCopies();
     this.stepLod(dt);
     this.poseCrowd();
+    this.walk.draw(dt, true);
     this.fx.update(dt);
     this.stepBoards(dt);
     this.stepLabels(dt);
@@ -719,6 +860,10 @@ export class FloorScene {
         // Behind the camera: never rigged
         this.dist[i] = dx * this.fwd.x + dy * this.fwd.y + dz * this.fwd.z < -2 ? Infinity : d;
       }
+      // You are drawn as your own rider, never a crowd rig
+      if (this.youI >= 0) this.dist[this.youI] = Infinity;
+      // Pulled right out (VAST): no rigs, and the crowd drops to its far LOD
+      this.mesh.setFar(this.cur.r > 200);
       const max = this.cur.r > 200 || !this.rigs.ready ? 0 : this.budget.rigs;
       this.rigWant = pickRigs(
         this.dist.subarray(0, ts.length),
@@ -735,6 +880,17 @@ export class FloorScene {
       dt,
       this.budget.rigsPerFrame,
     );
+    // Walking: whoever stands between the camera and you steps out of view
+    this.blockers.clear();
+    if (this.mode === 'walk') {
+      const e = this.camera.position;
+      const w = this.walk.walker;
+      for (const t of ts) {
+        if (t.i === this.youI || !inTheWay(e.x, e.z, w.x, w.z, t.x, t.z)) continue;
+        this.blockers.add(t.i);
+        this.rigs.hide(t.i);
+      }
+    }
   }
 
   private rigAct(t: Trader): { act: RigAct; speed: number } {
@@ -755,9 +911,12 @@ export class FloorScene {
       p.y = t.y;
       p.z = t.z;
       p.yaw = t.heading;
-      p.hidden = this.rigSet.has(i);
-      p.lift = Math.abs(Math.sin(t.phase)) * 0.09 * t.walk;
-      p.roll = Math.sin(t.phase) * 0.06 * t.walk;
+      p.hidden = this.rigSet.has(i) || i === this.youI || this.blockers.has(i);
+      // Legs swing with the walk (crowdMesh's shader), a smaller bob on top
+      p.phase = t.phase;
+      p.stride = t.walk * Math.min(1, t.speed / 1.2 + 0.35);
+      p.lift = Math.abs(Math.sin(t.phase)) * 0.05 * t.walk;
+      p.roll = Math.sin(t.phase) * 0.04 * t.walk;
       if (t.cheer > 0) p.lift += Math.abs(Math.sin(time * 8 + i)) * 0.55;
       else if (t.shout > 0) {
         p.lift += Math.abs(Math.sin(time * 11 + i)) * 0.14;
@@ -877,6 +1036,7 @@ export class FloorScene {
         pop: live?.pop === true && now - live.at < 0.6,
       });
     }
+    for (const s of this.walk.labels((x, y, z) => this.project(x, y, z), cam)) specs.push(s);
     this.labels.render(specs);
   }
 
@@ -902,6 +1062,7 @@ export class FloorScene {
 
   private touched(kind: 'rotate' | 'zoom' | 'pan') {
     this.idle = 0;
+    if (this.mode === 'walk') return; // look round / zoom without leaving WALK
     if (this.mode === 'wide' || this.mode === 'vast' || (kind === 'pan' && this.mode !== 'free')) {
       if (this.mode === 'follow') this.followI = null;
       this.mode = 'free';
@@ -960,7 +1121,7 @@ export class FloorScene {
     this.down.moved += Math.abs(dx) + Math.abs(dy);
     if (this.down.moved < 4) return;
     const panning = this.down.button === 2 || e.shiftKey || e.ctrlKey;
-    if (panning) {
+    if (panning && this.mode !== 'walk') {
       this.touched('pan');
       this.apply(o => pan(o, dx, dy, (FOV * Math.PI) / 180, this.host.clientHeight));
     } else {
@@ -984,8 +1145,14 @@ export class FloorScene {
     e.preventDefault();
     this.touched('zoom');
     const k = Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY * 0.0015)));
-    this.apply(o => zoom(o, k));
+    this.apply(o => this.walkZoom(zoom(o, k)));
   };
+
+  /** WALK keeps the camera close behind you. */
+  private walkZoom(o: Orbit): Orbit {
+    if (this.mode !== 'walk') return o;
+    return { ...o, r: Math.min(WALK_R.max, Math.max(WALK_R.min, o.r)) };
+  }
 
   private onKey = (e: KeyboardEvent) => {
     const tag = (e.target as HTMLElement | null)?.tagName;
@@ -999,7 +1166,9 @@ export class FloorScene {
     )
       return;
     if (!this.host.isConnected || this.host.offsetParent === null) return;
-    const m = modeForKey(e.key);
+    const walking = this.mode === 'walk';
+    if (walking && WalkMode.isWalkKey(e)) return; // WASD / arrows / Shift: walkMode's
+    const m = modeForKey(e.key, walking);
     if (m !== null) {
       this.setMode(m);
       return;
@@ -1015,7 +1184,8 @@ export class FloorScene {
     } else if (e.key === '-' || e.key === '_') {
       this.touched('zoom');
       this.apply(o => zoom(o, 1.25));
-    } else if (e.key === 'Escape' && this.followI !== null) this.follow(null);
+    } else if (e.key === 'Escape' && this.target !== null) this.setTarget(null);
+    else if (e.key === 'Escape' && this.followI !== null) this.follow(null);
     else if (e.key === ']' || e.key === '[') {
       this.pitIx = (this.pitIx + (e.key === ']' ? 1 : PITS.length - 1)) % PITS.length;
       this.mode = 'floor';
@@ -1025,13 +1195,28 @@ export class FloorScene {
     this.idle = 0;
   };
 
-  /** Tap / click: follow the Noun under the pointer. */
+  /**
+   * Tap / click: walking, open a trade with whoever's under the pointer (a
+   * player first, then a trader); with the other cameras, follow them.
+   */
   private tap(cx: number, cy: number) {
     const r = this.renderer.domElement.getBoundingClientRect();
     const x = cx - r.left;
     const y = cy - r.top;
+    const within = this.phone ? 34 : 26;
+    const peer = this.walk.pick((a, b, c) => this.project(a, b, c), x, y, within);
+    if (peer !== null) {
+      this.setTarget({
+        kind: 'peer',
+        key: `peer:${peer.id}`,
+        name: peer.name.toUpperCase(),
+        tag: peer.tag,
+        seedKey: peer.seedKey,
+      });
+      return;
+    }
     let best = -1;
-    let bestD = this.phone ? 34 : 26;
+    let bestD = within;
     for (const t of this.crowd.traders) {
       // Mid-body and head: whichever is nearer the tap
       for (const h of [1, 1.6]) {
@@ -1044,7 +1229,86 @@ export class FloorScene {
         }
       }
     }
-    if (best >= 0) this.follow(best);
+    if (best < 0 || best === this.youI) return;
+    if (this.mode === 'walk') this.setTarget(this.targetOf(best));
+    else this.follow(best);
+  }
+
+  // ── Trading with someone on the floor ──
+
+  /** The trade target for crowd trader i. */
+  targetOf(i: number): TradeTarget | null {
+    const t = this.crowd.traders[i];
+    if (t === undefined || t.kind === 'you') return null;
+    const name = t.name ?? `TRADER #${t.i + 1}`;
+    if (t.kind === 'bot') return { kind: 'bot', key: t.id, name, bot: t.id };
+    if (t.kind === 'rider') return { kind: 'rider', key: t.id, name, tag: t.id };
+    return { kind: 'sim', key: t.id, name, good: PITS[t.home % PITS.length]!.good };
+  }
+
+  setTarget(t: TradeTarget | null) {
+    this.target = t;
+    this.emitHud();
+  }
+
+  /** Send a trade (the panel's order or offer, or an answer to one). */
+  async act(a: ClientAction): Promise<ActReply> {
+    const r = await this.source.act(a);
+    // Tell the player you offered it to, so their screen shows it now
+    if (r.ok && a.t === 'offer' && a.to.startsWith('r:')) this.walk.net?.pingOffer(a.to);
+    if (r.ok && a.t === 'accept') {
+      const d = this.source.deals.incoming.find(x => x.id === a.deal) ?? r.deal;
+      if (d !== undefined) this.walk.net?.pingOffer(d.who);
+    }
+    this.emitHud();
+    void this.pollNow();
+    return r;
+  }
+
+  private lastPing = 0;
+
+  /**
+   * A player says they just sent you an offer: look now. Anyone can claim
+   * that (it's only a hint in their pose blob), so at most every 2 s.
+   */
+  private pinged() {
+    const now = performance.now();
+    if (now - this.lastPing < 2_000) return;
+    this.lastPing = now;
+    this.pollNow();
+  }
+
+  /** Poll the exchange now (someone pinged you an offer, or you just traded). */
+  pollNow() {
+    if (this.disposed) return;
+    if (this.pollTimer !== null) clearTimeout(this.pollTimer);
+    this.pollTimer = null;
+    void this.poll();
+  }
+
+  setStick(side: number, fwd: number) {
+    this.walk.setStick(side, fwd);
+  }
+
+  /** A display name for a tag in your offers list. */
+  nameOf(tag: string): string {
+    const p = this.walk.nameOf(tag);
+    if (p !== null) return p.toUpperCase();
+    const t = this.crowd.get(tag);
+    return (
+      t?.name ??
+      (tag.startsWith('bot:')
+        ? (BOT_BY_ID[tag]?.name ?? tag)
+        : `RIDER ${tag.slice(2, 6).toUpperCase()}`)
+    );
+  }
+
+  private nearPit(): GoodId {
+    const w = this.walk.walker;
+    let best = PITS[0]!;
+    for (const p of PITS)
+      if (Math.hypot(p.x - w.x, p.z - w.z) < Math.hypot(best.x - w.x, best.z - w.z)) best = p;
+    return best.good;
   }
 
   // ── HUD ──
@@ -1096,6 +1360,15 @@ export class FloorScene {
       sound: this.audio.on,
       news: this.news !== null && this.crowd.t - this.news.at < 8 ? this.news.text : null,
       vastHalls: this.vastHalls,
+      walking: this.mode === 'walk',
+      target: this.target,
+      you: this.source.you,
+      deals: this.source.deals,
+      tickers: this.tickers,
+      peers: this.walk.peers.length,
+      online: this.walk.net?.connected === true,
+      nearPit: this.nearPit(),
+      now: Date.now(),
     });
   }
 
@@ -1116,6 +1389,7 @@ export class FloorScene {
     this.ro.disconnect();
     window.removeEventListener('keydown', this.onKey);
     this.labels.dispose();
+    this.walk.dispose();
     this.rigs.dispose();
     this.fx.dispose();
     this.mesh.dispose();

@@ -11,6 +11,8 @@ import type { LevelData } from '../world/Level';
 
 import * as THREE from 'three';
 
+import { envMapSize } from '../render/textureDiet';
+
 import { groundAt, natureUniforms } from './shared';
 import { softSpotTexture } from './textures';
 
@@ -714,7 +716,7 @@ export class TimeOfDay {
     );
     disc.position.copy(c.lightDir).multiplyScalar(-45);
     envScene.add(disc);
-    const rt = pmrem.fromScene(envScene, 0.03, 0.1, 200);
+    const rt = pmrem.fromScene(envScene, 0.03, 0.1, 200, { size: envMapSize() });
     this.envRT?.dispose();
     this.envRT = rt;
     this.host.scene.environment = rt.texture;

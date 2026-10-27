@@ -313,6 +313,16 @@ export class Player {
    */
   ride: ((dt: number) => boolean) | null = null;
 
+  /**
+   * Parkour (parkour/): runs first in every on-foot step. While a move is
+   * on (wall run, ledge hang, pole…) it moves the rider itself and returns
+   * true, and this step's walking / climbing is skipped.
+   */
+  parkour: {
+    step(dt: number, input: InputFrame, camYaw: number): boolean;
+    busy(): boolean;
+  } | null = null;
+
   /** Bumped on every spawn / rescue, so the ride recorder can start afresh. */
   respawns = 0;
 
@@ -368,13 +378,16 @@ export class Player {
       this.state !== 'air' &&
       this.state !== 'grind' &&
       this.climb === null &&
-      this.vault === null
+      this.vault === null &&
+      this.parkour?.busy() !== true
     ) {
       this.toggleBoard();
     }
 
     if (this.mode === 'foot') {
-      if (this.climb !== null) this.updateClimb(dt, input);
+      if (this.parkour !== null && this.parkour.step(dt, input, camYaw)) {
+        // parkour moved the rider
+      } else if (this.climb !== null) this.updateClimb(dt, input);
       else this.updateFoot(dt, input, camYaw);
       this.clampBounds();
       this.terrainRescue();
@@ -721,7 +734,7 @@ export class Player {
     return r !== null && r.normal.dot(cn) > 0.85;
   }
 
-  private tryStartClimb(wallN: THREE.Vector3): boolean {
+  tryStartClimb(wallN: THREE.Vector3): boolean {
     if (!this.canClimb(wallN)) return false;
     const n = new THREE.Vector3(wallN.x, 0, wallN.z).normalize();
     const hit = this.wallProbe(this.pos, n, CLIMB_CHEST);
@@ -767,7 +780,7 @@ export class Player {
    * hop it if it's thin, step up onto it if the top carries on. Tall walls
    * (climbable, or with no top in reach) never vault.
    */
-  private tryStartVault(wallN: THREE.Vector3, carry: number): boolean {
+  tryStartVault(wallN: THREE.Vector3, carry: number): boolean {
     if (this.vaultCooldown > 0) return false;
     const d = new THREE.Vector3(-wallN.x, 0, -wallN.z);
     if (d.lengthSq() < 1e-4) return false;

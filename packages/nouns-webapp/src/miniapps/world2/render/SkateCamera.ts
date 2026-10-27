@@ -80,6 +80,22 @@ export class SkateCamera {
    */
   zoom = 1;
 
+  /**
+   * Parkour's camera feel (parkour/ParkourSystem.ts sets it every frame):
+   * extra FOV, a roll into wall runs, pull-back, climb framing for ledges.
+   */
+  pkCam: {
+    fov: number;
+    roll: number;
+    dist: number;
+    lift: number;
+    climb: number;
+    yaw: number | null;
+    /** World offset (m) for the camera itself (off a wall the rider runs along). */
+    ox: number;
+    oz: number;
+  } | null = null;
+
   /** 0 turns camera shake off (reduce motion). */
   shakeScale = 1;
 
@@ -146,6 +162,8 @@ export class SkateCamera {
         const n = p.climb.normal;
         // Slightly off-square (3/4 view) so the reaching arms read past the big head
         this.yaw = lerpAngle(this.yaw, Math.atan2(-n.x, -n.z) + 0.42, 1 - Math.exp(-3.5 * dt));
+      } else if (this.pkCam?.yaw != null && now - this.lastInputAt > 700) {
+        this.yaw = lerpAngle(this.yaw, this.pkCam.yaw, 1 - Math.exp(-3.5 * dt));
       }
       // Keyboard walking turns like the board: keep the camera in behind the
       // heading once the player stops steering it themselves
@@ -153,11 +171,13 @@ export class SkateCamera {
         this.yaw = lerpAngle(this.yaw, p.footYaw, 1 - Math.exp(-4 * dt));
       }
     }
+    const climbing = p.climb !== null || (!onBoard && (this.pkCam?.climb ?? 0) > 0.5);
     this.climbK = THREE.MathUtils.lerp(
       this.climbK,
-      p.climb !== null ? 1 : 0,
-      1 - Math.exp(-(p.climb !== null ? 3 : 2) * dt),
+      climbing ? 1 : 0,
+      1 - Math.exp(-(climbing ? 3 : 2) * dt),
     );
+    const pk = onBoard ? null : this.pkCam;
     const ck = this.climbK;
 
     const yaw = this.yaw + this.orbitYaw;
@@ -168,14 +188,17 @@ export class SkateCamera {
           ? { d: 5.6, h: 2.0, la: 1.0 }
           : { d: 3.3, h: 1.05, la: 0.95 };
     const speedPull = onBoard ? Math.min(1.2, p.speed * 0.045) : 0;
-    const dist = (onBoard ? preset.d * this.zoom : THREE.MathUtils.lerp(3.6, 6.8, ck)) + speedPull;
+    const dist =
+      (onBoard ? preset.d * this.zoom : THREE.MathUtils.lerp(3.6, 6.8, ck)) +
+      speedPull +
+      (pk?.dist ?? 0);
     // Climbing pulls the camera below the climber, looking up the facade
     const pitch = onBoard ? 0.1 + this.orbitPitch : THREE.MathUtils.lerp(this.pitch, -0.3, ck);
 
     const target = _target.copy(p.pos);
     // On vert, frame the ramp + rider instead of chasing straight up
     if (onBoard && p.state === 'air' && p.vertLip) target.y = Math.min(target.y, this.look.y + 0.5);
-    target.y += onBoard ? preset.la : 1.25 + ck * 0.9;
+    target.y += onBoard ? preset.la : 1.25 + ck * 0.9 + (pk?.lift ?? 0);
 
     const back = _back.set(-Math.sin(yaw), 0, -Math.cos(yaw));
     const desired = _desired
@@ -185,6 +208,11 @@ export class SkateCamera {
         UP,
         (onBoard ? (preset.h - preset.la + 0.35) * this.zoom : 0.2) + dist * Math.sin(pitch),
       );
+
+    if (pk !== null) {
+      desired.x += pk.ox;
+      desired.z += pk.oz;
+    }
 
     // Pulled back (the Big Drop), a camera this far behind is under the slope
     // you just came down: riding a 30° fall line, the snow 11 m uphill is
@@ -247,6 +275,7 @@ export class SkateCamera {
       this.shake *= Math.exp(-7 * dt);
     }
     this.camera.lookAt(this.look);
+    if (pk !== null && Math.abs(pk.roll) > 1e-3) this.camera.rotateZ(pk.roll * this.shakeScale);
 
     // Speed FOV
     // Speed FOV: the original ramp to 82° by ~16 m/s, then keeps opening up
@@ -255,7 +284,7 @@ export class SkateCamera {
     const fast = Math.max(0, p.speed - 17);
     let targetFov = onBoard
       ? 68 + Math.min(14, p.speed * 0.9) + 28 * (1 - Math.exp(-fast / 45))
-      : 62;
+      : 62 + (pk?.fov ?? 0);
     // These are vertical FOVs tuned on landscape screens. On a portrait phone
     // the same vertical FOV leaves a sliver of the world either side, so
     // keep at least the horizontal view a 1.4:1 screen would get (capped)

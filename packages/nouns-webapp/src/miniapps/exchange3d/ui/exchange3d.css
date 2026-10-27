@@ -37,6 +37,9 @@
   inset: 0;
   pointer-events: none;
   overflow: hidden;
+  /* Its own stacking context: name tags (inline z-index by depth) stay
+     under the panels (trade, offers: z-index 4+) */
+  z-index: 1;
 }
 .gx3d-err {
   display: flex;
@@ -484,5 +487,164 @@
 @container gx3d (max-width: 640px) {
   .gx3d-book {
     width: 100%;
+  }
+}
+
+/* ── Walking: the trade panel, offers, the touch stick ── */
+.gx3d-trade {
+  position: absolute;
+  right: 12px;
+  /* Clears the camera bar and the site's NOUN FM chip */
+  bottom: 96px;
+  width: min(320px, calc(100% - 24px));
+  background: rgba(8, 10, 14, 0.94);
+  border: 2px solid #ffd400;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  z-index: 4;
+}
+.gx3d-trade-tag {
+  font:
+    600 11px ui-monospace,
+    monospace;
+}
+.gx3d-trade-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: 13px;
+  color: #ffd400;
+}
+.gx3d-trade-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.gx3d-trade-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.gx3d-trade label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.gx3d-trade label.gx3d-trade-row {
+  flex-direction: row;
+}
+.gx3d-trade input,
+.gx3d-trade select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  background: #fff;
+  color: #111;
+  border: 2px solid #111;
+  border-radius: 5px;
+  padding: 4px 6px;
+  width: 100%;
+  user-select: text;
+}
+.gx3d-trade-send {
+  background: #3ddc84;
+}
+.gx3d-trade-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.gx3d-trade-msg {
+  font-weight: 700;
+}
+.gx3d-good {
+  color: #3ddc84;
+}
+.gx3d-bad {
+  color: #ff8a7a;
+}
+.gx3d-trade-quote {
+  font-size: 11px;
+}
+.gx3d-offers {
+  position: absolute;
+  left: 50%;
+  top: 96px;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 5;
+}
+.gx3d-offer {
+  background: rgba(8, 10, 14, 0.92);
+  border: 2px solid #fff;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.gx3d-offer-in {
+  border-color: #ffd400;
+  box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.25);
+}
+.gx3d-stick {
+  position: absolute;
+  left: 18px;
+  bottom: 120px;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.28);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  touch-action: none;
+  display: grid;
+  place-items: center;
+  z-index: 3;
+}
+.gx3d-stick-knob {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid #111;
+  pointer-events: none;
+}
+.gx3d-walkhint {
+  position: absolute;
+  left: 12px;
+  bottom: 70px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.gx3d-cam-walk.gx3d-on {
+  background: #3ddc84;
+}
+@container gx3d (max-width: 640px) {
+  .gx3d-trade {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: 116px;
+    max-height: 60%;
+    overflow: auto;
+  }
+  .gx3d-offers {
+    top: 150px;
+  }
+  .gx3d-walkhint {
+    display: none;
   }
 }

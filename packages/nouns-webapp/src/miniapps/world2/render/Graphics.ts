@@ -22,6 +22,7 @@ import {
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
+import { envMapSize } from './textureDiet';
 import { ClampEffect, InkOutlineEffect, inkExcluded } from './Toon';
 
 export type Quality = 'low' | 'medium' | 'high';
@@ -296,7 +297,7 @@ export class Graphics {
     sun.position.copy(this.sunDir).multiplyScalar(-45);
     envScene.add(sun);
     this.envRT?.dispose();
-    this.envRT = pmrem.fromScene(envScene, 0.03, 0.1, 200);
+    this.envRT = pmrem.fromScene(envScene, 0.03, 0.1, 200, { size: envMapSize() });
     this.scene.environment = this.envRT.texture;
     this.scene.environmentIntensity = intensity;
     pmrem.dispose();

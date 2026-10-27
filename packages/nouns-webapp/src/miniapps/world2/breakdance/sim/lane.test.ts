@@ -192,7 +192,11 @@ describe('strict chart (lobby battles)', () => {
   });
 
   it('a key between notes is a miss too', () => {
-    const { events } = playTurn(() => 'skip', { until: 3, strict: true, extra: [{ key: 'a', beat: 0.5 }] });
+    const { events } = playTurn(() => 'skip', {
+      until: 3,
+      strict: true,
+      extra: [{ key: 'a', beat: 0.5 }],
+    });
     expect(eventsOf(events, 'hit')[0]).toMatchObject({ grade: 'miss' });
   });
 });

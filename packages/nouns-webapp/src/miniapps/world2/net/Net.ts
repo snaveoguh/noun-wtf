@@ -19,16 +19,22 @@
 //       without it, listeners speak their chat lines in the house voice
 // Respect (respect/): `rs: 'L'` only while the rider is a legend (the
 // noggles badge on their name tag; cosmetic, not checked by the server).
+// Parkour (parkour/net/pk.ts): `pk: [code, phase, side, amt]` only while a
+// parkour pose shows (wall run, ledge hang, pole…), so others see it.
 // Freestyle (breakdance/freestyle/wire.ts): `fs: [move, seq, beat, n, bpm]`
 // only while the rider is breakdancing on the spot.
 // Outfit (character/outfit.ts): `of`, four base-36 chars (trousers, their
 // colour, shoes, their colour), only once the rider picked one; without it
 // a rider wears their seed's default (`outfitFromSeed`).
+// Riding together (cars/seats.ts, cars/netCar.ts): `rd: [driverId, seat]`
+// while the rider asks for / sits in someone's passenger seat; `ps`, the
+// driver's passenger list by seat, while they drive a car with seats.
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
 import type { BreakMsg } from '../breakdance/contract';
 import type { HoopsMsg } from '../hoops/contract';
+import type { PoolMsg } from '../pool/contract';
 
 import PartySocket from 'partysocket';
 import * as THREE from 'three';
@@ -37,6 +43,7 @@ import { PARTYKIT_HOST } from '../../world/engine/types';
 import { CHAT_ID_RE, TAG_RE } from '../audio/voice/booth/clips';
 import { type CalloutEvent } from '../audio/voice/callouts';
 import { decodeFs, type FsState, type FsWire } from '../breakdance/freestyle/wire';
+import { decodeCrew, decodeRide, type NetRide } from '../cars/netCar';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
 import { OUTFIT_KEY_RE } from '../character/outfit';
@@ -67,6 +74,8 @@ export interface NetPose {
    * dragon itself is placed from those, see dragon/mesh.ts).
    */
   vehicle?: Vehicle;
+  /** Parkour pose key (parkour/net/pk.ts), raw: decoded where it's drawn. */
+  pk?: unknown;
   /** Driving a car (cars/netCar.ts): its id + flags, e.g. "toro.2.0". */
   car?: string;
 }
@@ -135,6 +144,10 @@ export interface RemotePlayer {
   freestyle?: FsState | null;
   /** Outfit wire key (character/outfit.ts `decodeOutfit`), '' = their seed's default. */
   outfit?: string;
+  /** In (or asking for) someone's passenger seat (`rd`), else null. */
+  ride?: NetRide | null;
+  /** Driving: their passenger list by seat (`ps`), null when they don't send one. */
+  crew?: string[] | null;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -183,6 +196,8 @@ export class Net {
   onHoops?: (m: HoopsMsg) => void;
   /** Noun Breaks (breakdance/net): every `break:*` message, raw (its codec checks it). */
   onBreak?: (m: Record<string, unknown>) => void;
+  /** Noun Pool (pool/net): every `pool:*` message, raw (its codec checks it). */
+  onPool?: (m: Record<string, unknown>) => void;
   /** Noun Hide & Seek (hideseek/net): every `hideseek:*` message, raw (its codec checks it). */
   onHideSeek?: (m: Record<string, unknown>) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
@@ -208,6 +223,10 @@ export class Net {
   deck = '';
   /** My outfit's wire key (character/outfit.ts `encodeOutfit`), '' = seed default. */
   outfit = '';
+  /** My passenger seat ask `[driverId, seat]` (cars/netCar.ts), relayed while riding. */
+  ride: [string, number] | null = null;
+  /** My passenger list while driving a car with seats, relayed as `ps`. */
+  crew: string[] | null = null;
 
   connect() {
     if (this.ws) return;
@@ -242,6 +261,10 @@ export class Net {
     }
     if (type.startsWith('break:')) {
       this.onBreak?.(d);
+      return;
+    }
+    if (type.startsWith('pool:')) {
+      this.onPool?.(d);
       return;
     }
     if (type.startsWith('hideseek:')) {
@@ -334,6 +357,7 @@ export class Net {
     pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.vehicle = parseVehicle(blob.vh);
+    pose.pk = Array.isArray(blob.pk) ? blob.pk : undefined;
     if (typeof blob.cr === 'string') pose.car = blob.cr.slice(0, 20);
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     const co = parseCallout(blob.co);
@@ -377,6 +401,8 @@ export class Net {
     rp.ownChat = blob.mv === 1;
     rp.freestyle = decodeFs(blob.fs);
     rp.outfit = parseOutfitKey(blob.of);
+    rp.ride = decodeRide(blob.rd);
+    rp.crew = decodeCrew(blob.ps);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -424,6 +450,7 @@ export class Net {
       c.name = b.pose.name;
       c.seedKey = b.pose.seedKey;
       c.vehicle = b.pose.vehicle;
+      c.pk = b.pose.pk;
       c.car = b.pose.car;
     }
     void dt;
@@ -463,8 +490,11 @@ export class Net {
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
       ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
+      ...(pose.pk !== undefined ? { pk: pose.pk } : {}),
       ...(this.freestyle !== null ? { fs: this.freestyle } : {}),
       ...(this.outfit !== '' ? { of: this.outfit } : {}),
+      ...(this.ride !== null ? { rd: this.ride } : {}),
+      ...(this.crew !== null ? { ps: this.crew } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',
@@ -525,6 +555,10 @@ export class Net {
   }
 
   sendBreak(m: BreakMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendPool(m: PoolMsg) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 

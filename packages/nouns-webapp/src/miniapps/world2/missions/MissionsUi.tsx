@@ -1,7 +1,9 @@
 // ── Missions HUD: tracker, talk prompt, dialogue / journal panel, toasts ──
 //
 // The tracker is a `data-w2hud="missions"` block, so the settings cog's HUD
-// toggle hides it. E (or a tap on the prompt) talks to whoever's in range,
+// toggle hides it. Its icon sits in the ring HUD's icon row and the tracker
+// opens under the ring (hud/slots.tsx); toasts and the talk prompt join the
+// top-centre stack. E (or a tap on the prompt) talks to whoever's in range,
 // X opens the journal, Esc closes. While a panel is open the game takes no
 // keys (MissionSystem.openPanel).
 
@@ -14,6 +16,7 @@ import { npcVoice } from '../audio/voice/cast';
 import { lineDuration } from '../audio/voice/voiceParams';
 import { SCENE_IDS, SCENE_TITLES } from '../cutscene/scenes';
 import { IconButton } from '../hud/IconButton';
+import { HudSlot } from '../hud/slots';
 
 import { MISSIONS, NPCS, TIER_NAMES, type MissionDef, type NpcId } from './defs';
 import { DONE_LINE, GREETING, LOCKED_LINE, ORACLE_RIDDLES } from './dialogue';
@@ -85,74 +88,89 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
 
   return (
     <>
-      {/* Tracker */}
+      {/* Tracker: the icon in the ring's row, the list under the ring */}
       <div
         data-w2hud="missions"
         className={`w2h-left pointer-events-auto absolute flex flex-col items-start gap-1.5 ${touch ? 'left-2 top-12' : 'left-3 top-3'}`}
       >
-        <IconButton
-          icon="missions"
-          on={!hidden}
-          label={hidden ? 'Missions: show the tracker (X: journal)' : 'Missions: fold the tracker'}
-          badge={tracked.length + toMeet.length > 0 ? tracked.length + toMeet.length : undefined}
-          onClick={() => setHidden(h => !h)}
-        />
+        <HudSlot name="util">
+          <IconButton
+            icon="missions"
+            on={!hidden}
+            label={
+              hidden ? 'Missions: show the tracker (X: journal)' : 'Missions: fold the tracker'
+            }
+            badge={tracked.length + toMeet.length > 0 ? tracked.length + toMeet.length : undefined}
+            onClick={() => setHidden(h => !h)}
+            data={{ 'data-w2hud': 'missions' }}
+          />
+        </HudSlot>
         {hidden && sys.parcel !== null && (
-          <div className="w2-mtrack w2-mrow w2-mhot">
-            📦 {mmss((sys.parcel.until - now) / 1000)}
-          </div>
+          <HudSlot name="panels">
+            <div className="w2-mtrack w2-mrow w2-mhot">
+              📦 {mmss((sys.parcel.until - now) / 1000)}
+            </div>
+          </HudSlot>
         )}
         {!hidden && (
-          <div className={`w2-mtrack ${touch ? 'w-[190px]' : 'w-[250px]'}`}>
-            <button type="button" className="w2-mhead" onClick={() => sys.openPanel('journal')}>
-              <span>⌐◨-◨ JOURNAL</span>
-              <i>{touch ? 'tap' : 'X'}</i>
-            </button>
-            <div className="w2-mlist">
-              {title && <div className="w2-mtitle">“{title}”</div>}
-              {sys.ud.active && <div className="w2-mud">❄ the Big Drop — nothing here counts</div>}
-              {sys.parcel !== null && (
-                <div className="w2-mrow w2-mhot">
-                  📦 Parcel for Cap · {mmss((sys.parcel.until - now) / 1000)}
-                </div>
-              )}
-              {tracked.slice(0, touch ? 1 : 4).map(m => (
-                <TrackRow key={m.id} sys={sys} m={m} />
-              ))}
-              {toMeet.slice(0, touch ? 1 : 2).map(n => (
-                <div key={n} className="w2-mrow w2-mmeet">
-                  Talk to <b>{NPCS[n].name}</b>
-                  <small>{NPCS[n].where}</small>
-                </div>
-              ))}
-              {tracked.length === 0 && toMeet.length === 0 && (
-                <div className="w2-mrow">All done. You are The One?</div>
-              )}
+          <HudSlot name="panels">
+            <div data-w2hud="missions" className={`w2-mtrack ${touch ? 'w-[190px]' : 'w-[250px]'}`}>
+              <button type="button" className="w2-mhead" onClick={() => sys.openPanel('journal')}>
+                <span>⌐◨-◨ JOURNAL</span>
+                <i>{touch ? 'tap' : 'X'}</i>
+              </button>
+              <div className="w2-mlist">
+                {title && <div className="w2-mtitle">“{title}”</div>}
+                {sys.ud.active && (
+                  <div className="w2-mud">❄ the Big Drop — nothing here counts</div>
+                )}
+                {sys.parcel !== null && (
+                  <div className="w2-mrow w2-mhot">
+                    📦 Parcel for Cap · {mmss((sys.parcel.until - now) / 1000)}
+                  </div>
+                )}
+                {tracked.slice(0, touch ? 1 : 4).map(m => (
+                  <TrackRow key={m.id} sys={sys} m={m} />
+                ))}
+                {toMeet.slice(0, touch ? 1 : 2).map(n => (
+                  <div key={n} className="w2-mrow w2-mmeet">
+                    Talk to <b>{NPCS[n].name}</b>
+                    <small>{NPCS[n].where}</small>
+                  </div>
+                ))}
+                {tracked.length === 0 && toMeet.length === 0 && (
+                  <div className="w2-mrow">All done. You are The One?</div>
+                )}
+              </div>
             </div>
-          </div>
+          </HudSlot>
         )}
       </div>
 
       {/* The Big Drop note (also when the tracker's hidden) */}
       {sys.ud.active && (
-        <div className="w2-udnote pointer-events-auto absolute left-1/2 top-[84px] -translate-x-1/2">
-          ❄ the Big Drop — nothing here counts
-          <button type="button" onClick={() => sys.leaveUpsideDown()}>
-            leave
-          </button>
-        </div>
+        <HudSlot name="modes">
+          <div className="w2-udnote pointer-events-auto absolute left-1/2 top-[84px] -translate-x-1/2">
+            ❄ the Big Drop — nothing here counts
+            <button type="button" onClick={() => sys.leaveUpsideDown()}>
+              leave
+            </button>
+          </div>
+        </HudSlot>
       )}
 
       {/* Talk prompt */}
       {sys.near !== null && sys.panel === null && (
-        <button type="button" className="w2-prompt w2-prompt-at" onClick={() => sys.talk()}>
-          <kbd>{touch ? 'TAP' : 'E'}</kbd>
-          {sys.near === 'door'
-            ? sys.ud.active
-              ? 'THE DOOR: GO BACK'
-              : 'THE DEEPEST DOOR'
-            : `TALK TO ${NPCS[sys.near].name.toUpperCase()}`}
-        </button>
+        <HudSlot name="toasts">
+          <button type="button" className="w2-prompt w2-prompt-at" onClick={() => sys.talk()}>
+            <kbd>{touch ? 'TAP' : 'E'}</kbd>
+            {sys.near === 'door'
+              ? sys.ud.active
+                ? 'THE DOOR: GO BACK'
+                : 'THE DEEPEST DOOR'
+              : `TALK TO ${NPCS[sys.near].name.toUpperCase()}`}
+          </button>
+        </HudSlot>
       )}
 
       {/* Race */}
@@ -181,20 +199,22 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
 
       {/* Toast */}
       {sys.toast !== null && now - sys.toast.at < 5000 && (
-        <div
-          key={sys.toast.at}
-          className={`w2-nowplaying w2-mtoast absolute left-1/2 top-40 -translate-x-1/2 ${sys.toast.kind === 'fail' ? 'w2-mfail' : ''}`}
-        >
-          <span>
-            {sys.toast.kind === 'done'
-              ? '⌐◨-◨ MISSION COMPLETE'
-              : sys.toast.kind === 'fail'
-                ? '⌐◨-◨ MISSION'
-                : '⌐◨-◨ MISSIONS'}
-          </span>
-          <b>{sys.toast.title}</b>
-          {sys.toast.reward && <span>title unlocked: “{sys.toast.reward}”</span>}
-        </div>
+        <HudSlot name="toasts">
+          <div
+            key={sys.toast.at}
+            className={`w2-nowplaying w2-mtoast absolute left-1/2 top-40 -translate-x-1/2 ${sys.toast.kind === 'fail' ? 'w2-mfail' : ''}`}
+          >
+            <span>
+              {sys.toast.kind === 'done'
+                ? '⌐◨-◨ MISSION COMPLETE'
+                : sys.toast.kind === 'fail'
+                  ? '⌐◨-◨ MISSION'
+                  : '⌐◨-◨ MISSIONS'}
+            </span>
+            <b>{sys.toast.title}</b>
+            {sys.toast.reward && <span>title unlocked: “{sys.toast.reward}”</span>}
+          </div>
+        </HudSlot>
       )}
 
       {sys.panel !== null && <Panel game={game} sys={sys} who={sys.panel} />}

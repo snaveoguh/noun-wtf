@@ -1,10 +1,11 @@
 // ── Noun Hide & Seek UI: prompt, chip, menu, lobby, HUD, blindfold, reveal ─
 
-import type { Game } from '../../Game';
 import type { HsRow, HideSeekMode, HsUiState } from './HideSeekMode';
+import type { Game } from '../../Game';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import { HudSlot } from '../../hud/slots';
 import { PING_CD, WHISTLE_CD } from '../contract';
 
 const NOOP = () => () => {};
@@ -84,25 +85,29 @@ export function HideSeekUi({ game, touch }: { game: Game; touch: boolean }) {
       {g?.blind === true && <Blindfold t={g.t} round={g.round} rounds={g.rounds} />}
 
       {ui.near && ui.phase === 'idle' && (
-        <button
-          type="button"
-          className="hs-prompt pointer-events-auto absolute left-1/2 top-[30%] -translate-x-1/2"
-          onClick={() => m.openMenu()}
-        >
-          🙈 HIDE &amp; SEEK — press E / tap
-        </button>
+        <HudSlot name="toasts">
+          <button
+            type="button"
+            className="hs-prompt pointer-events-auto absolute left-1/2 top-[30%] -translate-x-1/2"
+            onClick={() => m.openMenu()}
+          >
+            🙈 HIDE &amp; SEEK — press E / tap
+          </button>
+        </HudSlot>
       )}
 
       {(ui.phase === 'idle' || ui.phase === 'done') && ui.hasSpot && !ui.near && (
-        <button
-          type="button"
-          className={`hs-chip pointer-events-auto absolute ${touch ? 'hs-chip-touch' : ''}`}
-          onClick={() => m.openMenu()}
-          title="Hide & Seek"
-        >
-          🙈<span> HIDE &amp; SEEK</span>
-          {ui.open.some(o => o.state === 'lobby') && <i className="hs-dot" />}
-        </button>
+        <HudSlot name="modes">
+          <button
+            type="button"
+            className={`hs-chip pointer-events-auto absolute ${touch ? 'hs-chip-touch' : ''}`}
+            onClick={() => m.openMenu()}
+            title="Hide & Seek"
+          >
+            🙈<span> HIDE &amp; SEEK</span>
+            {ui.open.some(o => o.state === 'lobby') && <i className="hs-dot" />}
+          </button>
+        </HudSlot>
       )}
 
       {ui.phase === 'menu' && <Menu m={m} ui={ui} />}
@@ -113,10 +118,12 @@ export function HideSeekUi({ game, touch }: { game: Game; touch: boolean }) {
       {ui.phase === 'done' && ui.done !== null && <Done m={m} ui={ui} />}
 
       {ui.toast !== null && now - ui.toast.at < 4000 && (
-        <div key={ui.toast.at} className="hs-toast absolute left-1/2 top-36 -translate-x-1/2">
-          <span>🙈 HIDE &amp; SEEK</span>
-          <b>{ui.toast.text}</b>
-        </div>
+        <HudSlot name="toasts">
+          <div key={ui.toast.at} className="hs-toast absolute left-1/2 top-36 -translate-x-1/2">
+            <span>🙈 HIDE &amp; SEEK</span>
+            <b>{ui.toast.text}</b>
+          </div>
+        </HudSlot>
       )}
     </div>
   );
@@ -159,33 +166,40 @@ function Hud({
   const big = touch || coarse();
   return (
     <>
-      <div
-        className={`hs-bar absolute left-1/2 -translate-x-1/2 ${g.me === 'h' ? 'hs-bar-h' : 'hs-bar-s'}`}
-      >
-        <b>{role}</b>
-        <span className="hs-time">
-          {phase} {g.gamePhase === 'reveal' ? `· next in ${Math.ceil(g.t)}` : clock(g.t)}
-        </span>
-        <span>
-          hiders left <b>{g.hidersLeft}</b>/{g.hiders}
-        </span>
-        <span className="opacity-70">
-          round {g.round + 1}/{g.rounds}
-        </span>
-      </div>
+      <HudSlot name="toasts">
+        <div
+          className={`hs-bar absolute left-1/2 -translate-x-1/2 ${g.me === 'h' ? 'hs-bar-h' : 'hs-bar-s'}`}
+        >
+          <b>{role}</b>
+          <span className="hs-time">
+            {phase} {g.gamePhase === 'reveal' ? `· next in ${Math.ceil(g.t)}` : clock(g.t)}
+          </span>
+          <span>
+            hiders left <b>{g.hidersLeft}</b>/{g.hiders}
+          </span>
+          <span className="opacity-70">
+            round {g.round + 1}/{g.rounds}
+          </span>
+        </div>
+      </HudSlot>
 
-      <button
-        type="button"
-        className="w2-chip hs-leave pointer-events-auto absolute text-xs"
-        onClick={() => m.leave()}
-      >
-        ✕ leave game
-      </button>
+      <HudSlot name="modes">
+        <button
+          type="button"
+          className="w2-chip hs-leave pointer-events-auto absolute text-xs"
+          onClick={() => m.leave()}
+        >
+          ✕ leave game
+        </button>
+      </HudSlot>
 
       {g.gamePhase === 'hide' && g.me === 'h' && (
-        <div className="hs-tip absolute left-1/2 -translate-x-1/2">
-          run! climb a roof, duck behind something, or slip into a building. your name tag is hidden
-        </div>
+        <HudSlot name="toasts">
+          <div className="hs-tip absolute left-1/2 -translate-x-1/2">
+            run! climb a roof, duck behind something, or slip into a building. your name tag is
+            hidden
+          </div>
+        </HudSlot>
       )}
 
       {g.gamePhase === 'seek' && (

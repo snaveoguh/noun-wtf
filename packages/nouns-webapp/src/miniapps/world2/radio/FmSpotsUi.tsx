@@ -2,6 +2,8 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 
+import { HudSlot } from '../hud/slots';
+
 import { type FmSpots } from './FmSpots';
 
 export function useSpots(spots: FmSpots) {
@@ -26,14 +28,16 @@ export function FmSpotsUi({ spots }: { spots: FmSpots }) {
   return (
     <>
       {song && (
-        <div
-          key={v.at}
-          data-w2hud="toasts"
-          className="w2-nowplaying pointer-events-none absolute left-1/2 top-16 -translate-x-1/2"
-        >
-          <span>{v.stage === 'town' ? '🌵 DRY GULCH' : '📻 COMMUNITY RADIO'}</span>
-          <b>{v.title}</b>
-        </div>
+        <HudSlot name="toasts">
+          <div
+            key={v.at}
+            data-w2hud="toasts"
+            className="w2-nowplaying pointer-events-none absolute left-1/2 top-16 -translate-x-1/2"
+          >
+            <span>{v.stage === 'town' ? '🌵 DRY GULCH' : '📻 COMMUNITY RADIO'}</span>
+            <b>{v.title}</b>
+          </div>
+        </HudSlot>
       )}
       {v.subtitle !== null && (
         <div

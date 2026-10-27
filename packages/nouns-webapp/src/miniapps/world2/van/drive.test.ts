@@ -80,6 +80,7 @@ function fakeGame() {
     gfx: { camera: new THREE.PerspectiveCamera(), scene, toon: false },
     missions: { ud: { active: false } },
     hoops: { active: false },
+    cars: { inCar: false },
     replay: { active: false },
     showroom: false,
     audio: { ctx: null, master: null, noise: null, start: () => undefined },
