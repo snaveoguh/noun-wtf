@@ -33,6 +33,7 @@ import {
   type BoardType,
   type CharacterAssets,
 } from './character/NounCharacter';
+import { encodeOutfit, type Outfit } from './character/outfit';
 import { Input, type InputFrame } from './core/Input';
 import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
@@ -561,6 +562,7 @@ export class Game {
     this.towns?.on('enter', t => this.sfx.setBed(t === 'cowboy' || t === 'beach' ? t : null));
     this.towns?.on('leave', () => this.sfx.setBed(null));
     this.me = new NounCharacter(this.seed, assets);
+    if (this.outfit !== null) this.me.setOutfit(this.outfit);
     this.me.setBoardType(this.boardType);
     this.me.setCastShadows(true);
     if (this.gfx.toon) toonify(this.me.root);
@@ -822,6 +824,16 @@ export class Game {
     this.me?.setWeight(w);
   }
 
+  /** My trousers + shoes (null = my seed's default); sent to the room as `of`. */
+  outfit: Outfit | null = null;
+
+  setOutfit(o: Outfit | null) {
+    this.outfit = o;
+    this.net.outfit = o !== null ? encodeOutfit(o) : '';
+    if (o !== null) this.me?.setOutfit(o);
+    else this.me?.setOutfitWire('');
+  }
+
   setBoardType(t: BoardType) {
     // The Big Drop is snowboards only (peak.ts sets it and restores yours after)
     if (this.missions.ud.active && t !== 'snowboard') return;
@@ -829,6 +841,15 @@ export class Game {
     this.me?.setBoardType(t);
   }
   showroomYaw = 0.5;
+  /** Select screen: extra turn from dragging the preview (radians). */
+  showroomSpin = 0;
+  /** Select screen: auto-sway amplitude (0 once the player drags). */
+  showroomSway = 0.7;
+  /**
+   * Select screen: where on the canvas to frame the rider (centre + size,
+   * fractions of the canvas): top on phones, left on desktop.
+   */
+  showroomFrame = { x: 0.66, y: 0.5, w: 0.6, h: 1 };
 
   /** Custom deck graphics (board shop) on my board and everyone else's. */
   private decks = new DeckSync();
@@ -1023,16 +1044,32 @@ export class Game {
     const riderYaw = Math.atan2(p.fwd.x, p.fwd.z);
     // Rider stands sideways on the board (chest toward -X of the board
     // frame), so orbit around the chest side with a gentle sway.
-    const a = riderYaw - Math.PI / 2 + Math.sin(this.showroomYaw) * 0.7;
-    const target = p.pos.clone().add(new THREE.Vector3(0, 1.35, 0));
+    const a =
+      riderYaw - Math.PI / 2 + this.showroomSpin + Math.sin(this.showroomYaw) * this.showroomSway;
+    // Rider + board are ~2.3 m tall: aim at their middle
+    const target = p.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
     const cam = this.gfx.camera;
     const dist = 4.4;
     cam.position.set(target.x + Math.sin(a) * dist, target.y + 0.35, target.z + Math.cos(a) * dist);
-    // Frame the Noun on the right third of the screen (menu panel on the left)
+    // Zoom so the rider fills showroomFrame, then look off-centre so it sits there
+    const f = this.showroomFrame;
+    const aspect = Math.max(0.2, cam.aspect);
+    const needH = Math.max(2.6 / Math.max(0.15, f.h), 1.7 / Math.max(0.15, f.w) / aspect);
+    const fov = THREE.MathUtils.clamp(
+      THREE.MathUtils.radToDeg(2 * Math.atan(needH / 2 / dist)),
+      28,
+      84,
+    );
+    const halfH = dist * Math.tan(THREE.MathUtils.degToRad(fov) / 2);
     const right = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
-    cam.lookAt(target.clone().addScaledVector(right, -0.75));
-    if (Math.abs(cam.fov - 45) > 0.01) {
-      cam.fov = 45;
+    cam.lookAt(
+      target
+        .clone()
+        .addScaledVector(right, -(f.x * 2 - 1) * halfH * aspect)
+        .add(new THREE.Vector3(0, (f.y * 2 - 1) * halfH, 0)),
+    );
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
     this.updateMyCharacter(dt);
@@ -1798,6 +1835,7 @@ export class Game {
       r.lastPos.copy(c.pos);
       ch.setBoardType(rp.boardType);
       if (ch.weight !== rp.weight) ch.setWeight(rp.weight);
+      ch.setOutfitWire(rp.outfit ?? '');
       ch.update(dt, {
         lean: c.lean,
         travelled: c.mode === 'board' ? travelled : 0,
@@ -1925,6 +1963,7 @@ export class Game {
       this.me.dispose();
     }
     this.me = new NounCharacter(seed, this.assets);
+    if (this.outfit !== null) this.me.setOutfit(this.outfit);
     this.me.setBoardType(this.boardType);
     this.me.setCastShadows(true);
     if (this.gfx.toon) toonify(this.me.root);
@@ -1946,6 +1985,7 @@ export class Game {
     makeRider: () => {
       if (!this.assets) return null;
       const r = new NounCharacter(this.seed, this.assets);
+      if (this.outfit !== null) r.setOutfit(this.outfit);
       r.setBoardType(this.boardType);
       if (this.gfx.toon) toonify(r.root);
       return r;

@@ -17,6 +17,9 @@
 //       ephemeral clip on the world-voice function)
 // Respect (respect/): `rs: 'L'` only while the rider is a legend (the
 // noggles badge on their name tag; cosmetic, not checked by the server).
+// Outfit (character/outfit.ts): `of`, four base-36 chars (trousers, their
+// colour, shoes, their colour), only once the rider picked one; without it
+// a rider wears their seed's default (`outfitFromSeed`).
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -31,6 +34,7 @@ import { CHAT_ID_RE, TAG_RE } from '../audio/voice/booth/clips';
 import { type CalloutEvent } from '../audio/voice/callouts';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
+import { OUTFIT_KEY_RE } from '../character/outfit';
 
 import { Voice } from './Voice';
 
@@ -96,6 +100,11 @@ export function parseChatVoice(v: unknown): { tag: string; id: string; seq: numb
   return { tag, id, seq };
 }
 
+/** A blob's `of` → the outfit wire key ('' for anything malformed or missing). */
+export function parseOutfitKey(v: unknown): string {
+  return typeof v === 'string' && OUTFIT_KEY_RE.test(v) ? v : '';
+}
+
 export interface RemotePlayer {
   id: string;
   /** Their public voice tag (Voice Booth), '' when they don't share one. */
@@ -113,6 +122,8 @@ export interface RemotePlayer {
   deck?: string;
   /** Respect badge ('L' = legend), '' = none. */
   respectBadge?: string;
+  /** Outfit wire key (character/outfit.ts `decodeOutfit`), '' = their seed's default. */
+  outfit?: string;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -178,6 +189,8 @@ export class Net {
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
+  /** My outfit's wire key (character/outfit.ts `encodeOutfit`), '' = seed default. */
+  outfit = '';
 
   connect() {
     if (this.ws) return;
@@ -338,6 +351,7 @@ export class Net {
     rp.deck = typeof blob.dk === 'string' && SHARE_RE.test(blob.dk) ? blob.dk : '';
     rp.voiceTag = typeof blob.vo === 'string' && TAG_RE.test(blob.vo) ? blob.vo : '';
     rp.respectBadge = blob.rs === 'L' ? 'L' : '';
+    rp.outfit = parseOutfitKey(blob.of);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -421,6 +435,7 @@ export class Net {
       ...(this.callout !== null ? { co: this.callout } : {}),
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
+      ...(this.outfit !== '' ? { of: this.outfit } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',
