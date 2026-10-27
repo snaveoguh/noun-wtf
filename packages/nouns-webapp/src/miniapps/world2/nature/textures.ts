@@ -6,14 +6,22 @@
 
 import * as THREE from 'three';
 
+import { MINOR_CAP, shrinkTexture, textureDiet } from '../render/textureDiet';
+
 import { Rng, fbm2, hash3 } from './shared';
 
 const cache = new Map<string, THREE.Texture>();
 
+/** Weak phones keep these at 256 px (render/textureDiet). */
+function diet<T extends THREE.Texture>(t: T): T {
+  if (textureDiet.on) shrinkTexture(t, MINOR_CAP);
+  return t;
+}
+
 function cached<T extends THREE.Texture>(key: string, make: () => T): T {
   const hit = cache.get(key);
   if (hit !== undefined) return hit as T;
-  const t = make();
+  const t = diet(make());
   cache.set(key, t);
   return t;
 }
@@ -568,8 +576,8 @@ export function barkTextures(kind: 'broadleaf' | 'palm'): {
   }
   const map = tileable(new THREE.DataTexture(rgba, W, H, THREE.RGBAFormat), true);
   const normal = heightToNormal(heights, W, H, kind === 'broadleaf' ? 6 : 4);
-  cache.set(`${key}-map`, map);
-  cache.set(`${key}-n`, normal);
+  cache.set(`${key}-map`, diet(map));
+  cache.set(`${key}-n`, diet(normal));
   return { map, normal };
 }
 
@@ -685,8 +693,8 @@ export function pebbleTextures(): { map: THREE.Texture; normal: THREE.Texture } 
   const heights = new Float32Array(S * S);
   for (let i = 0; i < S * S; i++) heights[i] = hd[i * 4] / 255;
   const normal = heightToNormal(heights, S, S, 3.5);
-  cache.set('pebble-map', map);
-  cache.set('pebble-n', normal);
+  cache.set('pebble-map', diet(map));
+  cache.set('pebble-n', diet(normal));
   return { map, normal };
 }
 

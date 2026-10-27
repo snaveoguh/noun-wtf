@@ -76,6 +76,12 @@ import {
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import { SkateCamera } from './render/SkateCamera';
+import {
+  capUploads,
+  checkTextureBudget,
+  textureDiet,
+  watchContextLoss,
+} from './render/textureDiet';
 import { inkExcluded, toonify } from './render/Toon';
 import { RecordsHub } from './replay/Records';
 import { ReplayView } from './replay/ReplayView';
@@ -362,8 +368,9 @@ export class Game {
   private lowFpsTime = 0;
   /** The low tier's step-down ladder (auto quality on 'low' only). */
   private ladder: FpsLadder | null = null;
-  /** A weak phone (booted at a lower render scale). */
+  /** A weak phone (booted at a lower render scale, on the texture diet). */
   weakDevice = false;
+  private unwatchLoss: (() => void) | null = null;
 
   constructor(opts: GameOptions) {
     this.opts = opts;
@@ -391,6 +398,13 @@ export class Game {
           ...this.gfx.lite,
           scale: Math.min(this.gfx.lite.scale, WEAK_BOOT_SCALE),
         });
+    }
+    // A weak phone also goes on the texture diet (render/textureDiet.ts)
+    textureDiet.on = this.weakDevice;
+    if (this.weakDevice) {
+      capUploads(this.gfx.renderer);
+      this.gfx.sun.shadow.mapSize.set(512, 512);
+      this.unwatchLoss = watchContextLoss(opts.canvas);
     }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
@@ -659,6 +673,9 @@ export class Game {
     void this.trade.load();
 
     this.setLoading(null);
+    // Dev: once the lazy systems are in, check the weak-phone texture budget
+    if (import.meta.env.DEV && this.weakDevice)
+      setTimeout(() => !this.disposed && checkTextureBudget(this.gfx.scene), 20_000);
     this.running = true;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
@@ -2281,6 +2298,7 @@ export class Game {
   }
 
   dispose() {
+    this.unwatchLoss?.();
     claimAudio('noun-world-radio', false);
     this.cutscene.abort();
     this.voice.stopAll();

@@ -9,6 +9,7 @@ import {
 } from '@nouns/voxel-engine';
 import * as THREE from 'three';
 
+import { MINOR_CAP, textureDiet } from '../render/textureDiet';
 import { toonify } from '../render/Toon';
 
 import { glbHeadNow, headHasModel, loadGlbHead, type GlbHeadModel } from './GlbHead';
@@ -298,7 +299,7 @@ const bodyTexCache = new Map<string, { texture: THREE.CanvasTexture; shirt: THRE
  * draw it nearest-neighbour into the front-of-torso UV rect.
  */
 export function buildBodyTexture(seed: NounSeed, opts: BodyTextureOptions = {}) {
-  const size = opts.size ?? 512;
+  const size = opts.size ?? (textureDiet.on ? MINOR_CAP : 512);
   const key = `${seed.body}-${seed.accessory}-${size}-${opts.front?.join(',')}-${opts.back?.join(',')}`;
   const hit = bodyTexCache.get(key);
   if (hit) return hit;

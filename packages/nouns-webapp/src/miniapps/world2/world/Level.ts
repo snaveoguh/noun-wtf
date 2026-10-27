@@ -5,6 +5,14 @@ import type { RailDef } from '../physics/Rails';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import {
+  MINOR_CAP,
+  UPLOAD_CAP,
+  materialTextures,
+  shrinkTexture,
+  textureDiet,
+} from '../render/textureDiet';
+
 import { buildFallbackPark } from './FallbackPark';
 import {
   alleyCutBoxes,
@@ -118,9 +126,12 @@ export async function loadLevel(
     const lmIntensity = json.lightMapIntensity ?? 1;
     const texLoader = new THREE.TextureLoader();
     const lmCache = new Map<string, THREE.Texture>();
+    // Weak phones: shrink on load (the 512 upload cap would anyway) so the
+    // full-size decoded image isn't kept
+    const onLm = textureDiet.on ? (t: THREE.Texture) => shrinkTexture(t, UPLOAD_CAP) : undefined;
     const loadLm = (file: string): THREE.Texture => {
-      if (opts.lite !== true) return texLoader.load(BASE + file);
-      const t = texLoader.load(BASE + liteName(file), undefined, undefined, () => {
+      if (opts.lite !== true) return texLoader.load(BASE + file, onLm);
+      const t = texLoader.load(BASE + liteName(file), onLm, undefined, () => {
         // no lite copy: the full lightmap into the same texture
         texLoader.load(BASE + file, full => {
           t.image = full.image;
@@ -166,6 +177,10 @@ export async function loadLevel(
         }
         const map = mat.map;
         if (map) map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        // Weak phones: the tiling materials at 256 px (lightmaps get the 512 upload cap)
+        if (textureDiet.on)
+          for (const [k, t] of materialTextures(mat))
+            if (k !== 'lightMap') shrinkTexture(t, MINOR_CAP);
         return mat;
       });
       mesh.material = Array.isArray(mesh.material) ? out : out[0];

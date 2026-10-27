@@ -6,6 +6,8 @@
 
 import * as THREE from 'three';
 
+import { textureDiet } from '../render/textureDiet';
+
 const CHANNEL_ID = '19207767'; // 60r90 — same as src/pages/Pip3Page
 const API_BASE =
   (import.meta.env.VITE_MAINNET_SUBGRAPH as string | undefined) ??
@@ -59,7 +61,11 @@ export class PipBillboards {
       if (!mesh.isMesh) return;
       const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       list.forEach((m, index) => {
-        if (SCREEN_MATERIAL.test(m.name)) targets.push({ mesh, index, key: m.uuid });
+        if (!SCREEN_MATERIAL.test(m.name)) return;
+        // A weak phone plays the mural only: every live video is a decoder
+        // and its frames; the posters keep their printed art
+        if (textureDiet.on && !/^mural__/i.test(m.name)) return;
+        targets.push({ mesh, index, key: m.uuid });
       });
     });
     if (targets.length === 0) return;
