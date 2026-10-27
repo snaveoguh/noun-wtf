@@ -56,6 +56,21 @@ export const CLIPS = {
     mp4: '/home/hero-hoops.mp4',
     poster: '/home/hero-hoops-poster.jpg',
   },
+  bigDrop: {
+    webm: '/home/hero-big-drop.webm',
+    mp4: '/home/hero-big-drop.mp4',
+    poster: '/home/hero-big-drop-poster.jpg',
+  },
+  breaks: {
+    webm: '/home/hero-breaks.webm',
+    mp4: '/home/hero-breaks.mp4',
+    poster: '/home/hero-breaks-poster.jpg',
+  },
+  exchange: {
+    webm: '/home/hero-exchange.webm',
+    mp4: '/home/hero-exchange.mp4',
+    poster: '/home/hero-exchange-poster.jpg',
+  },
 } satisfies Record<string, Clip>;
 
 export interface Game {
@@ -241,7 +256,15 @@ export function game(id: GameId): Game {
  * `clip` plays (muted unless sound is on, poster only for reduced motion /
  * save-data), otherwise `still` gets the slow Ken Burns.
  */
-export interface Slide {
+export type Slide = SlideBase & SlideTarget;
+
+/**
+ * What PLAY does: launch one of the games (MORE INFO describes it), or
+ * open a page that isn't a game (the Grand Exchange), with no MORE INFO.
+ */
+export type SlideTarget = { game: GameId; href?: never } | { href: string; game?: never };
+
+export interface SlideBase {
   key: string;
   /** Title (first word white, the rest in the accent colour) */
   title: string;
@@ -253,9 +276,7 @@ export interface Slide {
   still?: string;
   /** object-position for the cropped media */
   focus: string;
-  /** The game PLAY launches (and MORE INFO describes) */
-  game: GameId;
-  /** Label for the primary button (defaults to the game's CTA) */
+  /** Label for the primary button (defaults to the game's CTA; needed for an `href`) */
   cta?: string;
   /** Brand slide: the second button browses the shelves instead of MORE INFO */
   browse?: boolean;
@@ -295,6 +316,46 @@ export const HERO_SLIDES: Slide[] = [
     browse: true,
     vo: '/home/vo-intro.mp3',
     ms: 26300,
+  },
+  {
+    key: 'big-drop',
+    title: 'The Big Drop',
+    eyebrow: 'NEW GAME',
+    tagline: 'DROP · CARVE · SEND',
+    teaser:
+      'Behind the deepest door in Noun World: 1,000 km of snow mountain. Huge airs, loop-de-loops, no top speed, and herds of noggle yaks waiting at the bottom.',
+    accent: '#9fe8ff',
+    clip: CLIPS.bigDrop,
+    focus: '50% 50%',
+    game: 'drop',
+    ms: 12830,
+  },
+  {
+    key: 'breaks',
+    title: 'Noun Breaks',
+    eyebrow: 'NEW GAME',
+    tagline: 'TOPROCK · POWER · FREEZE',
+    teaser:
+      'Breakdance battles in the plaza cypher. Headspins, windmills and freezes on the beat while the DJ spins, the crowd goes off and three judges raise their cards.',
+    accent: '#ff2f8e',
+    clip: CLIPS.breaks,
+    focus: '50% 50%',
+    game: 'breaks',
+    ms: 11570,
+  },
+  {
+    key: 'exchange',
+    title: 'Grand Exchange',
+    eyebrow: 'NEW',
+    tagline: 'SHOUT · SHAKE · TRADE',
+    teaser:
+      'A trading floor that goes on forever. Bots and riders shout their orders, shake on the deal and the coin flies. Watch the real order book play out, live.',
+    accent: '#ffc83d',
+    clip: CLIPS.exchange,
+    focus: '50% 50%',
+    href: '/exchange',
+    cta: 'ENTER THE FLOOR',
+    ms: 10630,
   },
   {
     key: 'world-vhs',

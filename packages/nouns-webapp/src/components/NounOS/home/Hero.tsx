@@ -149,8 +149,10 @@ export default function Hero({
   sound,
   resumable,
   ctaFor,
+  lockedFor,
   onToggleSound,
   onPlay,
+  onGo,
   onMore,
   onBrowse,
 }: {
@@ -159,8 +161,12 @@ export default function Hero({
   sound: boolean;
   resumable: (id: GameId) => boolean;
   ctaFor: (id: GameId) => string;
+  /** A game the visitor hasn't unlocked yet (PLAY then explains how). */
+  lockedFor?: (id: GameId) => boolean;
   onToggleSound: () => void;
   onPlay: (id: GameId) => void;
+  /** A slide that opens a page instead of a game (its `href`). */
+  onGo: (href: string) => void;
   onMore: (id: GameId) => void;
   onBrowse: () => void;
 }) {
@@ -307,12 +313,23 @@ export default function Hero({
       sound &&
       !(s.clip?.audio === true && motion) &&
       s.bed === undefined &&
+      s.game !== undefined &&
       now - lastMotif.current > 1500
     ) {
       lastMotif.current = now;
       motif(s.game);
     }
   };
+
+  const locked = s.game !== undefined && lockedFor?.(s.game) === true;
+  const ctaLabel =
+    s.game === undefined
+      ? (s.cta ?? 'OPEN')
+      : locked
+        ? 'HOW TO UNLOCK'
+        : resumable(s.game)
+          ? 'RESUME'
+          : (s.cta ?? ctaFor(s.game));
 
   return (
     <section
@@ -376,17 +393,23 @@ export default function Hero({
           <span className="nh-strapline">{s.tagline}</span>
           <p>{s.teaser}</p>
           <div className="nh-hero-cta">
-            <button type="button" className="nh-play" onClick={() => onPlay(s.game)}>
-              <span aria-hidden>▶</span> {resumable(s.game) ? 'RESUME' : (s.cta ?? ctaFor(s.game))}
+            <button
+              type="button"
+              className="nh-play"
+              onClick={() => (s.game !== undefined ? onPlay(s.game) : onGo(s.href))}
+            >
+              <span aria-hidden>{locked ? '🔒' : '▶'}</span> {ctaLabel}
             </button>
             {s.browse === true ? (
               <button type="button" className="nh-more" onClick={onBrowse}>
                 <span aria-hidden>▾</span> BROWSE EVERYTHING
               </button>
             ) : (
-              <button type="button" className="nh-more" onClick={() => onMore(s.game)}>
-                <span aria-hidden>ⓘ</span> MORE INFO
-              </button>
+              s.game !== undefined && (
+                <button type="button" className="nh-more" onClick={() => onMore(s.game)}>
+                  <span aria-hidden>ⓘ</span> MORE INFO
+                </button>
+              )
             )}
           </div>
         </div>
