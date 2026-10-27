@@ -277,8 +277,10 @@ export default function AgentHome({
           sound={sound}
           resumable={resumable}
           ctaFor={ctaFor}
+          lockedFor={id => id === 'drop' && !dropOpen}
           onToggleSound={() => void toggleSound()}
           onPlay={play}
+          onGo={onNavigate}
           onMore={id => setSheet(GAMES.find(g => g.id === id) ?? null)}
           onBrowse={() => jump('play')}
         />
