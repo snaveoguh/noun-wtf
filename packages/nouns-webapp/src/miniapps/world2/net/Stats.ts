@@ -526,6 +526,8 @@ export class StatsTracker {
         runId: newId(),
         runAt: Date.now(),
         tries: 0,
+        // (a raise from the last visit that never got its answer: show it)
+        loud: true,
       });
       this.mine.best[p.k] = p.v;
       this.dirty = true;
