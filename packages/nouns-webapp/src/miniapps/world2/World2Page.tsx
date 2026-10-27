@@ -48,6 +48,8 @@ import { HudDrag } from './ui/HudDrag';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { WalletLink } from './ui/WalletLink';
 import { WorldMap } from './ui/WorldMap';
+import { CarHud } from './cars/CarHud';
+import { useCarDriving } from './cars/useCars';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
 import { worldPause } from './worldPause';
@@ -173,7 +175,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const breakOn = useBreakActive(game);
   const hoopsOn = useHoopsActive(game) || breakOn;
   // (flying the dragon keeps the skate stick: it turns and sets the speed)
-  const driving = useVanDriving(game);
+  const vanDriving = useVanDriving(game);
+  const carDriving = useCarDriving(game);
+  const driving = vanDriving || carDriving;
   const replaying = useReplayActive(game);
 
   // NOUN FM's start-of-game intro: from PRESS START, so it plays over character
@@ -216,6 +220,20 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     const tryLaunch = () => {
       if (game.me === null || game.hud.loading !== null || !game.breaks.arrive()) return false;
       breaksLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
+  // `?play=drive` (the homepage's NOUN DRIVE card): in a car on the ring road
+  const driveLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || driveLaunched.current || searchParams.get('play') !== 'drive') return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.cars.arrive()) return false;
+      driveLaunched.current = true;
       return true;
     };
     if (tryLaunch()) return;
@@ -345,6 +363,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && !driving && <TouchControls game={game} />}
       {game && started && !hoopsOn && !replaying && <VanHud game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <CarHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <DragonHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}

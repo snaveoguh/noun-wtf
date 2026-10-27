@@ -7,7 +7,7 @@ import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
 
 import { hostOf, KIND_LABEL, type CommunityEntry } from './community';
 
-export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'drop';
+export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'drop' | 'drive';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -149,6 +149,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'DROP IN',
     loading: 'off to the summit. wrap up warm',
+  },
+  {
+    id: 'drive',
+    name: 'Noun Drive',
+    cover: '/world2/drive-cover.webp',
+    card: '/home/covers/drive.webp',
+    focus: '50% 58%',
+    teaser:
+      'Take any car off the plaza kerb: a roadster that flies, a 1947 racer, a wedge with doors that go up, a lowrider on juice, a monster truck. Drift it, boost it, park it on a roof.',
+    tagline: 'DRIVE · DRIFT · FLY',
+    facts: [
+      'Eight cars, each with its own handling',
+      'The ROADSTAR flies: X at speed',
+      'Runs inside Noun World',
+    ],
+    cta: 'DRIVE',
+    loading: 'keys in. off to the ring road',
   },
 ];
 

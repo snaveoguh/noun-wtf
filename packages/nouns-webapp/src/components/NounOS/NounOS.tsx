@@ -199,6 +199,20 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // NOUN DRIVE: Noun World in a car on the ring road (`?play=drive`, read
+  // when the game starts, so a running one reloads)
+  const goDrive = useCallback(() => {
+    const url = '/world?play=drive';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // THE BIG DROP: Noun World straight onto the mountain (`?drop=1`, read when
   // the game starts, so a running one reloads, like Hoops)
   const goDrop = useCallback(() => {
@@ -354,6 +368,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           onEnterWorld={goNounWorld}
           onEnterHoops={goHoops}
           onEnterBreaks={goBreaks}
+          onEnterDrive={goDrive}
           onEnterDrop={goDrop}
           onEnterWarfare={goWarfare}
           onOpen={id => os.open(id)}

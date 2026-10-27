@@ -101,6 +101,7 @@ function hrefOf(it: Item): string | undefined {
     case 'game':
       if (it.action.id === 'hoops') return '/world?play=hoops&mode=3';
       if (it.action.id === 'breaks') return '/world?play=breaks';
+      if (it.action.id === 'drive') return '/world?play=drive';
       if (it.action.id === 'drop') return it.locked !== undefined ? '/world' : BIG_DROP_URL;
       return `/${it.action.id}`;
     case 'external':
