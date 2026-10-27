@@ -15,40 +15,27 @@ import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { DragonHud } from './dragon/DragonHud';
 import { Game, type HudState } from './Game';
-import { SprayPanel } from './graffiti/SprayPanel';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
+import { GtaHud, initialHelp } from './hud/GtaHud';
+import { HUD_CSS } from './hud/hudStyle';
 import { InteriorsUi } from './interiors/InteriorsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import { DROP_PARAM } from './missions/unlocks';
-import {
-  shortAddr,
-  STAT_INFO,
-  walletLink,
-  type MyBests,
-  type StatKey,
-  type StatRow,
-  type WorldStats,
-} from './net/Stats';
 import { applyWorldManifest, registerWorldSw } from './pwa/install';
 import { InstallButton } from './pwa/InstallButton';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
 import { introAllowed, introEnabled } from './radio/FmSpots';
 import { FmSpotsUi } from './radio/FmSpotsUi';
 import { RecordsUi, useReplayActive } from './replay/RecordsUi';
-import { RespectBanner, RespectMeter } from './respect/RespectHud';
 import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
-import { HudPrefsStyle, SettingsCog } from './settings/SettingsPanel';
+import { HudPrefsStyle } from './settings/SettingsPanel';
 import { bootQuality } from './settings/store';
 import { TradeUi } from './trade/TradeUi';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
-import { ControlsHelp } from './ui/ControlsHelp';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
-import { HudDrag } from './ui/HudDrag';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
-import { WalletLink } from './ui/WalletLink';
-import { WorldMap } from './ui/WorldMap';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
 import { worldPause } from './worldPause';
@@ -56,12 +43,6 @@ import { worldPause } from './worldPause';
 /** The Grand Exchange, hidden under the Noggles Fountain (a lazy chunk). */
 
 const UnderFountain = lazy(() => import('../exchange3d/world/UnderFountain'));
-
-/** The radio stations in M-cycle order, for the HUD's station strip. */
-const RADIO_STATIONS: { mode: 'fm' | 'beats'; name: string }[] = [
-  { mode: 'fm', name: 'COMMUNITY RADIO' },
-  { mode: 'beats', name: 'NOUN BEATS (hip-hop)' },
-];
 
 export interface World2PageProps {
   /** Backgrounded behind the NounOS desk: freeze sim + render, release input. */
@@ -92,10 +73,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState('');
-  // Phones start without the keyboard controls sheet (it covers the screen)
-  const [showHelp, setShowHelp] = useState(
-    () => window.matchMedia?.('(pointer: coarse)').matches !== true,
-  );
+  // The controls card: open on a first visit (keyboard), then behind its icon
+  const [showHelp, setShowHelp] = useState(initialHelp);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -326,12 +305,12 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       }}
       onPointerDown={() => gameRef.current?.unlockAudio()}
     >
-      <style>{CSS + FM_CSS + SETTINGS_CSS + MISSIONS_CSS + CUTSCENE_CSS}</style>
+      <style>{CSS + FM_CSS + SETTINGS_CSS + MISSIONS_CSS + CUTSCENE_CSS + HUD_CSS}</style>
       <HudPrefsStyle />
       <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
       {game && started && !hoopsOn && !replaying && (
-        <Hud
+        <GtaHud
           game={game}
           showHelp={showHelp}
           onHelp={() => setShowHelp(s => !s)}
@@ -514,319 +493,10 @@ function Splash({
   );
 }
 
-function Hud({
-  game,
-  showHelp,
-  onHelp,
-  onShop,
-  onFm,
-}: {
-  game: Game;
-  showHelp: boolean;
-  onHelp: () => void;
-  onShop: () => void;
-  onFm: () => void;
-}) {
-  const hud = useHud(game);
-  const now = performance.now();
-  const banked = hud.banked && now - hud.banked.at < 2600 ? hud.banked : null;
-  const pad = hud.inputMode === 'gamepad';
-  // Phones: sit below the compact site tray and drop desktop-only chips
-  const touch = useIsTouch();
-  const top = touch ? 'top-12' : 'top-4';
-  return (
-    <div className="pointer-events-none absolute inset-0">
-      {/* Speed lines once a mountain run outpaces the plaza (CSS only) */}
-      {hud.mode === 'board' && hud.speed > 20 && (
-        <div className="w2-speedlines" style={{ opacity: Math.min(0.75, (hud.speed - 20) / 45) }} />
-      )}
-      {/* Speedometer: just under the rider by default, drag it anywhere */}
-      {hud.mode === 'board' && (
-        <HudDrag id="speed" className="absolute left-1/2 top-[64%] -translate-x-1/2">
-          <div className="w2-speedo">
-            <b>{Math.round(hud.speed * 3.6)}</b>
-            <span>km/h</span>
-          </div>
-        </HudDrag>
-      )}
-
-      {/* Top-left: session */}
-      <HudDrag id="session" className={`absolute left-4 ${top} flex flex-col gap-1`}>
-        <div className="w2-chip">
-          <b>{hud.session.toLocaleString()}</b> pts{' '}
-          <span className="opacity-60">
-            best {Math.max(hud.best, hud.mineCombo ?? 0).toLocaleString()}
-          </span>
-        </div>
-        <div className="w2-chip text-xs opacity-80">
-          {hud.connected ? '●' : '○'} {hud.players} online, {hud.mode === 'board' ? '🛹' : '🚶'}{' '}
-          {Math.round(hud.speed * 3.6)} km/h
-        </div>
-        {hud.mountain !== null && (
-          <div className="w2-chip text-xs opacity-80">
-            {hud.mountain.surface === 'snow' ? '❄' : '⛰'} {(hud.mountain.down / 1000).toFixed(2)}{' '}
-            km {hud.mountain.surface === 'snow' ? 'down' : 'out'}, {hud.mountain.surface}, streak{' '}
-            {hud.mountain.streak}s
-          </div>
-        )}
-      </HudDrag>
-      <RespectBanner respect={game.respect} sfx={game.sfx} />
-
-      {/* Top-centre: landmarks compass (no room for it on phones) */}
-      <div
-        data-w2hud="compass"
-        className={`absolute left-1/2 top-3 -translate-x-1/2 gap-3 text-xs ${touch ? 'hidden' : 'flex'}`}
-      >
-        {hud.landmarks.slice(0, 4).map(l => {
-          const deg = (((((l.bearing * 180) / Math.PI) % 360) + 540) % 360) - 180;
-          if (Math.abs(deg) > 70) return null;
-          return (
-            <div key={l.name} className="w2-chip" style={{ transform: `translateX(${deg * 3}px)` }}>
-              {l.name} <span className="opacity-60">{l.dist}m</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Top-right: voice + system */}
-      <HudDrag id="system" className={`absolute right-4 ${top} flex flex-col items-end gap-2`}>
-        <div data-w2cogrow="" className="flex items-center gap-2">
-          <button
-            className={`w2-chip ${hud.mic === 'on' ? (hud.speaking ? 'w2-live' : 'w2-on') : ''}`}
-            onClick={() => void game.toggleMic()}
-            title="Toggle mic (V)"
-          >
-            {hud.mic === 'off'
-              ? '🎙️ join voice'
-              : hud.mic === 'muted'
-                ? '🔇 muted'
-                : hud.speaking
-                  ? '🔊 talking'
-                  : '🎙️ live'}
-          </button>
-          <SettingsCog game={game} />
-        </div>
-        <RespectMeter respect={game.respect} />
-        {!touch && (
-          <div data-w2hud="fps" className="w2-chip text-[10px] opacity-60">
-            {hud.fps} fps, {hud.quality}
-            {hud.baked ? ', baked GI' : ''}, cam {hud.camMode}
-          </div>
-        )}
-        {!touch && (
-          <button className="w2-chip text-xs" onClick={onHelp}>
-            {showHelp ? 'hide controls (H)' : 'controls (H)'}
-          </button>
-        )}
-        {touch && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`w2-chip text-base ${hud.radio.on ? 'w2-on' : ''}`}
-              onClick={() => (hud.radio.on ? game.nextRadioTrack() : game.cycleRadio())}
-              title="Radio: tap for the next track"
-            >
-              📻
-            </button>
-            {hud.radio.on && (
-              <button
-                type="button"
-                className="w2-chip text-xs"
-                onClick={() => game.cycleRadio()}
-                title="Change station"
-              >
-                {hud.radio.label}
-              </button>
-            )}
-            <button
-              type="button"
-              className="w2-chip text-base"
-              onClick={() => game.cycleTimeOfDay()}
-              title="Time of day"
-            >
-              {{ afternoon: '☀️', golden: '🌇', blue: '🌆', night: '🌙' }[hud.timeOfDay] ?? '☀️'}
-            </button>
-          </div>
-        )}
-        {!touch && (
-          <>
-            <button
-              type="button"
-              className="w2-chip text-xs"
-              onClick={() => game.cycleTimeOfDay()}
-              title="Time of day (P)"
-            >
-              {{
-                afternoon: '☀️ afternoon',
-                golden: '🌇 golden hour',
-                blue: '🌆 blue hour',
-                night: '🌙 night',
-              }[hud.timeOfDay] ?? hud.timeOfDay}
-            </button>
-            <button
-              type="button"
-              className={`w2-chip text-xs ${hud.radio.on ? 'w2-on' : ''}`}
-              onClick={() => game.cycleRadio()}
-              onContextMenu={e => {
-                e.preventDefault();
-                game.nextRadioTrack();
-              }}
-              title={`Change station (M): ${RADIO_STATIONS.map(r => r.name).join(' → ')} → off`}
-            >
-              📻 {hud.radio.on ? hud.radio.label : 'radio off'}
-            </button>
-            {hud.radio.on && (
-              <button
-                type="button"
-                className="w2-chip text-xs"
-                onClick={() => game.nextRadioTrack()}
-                title={hud.radio.mode === 'beats' ? 'Next beat (.)' : 'Next track (.)'}
-              >
-                ⏭
-              </button>
-            )}
-          </>
-        )}
-        <StatsChip
-          stats={hud.stats}
-          mine={hud.mine}
-          me={game.name}
-          players={hud.players}
-          onOpen={() => void game.refreshStats()}
-        />
-      </HudDrag>
-
-      {/* Now playing toast (JSR-style station card) */}
-      {hud.radio.on && now - hud.radio.at < 4500 && (
-        <div
-          key={hud.radio.at}
-          data-w2hud="toasts"
-          className="w2-nowplaying absolute left-1/2 top-16 -translate-x-1/2"
-        >
-          <span>
-            📻 NOW PLAYING
-            {hud.radio.label.startsWith('COMMUNITY RADIO') ? ' ON COMMUNITY RADIO' : ''}
-          </span>
-          <b>{hud.radio.label}</b>
-          <span className="w2-np-stations">
-            {RADIO_STATIONS.map(r => (
-              <i key={r.mode} className={r.mode === hud.radio.mode ? 'w2-np-cur' : ''}>
-                {r.name}
-              </i>
-            ))}
-            <i>{touch ? 'tap the station to switch' : 'M to switch'}</i>
-          </span>
-        </div>
-      )}
-
-      {/* One-off banner (secret spot found…) */}
-      {hud.toast !== null && now - hud.toast.at < 5000 && (
-        <div
-          key={hud.toast.at}
-          data-w2hud="toasts"
-          className="w2-nowplaying absolute left-1/2 top-28 -translate-x-1/2"
-        >
-          <span>{hud.toast.tag ?? '⌐◨-◨ 19 km out'}</span>
-          <b>{hud.toast.text}</b>
-        </div>
-      )}
-
-      {/* Noun Jersey board shop door */}
-      {hud.shop && (
-        <button
-          type="button"
-          className="pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
-          onClick={onShop}
-        >
-          ENTER BOARD SHOP — {touch ? 'TAP' : 'E / tap'}
-        </button>
-      )}
-
-      {/* NOUN FM decks in the ice cream van */}
-      {hud.fmDecks && (
-        <button
-          type="button"
-          className="pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
-          onClick={onFm}
-          data-fm="open"
-        >
-          COMMUNITY RADIO DECKS — {touch ? 'TAP' : 'E / tap'}
-        </button>
-      )}
-
-      {/* GTA-style map: minimap bottom-left, opens the full map (not on the
-          Big Drop: the map's world is the one you left) */}
-      {!game.missions.ud.active && <WorldMap game={game} touch={touch} />}
-
-      {/* Chat feed (above the minimap on desktop) */}
-      <div
-        data-w2hud="chat"
-        className={`absolute left-4 flex max-w-[60vw] flex-col gap-1 ${touch ? 'bottom-28' : 'bottom-[210px]'}`}
-      >
-        {hud.chat
-          .filter(c => now - c.at < 12000)
-          .map((c, i) => (
-            <div key={i} className="w2-chip text-sm">
-              <b>{c.name}</b> {c.text}
-            </div>
-          ))}
-      </div>
-
-      {/* Combo */}
-      <div
-        data-w2hud="combo"
-        className="absolute bottom-16 left-1/2 flex w-[90vw] -translate-x-1/2 flex-col items-center text-center"
-      >
-        {hud.combo && (
-          <>
-            <div className="w2-combo-label">{hud.combo.label}</div>
-            <div className="w2-combo-score">
-              {hud.combo.score.toLocaleString()}
-              {hud.combo.multiplier > 1 && <span> ×{hud.combo.multiplier}</span>}
-            </div>
-          </>
-        )}
-        {!hud.combo && banked && (
-          <div key={banked.at} className={`w2-banked ${banked.bailed ? 'w2-bailed' : ''}`}>
-            {banked.bailed ? 'BAILED' : `+${banked.points.toLocaleString()}`}
-            <div className="text-sm opacity-80">{banked.label}</div>
-          </div>
-        )}
-        {hud.manualBalance !== null && (
-          <div className="mt-2 flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2 text-xs font-bold">
-              <span className="text-[#ffd400]">W ◀</span>
-              <div className="h-2 w-48 rounded-full bg-white/20">
-                <div
-                  className="h-2 w-2 rounded-full bg-[#ffd400]"
-                  style={{
-                    transform: `translateX(${(Math.max(-1, Math.min(1, hud.manualBalance)) + 1) * 92}px)`,
-                  }}
-                />
-              </div>
-              <span className="text-[#ffd400]">▶ S</span>
-            </div>
-            <div className="text-xs opacity-80">W / S to balance, keep the dot centred</div>
-          </div>
-        )}
-      </div>
-
-      {!touch && !game.van2.driving && <SprayPanel game={game} />}
-
-      {/* Controls */}
-      {showHelp && hud.inputMode !== 'touch' && <ControlsHelp pad={pad} />}
-    </div>
-  );
-}
-
 const CSS = `
 .w2-speedlines{position:absolute;inset:-10%;background:repeating-conic-gradient(from 0deg at 50% 52%,rgba(255,255,255,0) 0deg 5deg,rgba(255,255,255,.55) 5deg 5.4deg,rgba(255,255,255,0) 5.4deg 9deg,rgba(255,255,255,.35) 9deg 9.25deg);-webkit-mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);animation:w2lines .24s steps(3) infinite;transition:opacity .3s}
 @keyframes w2lines{0%{transform:rotate(0)}100%{transform:rotate(3deg)}}
-.w2-speedo{display:flex;align-items:baseline;gap:6px;padding:4px 14px 6px;border-radius:14px;background:rgba(10,12,20,.45);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);font-family:system-ui,sans-serif;cursor:grab;user-select:none}
-.w2-speedo b{font-size:30px;font-weight:900;font-style:italic;line-height:1;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.5)}
-.w2-speedo span{font-size:11px;font-weight:700;letter-spacing:.12em;opacity:.7}
-@media (pointer:coarse){.w2-speedo b{font-size:22px}}
-.w2-chip{background:rgba(10,12,20,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-family:system-ui,sans-serif;white-space:nowrap}
+@media (pointer:coarse){.w2-chip{background:rgba(10,12,20,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-family:system-ui,sans-serif;white-space:nowrap}
 .w2-on{border-color:#3ddc84}
 .w2-live{border-color:#3ddc84;background:rgba(61,220,132,.35)}
 .w2-btn{pointer-events:auto;background:#d22209;color:#fff;font-size:22px;letter-spacing:.06em;padding:12px 28px;border-radius:14px;box-shadow:0 6px 0 #7a1405,0 10px 30px rgba(0,0,0,.4);transition:transform .08s}
@@ -858,134 +528,3 @@ const CSS = `
 .w2-said{background:#fff;color:#111;border-radius:10px;padding:3px 8px;margin-bottom:4px;max-width:220px;white-space:normal;font-size:12px}
 .w2-trick{color:#ffd400;font-style:italic;font-weight:700;margin-bottom:2px;text-shadow:0 1px 0 #000}
 `;
-
-/** Fastest of all time (room leaderboard): the record on the chip, top 10 on click. */
-const STAT_TABS: StatKey[] = [
-  'kmh',
-  'combo',
-  'session',
-  'airM',
-  'airS',
-  'grindM',
-  'downM',
-  'km',
-  'tricks',
-  'playS',
-];
-
-function StatsChip({
-  stats,
-  mine,
-  me,
-  players,
-  onOpen,
-}: {
-  stats: WorldStats | null;
-  mine: MyBests;
-  me: string;
-  players: number;
-  onOpen: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<StatKey>('kmh');
-  const speed = stats?.boards.kmh ?? [];
-  const top = speed.length > 0 ? speed[0] : undefined;
-  const rows = stats?.boards[tab] ?? [];
-  const info = STAT_INFO[tab];
-  // A linked rider is their address's row, whatever name they play under
-  const link = useSyncExternalStore(walletLink.subscribe, walletLink.get);
-  const isMe = (e: StatRow) =>
-    link !== null && e.addr !== undefined
-      ? e.addr.toLowerCase() === link.address.toLowerCase()
-      : link === null && e.name === me;
-  const myRank = rows.findIndex(isMe);
-  const myBest = tab in mine.best ? mine.best[tab as keyof MyBests['best']] : undefined;
-  const today = stats?.days[new Date().toISOString().slice(0, 10)] ?? 0;
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        className="w2-chip text-xs"
-        onClick={() => {
-          if (!open) onOpen();
-          setOpen(o => !o);
-        }}
-        title="All-time stats"
-      >
-        🏁 {top !== undefined ? `${Math.round(top.value)} km/h ${top.name}` : 'stats & records'}
-      </button>
-      {open && (
-        <div className="w2-panel relative z-30 flex w-[300px] max-w-[calc(100vw-32px)] flex-col gap-1.5 text-xs">
-          <div className="flex items-baseline justify-between font-bold">
-            <span>NOUN WORLD STATS</span>
-            <span className="text-[10px] opacity-60">{players} online now</span>
-          </div>
-          {stats !== null && (
-            <div className="grid grid-cols-3 gap-1 text-center">
-              <div className="rounded-lg bg-white/10 p-1">
-                <b className="block text-sm">{stats.riders.toLocaleString()}</b>
-                <span className="text-[10px] opacity-60">players ever</span>
-              </div>
-              <div className="rounded-lg bg-white/10 p-1">
-                <b className="block text-sm">{stats.sessions.toLocaleString()}</b>
-                <span className="text-[10px] opacity-60">sessions</span>
-              </div>
-              <div className="rounded-lg bg-white/10 p-1">
-                <b className="block text-sm">{today.toLocaleString()}</b>
-                <span className="text-[10px] opacity-60">today</span>
-              </div>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-1">
-            {STAT_TABS.map(t => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tab === t ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
-              >
-                {STAT_INFO[t].tab}
-              </button>
-            ))}
-          </div>
-          <div className="font-bold">{info.title}</div>
-          {stats === null && <div className="opacity-70">loading…</div>}
-          {stats !== null && rows.length === 0 && (
-            <div className="opacity-70">no records yet, go set one</div>
-          )}
-          <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto pr-1">
-            {rows.map((e, i) => (
-              <div key={i} className={isMe(e) ? 'font-bold text-[#ffd400]' : ''}>
-                <div className="flex justify-between gap-3">
-                  <span className="truncate" title={e.addr}>
-                    {i + 1}. {e.name}
-                    {e.addr !== undefined && (
-                      <span className="text-[10px] opacity-60">
-                        {' '}
-                        <span className="text-[#5be37d]">✓</span> {shortAddr(e.addr)}
-                      </span>
-                    )}
-                  </span>
-                  <b className="shrink-0">{info.fmt(e.value)}</b>
-                </div>
-                {e.label !== undefined && e.label !== '' && (
-                  <div className="truncate pl-4 text-[10px] opacity-60">{e.label}</div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="mt-1 opacity-70">
-            you:{' '}
-            {myBest !== undefined
-              ? info.fmt(myBest)
-              : myRank >= 0
-                ? info.fmt(rows[myRank]!.value)
-                : '–'}
-            {myRank >= 0 ? ` (#${myRank + 1})` : ''}
-          </div>
-          <WalletLink me={me} />
-        </div>
-      )}
-    </div>
-  );
-}
