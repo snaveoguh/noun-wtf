@@ -404,12 +404,18 @@ export class ParkourMotor {
     return m !== null && m.nx * nx + m.nz * nz > 0.8;
   }
 
-  /** A pole to launch at: along `yaw` ± 0.45 rad, up to 10 m out (once per launch). */
+  /** A pole to launch at: along `yaw` ± 0.6 rad (~35°), up to 10 m out (once per launch). */
   private poleAhead(x: number, y: number, z: number, yaw: number): PoleHit | null {
-    for (const off of [0, 0.22, -0.22, 0.45, -0.45]) {
+    // Poles are thin (a 0.18 m lamp post is ~0.025 rad wide at 7 m): sweep
+    // finer than that, nearest the aim first. Most rays miss outright, so
+    // this is at most ~70 cheap rays, once per launch.
+    for (let k = 0; k <= 66; k++) {
+      const off = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * 0.018;
       const a = yaw + off;
-      const pl = poleAlong(this.w, x, y, z, Math.sin(a), Math.cos(a), 10);
-      if (pl !== null && pl.top > y + 1) return pl;
+      // A metre lower than us: launched from high up, the next pole's top can
+      // be below our head (it only has to be there to catch)
+      const pl = poleAlong(this.w, x, y - 1.2, z, Math.sin(a), Math.cos(a), 10);
+      if (pl !== null && pl.top > y - 0.5) return pl;
     }
     return null;
   }
@@ -418,7 +424,7 @@ export class ParkourMotor {
     const base = hs > 0.8 ? Math.atan2(b.vel.x, b.vel.z) : b.yaw;
     for (const off of [0, 0.45, -0.45, 0.9, -0.9]) {
       const a = base + off;
-      const pl = poleAlong(this.w, b.pos.x, b.pos.y, b.pos.z, Math.sin(a), Math.cos(a), 1.6);
+      const pl = poleAlong(this.w, b.pos.x, b.pos.y, b.pos.z, Math.sin(a), Math.cos(a), 2.4);
       if (pl !== null) return pl;
     }
     return null;
@@ -933,7 +939,7 @@ export class ParkourMotor {
       const dl = Math.hypot(dx, dz);
       dx /= dl;
       dz /= dl;
-      // Pole to pole: another pole within ~25° of the launch gets aimed at
+      // Pole to pole: another pole within ~35° of the launch gets aimed at
       const next = this.poleAhead(p.x + ox * R, p.y, p.z + oz * R, Math.atan2(dx, dz));
       if (next !== null) {
         const ax = next.cx - p.x;

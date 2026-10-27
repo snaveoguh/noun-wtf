@@ -254,7 +254,7 @@ const CSS = `
 .pk-toasts{position:absolute;bottom:34%;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px}
 .pk-toasts b{font-size:30px;color:#fff;text-shadow:3px 3px 0 #ff2f8e,5px 5px 0 #000;animation:pktoast 1.4s ease-out both;font-weight:400}
 @keyframes pktoast{0%{transform:scale(1.5);opacity:0}12%{transform:scale(1);opacity:1}75%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
-.pk-btns{position:absolute;top:10px;right:12px;display:flex;gap:6px}
+.pk-btns{position:absolute;top:12px;left:calc(50% + 236px);display:flex;gap:6px}
 .pk-btns button,.pk-res-btns button{background:#111;color:#fff;border:2px solid #fff;padding:4px 12px;font-size:16px;cursor:pointer}
 .pk-res{display:flex;flex-direction:column;align-items:center;gap:6px;background:#111;color:#fff;padding:18px 28px;border:3px solid var(--rc);box-shadow:8px 8px 0 var(--rc);min-width:260px}
 .pk-big{font-size:64px;line-height:1;font-variant-numeric:tabular-nums}
@@ -265,7 +265,7 @@ const CSS = `
 @media (max-width:640px){
   .pk-menu{padding:14px 12px}.pk-menu h2{font-size:32px}
   .pk-top{top:6px;gap:8px;padding:2px 10px}.pk-time{font-size:26px;min-width:92px}.pk-name{display:none}
-  .pk-btns{top:auto;bottom:calc(200px + env(safe-area-inset-bottom));right:10px}
+  .pk-btns{top:auto;left:auto;bottom:calc(200px + env(safe-area-inset-bottom));right:10px}
   .pk-count{font-size:100px}
   .pk-toasts b{font-size:24px}
 }

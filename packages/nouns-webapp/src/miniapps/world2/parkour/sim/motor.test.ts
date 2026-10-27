@@ -6,6 +6,7 @@ import { PK } from '../contract';
 
 import { findLedge, poleAlong, sideWall } from './detect';
 import { landing } from './landing';
+import { ParkourMotor } from './motor';
 import { Rig, input, level } from './testKit';
 
 const RUN = 6.5;
@@ -263,6 +264,24 @@ describe('poles', () => {
 });
 
 describe('pole to pole', () => {
+  it('the aim assist finds a thin pole 25° off the launch line, 7 m out', () => {
+    const { w } = level(
+      [],
+      [
+        [15, 15, 0.1, 8],
+        [15, 7.5, 0.09, 6.5],
+      ],
+    );
+    const m = new ParkourMotor(w) as unknown as {
+      poleAhead(x: number, y: number, z: number, yaw: number): { cx: number; cz: number } | null;
+    };
+    const hit = m.poleAhead(15.5, 4.67, 14.08, Math.atan2(0.48, -0.88));
+    expect(hit).not.toBeNull();
+    expect(hit!.cz).toBeCloseTo(7.5, 1);
+    // …and nothing when there's nothing out there
+    expect(m.poleAhead(15.5, 4.67, 14.08, Math.PI / 2)).toBeNull();
+  });
+
   it('a launch roughly at the next pole is aimed at it and catches it', () => {
     const { w } = level(
       [],

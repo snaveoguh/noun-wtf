@@ -315,7 +315,7 @@ export const PK = {
 
   // Poles
   poleMaxR: 0.3,
-  poleReach: 0.95,
+  poleReach: 1.15,
   /** Rider centre to pole surface while holding on. */
   poleGap: 0.42,
   poleSlide: 3.4,
