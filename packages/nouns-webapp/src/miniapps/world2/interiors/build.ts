@@ -220,14 +220,14 @@ function holed(kit: Kit, hole: Box2 | null): Pick<Kit, 'add'> {
   };
 }
 
+/** Items the planner keeps clear but you walk on / through (their own collision, if any). */
+export const WALK_THROUGH: ReadonlySet<string> = new Set(['stairs', 'stairwell']);
+
 /**
  * A straight flight in its item frame (centre of its footprint), `y0` its
  * foot: treads, risers, a stringer each side, a handrail on the open side.
  * `collide`: its ramp (a closed wedge, the feet walk up the slope) goes in.
  */
-/** Items the planner keeps clear but you walk on / through (their own collision, if any). */
-export const WALK_THROUGH: ReadonlySet<string> = new Set(['stairs', 'stairwell']);
-
 function buildFlight(kit: Kit, st: StairPlan, y0: number, P: Palette, l: Layout, collide = true) {
   const w = st.x1 - st.x0;
   const run = st.z1 - st.z0;
