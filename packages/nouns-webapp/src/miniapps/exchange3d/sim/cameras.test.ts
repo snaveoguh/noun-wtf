@@ -4,6 +4,7 @@ import {
   angleTo,
   CAM_MODES,
   clampOrbit,
+  fitInHall,
   modeForKey,
   orbitEye,
   pan,
@@ -16,6 +17,7 @@ import {
   zoom,
   type Orbit,
 } from './cameras';
+import { DOOR, HALL_D, HALL_W, TOWER_HALF } from './layout';
 
 const ctx = { pit: { x: 10, z: 5 }, follow: { x: -3, y: 0.5, z: 7 }, aspect: 16 / 9, az: 0.4 };
 
@@ -87,5 +89,22 @@ describe('camera motion', () => {
     const down = pan(o, 0, 100, 0.9, 800);
     // camera sits on +z looking −z: away from it is −z
     expect(down.tz).toBeLessThan(0);
+  });
+  it('WALK: the camera comes in rather than going through a wall or the tower', () => {
+    const inHall = (e: { x: number; z: number }) =>
+      Math.abs(e.x) < HALL_W / 2 && Math.abs(e.z) < HALL_D / 2;
+    // At the door, looking in: the camera wants to sit outside, behind you
+    const door = { tx: DOOR.x, ty: 1.5, tz: DOOR.z + 1, r: 8, az: Math.PI, el: 0.3 };
+    expect(inHall(orbitEye(door))).toBe(false);
+    const fit = fitInHall(door);
+    expect(inHall(orbitEye(fit))).toBe(true);
+    expect(fit.r).toBeGreaterThanOrEqual(1.2);
+    // Facing the tower from just outside it: stop short of its face
+    const tower = { tx: 0, ty: 1.5, tz: TOWER_HALF + 3, r: 10, az: Math.PI, el: 0.2 };
+    const ft = fitInHall(tower);
+    expect(ft.r).toBeLessThan(3);
+    // In the open: unchanged (same object)
+    const open = { tx: 30, ty: 1.5, tz: 10, r: 6, az: 0.5, el: 0.3 };
+    expect(fitInHall(open)).toBe(open);
   });
 });

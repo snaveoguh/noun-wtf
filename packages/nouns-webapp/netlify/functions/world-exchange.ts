@@ -2,6 +2,8 @@ import { connectLambda, getStore } from '@netlify/blobs';
 
 import {
   checkInvariants,
+  dealAct,
+  dealsView,
   genesis,
   isGood,
   playerAct,
@@ -9,6 +11,7 @@ import {
   snapshot,
   STEP_MS,
   tick,
+  type DealAction,
   type ExchangeAction,
   type ExchangeState,
   type GoodId,
@@ -34,7 +37,13 @@ import { maskOwner, publicFloor } from '../../src/miniapps/exchange3d/sim/feed';
 //      action = { t: 'join' }                       starter grant (once per rider)
 //             | { t: 'order', side, good, qty, price, kind?: 'limit' | 'market' }
 //             | { t: 'cancel', order }
-//      → { ok, reason?, fills, snapshot }
+//             | { t: 'offer', to, side, good, qty, price }   a direct deal
+//             | { t: 'accept', deal } | { t: 'decline', deal }
+//      → { ok, reason?, fills, snapshot, deals, deal? }
+//      Deals (engine/deals.ts) are offers to one trader: `to` is a rider's
+//      public tag ('r:…', the masked tag the floor shows) or a bot id; a
+//      bot answers at once. GETs with a rider add `deals`: that rider's
+//      offers in and out, with tags only (never a raw rider id).
 //
 // Riders are the random browser ids from net/Stats.ts (riderId()). A new
 // rider gets STARTER_COIN once. Limits: body size, ACTIONS_PER_MIN per
@@ -114,10 +123,23 @@ function query(event: HandlerEvent): Record<string, string> {
   return out;
 }
 
-function parseAction(raw: unknown): ExchangeAction | { t: 'join' } | null {
+const tagOf = (owner: string) => maskOwner(owner, null);
+
+function parseAction(raw: unknown): ExchangeAction | DealAction | { t: 'join' } | null {
   if (!raw || typeof raw !== 'object') return null;
   const a = raw as Record<string, unknown>;
   if (a.t === 'join') return { t: 'join' };
+  if ((a.t === 'accept' || a.t === 'decline') && typeof a.deal === 'string' && a.deal.length <= 16)
+    return { t: a.t, deal: a.deal };
+  if (a.t === 'offer') {
+    if (typeof a.to !== 'string' || a.to.length > 40) return null;
+    if (a.side !== 'buy' && a.side !== 'sell') return null;
+    if (!isGood(a.good)) return null;
+    const qty = Number(a.qty);
+    const price = Number(a.price);
+    if (!Number.isFinite(qty) || !Number.isFinite(price)) return null;
+    return { t: 'offer', to: a.to, side: a.side, good: a.good, qty, price };
+  }
   if (a.t === 'cancel' && typeof a.order === 'string' && a.order.length <= 24) {
     return { t: 'cancel', order: a.order };
   }
@@ -156,7 +178,10 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     } else if (now - s.now >= STEP_MS) {
       tick(s, now); // in-memory only; the next write persists its own tick
     }
-    const snap = redact(snapshot(s, { good, tf, owner: rider }), rider);
+    const snap = {
+      ...redact(snapshot(s, { good, tf, owner: rider }), rider),
+      ...(rider !== null ? { deals: dealsView(s, rider, now, tagOf) } : {}),
+    };
     return json(200, q.floor === '1' ? { ...snap, floor3d: publicFloor(s, rider) } : snap);
   }
   if (method !== 'POST') return json(405, { error: 'Method not allowed' });
@@ -177,6 +202,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     : 'good' in action
       ? action.good
       : 'ICECREAM';
+  const isDeal = action.t === 'offer' || action.t === 'accept' || action.t === 'decline';
   const tf = input.tf === 'h' ? 'h' : 'm';
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
@@ -197,7 +223,9 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     const r =
       action.t === 'join'
         ? { ok: true, fills: [], reason: known ? undefined : 'welcome' }
-        : playerAct(s, rider, action, now);
+        : isDeal
+          ? dealAct(s, rider, action as DealAction, now, tagOf)
+          : playerAct(s, rider, action as ExchangeAction, now);
     // Never write a broken ledger
     const errs = checkInvariants(s);
     if (errs.length > 0) {
@@ -209,6 +237,8 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       ok: r.ok,
       ...(r.reason ? { reason: r.reason } : {}),
       fills: r.fills.map(f => redactFill(f, rider)),
+      ...('deal' in r && r.deal !== undefined ? { deal: r.deal } : {}),
+      deals: dealsView(s, rider, now, tagOf),
       snapshot: redact(snapshot(s, { good, tf, owner: rider }), rider),
     });
   }
