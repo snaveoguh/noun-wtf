@@ -101,9 +101,9 @@ describe('THE BIG DROP card', () => {
   const drop = (opts?: { dropUnlocked?: boolean }) =>
     buildRows(CATALOG, [], opts)[0]!.items.find(i => i.key === 'game:drop')!;
 
-  it('sits in Play now after the four games, with one obvious cover to swap', () => {
+  it('sits in Play now after the five games, with one obvious cover to swap', () => {
     const play = buildRows(CATALOG)[0]!;
-    expect(play.items.findIndex(i => i.key === 'game:drop')).toBe(4);
+    expect(play.items.findIndex(i => i.key === 'game:drop')).toBe(5);
     expect(GAMES.find(g => g.id === 'drop')).toMatchObject({
       card: BIG_DROP_CARD,
       cover: BIG_DROP_COVER,

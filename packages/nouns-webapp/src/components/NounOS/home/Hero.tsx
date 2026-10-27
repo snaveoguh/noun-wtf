@@ -22,6 +22,7 @@ export const GAME_ACCENT: Record<GameId, string> = {
   world: '#ffd400',
   hoops: '#ff9a1f',
   breaks: '#ff2f8e',
+  hideseek: '#b26bff',
   warfare: '#3dff8a',
   drop: '#9fe8ff',
 };

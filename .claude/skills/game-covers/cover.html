@@ -40,6 +40,8 @@ const SPLAT = c => '<svg viewBox="-60 -60 120 120"><path fill="' + c + '" stroke
 const BALL = '<svg viewBox="-60 -60 120 120"><circle r="52" fill="#ff7a1a" stroke="#0b0b0f" stroke-width="7"/><path d="M-52 0H52M0-52V52M-37-37C-12-14-12 14-37 37M37-37C12-14 12 14 37 37" fill="none" stroke="#0b0b0f" stroke-width="5"/><path d="M-30-38a48 48 0 0 1 30-12" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" opacity=".7"/></svg>';
 const FLAKE = '<svg viewBox="-60 -60 120 120"><g stroke="#0b0b0f" stroke-width="15" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g><g stroke="#e9fbff" stroke-width="8" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g></svg>';
 const VINYL = '<svg viewBox="-60 -60 120 120"><circle r="54" fill="#141418" stroke="#0b0b0f" stroke-width="6"/><g fill="none" stroke="#3a3a46" stroke-width="2"><circle r="46"/><circle r="40"/><circle r="34"/><circle r="28"/></g><path d="M-40-22a46 46 0 0 1 30-22" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".55"/><circle r="17" fill="#ffe23a" stroke="#0b0b0f" stroke-width="4"/><circle r="3.5" fill="#0b0b0f"/></svg>';
+// Two big eyes peeking over a wall (hide & seek)
+const PEEK = '<svg viewBox="-70 -60 140 120"><g stroke="#0b0b0f" stroke-width="5" stroke-linejoin="round"><ellipse cx="-24" cy="-14" rx="22" ry="26" fill="#fff"/><ellipse cx="24" cy="-14" rx="22" ry="26" fill="#fff"/></g><circle cx="-16" cy="-8" r="10" fill="#0b0b0f"/><circle cx="32" cy="-8" r="10" fill="#0b0b0f"/><circle cx="-13" cy="-12" r="3" fill="#fff"/><circle cx="35" cy="-12" r="3" fill="#fff"/><g stroke="#0b0b0f" stroke-width="5"><rect x="-66" y="4" width="132" height="54" fill="#ff7a4a"/><path d="M-66 22H66M-66 40H66M-30 4V22M14 4V22M40 4V22M-52 22V40M-8 22V40M30 22V40M-30 40V58M14 40V58M52 40V58" fill="none"/></g></svg>';
 const K = {
   hoops: { bg: 'linear-gradient(150deg,#ff8a1f 0%,#ff5a3c 45%,#7b3cff 100%)', accent: '#ffe23a', badge: '#20d6ff',
     t1: 'NOUN', t2: 'HOOPS', tag: 'DUNK · CROSS · SWISH', url: 'NOUN.WTF/WORLD', bdg: '3 ON 3',
@@ -59,6 +61,12 @@ const K = {
     prop: '<div class="prop" style="left:70px;top:430px;width:300px;transform:rotate(-12deg)">' + VINYL + '</div>',
     portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '132px', l2x: '24px', cap: ['ohhhh!', 'left:520px;top:340px', '6deg'],
       prop: '<div class="prop" style="left:560px;top:860px;width:190px;transform:rotate(14deg)">' + VINYL + '</div>' } },
+  hideseek: { bg: 'linear-gradient(155deg,#b26bff 0%,#4b1fb0 52%,#140b3a 100%)', accent: '#3dff8a', badge: '#ffe23a',
+    t1: 'HIDE &', t2: 'SEEK', tag: 'HIDE · SEEK · FOUND', url: 'NOUN.WTF/WORLD', bdg: '2–12 ONLINE',
+    sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['ready or<br>not!', 'left:84px;top:330px;font-size:42px;line-height:1;text-align:center;color:#fff;-webkit-text-stroke:1.5px #0b0b0f', '-8deg'], ts: '190px', l2x: '150px', br: '1.05',
+    prop: '<div class="prop" style="left:60px;top:470px;width:320px;transform:rotate(-6deg)">' + PEEK + '</div>',
+    portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '132px', l2x: '60px', cap: ['ready or not!', 'left:430px;top:330px;font-size:40px;color:#fff;-webkit-text-stroke:1.5px #0b0b0f', '6deg'],
+      prop: '<div class="prop" style="left:500px;top:860px;width:240px;transform:rotate(8deg)">' + PEEK + '</div>' } },
 }[kind];
 const img = q.get('img');
 const c = document.getElementById('c');
