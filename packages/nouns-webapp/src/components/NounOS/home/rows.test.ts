@@ -236,13 +236,13 @@ describe('HERO_SLIDES', () => {
     }
   });
 
-  it('keeps the opening sizzle first, then the three new reels, then the rest', () => {
+  it('keeps the opening sizzle first, Noun World second, then the new reels, then the rest', () => {
     expect(HERO_SLIDES.map(s => s.key)).toEqual([
       'sizzle',
+      'world-vhs',
       'big-drop',
       'breaks',
       'exchange',
-      'world-vhs',
       'hoops',
       'warfare',
     ]);
