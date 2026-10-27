@@ -13,20 +13,31 @@ import { decodeParts } from '@nouns/voxel-engine';
 import * as THREE from 'three';
 
 import { discounted, menuOf } from './dialogue';
+import { askText, label, labelColor, type Exhibit } from './museum';
 import { TRAITS } from './residents';
 import { hash32, mulberry32, pick, type Rng } from './rng';
 
 export type TimeOfDay = 'afternoon' | 'golden' | 'blue' | 'night';
 
-const SIZE = 1024;
 const PX_PER_M = 110;
 
 export interface ArtAtlas {
   texture: THREE.CanvasTexture;
   /** Decor index → uv rect (u0, v0, u1, v1). */
   slots: Map<number, [number, number, number, number]>;
-  /** Extra slots by name (screens). */
+  /** Extra slots by name (screens; the museum's plinth labels and rug). */
   named: Map<string, [number, number, number, number]>;
+  /**
+   * The Prop Museum: repaint its placards (wall decor, in order) and plinth
+   * labels with these props (the API answered after the room was built).
+   */
+  paintExhibits?(walls: readonly Exhibit[], plinths: readonly Exhibit[]): void;
+}
+
+/** The Prop Museum's exhibits: the latest props on the walls, the famous ones on the plinths. */
+export interface MuseumArt {
+  walls: readonly Exhibit[];
+  plinths: readonly Exhibit[];
 }
 
 /** Draw a whole Noun (background, body, accessory, head, glasses) into a square. */
@@ -91,9 +102,12 @@ interface Packer {
   x: number;
   y: number;
   row: number;
+  /** Atlas size (px). */
+  size: number;
 }
 
 function alloc(p: Packer, w: number, h: number): [number, number] | null {
+  const SIZE = p.size;
   const W = Math.min(SIZE - 8, Math.round(w));
   const H = Math.min(SIZE - 8, Math.round(h));
   if (p.x + W + 4 > SIZE) {
@@ -108,15 +122,28 @@ function alloc(p: Packer, w: number, h: number): [number, number] | null {
   return at;
 }
 
-function uvOf(x: number, y: number, w: number, h: number): [number, number, number, number] {
+function uvOf(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  SIZE: number,
+): [number, number, number, number] {
   return [x / SIZE, 1 - (y + h) / SIZE, (x + w) / SIZE, 1 - y / SIZE];
 }
 
 /** Build the atlas for a layout (`area` styles the view out of the windows). */
 export function buildArtAtlas(
   l: Layout,
-  opts: { area: string; time: TimeOfDay; tier: Parameters<typeof discounted>[1] },
+  opts: {
+    area: string;
+    time: TimeOfDay;
+    tier: Parameters<typeof discounted>[1];
+    museum?: MuseumArt;
+  },
 ): ArtAtlas {
+  const museum = l.theme === 'prop-museum' ? opts.museum : undefined;
+  const SIZE = l.theme === 'prop-museum' ? 2048 : 1024;
   const canvas = document.createElement('canvas');
   canvas.width = SIZE;
   canvas.height = SIZE;
@@ -126,14 +153,15 @@ export function buildArtAtlas(
   g.fillRect(0, 0, SIZE, SIZE);
   const slots = new Map<number, [number, number, number, number]>();
   const named = new Map<string, [number, number, number, number]>();
-  const pack: Packer = { x: 0, y: 0, row: 0 };
+  const pack: Packer = { x: 0, y: 0, row: 0, size: SIZE };
+  const placards: { at: [number, number]; w: number; h: number }[] = [];
   // Windows first (biggest), then the rest
   const order = l.decor
     .map((d, i) => [d, i] as const)
     .sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h);
   for (const [d, i] of order) {
     if (d.type === 'upper_cabinets' || d.type === 'wall_shelf') continue;
-    const scale = d.type === 'window' ? 70 : PX_PER_M;
+    const scale = d.type === 'window' ? 70 : d.type === 'placard' ? PLACARD_PX_PER_M : PX_PER_M;
     const w = Math.max(24, d.w * scale);
     const h = Math.max(24, d.h * scale);
     const at = alloc(pack, w, h);
@@ -143,9 +171,10 @@ export function buildArtAtlas(
     g.beginPath();
     g.rect(at[0], at[1], Math.round(w), Math.round(h));
     g.clip();
-    paintDecor(g, d, at[0], at[1], Math.round(w), Math.round(h), rnd, l, opts);
+    if (d.type === 'placard') placards[i] = { at, w: Math.round(w), h: Math.round(h) };
+    else paintDecor(g, d, at[0], at[1], Math.round(w), Math.round(h), rnd, l, opts);
     g.restore();
-    slots.set(i, uvOf(at[0], at[1], Math.round(w), Math.round(h)));
+    slots.set(i, uvOf(at[0], at[1], Math.round(w), Math.round(h), SIZE));
   }
   // Screens (TVs, arcade cabinets): a few looping-looking stills
   for (let k = 0; k < 3; k++) {
@@ -153,14 +182,247 @@ export function buildArtAtlas(
     if (at === null) break;
     const rnd = mulberry32(hash32(`${l.id}:screen:${k}`));
     paintScreen(g, at[0], at[1], 96, 64, rnd, l.kind);
-    named.set(`screen${k}`, uvOf(at[0], at[1], 96, 64));
+    named.set(`screen${k}`, uvOf(at[0], at[1], 96, 64, SIZE));
   }
+  // The Prop Museum: plinth labels and the rug
+  const labels: [number, number][] = [];
+  if (l.theme === 'prop-museum') {
+    const nPlinths = l.items.filter(it => it.type === 'plinth').length;
+    for (let k = 0; k < nPlinths; k++) {
+      const at = alloc(pack, LABEL_W, LABEL_H);
+      if (at === null) break;
+      labels.push(at);
+      named.set(`plinth${k}`, uvOf(at[0], at[1], LABEL_W, LABEL_H, SIZE));
+    }
+    const at = alloc(pack, RUG_W, RUG_H);
+    if (at !== null) {
+      paintEsportsRug(g, at[0], at[1], RUG_W, RUG_H);
+      named.set('esports', uvOf(at[0], at[1], RUG_W, RUG_H, SIZE));
+    }
+  }
+  const paintExhibits = (walls: readonly Exhibit[], plinths: readonly Exhibit[]) => {
+    let k = 0;
+    placards.forEach(pl => {
+      const e = walls.length > 0 ? walls[k++ % walls.length] : undefined;
+      paintPlacard(g, pl.at[0], pl.at[1], pl.w, pl.h, e);
+    });
+    labels.forEach((at, i) =>
+      paintPlinthLabel(
+        g,
+        at[0],
+        at[1],
+        LABEL_W,
+        LABEL_H,
+        plinths.length > 0 ? plinths[i % plinths.length] : undefined,
+      ),
+    );
+  };
+  if (l.theme === 'prop-museum') paintExhibits(museum?.walls ?? [], museum?.plinths ?? []);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.anisotropy = 4;
-  return { texture, slots, named };
+  if (l.theme !== 'prop-museum') return { texture, slots, named };
+  return {
+    texture,
+    slots,
+    named,
+    paintExhibits: (walls: readonly Exhibit[], plinths: readonly Exhibit[]) => {
+      paintExhibits(walls, plinths);
+      texture.needsUpdate = true;
+    },
+  };
+}
+
+// ── The Prop Museum ──────────────────────────────────────────────────────
+
+/** Placards are read up close: drawn finer than other wall art. */
+const PLACARD_PX_PER_M = 260;
+const LABEL_W = 220;
+const LABEL_H = 140;
+const RUG_W = 600;
+const RUG_H = 400;
+const SANS = '"Helvetica Neue", Helvetica, Arial, sans-serif';
+
+/** Words → lines that fit `maxW` px in the current font (at most `maxLines`, the last cut with …). */
+export function wrapText(
+  measure: (s: string) => number,
+  text: string,
+  maxW: number,
+  maxLines: number,
+): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = '';
+  let used = 0;
+  for (const w of words) {
+    const next = cur === '' ? w : `${cur} ${w}`;
+    if (cur === '' || measure(next) <= maxW) {
+      cur = next;
+      used++;
+      continue;
+    }
+    lines.push(cur);
+    if (lines.length === maxLines) {
+      cur = '';
+      break;
+    }
+    cur = w;
+    used++;
+  }
+  if (cur !== '' && lines.length < maxLines) lines.push(cur);
+  if (used < words.length && lines.length > 0) {
+    let last = lines[lines.length - 1]!;
+    while (last.length > 1 && measure(`${last}…`) > maxW) last = last.slice(0, -1);
+    lines[lines.length - 1] = `${last}…`;
+  }
+  return lines;
+}
+
+function wrap(g: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number) {
+  return wrapText(s => g.measureText(s).width, text, maxW, maxLines);
+}
+
+/** A museum placard: PROP n, its outcome, its title, the votes, what it asked for. */
+function paintPlacard(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  e: Exhibit | undefined,
+) {
+  g.save();
+  g.beginPath();
+  g.rect(x, y, w, h);
+  g.clip();
+  // Black frame, off-white card
+  g.fillStyle = '#111';
+  g.fillRect(x, y, w, h);
+  const m = Math.round(w * 0.05);
+  g.fillStyle = '#f4f1ea';
+  g.fillRect(x + m, y + m, w - 2 * m, h - 2 * m);
+  const px = x + m * 2;
+  const iw = w - 4 * m;
+  let py = y + m * 2;
+  g.textBaseline = 'top';
+  g.textAlign = 'left';
+  if (e === undefined) {
+    g.fillStyle = '#999';
+    g.font = `700 ${Math.round(w * 0.08)}px ${SANS}`;
+    g.fillText('ON LOAN', px, py);
+    g.restore();
+    return;
+  }
+  g.fillStyle = '#111';
+  g.font = `900 ${Math.round(w * 0.16)}px ${SANS}`;
+  g.fillText(`PROP ${e.id}`, px, py);
+  py += w * 0.2;
+  // Outcome pill
+  const lab = label(e);
+  g.font = `800 ${Math.round(w * 0.07)}px ${SANS}`;
+  const tw = g.measureText(lab).width + w * 0.06;
+  g.fillStyle = labelColor(lab);
+  g.fillRect(px, py, tw, w * 0.1);
+  g.fillStyle = '#fff';
+  g.fillText(lab, px + w * 0.03, py + w * 0.018);
+  py += w * 0.15;
+  // Title
+  g.fillStyle = '#111';
+  const fs = Math.round(w * 0.075);
+  g.font = `700 ${fs}px ${SANS}`;
+  for (const line of wrap(g, e.title, iw, 6)) {
+    g.fillText(line, px, py);
+    py += fs * 1.2;
+  }
+  // Votes and money, along the bottom
+  g.font = `600 ${Math.round(w * 0.055)}px ${SANS}`;
+  g.fillStyle = '#444';
+  const by = y + h - m * 2 - w * 0.2;
+  g.fillText(`FOR ${e.forVotes} · AGAINST ${e.againstVotes}`, px, by);
+  g.fillStyle = '#111';
+  wrap(g, askText(e), iw, 2).forEach((line, i) => g.fillText(line, px, by + w * 0.07 * (i + 1)));
+  g.restore();
+}
+
+/** The small card on a plinth's front. */
+function paintPlinthLabel(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  e: Exhibit | undefined,
+) {
+  g.save();
+  g.beginPath();
+  g.rect(x, y, w, h);
+  g.clip();
+  g.fillStyle = '#f7f5ef';
+  g.fillRect(x, y, w, h);
+  g.fillStyle = '#111';
+  g.fillRect(x, y, w, 6);
+  g.textBaseline = 'top';
+  g.textAlign = 'left';
+  if (e !== undefined) {
+    g.font = `900 ${Math.round(h * 0.26)}px ${SANS}`;
+    g.fillText(`PROP ${e.id}`, x + 10, y + 12);
+    const lab = label(e);
+    g.font = `800 ${Math.round(h * 0.11)}px ${SANS}`;
+    g.fillStyle = labelColor(lab);
+    g.fillText(lab, x + w - 10 - g.measureText(lab).width, y + 16);
+    g.fillStyle = '#222';
+    g.font = `700 ${Math.round(h * 0.12)}px ${SANS}`;
+    wrap(g, e.title, w - 20, 3).forEach((line, i) =>
+      g.fillText(line, x + 10, y + h * 0.5 + i * h * 0.15),
+    );
+  }
+  g.restore();
+}
+
+/**
+ * The ESPORTS rug, Off-White style: off-white pile, black condensed
+ * capitals in quotation marks, a small label in the corner.
+ */
+function paintEsportsRug(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  g.save();
+  g.beginPath();
+  g.rect(x, y, w, h);
+  g.clip();
+  g.fillStyle = '#ece6d8';
+  g.fillRect(x, y, w, h);
+  // A little pile texture
+  const rnd = mulberry32(0xe5);
+  for (let i = 0; i < 1400; i++) {
+    g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.035)' : 'rgba(255,255,255,0.06)';
+    g.fillRect(x + rnd() * w, y + rnd() * h, 2, 2);
+  }
+  // “ESPORTS”: squeezed heavy caps, centred
+  g.fillStyle = '#111';
+  g.textBaseline = 'middle';
+  g.textAlign = 'center';
+  const fs = Math.round(h * 0.3);
+  g.font = `900 ${fs}px ${SANS}`;
+  const text = '“ESPORTS”';
+  const squeeze = 0.72;
+  const tw = g.measureText(text).width * squeeze;
+  const k = Math.min(1, (w * 0.86) / tw);
+  g.save();
+  g.translate(x + w / 2, y + h * 0.52);
+  g.scale(squeeze * k, k);
+  g.fillText(text, 0, 0);
+  g.restore();
+  // Corner labels
+  g.textAlign = 'left';
+  g.textBaseline = 'top';
+  g.font = `700 ${Math.round(h * 0.045)}px ${SANS}`;
+  g.fillText('"RUG"', x + w * 0.04, y + h * 0.06);
+  g.fillText('c/o NOUNS DAO', x + w * 0.04, y + h * 0.06 + h * 0.055);
+  g.textAlign = 'right';
+  g.textBaseline = 'bottom';
+  g.fillText('PROP 466 · NOUNS ESPORTS', x + w * 0.96, y + h * 0.94);
+  g.restore();
 }
 
 function paintDecor(
