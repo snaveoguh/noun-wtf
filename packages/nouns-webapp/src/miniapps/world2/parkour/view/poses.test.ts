@@ -1,12 +1,11 @@
 // Parkour poses on the real Noun skeleton: finite, hands where the moves
 // put them, and the big head kept out of the wall it's facing.
 
-import type { PkAnim, ANIM, PK, type AnimKind } from '../contract';
-
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { PoseDriver } from '../../breakdance/view/rig';
+import { ANIM, PK, type AnimKind, type PkAnim } from '../contract';
 import { decodePk, encodePk, PkSmoother } from '../net/pk';
 
 import { pkPose } from './poses';

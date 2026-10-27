@@ -68,6 +68,20 @@ const MEDAL: Record<string, string> = { gold: 'GOLD', silver: 'SILVER', bronze: 
 export function ParkourUi({ game, touch }: { game: Game; touch: boolean }) {
   const v = useCourse(game);
   const [, tick] = useState(0);
+  // K on foot: the route menu (K is only a trick key on the board)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyK' || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t !== null && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable))
+        return;
+      const c = game.parkour.course;
+      if (c.view.phase === 'menu') c.close();
+      else if (c.view.phase === 'off' && game.player.mode === 'foot') c.open();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [game]);
   // Toasts and split flashes fade on their own clock
   useEffect(() => {
     if (v === null || v.phase !== 'running') return;

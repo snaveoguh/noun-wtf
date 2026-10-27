@@ -185,6 +185,20 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // NOUN PARKOUR: Noun World with the route menu open (`?play=parkour`,
+  // read when the game starts, so a running one reloads)
+  const goParkour = useCallback(() => {
+    const url = '/world?play=parkour';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // NOUN BREAKS: Noun World at the plaza cypher with the battle menu open
   // (`?play=breaks`, read when the game starts, so a running one reloads)
   const goBreaks = useCallback(() => {
@@ -354,6 +368,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           onEnterWorld={goNounWorld}
           onEnterHoops={goHoops}
           onEnterBreaks={goBreaks}
+          onEnterParkour={goParkour}
           onEnterDrop={goDrop}
           onEnterWarfare={goWarfare}
           onOpen={id => os.open(id)}

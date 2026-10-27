@@ -305,6 +305,25 @@ describe('ground moves', () => {
   });
 });
 
+describe('precision', () => {
+  it('a standing jump with the stick held carries a set distance and sticks on a post', () => {
+    // Two posts 0.6 wide, 3 m apart (centres), 3 m tall
+    const { w } = level([
+      [0, 1.5, 0, 0.6, 3, 0.6],
+      [0, 1.5, 3, 0.6, 3, 0.6],
+    ]);
+    const r = new Rig(w, 0, 3, 0);
+    r.run(10, input());
+    r.step(input({ moveY: 1, wishZ: 1, jump: true }), 1.9);
+    expect(r.b.has('leap')).toBe(true);
+    r.run(70, input(), 0);
+    expect(r.b.grounded).toBe(true);
+    expect(r.b.pos.y).toBeCloseTo(3, 1);
+    expect(r.b.pos.z).toBeGreaterThan(2.7);
+    expect(r.b.has('stick')).toBe(true);
+  });
+});
+
 describe('landings', () => {
   it('the rules', () => {
     const base = { speed: 5, sinceDuck: Infinity, narrow: false };

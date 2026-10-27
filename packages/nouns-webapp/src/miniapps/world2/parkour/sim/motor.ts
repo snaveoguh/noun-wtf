@@ -254,6 +254,20 @@ export class ParkourMotor {
           }
         }
       }
+      // From a standstill (a post, a wall top): a precision jump, a set
+      // distance along the stick, so post-to-post lines can be judged
+      if (i.jump && hs < PK.precisionSpeed) {
+        const wl = Math.hypot(i.wishX, i.wishZ);
+        if (wl > 0.5) {
+          b.vel.x = (i.wishX / wl) * PK.precisionSpeed;
+          b.vel.z = (i.wishZ / wl) * PK.precisionSpeed;
+          b.vel.y = PK.precisionJump;
+          b.grounded = false;
+          b.yaw = Math.atan2(i.wishX, i.wishZ);
+          b.emit({ type: 'leap', power: 0.4 });
+          return false;
+        }
+      }
       // Running at a bench / low wall / railing: vault it
       const want = Math.hypot(i.wishX, i.wishZ);
       if (hs >= PK.autoVaultSpeed && want > 0.5) {
@@ -271,12 +285,15 @@ export class ParkourMotor {
     // ── In the air ──
     this.narrow = false;
     const vy = b.vel.y;
+    if (vy < 0) this.landingAssist(dt, b);
     // A lip in front of the hands
     if (this.regrab <= 0 && vy < 3.2) {
       const fw =
         wallAt(w, p.x, p.y + 1.0, p.z, fx, fz, 0.95) ??
         wallAt(w, p.x, p.y + 1.6, p.z, fx, fz, 0.95);
-      if (fw !== null && -(fx * fw.nx + fz * fw.nz) > 0.45) {
+      // Moving fast but glancing along the wall: that's a wall run, not a grab
+      const into = hs > 3 ? -(b.vel.x * (fw?.nx ?? 0) + b.vel.z * (fw?.nz ?? 0)) / hs : 1;
+      if (fw !== null && -(fx * fw.nx + fz * fw.nz) > 0.45 && into > 0.78) {
         const l = findLedge(w, p.x, p.y, p.z, fw.nx, fw.nz);
         if (l !== null) {
           this.startHang(b, l);
@@ -326,8 +343,8 @@ export class ParkourMotor {
       const dz = b.vel.z / hs;
       const sw = sideWall(w, p.x, p.y, p.z, dx, dz, 0.9);
       if (sw !== null && !this.sameWall(sw.nx, sw.nz)) {
-        // Along the wall, not into it
-        if (Math.abs(dx * sw.nx + dz * sw.nz) < 0.7)
+        // Along the wall, not straight into it (wall-to-wall bounces come in steep)
+        if (Math.abs(dx * sw.nx + dz * sw.nz) < 0.8)
           return this.startWallRun(b, sw, dx, dz, hs, false);
       }
     }
@@ -339,6 +356,48 @@ export class ParkourMotor {
     this.flipKind = kind;
     this.flipSide = side;
   }
+
+  /**
+   * Precision assist: coming down onto something narrow (a post, a rail, a
+   * wall top) that the jump would just miss, steer the last half metre so
+   * the feet land on it. Checked a few times a second; never more than a
+   * 2.5 m/s nudge, and only for tops within 0.65 m of the line.
+   */
+  private landingAssist(dt: number, b: PkBody) {
+    this.assistAcc += dt;
+    if (this.assistAcc < 1 / 30) return;
+    this.assistAcc = 0;
+    const p = b.pos;
+    const hs = Math.hypot(b.vel.x, b.vel.z);
+    if (hs < 0.5) return;
+    const dx = b.vel.x / hs;
+    const dz = b.vel.z / hs;
+    // When do we come down to height h (ballistic)?
+    const tAt = (h: number) => {
+      const disc = b.vel.y * b.vel.y - 2 * PK.gravity * (h - p.y);
+      return disc < 0 ? -1 : (b.vel.y + Math.sqrt(disc)) / PK.gravity;
+    };
+    // Around where we'd land on something a little below us
+    const ahead = hs * Math.max(0, tAt(p.y - 0.4));
+    for (const s of [0, -0.35, 0.35, -0.65, 0.65]) {
+      const fx = p.x + dx * (ahead + s);
+      const fz = p.z + dz * (ahead + s);
+      const fy = floorAt(this.w, fx, p.y + 0.05, fz, 1.6);
+      if (fy === null || !narrowUnder(this.w, fx, fy, fz)) continue;
+      const t = tAt(fy);
+      if (t <= 0.05) continue;
+      // Velocity that lands on (fx, fz), nudged at most 2.5 m/s
+      const ex = (fx - p.x) / t - b.vel.x;
+      const ez = (fz - p.z) / t - b.vel.z;
+      const el = Math.hypot(ex, ez);
+      const k = el > 2.5 ? 2.5 / el : 1;
+      b.vel.x += ex * k;
+      b.vel.z += ez * k;
+      return;
+    }
+  }
+
+  private assistAcc = 0;
 
   private sameWall(nx: number, nz: number) {
     const m = this.memoN;

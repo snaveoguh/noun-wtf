@@ -53,6 +53,7 @@ export const KEYBOARD: ControlGroup[] = [
       { keys: ['JUMP', '→ pole'], what: 'lamp posts: slide · A/D swing · SPACE launch' },
       { keys: ['Q'], what: 'sprinting: slide · landing: roll · ledge: drop' },
       { keys: ['RUN', '→ bench'], what: 'vaults on its own' },
+      { keys: ['K'], what: 'NOUN PARKOUR: time-trial routes (on foot)' },
     ],
   },
   {

@@ -339,6 +339,10 @@ export const PK = {
   stumbleHardTime: 1.5,
   autoVaultSpeed: 3.6,
 
+  /** Standing precision jump: horizontal speed (m/s) and take-off (≈ 3.6 m on the level). */
+  precisionSpeed: 4.2,
+  precisionJump: 5.4,
+
   // Gap jumps
   gapCheck: 1.4,
   gapDrop: 2.0,
