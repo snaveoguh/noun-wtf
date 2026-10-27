@@ -14,10 +14,10 @@ import type { PadId } from '../hud/thumbLayout';
 import { useEffect, useRef, useState } from 'react';
 
 import { SprayTouch } from '../graffiti/SprayPanel';
-import { useParkourLabels } from '../parkour/game/ParkourUi';
 import { HudIcon } from '../hud/icons';
 import { sideColumn, thumbPad } from '../hud/thumbLayout';
 import { useViewport } from '../hud/useViewport';
+import { useParkourLabels } from '../parkour/game/ParkourUi';
 
 const R = 56;
 /** The first-run steering hint fades after this (ms). */
