@@ -16,11 +16,18 @@
 //            drives the rig, VanCamera chases it; stats are suspended;
 //   exit     it parks where it stopped.
 // Other riders see your car (net: vh 'car' + cr, see netCar.ts).
+//
+// Riding together (seats.ts): E beside a car someone else is driving puts
+// you in their passenger seat. You ride in their car as other riders see it
+// (its interpolated pose), the chase camera follows it, E gets you out at
+// the next stop. Their client decides who sits where (`ps`), so a seat
+// never holds two; if they get out or go, you're put out beside the car.
+// Open cars show everyone in their seats; closed cars hide them.
 
 import type { InputFrame } from '../core/Input';
 import type { Game } from '../Game';
-import type { LevelData } from '../world/Level';
 import type { CarModel } from './models';
+import type { LevelData } from '../world/Level';
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -50,7 +57,19 @@ import {
   type LanePoint,
 } from './lanes';
 import { poseDoors } from './models';
-import { decodeCar, encodeCar } from './netCar';
+import { decodeCar, encodeCar, encodeCrew, encodeRide, type NetCar } from './netCar';
+import { leaveSeat, poseInSeat } from './seatPose';
+import {
+  assignSeats,
+  freeSeat,
+  passengerSeats,
+  RIDER_SCALE,
+  rideCheck,
+  riderShown,
+  seatRoot,
+  type RideCheck,
+  type SeatAsk,
+} from './seats';
 import { CAR_IDS, CARS, simParams, type CarId, type CarSpec } from './specs';
 
 /** CollisionWorld dynamic-body ids: `car|<n>|`. */
@@ -61,10 +80,10 @@ const EXIT_SPEED = 4;
 const TAKE_SPEED = 7.5;
 /** Traffic further than this from the camera isn't drawn. */
 const DRAW_DIST = 190;
-/** Rider scale in an open car (the Noun's head is big). */
-const SEAT_SCALE = 0.62;
-/** Hip height of the standing rig (m, at scale 1). */
-const HIP = 0.92;
+/** Someone else's car this slow (m/s) or slower can be boarded. */
+const BOARD_SPEED = 8;
+/** A driver silent this long (ms) has gone (a frozen tab, a dropped line): passengers get out. */
+const DRIVER_GONE_MS = 8000;
 
 export interface CarUi {
   driving: boolean;
@@ -87,6 +106,23 @@ export interface CarUi {
   alt: number;
   /** A crash this moment (SMASH!). */
   smash: boolean;
+  /** On foot beside someone else's car with a free seat: E rides along. */
+  nearRide: { driver: string; who: string; car: string } | null;
+  /** In someone's passenger seat. */
+  ride: {
+    who: string;
+    car: string;
+    seat: number;
+    /** Their client hasn't confirmed the seat yet. */
+    pending: boolean;
+    /** E pressed while moving: out at the next stop. */
+    leaving: boolean;
+    flying: boolean;
+  } | null;
+  /** Driving: who's riding with you (names). */
+  crew: string[];
+  /** A one-off line (seat taken, the driver left…). */
+  notice: string;
 }
 
 const IDLE_UI: CarUi = {
@@ -106,6 +142,10 @@ const IDLE_UI: CarUi = {
   canFly: false,
   alt: 0,
   smash: false,
+  nearRide: null,
+  ride: null,
+  crew: [],
+  notice: '',
 };
 
 /** Who built a car's body (shown when you take it / drive it). */
@@ -155,6 +195,20 @@ interface RemoteCar {
   model: CarModel;
   last: THREE.Vector3;
   spin: number;
+  car: NetCar;
+  /** Smoothed velocity (m/s) from the interpolated pose. */
+  vel: THREE.Vector3;
+}
+
+/** Me in someone else's car. */
+interface Ride {
+  driver: string;
+  seat: number;
+  /** Seconds since I asked. */
+  waited: number;
+  status: RideCheck;
+  /** E pressed while it was moving: out once it stops. */
+  leaving: boolean;
 }
 
 const _v = new THREE.Vector3();
@@ -208,8 +262,18 @@ export class CarSystem {
   private started = false;
   private hidden = false;
   private camPos = new THREE.Vector3();
-  private seatScale = 1;
   private gone = false;
+  /** Driving: passengers by seat (seat i+1), '' = empty. */
+  private crew: string[] = [];
+  /** Driving: when each asker was first seen asking (ms). */
+  private askedAt = new Map<string, number>();
+  /** Riding in someone else's car, else null. */
+  private ride: Ride | null = null;
+  /** Remote riders posed in a car last frame (their scale comes back on leaving). */
+  private seated = new Set<string>();
+  private look = { x: 0, y: 0, now: 0 };
+  private notice = '';
+  private noticeT = 0;
 
   constructor(private game: Game) {
     this.ground = new WorldGround(game.world);
@@ -218,6 +282,17 @@ export class CarSystem {
 
   get driving(): boolean {
     return this.driven !== null;
+  }
+
+  /** Driving, or riding in someone's passenger seat (the skater sits out). */
+  get inCar(): boolean {
+    return this.driven !== null || this.ride !== null;
+  }
+
+  /** Riding in someone's passenger seat (tests / dev). */
+  get passenger(): { driver: string; seat: number; status: RideCheck } | null {
+    const r = this.ride;
+    return r === null ? null : { driver: r.driver, seat: r.seat, status: r.status };
   }
 
   /** The car in your hands (tests / dev), else null. */
@@ -520,12 +595,33 @@ export class CarSystem {
    */
   preStep(input: InputFrame): boolean {
     const g = this.game;
-    if (g.hoops.active || g.replay.active || g.showroom) return this.driving;
+    if (g.hoops.active || g.replay.active || g.showroom) return this.inCar;
     const toggle = input.boardTogglePressed || this.toggleQueued;
     this.toggleQueued = false;
+    if (this.ride !== null) {
+      // A passenger: E gets out (at the next stop); nothing else is yours
+      if (toggle) this.askOut();
+      input.boardTogglePressed = false;
+      input.respawnPressed = false;
+      input.jumpPressed = false;
+      input.spray = false;
+      input.tricks.length = 0;
+      input.emotePressed = 0;
+      this.look.x = input.lookX;
+      this.look.y = input.lookY;
+      return this.ride !== null;
+    }
     if (!this.driving) {
       if (toggle) {
-        const t = this.nearestTakeable();
+        // Someone's free seat beats an empty car (each client parks its own
+        // fleet, so the car they took may still sit at the kerb here)
+        const r = this.nearestRide();
+        const t = r === null ? this.nearestTakeable() : null;
+        if (r !== null) {
+          input.boardTogglePressed = false;
+          this.joinRide(r.driver, r.seat);
+          return true;
+        }
         if (t !== null) {
           input.boardTogglePressed = false;
           this.enter(t);
@@ -604,6 +700,222 @@ export class CarSystem {
     return best;
   }
 
+  // ── Riding in someone else's car ──
+
+  /** Someone's car you could ride in with E right now (on foot, beside it, a seat free), or null. */
+  private nearestRide(): { driver: string; seat: number; d: number } | null {
+    const g = this.game;
+    const p = g.player;
+    if (this.inCar || this.hidden || g.hoops.active || g.replay.active || g.showroom) return null;
+    if (g.van2.driving || g.dragon.riding || g.net.myId === '') return null;
+    if (p.climb !== null || p.vault !== null) return null;
+    if (p.mode === 'board' && (p.speed > 6 || p.state !== 'ground')) return null;
+    let best: { driver: string; seat: number; d: number } | null = null;
+    for (const [id, rc] of this.remotes) {
+      const rp = g.net.players.get(id);
+      const crew = rp?.crew ?? null;
+      if (crew === null || rc.car.flying || rc.vel.length() > BOARD_SPEED) continue;
+      const spec = CARS[rc.car.id];
+      const grp = rc.model.group;
+      const yaw = yawOf(grp.quaternion);
+      const dx = p.pos.x - grp.position.x;
+      const dz = p.pos.z - grp.position.z;
+      const c = Math.cos(yaw);
+      const sn = Math.sin(yaw);
+      const lx = dx * c - dz * sn;
+      const lz = dx * sn + dz * c;
+      const geo = spec.geo;
+      if (Math.abs(lx) > geo.width / 2 + 1.5 || Math.abs(lz) > geo.length / 2 + 0.9) continue;
+      if (Math.abs(p.pos.y - grp.position.y) > geo.height + 1.2) continue;
+      // Seats someone else is already asking for count as taken
+      const asking = new Set<number>();
+      for (const [oid, op] of g.net.players)
+        if (oid !== id && op.ride?.driver === id) asking.add(op.ride.seat);
+      const seat = freeSeat(spec.id, crew, asking);
+      if (seat === null) continue;
+      const d = Math.hypot(lx, lz);
+      if (best === null || d < best.d) best = { driver: id, seat, d };
+    }
+    return best;
+  }
+
+  /** Climb into `driver`'s passenger seat (ours once their client lists us). */
+  private joinRide(driver: string, seat: number) {
+    const g = this.game;
+    const p = g.player;
+    if (p.mode === 'board') p.toggleBoard();
+    this.ride = { driver, seat, waited: 0, status: 'pending', leaving: false };
+    g.net.ride = encodeRide({ driver, seat });
+    if (g.me !== null) g.me.board.visible = false;
+    g.stats.suspended = true;
+    const rc = this.remotes.get(driver);
+    if (rc !== undefined) this.camera.snap(yawOf(rc.model.group.quaternion));
+    g.audio.start();
+    this.pushUi();
+  }
+
+  /** E as a passenger: out now if the car's stopped, else at the next stop. */
+  private askOut() {
+    const r = this.ride;
+    if (r === null) return;
+    const rc = this.remotes.get(r.driver);
+    if (r.leaving || rc === undefined || (!rc.car.flying && rc.vel.length() <= EXIT_SPEED))
+      this.leaveRide('');
+    else r.leaving = true;
+    this.pushUi();
+  }
+
+  /** Out of the passenger seat, onto the ground beside the car. */
+  private leaveRide(notice: string) {
+    const g = this.game;
+    const r = this.ride;
+    if (r === null) return;
+    this.ride = null;
+    g.net.ride = null;
+    const rc = this.remotes.get(r.driver);
+    const p = g.player;
+    let spot: THREE.Vector3;
+    let yaw = p.footYaw;
+    if (rc !== undefined) {
+      const grp = rc.model.group;
+      yaw = yawOf(grp.quaternion);
+      const side = (seatRoot(rc.car.id, r.seat)?.[0] ?? -1) >= 0 ? 1 : -1;
+      spot = rc.car.flying
+        ? this.groundUnder(grp.position)
+        : this.exitSpotAt(grp, CARS[rc.car.id], side);
+    } else spot = p.pos.clone();
+    this.placeOnFoot(spot, yaw);
+    if (notice !== '') this.say(notice);
+    this.pushUi();
+  }
+
+  /** The ground straight below a point (flying cars), else the level's floor. */
+  private groundUnder(at: THREE.Vector3): THREE.Vector3 {
+    const hit = this.game.world.raycast(_v.copy(at).setY(at.y + 2), DOWN, 400);
+    const y = hit !== null ? hit.point.y : this.game.player.floorAt(at.x, at.z);
+    return new THREE.Vector3(at.x, y, at.z);
+  }
+
+  /** The rider on foot at `spot` facing `yaw`: a fresh ride, the camera behind. */
+  private placeOnFoot(spot: THREE.Vector3, yaw: number) {
+    const g = this.game;
+    const p = g.player;
+    p.pos.copy(spot);
+    p.vel.set(0, 0, 0);
+    p.footYaw = yaw;
+    p.footGrounded = true;
+    p.fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
+    p.up.copy(UP);
+    p.safePos.copy(spot);
+    p.safeFwd.copy(p.fwd);
+    // A fresh ride for the stats / drop proofs (nothing carried out of the car)
+    p.respawns++;
+    p.run = 0;
+    p.runTime = 0;
+    g.stats.suspended = g.missions.ud.active;
+    if (g.me !== null) {
+      g.me.root.visible = true;
+      leaveSeat(g.me);
+      g.me.root.position.copy(spot);
+      g.me.root.quaternion.setFromAxisAngle(UP, yaw);
+    }
+    g.cam.snap(p);
+  }
+
+  private say(text: string) {
+    this.notice = text;
+    this.noticeT = 2.8;
+  }
+
+  /**
+   * The passenger's frame (after the remote cars moved): check the seat
+   * with the driver, sit in their car, follow it with the camera.
+   */
+  private rideAlong(dt: number) {
+    const g = this.game;
+    const r = this.ride;
+    if (r === null) return;
+    r.waited += dt;
+    const rp = g.net.players.get(r.driver);
+    const rc = this.remotes.get(r.driver);
+    const alive = rp !== undefined && performance.now() - rp.lastSeen < DRIVER_GONE_MS;
+    r.status = rideCheck(
+      g.net.myId,
+      r.seat,
+      alive ? { inCar: rc !== undefined, crew: rp.crew ?? null } : null,
+      r.waited,
+    );
+    const who = rp?.name || 'THE DRIVER';
+    if (r.status === 'gone' || rc === undefined) return this.leaveRide(`${who} GOT OUT`);
+    if (r.status === 'refused') return this.leaveRide('SEAT TAKEN');
+    if (r.leaving && !rc.car.flying && rc.vel.length() <= EXIT_SPEED) return this.leaveRide('');
+    const grp = rc.model.group;
+    const spec = CARS[rc.car.id];
+    // Where I am: the seat (the world streams round it, my name tag rides on the car)
+    const at = seatRoot(spec.id, r.seat) ?? [0, 0, 0];
+    grp.updateMatrixWorld(true);
+    const p = g.player;
+    p.pos.copy(grp.localToWorld(_v.set(at[0], at[1], at[2])));
+    p.vel.copy(rc.vel);
+    const heading = yawOf(grp.quaternion);
+    p.footYaw = heading;
+    g.stats.suspended = true;
+    const me = g.me;
+    if (me !== null) {
+      me.root.visible = riderShown(spec, r.seat);
+      me.play({ clip: 'idle', fade: 0.25 });
+      me.update(dt, { lean: 0, travelled: 0, riding: false });
+      poseInSeat(me, grp, spec.id, r.seat, { driver: false });
+    }
+    this.velV.copy(rc.vel);
+    const fwd = rc.vel.dot(_v2.set(Math.sin(heading), 0, Math.cos(heading)));
+    this.camera.update(
+      dt,
+      grp.position,
+      this.velV,
+      heading,
+      fwd,
+      rc.car.flying ? 'far' : g.cam.mode,
+      this.look.x,
+      this.look.y,
+      performance.now(),
+      g.cam.shakeScale,
+    );
+    g.cam.yaw = this.camera.yaw;
+    g.cam.orbitYaw = 0;
+  }
+
+  /** Driving: give out the seats people are asking for (the driver decides), publish the list. */
+  private seatCrew() {
+    const g = this.game;
+    const t = this.driven;
+    if (t === null || passengerSeats(t.spec.id) === 0) {
+      this.crew = [];
+      this.askedAt.clear();
+      g.net.crew = null;
+      return;
+    }
+    const me = g.net.myId;
+    const now = performance.now();
+    const asks: SeatAsk[] = [];
+    for (const [id, rp] of g.net.players) {
+      const r = rp.ride;
+      if (r === null || r === undefined || r.driver !== me || me === '') {
+        this.askedAt.delete(id);
+        continue;
+      }
+      let since = this.askedAt.get(id);
+      if (since === undefined) {
+        since = now;
+        this.askedAt.set(id, since);
+      }
+      asks.push({ id, seat: r.seat, since });
+    }
+    for (const id of this.askedAt.keys()) if (!g.net.players.has(id)) this.askedAt.delete(id);
+    this.crew = assignSeats(t.spec.id, this.crew, asks);
+    g.net.crew = encodeCrew(this.crew);
+  }
+
   private enter(t: TCar) {
     const g = this.game;
     const p = g.player;
@@ -645,7 +957,7 @@ export class CarSystem {
     this.audio.setCar(t.spec);
     this.audio.start(g.audio.ctx, g.audio.master, g.audio.noise);
     this.seatRider();
-    this.pushUi(true);
+    this.pushUi();
   }
 
   /** Sit the rider in an open car (scaled down), or hide them in a closed one. */
@@ -653,11 +965,8 @@ export class CarSystem {
     const me = this.game.me;
     const t = this.driven;
     if (me === null || t === null) return;
-    // While the doors are opening they're still climbing in: show them
-    const visible = t.spec.open;
-    me.root.visible = visible;
-    this.seatScale = visible ? SEAT_SCALE : 1;
-    me.root.scale.setScalar(this.seatScale);
+    me.root.visible = riderShown(t.spec, 0);
+    me.root.scale.setScalar(RIDER_SCALE);
   }
 
   private exit() {
@@ -685,44 +994,28 @@ export class CarSystem {
     if (t.model.thrusters !== null) t.model.thrusters.visible = false;
     t.doors.openThenClose();
     this.park(t);
-    const p = g.player;
-    const spot = this.exitSpot(t);
-    const yaw = t.yaw;
-    p.pos.copy(spot);
-    p.vel.set(0, 0, 0);
-    p.footYaw = yaw;
-    p.footGrounded = true;
-    p.fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
-    p.up.copy(UP);
-    p.safePos.copy(spot);
-    p.safeFwd.copy(p.fwd);
-    // A fresh ride for the stats / drop proofs (nothing carried out of the car)
-    p.respawns++;
-    p.run = 0;
-    p.runTime = 0;
-    g.stats.suspended = g.missions.ud.active;
-    if (g.me !== null) {
-      g.me.root.visible = true;
-      g.me.root.scale.setScalar(1);
-      g.me.root.position.copy(spot);
-      g.me.root.quaternion.setFromAxisAngle(UP, yaw);
-    }
-    this.seatScale = 1;
-    g.cam.snap(p);
-    this.pushUi(true);
-  }
-
-  /** Beside the driver's door if clear, else the other side, behind, in front, the roof. */
-  private exitSpot(t: TCar): THREE.Vector3 {
-    const w = this.game.world;
-    const g = t.spec.geo;
+    // Passengers see the car parked (no `ps`) and climb out themselves
+    this.crew = [];
+    this.askedAt.clear();
+    g.net.crew = null;
     const grp = t.model.group;
     grp.position.copy(t.pos);
     grp.quaternion.setFromAxisAngle(UP, t.yaw);
+    this.placeOnFoot(this.exitSpotAt(grp, t.spec, 1), t.yaw);
+    this.pushUi();
+  }
+
+  /**
+   * Beside the door on `side` (+1 the car's left, the driver's) if clear,
+   * else the other side, behind, in front, the roof.
+   */
+  private exitSpotAt(grp: THREE.Object3D, spec: CarSpec, side: number): THREE.Vector3 {
+    const w = this.game.world;
+    const g = spec.geo;
     grp.updateMatrixWorld(true);
     const spots: [number, number, number][] = [
-      [g.width / 2 + 0.75, 0, g.seat[2]],
-      [-(g.width / 2 + 0.75), 0, g.seat[2]],
+      [side * (g.width / 2 + 0.75), 0, g.seat[2]],
+      [-side * (g.width / 2 + 0.75), 0, g.seat[2]],
       [0, 0, -g.length / 2 - 1],
       [0, 0, g.length / 2 + 1],
     ];
@@ -890,13 +1183,10 @@ export class CarSystem {
     const me = g.me;
     if (me !== null) {
       if (me.root.visible) {
-        const seat = t.spec.geo.seat;
-        grp.localToWorld(_v.set(seat[0], seat[1] - HIP * this.seatScale, seat[2]));
-        me.root.position.copy(_v);
         me.play({ clip: 'idle', fade: 0.25 });
         me.update(dt, { lean: 0, travelled: 0, riding: false });
-      } else me.root.position.copy(this.origin);
-      me.root.quaternion.copy(grp.quaternion);
+      }
+      poseInSeat(me, grp, t.spec.id, 0, { driver: true, steer: -c.steer });
     }
     g.stats.suspended = true;
 
@@ -1069,11 +1359,17 @@ export class CarSystem {
       }
       this.updateHoppers(dt);
     }
+    this.seatCrew();
     this.updateRemotes(dt);
+    this.rideAlong(dt);
+    if (this.noticeT > 0) {
+      this.noticeT -= dt;
+      if (this.noticeT <= 0) this.notice = '';
+    }
     this.uiAcc += dt;
-    if (this.driving) {
-      if (this.uiAcc >= 1 / 12) this.pushUi(false);
-    } else if (this.uiAcc >= 1 / 8) this.pushUi(false);
+    if (this.inCar) {
+      if (this.uiAcc >= 1 / 12) this.pushUi();
+    } else if (this.uiAcc >= 1 / 8) this.pushUi();
   }
 
   private setHidden(h: boolean) {
@@ -1088,12 +1384,33 @@ export class CarSystem {
     if (!h) for (const t of this.fleet) if (t.mode !== 'driven') this.setCollider(t, true);
   }
 
-  private pushUi(force: boolean) {
+  private pushUi() {
     this.uiAcc = 0;
     const t = this.driven;
     const sim = this.sim;
+    const notice = this.notice;
+    const name = (id: string) => this.game.net.players.get(id)?.name || 'NOUN';
+    const r = this.ride;
+    if (r !== null) {
+      const rc = this.remotes.get(r.driver);
+      this.setUi({
+        ...IDLE_UI,
+        notice,
+        kmh: rc !== undefined ? Math.round(rc.vel.length() * 3.6) : 0,
+        ride: {
+          who: name(r.driver),
+          car: rc !== undefined ? CARS[rc.car.id].name : '',
+          seat: r.seat,
+          pending: r.status === 'pending',
+          leaving: r.leaving,
+          flying: rc?.car.flying === true,
+        },
+      });
+      return;
+    }
     if (t === null || sim === null) {
-      const n = this.nearestTakeable();
+      const nr = this.nearestRide();
+      const n = nr === null ? this.nearestTakeable() : null;
       const near =
         n === null
           ? null
@@ -1103,8 +1420,12 @@ export class CarSystem {
               tagline: n.spec.tagline,
               credit: carCredit(n.spec),
             };
-      if (force || near?.id !== this.ui.near?.id || this.ui.driving)
-        this.setUi({ ...IDLE_UI, near });
+      const rc = nr !== null ? this.remotes.get(nr.driver) : undefined;
+      const nearRide =
+        nr === null || rc === undefined
+          ? null
+          : { driver: nr.driver, who: name(nr.driver), car: CARS[rc.car.id].name };
+      this.setUi({ ...IDLE_UI, near, nearRide, notice });
       return;
     }
     const f = this.flight;
@@ -1135,6 +1456,10 @@ export class CarSystem {
         !flying && fl !== undefined && canLiftOff(fl, Math.abs(sim.forwardSpeed), sim.grounded),
       alt: flying ? Math.max(0, Math.round(f.y - this.flightGround(f.x, f.z, f.y))) : 0,
       smash: this.smashT > 0,
+      nearRide: null,
+      ride: null,
+      crew: this.crew.filter(x => x !== '').map(name),
+      notice,
     });
   }
 
@@ -1156,7 +1481,12 @@ export class CarSystem {
       u.flying === next.flying &&
       u.canFly === next.canFly &&
       u.alt === next.alt &&
-      u.smash === next.smash
+      u.smash === next.smash &&
+      u.nearRide?.driver === next.nearRide?.driver &&
+      u.nearRide?.who === next.nearRide?.who &&
+      JSON.stringify(u.ride) === JSON.stringify(next.ride) &&
+      u.crew.join('\n') === next.crew.join('\n') &&
+      u.notice === next.notice
     )
       return;
     this.ui = next;
@@ -1168,6 +1498,7 @@ export class CarSystem {
   private updateRemotes(dt: number) {
     const g = this.game;
     const hideAll = g.missions.ud.active;
+    const seatedNow = new Set<string>();
     for (const [id, rp] of g.net.players) {
       const c = rp.current;
       const nc = c.vehicle === 'car' ? decodeCar(c.car) : null;
@@ -1185,14 +1516,28 @@ export class CarSystem {
         if (nc === null || hideAll) continue;
       }
       if (rc === undefined) {
-        rc = { key, model: this.takeRemote(nc.id, nc.paint), last: c.pos.clone(), spin: 0 };
+        rc = {
+          key,
+          model: this.takeRemote(nc.id, nc.paint),
+          last: c.pos.clone(),
+          spin: 0,
+          car: nc,
+          vel: new THREE.Vector3(),
+        };
         this.remotes.set(id, rc);
       }
+      rc.car = nc;
       const m = rc.model;
       const grp = m.group;
       grp.position.copy(c.pos);
       grp.quaternion.copy(c.quat);
+      grp.updateMatrixWorld(true);
       const moved = rc.last.distanceTo(c.pos);
+      if (dt > 0) {
+        _v.copy(c.pos).sub(rc.last).divideScalar(dt);
+        // a teleport (respawn, a new car) isn't speed
+        if (_v.lengthSq() < 150 * 150) rc.vel.lerp(_v, 1 - Math.exp(-8 * dt));
+      }
       rc.last.copy(c.pos);
       rc.spin = (rc.spin + moved / m.spec.geo.wheelR) % (Math.PI * 2);
       poseWheelsFlat(m, nc.flying ? 1 : 0);
@@ -1202,9 +1547,52 @@ export class CarSystem {
         m.thrusters.scale.set(1, 1, nc.boosting ? 1.3 : 0.8);
       }
       poseDoors(m, nc.doorsOpen ? DOOR_OPEN[m.spec.doors] : 0);
-      void dt;
-      if (r !== undefined) r.character.root.visible = false;
+      // The driver: in the seat in an open car, hidden in a closed one
+      if (r !== undefined) {
+        const shown = riderShown(m.spec, 0);
+        r.character.root.visible = shown;
+        if (shown) {
+          poseInSeat(r.character, grp, m.spec.id, 0, { driver: true });
+          seatedNow.add(id);
+        }
+      }
     }
+    // Passengers, in whichever car their driver's list puts them
+    for (const [id, rp] of g.net.players) {
+      const ride = rp.ride;
+      const r = g.remotes.get(id);
+      if (ride === null || ride === undefined || r === undefined || hideAll) continue;
+      let car: THREE.Object3D | null = null;
+      let spec: CarSpec | null = null;
+      if (ride.driver === g.net.myId && this.driven !== null) {
+        if (this.crew[ride.seat - 1] === id) {
+          car = this.driven.model.group;
+          spec = this.driven.spec;
+        }
+      } else {
+        const rc = this.remotes.get(ride.driver);
+        const crew = g.net.players.get(ride.driver)?.crew;
+        if (rc !== undefined && crew?.[ride.seat - 1] === id) {
+          car = rc.model.group;
+          spec = rc.model.spec;
+        }
+      }
+      if (car === null || spec === null) continue;
+      r.character.root.visible = riderShown(spec, ride.seat);
+      poseInSeat(r.character, car, spec.id, ride.seat, { driver: false });
+      seatedNow.add(id);
+    }
+    // Out of a seat: full size again
+    for (const id of this.seated) {
+      if (seatedNow.has(id)) continue;
+      const r = g.remotes.get(id);
+      if (r === undefined) continue;
+      leaveSeat(r.character);
+      // (a closed car hid them; the van hides its own driver)
+      r.character.root.visible =
+        !hideAll && g.net.players.get(id)?.current.vehicle !== 'van' && !this.remotes.has(id);
+    }
+    this.seated = seatedNow;
     for (const [id, rc] of this.remotes) {
       if (g.net.players.has(id)) continue;
       this.releaseRemote(rc);
@@ -1248,6 +1636,9 @@ export class CarSystem {
     this.hoppers.length = 0;
     for (const rc of this.remotes.values()) g.gfx.scene.remove(rc.model.group);
     this.remotes.clear();
+    this.ride = null;
+    g.net.ride = null;
+    g.net.crew = null;
     this.uiListeners.clear();
   }
 }
@@ -1259,6 +1650,12 @@ function carsOn(): boolean {
   } catch {
     return true;
   }
+}
+
+/** Heading (rad, 0 = +Z) of an orientation. */
+function yawOf(q: THREE.Quaternion): number {
+  _v2.set(0, 0, 1).applyQuaternion(q);
+  return Math.atan2(_v2.x, _v2.z);
 }
 
 /** Wheels turned flat under the body (ROADSTAR in hover), 0..1. */

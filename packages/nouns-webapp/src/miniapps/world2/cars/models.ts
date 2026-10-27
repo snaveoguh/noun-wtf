@@ -272,7 +272,8 @@ function roadstar(s: CarSpec, P: number): Built {
   k.box(DARK, [1.56, 0.06, 1.35], [0, 0.82, -0.2]);
   for (const x of [-0.36, 0.36]) {
     k.box(DARK, [0.48, 0.12, 0.5], [x, 0.84, -0.4]);
-    k.box(DARK, [0.48, 0.48, 0.14], [x, 1.02, -0.68], { rot: [-0.18, 0, 0], topX: 0.8 });
+    // low backs, so the chase camera sees the riders' shoulders over them
+    k.box(DARK, [0.48, 0.32, 0.14], [x, 0.95, -0.66], { rot: [-0.18, 0, 0], topX: 0.8 });
   }
   k.box(GLASS, [1.56, 0.44, 0.06], [0, 1.0, 0.5], { rot: [-1.0, 0, 0], topX: 0.82 });
   k.box(DARK, [1.62, 0.3, 0.26], [0, 1.0, -0.92], { topX: 0.82 });

@@ -323,6 +323,7 @@ export class VanDrive implements VanDriveApi {
     const p = g.player;
     if (grp === null || this.driving || g.hoops.active || g.replay.active || g.showroom)
       return false;
+    if (g.cars.inCar) return false;
     if (p.climb !== null || p.vault !== null) return false;
     if (p.mode === 'board' && (p.speed > 6 || p.state !== 'ground')) return false;
     for (const side of [-1, 1]) {
