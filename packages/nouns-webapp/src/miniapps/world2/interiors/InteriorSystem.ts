@@ -1916,7 +1916,7 @@ export class InteriorSystem implements InteriorsApi {
     const merged = mergeGeometries(parts, false);
     for (const c of parts) c.dispose();
     if (merged === null) {
-      console.warn('[interiors] could not merge the floors\' collision');
+      console.warn("[interiors] could not merge the floors' collision");
       return;
     }
     this.game.world.setDynamic('interior', merged, L.origin);
