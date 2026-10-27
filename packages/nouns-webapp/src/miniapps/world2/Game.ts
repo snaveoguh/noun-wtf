@@ -46,6 +46,7 @@ import { HideSeekMode } from './hideseek/net/HideSeekMode';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
 import { InteriorSystem } from './interiors/InteriorSystem';
+import { encodeRoom, sameSpace } from './interiors/roomNet';
 import { MissionSystem } from './missions/MissionSystem';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
@@ -219,6 +220,8 @@ interface RemoteAvatar {
   pointer: HTMLDivElement | null;
   seedKey: string;
   lastPos: THREE.Vector3;
+  /** Hidden for being somewhere else (in a room I'm not in, or the street while I'm inside). */
+  apart?: boolean;
 }
 
 export interface GameOptions {
@@ -1908,6 +1911,8 @@ export class Game {
     // Share my voice tag only while sharing recordings is on
     this.net.voiceTag = settings.get().shareRecordings ? (myTag() ?? '') : '';
     this.net.ownChat = this.voices.sharesOwnChat();
+    const room = this.interiors.roomKey();
+    this.net.room = room === null ? null : encodeRoom(room);
     const me = this.me;
     if (me) {
       const pose: NetPose = {
@@ -1951,6 +1956,12 @@ export class Game {
       if (!r) continue;
       const c = rp.current;
       const ch = r.character;
+      // Only riders where I am are drawn: the street, or the same room and
+      // floor (still posed while hidden: a window's view shows the street)
+      const apart = !sameSpace(room, rp.room ?? null);
+      if (apart) ch.root.visible = false;
+      else if (r.apart === true) ch.root.visible = true;
+      r.apart = apart;
       ch.root.position.copy(c.pos);
       ch.root.quaternion.copy(c.quat);
       ch.board.visible = c.mode === 'board';
@@ -1969,10 +1980,16 @@ export class Game {
       });
       this.parkour.remote(id, ch, c.pk, dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
+      this.interiors.poseRemote(id, ch, rp.room ?? null, dt);
       // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
       const show = this.hideseek.labelFor(id);
-      if (r.label) {
-        const v = c.pos
+      if (apart) {
+        if (r.label) r.label.style.display = 'none';
+        if (r.pointer) r.pointer.style.display = 'none';
+      } else if (r.label) {
+        // Indoors the street's tags go (data-away) but a room-mate's stays
+        r.label.toggleAttribute('data-room', room !== null);
+        const v = ch.root.position
           .clone()
           .add(new THREE.Vector3(0, 2.05, 0))
           .project(cam);

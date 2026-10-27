@@ -233,6 +233,10 @@ A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews 
 - `net/` `PoolMode` (Game hook, owns the frame while `active`), `PoolUi` (menu, HUD: drag to aim, pull the power bar, spin ball), lockstep sync (`session.ts`: only shots travel, every client plays them with the same sim, the host judges and sends the rounded state), `pool:*` relayed by `packages/nouns-party/src/poolRelay.ts` (online play needs the worker redeployed; an old worker drops `pool:*`, so VS CPU still works).
 - Gamepad: stick aims, RT pull-and-release, right stick spin, RB + stick ball in hand. Wins add respect.
 
+### Seeing each other indoors
+
+A room is built 4 km over its door (`POCKET_Y`, origin `(door.x, POCKET_Y, door.z)`), the same on every client, so positions inside are already a shared frame. The pose blob carries `in: [doorId, level, seat]` only while inside (`interiors/roomNet.ts`). `Game.updateNetwork` draws only riders in the same space (`sameSpace`): street riders in the street, and riders in the same room and on the same floor indoors, with their name tags (`data-room` gets past `[data-away]`). A seated rider is put on their seat by `InteriorSystem.poseRemote`. A window's view of the street shows only street riders. Older clients ignore `in`, so they still draw indoor riders 4 km up. No worker change is needed.
+
 ### Respect
 
 One score for how you act (`world2/respect/`, contract in `interiors/contract.ts` `RespectApi`, on `game.respect`). Rules in `respect/rules.ts` (pure, shared with `netlify/functions/world-respect.ts`): gifts, eating/thanks, buying local, helping, clean big combos, graffiti pieces, serving, hoops/break wins up; stealing, bailing into people, tagging homes, refusing food, overstaying down. Per-kind rate limits + ±minute caps; tiers outcast / stranger / local (50) / regular (200) / legend (600) with hysteresis; slow drift above the tier floor. The client sends events only; the server re-scores them (Blobs store `noun-world-respect`). HUD meter top-right, tier banners, legend noggles badge on name labels.

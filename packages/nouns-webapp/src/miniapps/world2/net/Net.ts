@@ -29,6 +29,9 @@
 // Riding together (cars/seats.ts, cars/netCar.ts): `rd: [driverId, seat]`
 // while the rider asks for / sits in someone's passenger seat; `ps`, the
 // driver's passenger list by seat, while they drive a car with seats.
+// Indoors (interiors/roomNet.ts): `in: [doorId, level, seat]` only while
+// inside a building, so riders are drawn in the room they're in and not in
+// the street (a room's positions are already a frame every client shares).
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -47,6 +50,7 @@ import { decodeCrew, decodeRide, type NetRide } from '../cars/netCar';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
 import { OUTFIT_KEY_RE } from '../character/outfit';
+import { decodeRoom, type RoomKey, type RoomWire } from '../interiors/roomNet';
 
 import { Voice } from './Voice';
 
@@ -148,6 +152,8 @@ export interface RemotePlayer {
   ride?: NetRide | null;
   /** Driving: their passenger list by seat (`ps`), null when they don't send one. */
   crew?: string[] | null;
+  /** Inside a building (`in`): which room, floor and seat; null = in the street. */
+  room?: RoomKey | null;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -227,6 +233,8 @@ export class Net {
   ride: [string, number] | null = null;
   /** My passenger list while driving a car with seats, relayed as `ps`. */
   crew: string[] | null = null;
+  /** The room I'm in (interiors/roomNet.ts), relayed as `in` while inside. */
+  room: RoomWire | null = null;
 
   connect() {
     if (this.ws) return;
@@ -403,6 +411,7 @@ export class Net {
     rp.outfit = parseOutfitKey(blob.of);
     rp.ride = decodeRide(blob.rd);
     rp.crew = decodeCrew(blob.ps);
+    rp.room = decodeRoom(blob.in);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -495,6 +504,7 @@ export class Net {
       ...(this.outfit !== '' ? { of: this.outfit } : {}),
       ...(this.ride !== null ? { rd: this.ride } : {}),
       ...(this.crew !== null ? { ps: this.crew } : {}),
+      ...(this.room !== null ? { in: this.room } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',
