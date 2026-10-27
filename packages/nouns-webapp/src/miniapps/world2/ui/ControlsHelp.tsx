@@ -69,6 +69,7 @@ export const KEYBOARD: ControlGroup[] = [
     title: 'PLACES',
     lines: [
       { keys: ['E', 'cab'], what: 'drive the ice cream van (H horn, SHIFT boost)' },
+      { keys: ['E', 'car'], what: 'take any parked car (X: fly / hop / stomp)' },
       { keys: ['E', 'decks'], what: 'van DJ decks: queue a track' },
       { keys: ['E', 'cypher'], what: 'breakdance battle (plaza)' },
       { keys: ['E', 'court'], what: 'hoops (Noun Jersey)' },

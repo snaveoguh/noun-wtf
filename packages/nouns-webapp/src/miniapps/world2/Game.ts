@@ -36,6 +36,7 @@ import {
 } from './character/NounCharacter';
 import { encodeOutfit, type Outfit } from './character/outfit';
 import { Input, type InputFrame } from './core/Input';
+import { CarSystem } from './cars/Cars';
 import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
@@ -331,6 +332,8 @@ export class Game {
   readonly van2: VanDrive;
   /** The Noun dragon (dragon/): bought at the Dragon Roost, called with Z, flown. */
   readonly dragon: DragonRide;
+  /** The cars (cars/): kerbside fleet + slow traffic on the ring road; E takes one. */
+  readonly cars: CarSystem;
   /** RESPECT (respect/): the score, tiers, persistence; the hooks report the street's events. */
   readonly respect: RespectSystem;
   readonly respectHooks: RespectHooks;
@@ -391,6 +394,7 @@ export class Game {
     this.cam = new SkateCamera(this.gfx.camera, this.world);
     this.van2 = new VanDrive(this);
     this.dragon = new DragonRide(this);
+    this.cars = new CarSystem(this);
     this.gfx.scene.add(this.particles.group);
     inkExcluded.add(this.particles.group);
     this.hud = {
@@ -487,12 +491,14 @@ export class Game {
         }
       });
     }
+    this.cars.stripBaked(level);
     this.world.build(level.collisionMeshes);
     this.player.softBounds = level.softBounds ?? Infinity;
     if (level.mountain !== undefined) this.buildMountain(level);
     const fountain = level.spawns.find(s => /fountain/i.test(s.name ?? ''));
     if (fountain) this.player.homeSpots.push({ pos: fountain.position.clone(), yaw: fountain.yaw });
     this.placeIceCreamVan(level);
+    this.cars.start(level);
     this.rails.load(level.rails);
     this.placeMegaRamp(level);
     this.graffiti = new Graffiti(
@@ -939,7 +945,8 @@ export class Game {
     this.cutscene.tick();
     const input = this.input.poll(now);
     // Driving the ice cream van: E / R / spray are the van's this frame
-    const driving = this.van2.preStep(input) || this.dragon.preStep(input);
+    const driving =
+      this.van2.preStep(input) || this.cars.preStep(input) || this.dragon.preStep(input);
     // On foot (and on walls) the mouse is a free cursor for painting
     this.input.freeCursor = !driving && this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
@@ -973,6 +980,7 @@ export class Game {
     }
 
     if (this.van2.driving) this.van2.drive(dt, input, now);
+    else if (this.cars.driving) this.cars.drive(dt, input, now);
     else if (this.dragon.riding) this.dragon.fly(dt, input, now);
     else {
       this.cam.update(dt, this.player, input.lookX, input.lookY, now);
@@ -982,13 +990,18 @@ export class Game {
     {
       const p = this.player;
       const riding =
-        p.mode === 'board' && p.state !== 'bail' && !this.van2.driving && !this.dragon.riding;
+        p.mode === 'board' &&
+        p.state !== 'bail' &&
+        !this.van2.driving &&
+        !this.cars.driving &&
+        !this.dragon.riding;
       this.rider.tick(dt, p.speed, riding);
     }
     this.updateFm(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
     this.van2.update(dt);
+    this.cars.update(dt);
     this.dragon.update(dt);
     // On the Big Drop the world you left waits: nothing down there streams
     // or triggers round a rider who's somewhere else entirely
@@ -1049,6 +1062,7 @@ export class Game {
     this.updateFm(dt);
     this.updateNetwork(dt);
     this.van2.update(wdt);
+    this.cars.update(wdt);
     const away = this.missions.ud.active || this.interiors.inside;
     if (!away) this.crew?.update(wdt, this.player.pos);
     this.missions.update(wdt);
@@ -1578,7 +1592,7 @@ export class Game {
   } {
     const p = this.player;
     // In the saddle: sat still (the rig has no seated clip; idle beats legs sprinting in the air)
-    if (this.dragon.riding) return { clip: 'idle', fade: 0.3 };
+    if (this.dragon.riding || this.cars.driving) return { clip: 'idle', fade: 0.3 };
     if (p.climb !== null) {
       // No climb clip in the rig: the walk cycle's legs read as stepping up
       // the wall; NounCharacter overrides the arms into an overhead reach.
@@ -1864,7 +1878,14 @@ export class Game {
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
         weight: this.weight,
-        vehicle: this.van2.driving ? 'van' : this.dragon.riding ? 'dragon' : undefined,
+        vehicle: this.van2.driving
+          ? 'van'
+          : this.cars.driving
+            ? 'car'
+            : this.dragon.riding
+              ? 'dragon'
+              : undefined,
+        car: this.cars.netKey,
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
@@ -2259,6 +2280,7 @@ export class Game {
     this.freestyle.dispose();
     this.hideseek.dispose();
     this.van2.dispose();
+    this.cars.dispose();
     this.dragon.dispose();
     this.stats.dispose();
     this.drops?.dispose();

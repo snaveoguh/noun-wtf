@@ -67,13 +67,15 @@ export interface NetPose {
    * dragon itself is placed from those, see dragon/mesh.ts).
    */
   vehicle?: Vehicle;
+  /** Driving a car (cars/netCar.ts): its id + flags, e.g. "toro.2.0". */
+  car?: string;
 }
 
-export type Vehicle = 'van' | 'dragon';
+export type Vehicle = 'van' | 'dragon' | 'car';
 
 /** A blob's `vh` → the vehicle (anything else, or nothing: on foot / board). */
 export function parseVehicle(v: unknown): Vehicle | undefined {
-  return v === 'van' || v === 'dragon' ? v : undefined;
+  return v === 'van' || v === 'dragon' || v === 'car' ? v : undefined;
 }
 
 /** Callout events by their wire code (co[1]). */
@@ -332,6 +334,7 @@ export class Net {
     pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.vehicle = parseVehicle(blob.vh);
+    if (typeof blob.cr === 'string') pose.car = blob.cr.slice(0, 20);
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     const co = parseCallout(blob.co);
     const cv = parseChatVoice(blob.cv);
@@ -421,6 +424,7 @@ export class Net {
       c.name = b.pose.name;
       c.seedKey = b.pose.seedKey;
       c.vehicle = b.pose.vehicle;
+      c.car = b.pose.car;
     }
     void dt;
   }
@@ -452,6 +456,7 @@ export class Net {
       // Only while riding, so older clients' blobs are unchanged otherwise
       // (an older client reads 'dragon' as nothing: the rider, no dragon)
       ...(pose.vehicle !== undefined ? { vh: pose.vehicle } : {}),
+      ...(pose.car !== undefined ? { cr: pose.car } : {}),
       // Voice Booth (see the header): only when set
       ...(this.voiceTag !== '' ? { vo: this.voiceTag } : {}),
       ...(this.callout !== null ? { co: this.callout } : {}),
