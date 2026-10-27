@@ -88,3 +88,26 @@ export async function inParallel<T>(
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, jobs.length)) }, lane));
 }
+
+/**
+ * Run `job` until it gives a value (not null), at most `tries` times, with
+ * `wait(attempt)` between goes. A throw counts as a miss. Null if every go
+ * missed. A store batch that hit a cold or busy function used to be dropped
+ * here, and its walls stayed bare until someone sprayed them.
+ */
+export async function retry<T>(
+  job: () => Promise<T | null>,
+  tries: number,
+  wait: (attempt: number) => Promise<void>,
+): Promise<T | null> {
+  for (let n = 0; n < tries; n++) {
+    if (n > 0) await wait(n - 1);
+    try {
+      const v = await job();
+      if (v !== null) return v;
+    } catch {
+      // a miss: go again
+    }
+  }
+  return null;
+}
