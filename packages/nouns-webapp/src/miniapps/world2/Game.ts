@@ -25,6 +25,7 @@ import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
 import { FreestyleMode } from './breakdance/freestyle/FreestyleMode';
 import { BreakMode } from './breakdance/net/BreakMode';
+import { CarSystem } from './cars/Cars';
 import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
 import {
@@ -36,14 +37,13 @@ import {
 } from './character/NounCharacter';
 import { encodeOutfit, type Outfit } from './character/outfit';
 import { Input, type InputFrame } from './core/Input';
-import { CarSystem } from './cars/Cars';
 import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
-import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HideSeekMode } from './hideseek/net/HideSeekMode';
+import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
 import { InteriorSystem } from './interiors/InteriorSystem';
 import { MissionSystem } from './missions/MissionSystem';
@@ -512,6 +512,7 @@ export class Game {
           },
     );
     this.gfx.scene.add(this.graffiti.group);
+    this.graffiti.near = () => this.player.pos;
     this.graffiti.onStroke = (plane, at) => this.respectHooks.stroke(plane, at);
     if (this.drops !== null) this.gfx.scene.add(this.drops.group);
     // Paint is decals on walls: the normals pass would draw each canvas as a

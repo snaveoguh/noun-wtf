@@ -24,6 +24,7 @@ import type { CollisionWorld } from '../physics/Collision';
 import * as THREE from 'three';
 
 import { type DrawItem, SprayHistory, WallLog, type Outgoing } from './history';
+import { inParallel, nearestFirst } from './loadOrder';
 import { postTag, type QueuedTag, StoreQueue } from './storeQueue';
 import {
   CELL_H_MM,
@@ -93,6 +94,8 @@ const INDEX_BUCKETS = 8;
 const RANGE = 7;
 const STORE_URL = '/.netlify/functions/world-graffiti';
 const STORE_BATCH = 40;
+/** Store batches in flight at once while loading. */
+const STORE_PARALLEL = 4;
 const PREFS_KEY = 'w2-spray-v1';
 const OFFLINE_KEY = 'w2-graffiti-offline';
 const OFFLINE_MAX_CHARS = 1_500_000;
@@ -357,6 +360,8 @@ export class Graffiti {
   /** Permanent-store load; PartyKit's index waits for it. */
   private stored: Promise<void> | null = null;
   private storedDone = false;
+  /** Where the rider is (Game sets it): stored walls load nearest-first. */
+  near: (() => { x: number; y: number; z: number } | null) | null = null;
   private readonly startedAt = Date.now();
   private hiss: { gain: GainNode } | null = null;
   private tierCaps: number[];
@@ -620,13 +625,17 @@ export class Graffiti {
       if (!res.ok) return;
       const { walls } = (await res.json()) as { walls: string[] };
       for (const id of walls) this.indexed.add(id);
-      for (let i = 0; i < walls.length; i += STORE_BATCH) {
-        const ids = JSON.stringify(walls.slice(i, i + STORE_BATCH));
+      // The walls round the rider first, a few batches at once (loadOrder.ts)
+      const order = nearestFirst(walls, this.near?.() ?? null, CELL_W, CELL_H);
+      const batches: string[][] = [];
+      for (let i = 0; i < order.length; i += STORE_BATCH)
+        batches.push(order.slice(i, i + STORE_BATCH));
+      await inParallel(batches, STORE_PARALLEL, async batch => {
         const r = await fetch(
-          `${STORE_URL}?level=${this.levelKey}&ids=${encodeURIComponent(ids)}`,
+          `${STORE_URL}?level=${this.levelKey}&ids=${encodeURIComponent(JSON.stringify(batch))}`,
           { cache: 'no-store' },
         );
-        if (!r.ok) continue;
+        if (!r.ok) return;
         const got = (await r.json()) as { walls: Record<string, string[]> };
         for (const [id, tags] of Object.entries(got.walls))
           this.paintTags(
@@ -634,7 +643,7 @@ export class Graffiti {
             tags.map(d => ({ imageData: d })),
             false,
           );
-      }
+      });
     } catch {
       // Offline or the function is down: PartyKit still has recent tags
     }

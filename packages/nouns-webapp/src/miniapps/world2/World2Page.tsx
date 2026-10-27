@@ -10,6 +10,8 @@ import { BeatsScreen } from './audio/BeatsScreen';
 import { bindUiSounds } from './audio/sfx/uiSounds';
 import { FreestyleUi } from './breakdance/freestyle/FreestyleUi';
 import { BreakUi, useBreakActive } from './breakdance/net/BreakUi';
+import { CarHud } from './cars/CarHud';
+import { useCarDriving } from './cars/useCars';
 import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppearance';
 import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
@@ -37,8 +39,6 @@ import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/C
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
-import { CarHud } from './cars/CarHud';
-import { useCarDriving } from './cars/useCars';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
 import { worldPause } from './worldPause';
@@ -71,6 +71,12 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   }, [game]);
   // title → select (character select over the live showroom) → play
   const [phase, setPhase] = useState<'title' | 'select' | 'play'>('title');
+  // Character select: the music screens (NOUN BEATS, the site's NOUN FM) sat
+  // over its fields on phones. Hidden, not unmounted, so the music plays on
+  useEffect(() => {
+    document.body.toggleAttribute('data-w2select', phase === 'select');
+    return () => document.body.removeAttribute('data-w2select');
+  }, [phase]);
   const started = phase === 'play';
   const saved = useMemo(() => loadSavedCharacter(), []);
   const [error, setError] = useState<string | null>(null);
@@ -557,6 +563,7 @@ const CSS = `
 .w2-bailed{color:#ff4d3d;text-shadow:0 3px 0 #6a0f06}
 @keyframes w2bank{0%{transform:scale(.6);opacity:0}10%{transform:scale(1.1);opacity:1}20%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-20px)}}
 .w2-nowplaying{display:flex;flex-direction:column;align-items:center;gap:2px;background:#ffd400;color:#000;padding:8px 18px;transform-origin:center;box-shadow:6px 6px 0 #d22209;font-family:system-ui,sans-serif;animation:w2np 4.5s ease-out forwards}.w2-nowplaying span{font-size:10px;letter-spacing:.2em}.w2-nowplaying b{font-size:18px;font-style:italic}.w2-np-stations{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;margin-top:2px}.w2-np-stations i{font-style:normal;opacity:.55}.w2-np-stations i.w2-np-cur{opacity:1;font-weight:800;text-decoration:underline}@keyframes w2np{0%{opacity:0;transform:translate(-50%,-20px) rotate(-3deg)}8%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}85%{opacity:1}100%{opacity:0}}
+body[data-w2select] [data-beats="screen"],body[data-w2select] [data-nounfm]{visibility:hidden!important;pointer-events:none!important}
 .w2-nametag{position:absolute;left:0;top:0;text-align:center;font-family:system-ui,sans-serif;font-size:12px;white-space:nowrap}
 .w2-nametag span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .w2-panel{background:rgba(10,12,20,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;font-family:system-ui,sans-serif;white-space:normal;box-shadow:0 12px 40px rgba(0,0,0,.45)}
