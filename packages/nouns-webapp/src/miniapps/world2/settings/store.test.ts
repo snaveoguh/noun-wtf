@@ -157,7 +157,7 @@ describe('HUD stylesheet', () => {
     s.hudScale = 1.25;
     const css = hudCss(s);
     expect(css).toContain('[data-w2hud="speed"]{display:none!important}');
-    expect(css).toContain('.w2-minimap{display:none!important}');
+    expect(css).toContain('.w2-minimap,.w2h-void{display:none!important}');
     expect(css).toContain(':not([data-w2cog])');
     expect(css).toContain('.w2-nametag>span');
     expect(css).toContain('.w2-speedlines{display:none!important}');
