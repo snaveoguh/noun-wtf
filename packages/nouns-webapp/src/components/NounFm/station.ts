@@ -29,8 +29,6 @@ export interface FmJingle {
 
 /** A video or podcast after roughly this many songs. */
 export const TALK_EVERY = 8;
-/** Every Nth break is a full jingle; the rest are stings. */
-export const FULL_JINGLE_EVERY = 4;
 /** Ids remembered (per listener) so the shuffle doesn't repeat itself. */
 export const RECENT_MAX = 400;
 
@@ -103,16 +101,18 @@ export function afterPlay(s: PickState, item: FmItem): PickState {
   };
 }
 
-/** The jingle for break number `n` (0-based): a sting, or the full cut every Nth break. */
+/**
+ * The jingle for a break: the full interlude between songs (they're only
+ * 10-18 s; the 4 s stings cut them off mid-phrase), the sting on a skip.
+ */
 export function jingleFor(
   jingles: readonly FmJingle[],
-  n: number,
+  sting: boolean,
   lastId: string,
   rng: () => number,
 ): { jingle: FmJingle; url: string } | null {
   if (jingles.length === 0) return null;
   const pool = jingles.length > 1 ? jingles.filter(j => j.id !== lastId) : jingles;
   const jingle = pool[Math.floor(rng() * pool.length)] ?? jingles[0]!;
-  const full = n % FULL_JINGLE_EVERY === 0;
-  return { jingle, url: full ? jingle.full : jingle.sting };
+  return { jingle, url: sting ? jingle.sting : jingle.full };
 }

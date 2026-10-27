@@ -85,7 +85,6 @@ export class NounFmStation {
   private jingles: FmJingle[] = [];
   private loaded: Promise<void> | null = null;
   private pick: PickState;
-  private breaks = 0;
   private lastJingle = '';
   private jingleEl: HTMLAudioElement | null = null;
   private watchdog: ReturnType<typeof setTimeout> | null = null;
@@ -240,9 +239,7 @@ export class NounFmStation {
     this.clearTimers();
     this.stopJingle();
     this.deck.stop();
-    const n = forceSting ? 1 : this.breaks;
-    this.breaks++;
-    const j = jingleFor(this.jingles, n, this.lastJingle, Math.random);
+    const j = jingleFor(this.jingles, forceSting, this.lastJingle, Math.random);
     if (j === null || audioClaimed()) {
       this.startTrack(gen);
       return;

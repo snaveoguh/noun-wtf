@@ -288,6 +288,7 @@ export class BreakLobby {
       crewSize: o.crewSize,
       dancers,
       ...FORMATS[o.crewSize],
+      chart: 'strict',
       // EASY: a softer CPU and wider timing windows for everyone
       ...(o.difficulty === 'easy' ? { windows: { ...EASY_WINDOWS } } : {}),
     };

@@ -20,6 +20,7 @@ import VoiceBooth from '../booth/VoiceBooth';
 import { installState, subscribeInstall } from '../pwa/install';
 import { InstallButton } from '../pwa/InstallButton';
 import { resetHudPositions } from '../ui/HudDrag';
+import { cleanName, NAME_MAX, renameRider } from '../ui/riderName';
 import { worldPause } from '../worldPause';
 
 import { hudCss } from './hudCss';
@@ -68,6 +69,48 @@ export function SettingsCog({ game }: { game: Game }) {
 }
 
 const label = (v: number) => `${Math.round(v * 100)}%`;
+
+/** YOU: change the rider's name (for anyone who skipped it at the start). */
+function NameRow({ game }: { game: Game }) {
+  const [name, setName] = useState(game.name);
+  const [saved, setSaved] = useState(false);
+  const save = () => {
+    const n = renameRider(game, name);
+    if (n === null) return setName(game.name);
+    setName(n);
+    setSaved(true);
+  };
+  return (
+    <Section title="YOU">
+      <form
+        className="flex items-center gap-2"
+        onSubmit={e => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <input
+          aria-label="Your name"
+          value={name}
+          maxLength={NAME_MAX}
+          spellCheck={false}
+          onChange={e => {
+            setName(cleanName(e.target.value));
+            setSaved(false);
+          }}
+          onBlur={save}
+          className="min-w-0 flex-1 rounded-lg border border-white/20 bg-black/40 px-3 py-2 font-bold tracking-wide text-white outline-none focus:border-[#ffd400]"
+        />
+        <button
+          type="submit"
+          className="rounded-lg bg-[#ffd400] px-3 py-2 text-xs font-black text-black"
+        >
+          {saved ? 'SAVED ✓' : 'SAVE'}
+        </button>
+      </form>
+    </Section>
+  );
+}
 
 function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
   const s = useSettings();
@@ -145,6 +188,8 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
             close <span className="opacity-60">esc</span>
           </button>
         </div>
+
+        <NameRow game={game} />
 
         <Section title="AUDIO">
           <Slider
