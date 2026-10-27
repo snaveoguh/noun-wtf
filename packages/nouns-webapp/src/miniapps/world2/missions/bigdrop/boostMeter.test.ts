@@ -6,6 +6,7 @@ import {
   createBoost,
   fillFromCombo,
   fillFromRiding,
+  GOVERN,
   governSpeed,
   padBoost,
   stepBoost,
@@ -78,6 +79,13 @@ describe('the SSX boost meter', () => {
 });
 
 describe('the course governor', () => {
+  it('holds a board the slope keeps pulling to within ~2 m/s of the cap', () => {
+    // 49° at 40% gravity: ~3.8 m/s² along the fall line
+    let v = 30;
+    for (let i = 0; i < 600; i++) v = governSpeed(v + 3.8 / 60, 30, false, 1 / 60);
+    expect(v - 30).toBeLessThan(2);
+  });
+
   it('leaves you alone under the cap', () => {
     expect(governSpeed(20, 30, false, 1 / 60)).toBe(20);
     expect(governSpeed(40, 30, true, 1 / 60)).toBe(40);
@@ -91,12 +99,13 @@ describe('the course governor', () => {
       v = governSpeed(v, 30, false, dt);
       expect(v).toBeLessThan(prev);
       // No more than a gentle slow-down per frame (a landing eases back)
-      expect(prev - v).toBeLessThan(0.5);
+      expect(prev - v).toBeLessThanOrEqual(GOVERN.maxDecel * dt + 1e-9);
       expect(v).toBeGreaterThan(30);
       prev = v;
     }
-    // About a time constant later, most of the excess is gone
-    expect(v - 30).toBeLessThan(30 * 0.5);
+    // A couple of seconds later, nearly all the excess is gone
+    for (let i = 0; i < 120; i++) v = governSpeed(v, 30, false, dt);
+    expect(v - 30).toBeLessThan(3);
     for (let i = 0; i < 600; i++) v = governSpeed(v, 30, false, dt);
     expect(v).toBeCloseTo(30, 1);
   });

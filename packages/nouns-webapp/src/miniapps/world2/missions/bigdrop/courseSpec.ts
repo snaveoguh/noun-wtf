@@ -209,7 +209,8 @@ export const CAVES: readonly Cave[] = [
     s0: 2430,
     s1: 2570,
     R: 27,
-    H: 14,
+    // (tall: the camera rides well back and up behind you)
+    H: 24,
     mound: 26,
     trough: false,
   },

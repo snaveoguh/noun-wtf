@@ -61,6 +61,9 @@ import { lineAt, TRACK } from './track';
 
 /** Pulled onto a rail from this far (m, across) and this high over it (m). */
 const MAGNET = { across: 2.2, above: 2.8, below: 0.4 } as const;
+/** The camera's pull-back on the Big Drop (peak.ts), and inside a cave. */
+const PEAK_ZOOM = 3.4;
+const CAVE_ZOOM = 1.7;
 /** Gates count you through within this far past the lane edge (m). */
 const GATE_MARGIN = 8;
 
@@ -91,6 +94,9 @@ class Course implements PeakSystem {
   private rails: MagnetRail[];
   private ln: LineSample = { cx: 0, dcx: 0, w: 0, gully: 0, cruise: 0, feats: [] };
   private touchBoost = false;
+  /** A touch screen: show the BOOST button before the first touch flips the input mode. */
+  private readonly touchScreen =
+    typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   private lastState = '';
   private lastBanked: unknown = null;
   private lastSection = '';
@@ -204,7 +210,16 @@ class Course implements PeakSystem {
     // ── Effects ──
     g.cam.fovKick = burning ? (this.boost.tricky ? 16 : 11) : 0;
     let cave = false;
-    for (const cv of CAVES) if (insideCave(cv, rp.x, rp.y, rp.z)) cave = true;
+    let nearCave = false;
+    for (const cv of CAVES) {
+      if (insideCave(cv, rp.x, rp.y, rp.z)) cave = true;
+      // (the camera starts coming in just before the mouth)
+      if (cave || insideCave(cv, rp.x, rp.y, rp.z + 45)) nearCave = true;
+    }
+    // In a cave the camera comes in close (pulled ×3.4 back and up it'd sit
+    // in the roof); back out it eases back to the Big Drop's
+    const zoom = nearCave ? CAVE_ZOOM : PEAK_ZOOM;
+    g.cam.zoom += (zoom - g.cam.zoom) * (1 - Math.exp(-3 * dt));
     const sec = courseSectionName(s);
     if (sec !== this.lastSection) {
       if (sec !== '' && this.run.phase === 'running') this.hud?.banner(sec, 1100);
@@ -232,7 +247,7 @@ class Course implements PeakSystem {
       full: this.boost.meter >= 0.999,
       burning,
       cave,
-      touch: g.input.mode === 'touch',
+      touch: this.touchScreen || g.input.mode === 'touch',
     });
     const d = this.debug;
     d.s = s;

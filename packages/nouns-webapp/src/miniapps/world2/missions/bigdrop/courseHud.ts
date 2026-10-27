@@ -36,7 +36,7 @@ const CSS = `
 .bdssx-cave{position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .35s;background:radial-gradient(ellipse at 50% 50%,rgba(0,8,30,0) 30%,rgba(0,8,30,.55) 70%,rgba(0,4,16,.85) 100%)}
 .bdssx-cave.on{opacity:1}
 .bdssx[data-off] .bdssx-top{display:none}
-@media (max-width:640px){.bdssx-top{top:104px}.bdssx-t{font-size:26px}.bdssx-banner{font-size:34px}.bdssx-banner small{font-size:15px}.bdssx-boost{width:130px;bottom:auto;top:150px;left:12px}}
+@media (max-width:640px){.bdssx-top{top:150px}.bdssx-t{font-size:26px}.bdssx-banner{font-size:34px}.bdssx-banner small{font-size:15px}.bdssx-boost{width:120px;bottom:44%;left:12px}.bdssx-btn{bottom:30%;right:12px;width:64px;height:64px}}
 `;
 
 export interface HudView {

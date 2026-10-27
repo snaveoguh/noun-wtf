@@ -100,14 +100,19 @@ export function stepBoost(b: BoostState, dt: number): boolean {
   return true;
 }
 
+/** The governor: how fast the excess goes (s), and the hardest it ever brakes (m/s²). */
+export const GOVERN = { tau: 0.4, maxDecel: 12 } as const;
+
 /**
  * The course's governor (m/s) for a board at `speed` under a cap: over the
- * cap the excess bleeds off with a 1.2 s time constant (a landing at speed
- * eases back instead of hitting a wall), burning raises the cap. Returns
- * the governed speed.
+ * cap the excess bleeds off (a 0.4 s time constant, so the slope's pull
+ * only holds you ~1.5 m/s over it), but never harder than 12 m/s², so a
+ * landing at speed eases back instead of hitting a wall. Burning raises the
+ * cap. Returns the governed speed.
  */
 export function governSpeed(speed: number, cap: number, burning: boolean, dt: number): number {
   const c = burning ? cap * BOOST.capK : cap;
   if (speed <= c) return speed;
-  return c + (speed - c) * Math.exp(-dt / 1.2);
+  const target = c + (speed - c) * Math.exp(-dt / GOVERN.tau);
+  return Math.max(target, speed - GOVERN.maxDecel * dt);
 }

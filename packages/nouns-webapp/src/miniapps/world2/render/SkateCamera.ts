@@ -221,9 +221,18 @@ export class SkateCamera {
     // 5.6 m above you. The obstruction check then yanked it in to skim the
     // surface right behind the board (too close, and the snow's edge drawn
     // across the bottom of the screen). Sit above the slope behind instead.
+    // (the snow itself, not set pieces over it: a cave's roof would put the
+    // camera on top of the cave)
     if (onBoard && this.zoom > 1) {
-      const gb = this.world.raycast(_probe.copy(desired).addScaledVector(UP, 80), DOWN, 160);
-      if (gb && desired.y < gb.point.y + SLOPE_CLEAR) desired.y = gb.point.y + SLOPE_CLEAR;
+      const terr = this.world.terrain;
+      const o = _probe.copy(desired).addScaledVector(UP, 80);
+      if (terr !== null) {
+        const t = terr.raycast(o.x, o.y, o.z, 0, -1, 0, 160);
+        if (t >= 0 && desired.y < o.y - t + SLOPE_CLEAR) desired.y = o.y - t + SLOPE_CLEAR;
+      } else {
+        const gb = this.world.raycast(o, DOWN, 160);
+        if (gb && desired.y < gb.point.y + SLOPE_CLEAR) desired.y = gb.point.y + SLOPE_CLEAR;
+      }
     }
 
     // Collision: pull in toward the target

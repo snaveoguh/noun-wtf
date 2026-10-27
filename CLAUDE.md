@@ -257,6 +257,13 @@ The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,
   - sky, sun, cloud sea, ranges, giant Noun, forests and creatures: `scenery/` (`journey.ts` maps depth to time of day: storm, blue, golden, sunset, aurora);
   - NPC hoverboarders: `riders.ts` / `riderSim.ts`; built Nouns are kept between visits, because a build is a hitch;
   - snow spray, wind streaks and sonic booms: `spray.ts` / `sprayRules.ts`.
+- **The SSX course** (the first ~5 km of the track; `bigdrop/courseSpec.ts` is the layout in track terms, s = peak z):
+  - START gate (s 40) → DROP-IN, S-CURVES, BIG AIR, ICE CAVE, THE SPLIT, RAIL YARD, FINAL DROP → FINISH (s 4980), four checkpoints; then the random track as before. About 3 min.
+  - **Governed:** on the course's snow a grounded board is held to `courseCap(s)` (94 → 195 km/h, ×1.45 boosting; the excess bleeds off, `governSpeed`). `trackSpeed.ts` integrates the same cap, so `designKicker` cuts the course's kickers for the real speed (snappier: `hangK` 0.7). Change the cap and the kickers follow.
+  - **THE SPLIT:** the main (safe) line bulges round the shortcut (`courseBulge`); the shortcut is a second lane carved in `terrainCarve.ts` (`withBranch`: lane, rock-bore trough, gap kicker `branchKicker()`, crevasse). Trees stay clear (`courseClearLat`).
+  - **Props** (`courseProps.ts`, built in ~2 ms slices): arches, gates, boost pads, rails in the game's RailSet (local coordinates, re-added on rebase), the caves (mesh + `ctx.setCollider`), rock arches, signs.
+  - **Play** (`course.ts`): boost meter (`boostMeter.ts`; Tab / gamepad X / a touch button, `InputFrame.boostPressed`), magnet rails, the timed run + splits + a local best (`courseRun.ts`, `noun-bigdrop-ssx-v1`), DOM HUD (`courseHud.ts`), `SkateCamera.fovKick`. Nothing counts (stats stay suspended).
+  - Tests: `course.test.ts` (layout, the split, caves, flights clear of props at 0.75–1.45× speed), `boostMeter.test.ts`, `courseRun.test.ts`; `kickerFlight.ts` flies a kicker like the board does. Browser shots: `.claude/ssx-shots/`.
 - In dev: `window.__w2.missions.enterUpsideDown()` / `leaveUpsideDown()`.
 
 ### Books (Meme Value)
