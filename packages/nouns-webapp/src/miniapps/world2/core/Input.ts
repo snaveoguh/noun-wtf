@@ -56,6 +56,9 @@ export interface InputFrame {
   undoPressed?: boolean;
   /** Alt+click on a wall (eyedropper). */
   pickPressed?: boolean;
+  /** On foot: Q / gamepad B / touch STOP held, and its press (parkour slide, roll, drop). */
+  duck?: boolean;
+  duckPressed?: boolean;
   tricks: TrickInput[];
   mode: InputMode;
 }
@@ -138,6 +141,7 @@ export class Input {
   private stickTracker = newTracker();
   private pendingTricks: TrickInput[] = [];
   private gamepadPrev: boolean[] = [];
+  private touchDuckWas = false;
   mode: InputMode = 'keyboard';
   pointerLocked = false;
   /** Mouse-look multiplier and Y flip (settings panel). */
@@ -398,6 +402,8 @@ export class Input {
     f.cameraTogglePressed = this.keyPressed('KeyC');
     f.micPressed = this.keyPressed('KeyV');
     f.respawnPressed = this.keyPressed('KeyR');
+    f.duck = this.key('KeyQ');
+    f.duckPressed = this.keyPressed('KeyQ');
     f.spray = this.key('KeyG') || this.lmb;
     f.colorCyclePressed = this.keyPressed('KeyT');
     f.sizeStep =
@@ -467,6 +473,8 @@ export class Input {
         f.push = btn(0) || btn(2);
         f.pushPressed = btnPressed(0) || btnPressed(2);
         f.brake = btn(1);
+        f.duck = btn(1);
+        f.duckPressed = btnPressed(1);
         f.grabL = btn(6);
         f.grabR = btn(7);
         f.sprint = btn(10);
@@ -504,6 +512,11 @@ export class Input {
         f.stickY = this.touch.stickY;
         f.push = this.touch.push || f.moveY > 0.55;
         f.brake = this.touch.brake;
+        f.duck = this.touch.brake;
+        f.duckPressed = this.touch.brake && !this.touchDuckWas;
+        this.touchDuckWas = this.touch.brake;
+        // On foot, PUSH is RUN
+        f.sprint = f.sprint || this.touch.push;
         f.grabR = this.touch.grab;
         f.spray = f.spray || this.touch.spray;
         f.crouch = f.stickY < DOWN_T || this.touch.crouch;

@@ -28,6 +28,7 @@ import {
   type StatRow,
   type WorldStats,
 } from './net/Stats';
+import { ParkourUi } from './parkour/game/ParkourUi';
 import { applyWorldManifest, registerWorldSw } from './pwa/install';
 import { InstallButton } from './pwa/InstallButton';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
@@ -223,6 +224,22 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => window.clearInterval(t);
   }, [game, started, searchParams]);
 
+  // `?play=parkour` (the homepage's NOUN PARKOUR card): the route menu
+  const parkourLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || parkourLaunched.current || searchParams.get('play') !== 'parkour')
+      return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null) return false;
+      parkourLaunched.current = true;
+      game.parkour.course.open();
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   useEffect(() => {
@@ -356,6 +373,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
+      {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && (
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
       )}

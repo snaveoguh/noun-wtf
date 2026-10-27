@@ -3,7 +3,7 @@
 //   impact < rollImpact (9 m/s, ~3 m)    land as normal (a narrow top sticks)
 //   rollImpact ≤ impact < hardImpact     moving → roll and keep the speed;
 //                                         standing → a crouched landing
-//   impact ≥ hardImpact (14 m/s, ~8 m)   roll only with duck pressed in the
+//   impact ≥ hardImpact (15 m/s, ~9 m)   roll only with duck pressed in the
 //                                         last 0.4 s (or held), else stumble
 //
 // A stumble from very high (≥ 1.6 × hardImpact) lasts longer.

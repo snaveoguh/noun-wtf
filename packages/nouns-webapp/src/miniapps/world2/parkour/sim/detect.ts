@@ -6,8 +6,8 @@
 // posts, sign poles, railings, fire escapes. Nothing is tagged by hand.
 // Hits from `PkWorld` may be reused objects, so values are copied out.
 //
-// Costs (rays): sideWall 4, frontWall 2, findLedge ≤ 9, findPole ≤ 8 per
-// direction (plus a cached top), lowObstacle 2, gapAhead 1, narrowUnder 4.
+// Costs (rays): sideWall 4, frontWall 2, findLedge ≤ 9, poleAlong ≤ 8 per
+// direction (plus a cached top), lowObstacle 2, gapAhead 2, narrowUnder 4.
 
 import { PK, type PkWorld } from '../contract';
 
@@ -336,6 +336,8 @@ export function gapAhead(
   ahead: number = PK.gapCheck,
   drop: number = PK.gapDrop,
 ): boolean {
+  // Not a wall in the way (the floor "behind" a facade is no gap)
+  if (w.ray(x, y + 1.0, z, dx, 0, dz, ahead + 0.4) !== null) return false;
   return floorAt(w, x + dx * ahead, y + 0.5, z + dz * ahead, drop + 0.5) === null;
 }
 

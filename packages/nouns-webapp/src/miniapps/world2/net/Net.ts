@@ -19,6 +19,8 @@
 //       without it, listeners speak their chat lines in the house voice
 // Respect (respect/): `rs: 'L'` only while the rider is a legend (the
 // noggles badge on their name tag; cosmetic, not checked by the server).
+// Parkour (parkour/net/pk.ts): `pk: [code, phase, side, amt]` only while a
+// parkour pose shows (wall run, ledge hang, pole…), so others see it.
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -60,6 +62,8 @@ export interface NetPose {
    * dragon itself is placed from those, see dragon/mesh.ts).
    */
   vehicle?: Vehicle;
+  /** Parkour pose key (parkour/net/pk.ts), raw: decoded where it's drawn. */
+  pk?: unknown;
 }
 
 export type Vehicle = 'van' | 'dragon';
@@ -306,6 +310,7 @@ export class Net {
     pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.vehicle = parseVehicle(blob.vh);
+    pose.pk = Array.isArray(blob.pk) ? blob.pk : undefined;
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     const co = parseCallout(blob.co);
     const cv = parseChatVoice(blob.cv);
@@ -393,6 +398,7 @@ export class Net {
       c.name = b.pose.name;
       c.seedKey = b.pose.seedKey;
       c.vehicle = b.pose.vehicle;
+      c.pk = b.pose.pk;
     }
     void dt;
   }
@@ -430,6 +436,7 @@ export class Net {
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
       ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
+      ...(pose.pk !== undefined ? { pk: pose.pk } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

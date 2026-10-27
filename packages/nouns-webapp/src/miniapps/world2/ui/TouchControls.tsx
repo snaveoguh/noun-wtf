@@ -5,6 +5,7 @@ import type { Game } from '../Game';
 import { useEffect, useRef, useState } from 'react';
 
 import { SprayTouch } from '../graffiti/SprayPanel';
+import { useParkourLabels } from '../parkour/game/ParkourUi';
 
 const R = 56;
 
@@ -19,6 +20,8 @@ export function useIsTouch() {
 
 export function TouchControls({ game }: { game: Game }) {
   const isTouch = useIsTouch();
+  // On foot the pad is parkour's: JUMP, RUN and a context DUCK (slide / drop / roll)
+  const footLabels = useParkourLabels(game);
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const [knobL, setKnobL] = useState<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -33,6 +36,7 @@ export function TouchControls({ game }: { game: Game }) {
 
   if (!isTouch) return null;
   const t = game.input.touch;
+  const foot = footLabels;
 
   const stickHandlers = (side: 'L' | 'R') => {
     const d = drag.current[side];
@@ -165,13 +169,13 @@ export function TouchControls({ game }: { game: Game }) {
           GRAB
         </button>
         <button type="button" className="w2-tbtn w2-t-stop" {...hold('brake')}>
-          STOP
+          {foot?.duck ?? 'STOP'}
         </button>
         <button type="button" className="w2-tbtn w2-tbtn-main w2-t-push" {...hold('push')}>
-          PUSH
+          {foot !== null ? 'RUN' : 'PUSH'}
         </button>
         <button type="button" className="w2-tbtn w2-t-ollie" {...ollie}>
-          OLLIE
+          {foot?.jump ?? 'OLLIE'}
         </button>
       </div>
       <style>{`

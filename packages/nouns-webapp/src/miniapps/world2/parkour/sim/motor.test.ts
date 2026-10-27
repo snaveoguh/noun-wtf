@@ -225,11 +225,17 @@ describe('poles', () => {
     expect(got).toBe(true);
     const y0 = r.b.pos.y;
     // Swing with D while sliding
-    r.run(20, input({ moveX: 1 }));
+    r.run(25, input({ moveX: 1 }));
     const m = r.motor.move!;
     expect(m.k === 'pole' && m.spin).toBeGreaterThan(0.5);
-    expect(r.b.pos.y).toBeLessThan(y0);
     expect(r.motor.anim.kind).toBe('pole');
+    // …and slides down below where it caught on
+    let low = r.b.pos.y;
+    for (let k = 0; k < 120 && r.move === 'pole'; k++) {
+      r.step(input());
+      low = Math.min(low, r.b.pos.y);
+    }
+    expect(low).toBeLessThan(y0 - 0.3);
     r.run(240, input());
     expect(r.move).toBe('none');
     expect(r.b.grounded).toBe(true);

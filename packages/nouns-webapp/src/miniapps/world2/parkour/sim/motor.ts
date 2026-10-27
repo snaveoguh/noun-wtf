@@ -76,6 +76,9 @@ export class ParkourMotor {
   /** Flourish timers (anim only). */
   private flipT = 0;
   private flipSide: 1 | -1 = 1;
+  /** 0 a twist (wall jump), 0.5 a front flip (pole launch), 1 a backflip (tic-tac). */
+  private flipKind = 0;
+  private flipDur = 0.55;
   private stickT = 0;
   private gapT = 0;
   private narrow = false;
@@ -98,6 +101,17 @@ export class ParkourMotor {
     this.memoN = null;
     this.pole = null;
     this.regrab = this.poleCool = this.wallCool = 0;
+  }
+
+  /**
+   * Pick up again after steps it didn't see (the rider was on the board):
+   * whatever happened meanwhile isn't a landing to judge.
+   */
+  resync(b: PkBody) {
+    this.reset();
+    this.wasGrounded = b.grounded;
+    this.prevVy = 0;
+    this.airT = 0;
   }
 
   /** One physics step. True when the engine moved the body itself. */
@@ -282,7 +296,12 @@ export class ParkourMotor {
       if (pl !== null) {
         const d = Math.hypot(p.x - pl.cx, p.z - pl.cz);
         const hands = p.y + 1.5;
-        if (d < pl.r + PK.poleReach && hands > pl.base + 0.8 && p.y < pl.top - 0.6) {
+        if (
+          d < pl.r + PK.poleReach &&
+          p.y > pl.base + 0.3 &&
+          hands > pl.base + 1.2 &&
+          p.y < pl.top - 0.6
+        ) {
           this.startPole(b, pl);
           return true;
         }
@@ -313,6 +332,12 @@ export class ParkourMotor {
       }
     }
     return false;
+  }
+
+  private flip(dur: number, kind: number, side: 1 | -1) {
+    this.flipT = this.flipDur = dur;
+    this.flipKind = kind;
+    this.flipSide = side;
   }
 
   private sameWall(nx: number, nz: number) {
@@ -425,7 +450,8 @@ export class ParkourMotor {
       base: pl.base,
       ang,
       spin,
-      vy: Math.min(0, b.vel.y) * 0.5,
+      // A jump's rise carries on up the pole a little; a fall is caught
+      vy: b.vel.y > 0 ? b.vel.y * 0.75 : b.vel.y * 0.5,
       t: 0,
     };
     b.pos.y = Math.min(b.pos.y, pl.top - 1.45);
@@ -533,8 +559,7 @@ export class ParkourMotor {
       b.vel.z = m.tz * m.speed * 0.85 + m.nz * PK.wallJumpOut;
       b.vel.y = PK.wallJumpUp;
       b.yaw = Math.atan2(b.vel.x, b.vel.z);
-      this.flipT = 0.55;
-      this.flipSide = m.side;
+      this.flip(0.55, 0, m.side);
       this.sinceJump = 0;
       this.wallCool = 0.12;
       b.emit({ type: 'walljump', power: 0.8 });
@@ -633,8 +658,7 @@ export class ParkourMotor {
       b.vel.y = PK.ticTacUp;
       b.yaw = Math.atan2(kx, kz);
       this.memoN = { nx: m.nx, nz: m.nz };
-      this.flipT = 0.6;
-      this.flipSide = s >= 0 ? 1 : -1;
+      this.flip(0.6, 1, s >= 0 ? 1 : -1);
       this.sinceJump = 0;
       this.regrab = 0.15;
       b.emit({ type: 'tictac', power: 0.9 });
@@ -716,7 +740,7 @@ export class ParkourMotor {
       // Back eject: S + jump turns and leaps away from the wall
       if (i.moveY < -0.5) {
         b.yaw = Math.atan2(m.nx, m.nz);
-        this.flipT = 0.5;
+        this.flip(0.6, 1, 1);
         this.sinceJump = 0;
         b.emit({ type: 'walljump', power: 0.7 });
         return drop(m.nx * 4.6, 5.2, m.nz * 4.6);
@@ -849,8 +873,7 @@ export class ParkourMotor {
       p.x = m.cx + ox * (R + 0.08);
       p.z = m.cz + oz * (R + 0.08);
       this.poleCool = 0.45;
-      this.flipT = 0.5;
-      this.flipSide = m.spin >= 0 ? 1 : -1;
+      this.flip(0.55, Math.abs(m.spin) > 2 ? 0 : 0.5, m.spin >= 0 ? 1 : -1);
       this.sinceJump = 0;
       b.emit({ type: 'poleLaunch', power: clamp(sp / 8, 0.5, 1) });
       this.end(b, false);
@@ -1004,7 +1027,12 @@ export class ParkourMotor {
       }
     }
     if (!b.grounded && this.flipT > 0)
-      return { kind: 'flip', phase: 1 - this.flipT / 0.6, side: this.flipSide, amt: 0 };
+      return {
+        kind: 'flip',
+        phase: 1 - this.flipT / this.flipDur,
+        side: this.flipSide,
+        amt: this.flipKind,
+      };
     if (!b.grounded && this.gapT > 0) {
       this.gapT = Math.max(0, this.gapT - dt);
       this.gait = (this.gait + dt * 1.6) % 1;

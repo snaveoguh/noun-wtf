@@ -276,7 +276,7 @@ export const PK = {
   wallRunMaxSpeed: 8.6,
   /** How far the wall may be from the rider's centre to start / keep running. */
   wallRunReach: 1.05,
-  wallRunDist: 0.5,
+  wallRunDist: 0.58,
   wallRunTime: 1.6,
   /** Fraction of gravity while the run is fresh, and after `wallRunFresh` s. */
   wallRunGrav: 0.32,
@@ -289,16 +289,20 @@ export const PK = {
   // Vertical run (tic-tac)
   wallUpMinSpeed: 2.8,
   wallUpReach: 1.25,
-  wallUpDist: 0.46,
+  wallUpDist: 0.5,
   wallUpTime: 0.62,
   wallUpSpeed: 6.4,
   ticTacOut: 4.8,
   ticTacUp: 6.2,
 
   // Ledges
-  /** Rider feet sit this far under the lip while hanging. */
-  hangDrop: 1.38,
-  hangDist: 0.42,
+  /**
+   * Rider feet sit this far under the lip, this far out from the face. The
+   * Noun's arms are ~0.42 m and its head a 0.85 m deep cube: hands on the
+   * lip put the head's face right on the wall (peeking over the edge).
+   */
+  hangDrop: 1.22,
+  hangDist: 0.52,
   /** Lip heights (above the feet) a reach can catch. */
   grabMin: 1.0,
   grabMax: 2.25,
@@ -313,7 +317,7 @@ export const PK = {
   poleMaxR: 0.3,
   poleReach: 0.95,
   /** Rider centre to pole surface while holding on. */
-  poleGap: 0.3,
+  poleGap: 0.42,
   poleSlide: 3.4,
   poleSlideFast: 7.5,
   poleClimb: 1.7,
@@ -327,9 +331,9 @@ export const PK = {
   slideFriction: 3.4,
   slideHeight: 0.8,
   rollTime: 0.62,
-  /** Landing speeds (m/s down): a roll, a hard landing (needs the timed duck). */
+  /** Landing speeds (m/s down): a roll (~3 m), a hard landing (~9 m, needs the timed duck). */
   rollImpact: 9,
-  hardImpact: 14,
+  hardImpact: 15,
   duckWindow: 0.4,
   stumbleTime: 0.95,
   stumbleHardTime: 1.5,

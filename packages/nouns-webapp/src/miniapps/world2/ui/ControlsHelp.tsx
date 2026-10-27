@@ -45,6 +45,17 @@ export const KEYBOARD: ControlGroup[] = [
     ],
   },
   {
+    title: 'PARKOUR',
+    lines: [
+      { keys: ['SHIFT', 'SPACE'], what: 'beside a wall: wall run · at a wall: run up it' },
+      { keys: ['SPACE'], what: 'on a wall: wall jump · tic-tac (A/D aims it)' },
+      { keys: ['JUMP', '→ ledge'], what: 'grab it · A/D shimmy · W pull up · SPACE+dir leap' },
+      { keys: ['JUMP', '→ pole'], what: 'lamp posts: slide · A/D swing · SPACE launch' },
+      { keys: ['Q'], what: 'sprinting: slide · landing: roll · ledge: drop' },
+      { keys: ['RUN', '→ bench'], what: 'vaults on its own' },
+    ],
+  },
+  {
     title: 'PAINT',
     lines: [
       { keys: ['CLICK+DRAG', 'G'], what: 'spray where you point' },
@@ -106,6 +117,8 @@ export const GAMEPAD: ControlGroup[] = [
     title: 'ON FOOT',
     lines: [
       { keys: ['WALL'], what: 'walk into any wall to climb · A wall-jump · Y let go' },
+      { keys: ['A'], what: 'by a wall: wall run · at one: run up it · ledges, poles' },
+      { keys: ['B'], what: 'slide · roll on landing · drop from a ledge' },
       { keys: ['RT'], what: 'spray paint · R3 colour' },
     ],
   },
