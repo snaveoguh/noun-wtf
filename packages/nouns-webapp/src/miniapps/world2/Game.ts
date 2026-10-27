@@ -1006,6 +1006,10 @@ export class Game {
     // On the Big Drop the world you left waits: nothing down there streams
     // or triggers round a rider who's somewhere else entirely
     const away = this.missions.ud.active || this.interiors.inside;
+    // Indoors (or on the Big Drop) the street's name tags and pointers go:
+    // the Oracle's tag over a shop's ceiling is nonsense (the room's own
+    // labels live in interiors' .ni-layer and stay)
+    this.labelLayer.toggleAttribute('data-away', away);
     // A van ride can't touch a drop (its proof would be a 140 km/h walk)
     if (!driving && !away) this.drops?.update(dt, this.player);
     if (!away) this.crew?.update(dt, this.player.pos);
