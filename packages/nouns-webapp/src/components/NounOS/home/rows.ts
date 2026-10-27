@@ -60,16 +60,19 @@ export const CLIPS = {
     webm: '/home/hero-big-drop.webm',
     mp4: '/home/hero-big-drop.mp4',
     poster: '/home/hero-big-drop-poster.jpg',
+    audio: true,
   },
   breaks: {
     webm: '/home/hero-breaks.webm',
     mp4: '/home/hero-breaks.mp4',
     poster: '/home/hero-breaks-poster.jpg',
+    audio: true,
   },
   exchange: {
     webm: '/home/hero-exchange.webm',
     mp4: '/home/hero-exchange.mp4',
     poster: '/home/hero-exchange-poster.jpg',
+    audio: true,
   },
   parkour: {
     webm: '/home/hero-parkour.webm',
@@ -123,6 +126,7 @@ export const GAMES: Game[] = [
   {
     id: 'hoops',
     name: 'Noun Hoops',
+    preview: CLIPS.hoops,
     cover: '/world2/hoops-cover.webp',
     card: '/home/covers/hoops.webp',
     focus: '72% 58%',
@@ -136,6 +140,7 @@ export const GAMES: Game[] = [
   {
     id: 'breaks',
     name: 'Noun Breaks',
+    preview: CLIPS.breaks,
     cover: '/world2/breaks-cover.webp',
     card: '/home/covers/breaks.webp',
     focus: '50% 58%',
@@ -187,6 +192,7 @@ export const GAMES: Game[] = [
   {
     id: 'drop',
     name: 'The Big Drop',
+    preview: CLIPS.bigDrop,
     cover: BIG_DROP_COVER,
     card: BIG_DROP_CARD,
     focus: '50% 50%',
@@ -204,6 +210,7 @@ export const GAMES: Game[] = [
   {
     id: 'parkour',
     name: 'Noun Parkour',
+    preview: CLIPS.parkour,
     cover: '/world2/parkour-cover.webp',
     card: '/home/covers/parkour.webp',
     focus: '50% 55%',
@@ -238,6 +245,7 @@ export const GAMES: Game[] = [
   {
     id: 'pool',
     name: 'Noun Pool',
+    preview: CLIPS.pool,
     cover: '/world2/pool-cover.webp',
     card: '/home/covers/pool.webp',
     focus: '50% 55%',

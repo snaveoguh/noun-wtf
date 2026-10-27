@@ -52,6 +52,19 @@ time.
 | `hero-parkour` | `edits/parkour.json` | `parkour` |
 | `hero-pool` | `edits/pool.json` | `pool` |
 
+### Music
+
+A reel can carry a soundtrack: add `"music": { "file":
+"scripts/sizzle/music/<track>.mp3", "in": 0 }` to its edit list and
+`cut.mjs` muxes it in (AAC in the mp4, Opus in the webm, faded out over
+the last 0.9 s, loudness-normalised to −16 LUFS). Set `audio: true` on the
+slide's clip in `home/rows.ts`: the hero plays it only once the visitor
+turns sound on. `music/` holds excerpts of the owner's Suno tracks, each
+already starting where it should (the Drop from 0:59.3 of the full song,
+Breaks and Grand Exchange from 0:00). To add music to a clip whose frames
+are gone, `sh scripts/sizzle/mux.sh public/home/<clip> scripts/sizzle/music/<track>.mp3`
+swaps the audio in without touching the video.
+
 After cutting, set the slide's `ms` in `rows.ts` to the clip's real length
 (`ffprobe -v error -show_entries format=duration -of csv=p=0 public/home/<name>.mp4`):
 the carousel moves on when the clip ends.

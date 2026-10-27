@@ -2,6 +2,7 @@
   "name": "hero-exchange",
   "poster": 9.4,
   "grade": "eq=contrast=1.06:saturation=1.12,unsharp=5:5:0.4",
+  "music": { "file": "scripts/sizzle/music/grand-exchange.mp3", "in": 0 },
   "cuts": [
     { "shot": "gx-descent", "in": 0, "dur": 2.0 },
     { "shot": "gx-shout2", "in": 0.1, "dur": 1.8 },

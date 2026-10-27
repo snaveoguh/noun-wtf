@@ -3,6 +3,7 @@
   "poster": 6.6,
   "maxrate": 2.2,
   "grade": "eq=contrast=1.08:saturation=1.15,unsharp=5:5:0.4",
+  "music": { "file": "scripts/sizzle/music/noun-drop.mp3", "in": 0 },
   "cuts": [
     { "shot": "bd-summit", "in": 0.5, "dur": 1.6 },
     { "shot": "bd-chase", "in": 0.5, "dur": 1.8 },

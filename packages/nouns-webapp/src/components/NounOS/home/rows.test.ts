@@ -282,6 +282,20 @@ describe('HERO_SLIDES', () => {
   });
 });
 
+describe('game card hover previews', () => {
+  it('every game with a reel previews it on its card', () => {
+    const pv = (id: string) => GAMES.find(g => g.id === id)!.preview;
+    expect(pv('world')).toBe(CLIPS.worldVhs);
+    expect(pv('hoops')).toBe(CLIPS.hoops);
+    expect(pv('breaks')).toBe(CLIPS.breaks);
+    expect(pv('drop')).toBe(CLIPS.bigDrop);
+    expect(pv('parkour')).toBe(CLIPS.parkour);
+    expect(pv('pool')).toBe(CLIPS.pool);
+    const play = buildRows(CATALOG)[0]!;
+    expect(play.items.find(i => i.key === 'game:pool')!.preview).toBe(CLIPS.pool);
+  });
+});
+
 describe('NOUN POOL card', () => {
   it('is a game in Play now, hot, with its posters on disk', () => {
     const pool = buildRows(CATALOG)[0]!.items.find(i => i.key === 'game:pool')!;

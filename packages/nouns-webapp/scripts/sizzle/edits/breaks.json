@@ -2,6 +2,7 @@
   "name": "hero-breaks",
   "poster": 6.6,
   "grade": "eq=contrast=1.06:saturation=1.15,unsharp=5:5:0.4",
+  "music": { "file": "scripts/sizzle/music/noun-breaks.mp3", "in": 0 },
   "cuts": [
     { "shot": "brk-intro", "in": 0, "dur": 1.6 },
     { "shot": "brk-toprock", "in": 0.2, "dur": 1.4 },
