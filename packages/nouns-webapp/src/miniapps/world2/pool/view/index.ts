@@ -115,8 +115,8 @@ export class PoolView {
     // Fit the prop's footprint (never smaller, so the prop never shows through)
     const s = Math.max(1, place.length / (HX * 2), place.width / (HZ * 2)) * 1.02;
     const top = place.height ?? 0.86;
-    // Clear of the prop's own clutter (its leaning cue rises ~0.05 over its top)
-    this.feltY = (top + 0.06) / s;
+    // Clear of the prop's own clutter (its leaning cue's raised end pokes ~0.08 over its top)
+    this.feltY = (top + 0.09) / s;
     this.root.name = 'noun-pool';
     this.root.position.set(place.x, place.y, place.z);
     this.root.rotation.y = place.yaw;
