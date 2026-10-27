@@ -109,17 +109,44 @@ export class Kit {
   readonly small = new Map<SmallShape, { m: THREE.Matrix4; c: number }[]>();
   /** Collision boxes (room frame). */
   readonly col: THREE.Box3[] = [];
+  /** Extra collision triangles (room frame, xyz × 3 per triangle): stair ramps. */
+  readonly colTris: number[] = [];
   /** The current item's frame (room frame); `add` goes through it. */
   frame = new THREE.Matrix4();
 
   /** Where `add` puts things by default ('shell' while building walls: they cast no shadow). */
   base: Bucket = 'solid';
 
+  /** What's being built (an item or decor type), recorded per geometry (tests, the z-fight pass). */
+  tag = '';
+  /** Every geometry's place in the order things were added (later = laid on top). */
+  readonly order = new Map<THREE.BufferGeometry, number>();
+  private added = 0;
+
+  /** All geometries, in the order they were added, with their bucket and tag. */
+  all(): { geo: THREE.BufferGeometry; bucket: Bucket; tag: string }[] {
+    return (Object.keys(this.geo) as Bucket[])
+      .flatMap(bucket =>
+        this.geo[bucket].map((geo, i) => ({ geo, bucket, tag: this.tags[bucket][i]! })),
+      )
+      .sort((a, b) => this.order.get(a.geo)! - this.order.get(b.geo)!);
+  }
+  readonly tags: Record<Bucket, string[]> = {
+    solid: [],
+    shell: [],
+    glow: [],
+    art: [],
+    artGlow: [],
+    glass: [],
+  };
+
   /** Add a geometry (consumed) in colour `color`, in the current frame. */
   add(g: THREE.BufferGeometry, color: number, bucket?: Bucket) {
     const b =
       bucket === undefined || (bucket === 'solid' && this.base === 'shell') ? this.base : bucket;
     this.geo[b].push(paint(g, color, this.frame));
+    this.tags[b].push(this.tag);
+    this.order.set(this.geo[b][this.geo[b].length - 1]!, this.added++);
   }
 
   /** A textured plane from the atlas slot (u0, v0)–(u1, v1). */
@@ -129,7 +156,10 @@ export class Kit {
     const a = geo.attributes.uv as THREE.BufferAttribute;
     for (let i = 0; i < a.count; i++)
       a.setXY(i, a.getX(i) < 0.5 ? uv[0] : uv[2], a.getY(i) < 0.5 ? uv[1] : uv[3]);
-    this.geo[glow ? 'artGlow' : 'art'].push(paint(geo, 0xffffff, this.frame));
+    const b = glow ? 'artGlow' : 'art';
+    this.geo[b].push(paint(geo, 0xffffff, this.frame));
+    this.tags[b].push(this.tag);
+    this.order.set(this.geo[b][this.geo[b].length - 1]!, this.added++);
   }
 
   /** A small prop instance at local (x, y, z), turned by `yaw`. */

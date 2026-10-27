@@ -26,6 +26,7 @@ import type { GoodId, TownId, TradeAction, TradeApi } from '../trade/contract';
 import type { LevelData } from '../world/Level';
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import { seedVoice } from '../audio/voice/cast';
 import { prefetchGlbHead } from '../character/GlbHead';
@@ -36,7 +37,7 @@ import { GOODS, GOOD_ICON, GOOD_IDS } from '../trade/goods';
 import { inCorridor } from '../world/mountain/Alleys';
 import { NJ, njFrame, njToWorld } from '../world/mountain/nounJersey';
 
-import { buildArtAtlas, type TimeOfDay } from './art';
+import { buildArtAtlas, type ArtAtlas, type TimeOfDay } from './art';
 import { buildInterior, type BuiltInterior } from './build';
 import { discounted, menuOf, type Food, type MenuItem } from './dialogue';
 import { BANNED, SHUT } from './dialogue';
@@ -48,15 +49,28 @@ import {
   generateLayout,
   itemBox,
   layoutGrid,
+  planBuilding,
   stealables,
   type Grid,
   type Layout,
 } from './layout';
+import {
+  FEATURED,
+  SNAPSHOT,
+  askText,
+  isPropMuseum,
+  label,
+  labelColor,
+  latestProps,
+  markPropMuseum,
+  type Exhibit,
+} from './museum';
 import { KIND_LABEL } from './names';
 import { plazaDoors } from './plazaDoors';
 import { handPos, poseEat, poseSit } from './pose';
 import { residentsFor, type ResidentDef } from './residents';
 import { hash32, mulberry32, pick, type Rng } from './rng';
+import { storeyHeight, upperUse, USE_LABEL } from './storeys';
 import { njDoors, townDoors } from './townDoors';
 import {
   EAT_S,
@@ -70,9 +84,19 @@ import {
   type Visit,
   type VisitEvent,
 } from './visit';
+import { WindowViews } from './WindowViews';
 
 /** Pocket height: the interiors float this high over their door (nothing up there). */
 export const POCKET_Y = 4000;
+
+/** The Prop Museum's wall props once the API has answered (this session). */
+let museumWalls: readonly Exhibit[] | null = null;
+/** Pool table felt height (build.ts pool_table). */
+const POOL_FELT_Y = 0.82;
+
+const _sunC = new THREE.Color();
+const _hemiC = new THREE.Color();
+const _hemiG = new THREE.Color();
 /** Door prompt reach (m) and the most you can be moving to get one. */
 const DOOR_R = 2.2;
 const DOOR_SPEED = 7;
@@ -93,8 +117,8 @@ const Y = new THREE.Vector3(0, 1, 0);
 
 /** What the menu (React) shows. */
 export interface InteriorsView {
-  /** The door prompt outside / the way out inside. */
-  prompt: { text: string; kind: 'enter' | 'leave'; sub?: string } | null;
+  /** The door prompt outside, the way out inside, or a thing you're at (a pool table, an exhibit). */
+  prompt: { text: string; kind: 'enter' | 'leave' | 'spot'; sub?: string } | null;
   inside: { name: string; kind: InteriorKind; icon: string; label: string } | null;
   actions: Action[];
   /** The buy panel (goods for a shop, the menu elsewhere). */
@@ -103,6 +127,42 @@ export interface InteriorsView {
   coin: number | null;
   note: { text: string; at: number } | null;
   eating: { name: string; icon: string } | null;
+  /** The Prop Museum: the prop you're reading. */
+  exhibit: ExhibitView | null;
+}
+
+export interface ExhibitView {
+  id: number;
+  title: string;
+  label: string;
+  color: string;
+  ask: string;
+  votes: string;
+  href: string;
+}
+
+/** Something in the room you can use from close by (E / tap): an exhibit, a pool table… */
+interface Hotspot {
+  /** Room frame. */
+  x: number;
+  z: number;
+  reach: number;
+  text: string;
+  sub?: string;
+  run: () => void;
+}
+
+/** What `game.pool` offers (built separately; absent until it lands). */
+interface PoolApi {
+  playAt(table: {
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
+    length: number;
+    width: number;
+  }): void;
+  readonly active: boolean;
 }
 
 export interface ShopRow {
@@ -120,6 +180,7 @@ export type UiAction =
   | { a: 'menu'; index: number }
   | { a: 'buy'; id: string }
   | { a: 'gift'; coin: number }
+  | { a: 'spot' }
   | { a: 'close' };
 
 interface Saved {
@@ -158,6 +219,25 @@ interface Folk {
   wave: number;
 }
 
+/** A floor of the building (0 = the ground floor, built on entry; the rest when you get near). */
+interface Floor {
+  level: number;
+  layout: Layout;
+  built: BuiltInterior | null;
+  windows: WindowViews | null;
+  spots: Hotspot[];
+  /** Upstairs residents: they stay put (the ground floor's are `Live.folk`). */
+  folk: { def: ResidentDef; ch: NounCharacter | null; x: number; z: number; yaw: number }[];
+}
+
+/** A spot in the world (a rooftop), facing `yaw`. */
+interface Pose {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+}
+
 interface Live {
   door: BuildingDoor;
   kind: InteriorKind;
@@ -178,6 +258,23 @@ interface Live {
   outIn: number | null;
   outWhy: 'kicked' | 'caught' | null;
   town: TownId;
+  /** The real view out of the windows. */
+  windows: WindowViews;
+  atlas: ArtAtlas;
+  /** Things to use from close by, and the one you're at. */
+  spots: Hotspot[];
+  spot: Hotspot | null;
+  /** The Prop Museum: what's on the walls and plinths, and the one being read. */
+  museum: { walls: readonly Exhibit[]; plinths: readonly Exhibit[] } | null;
+  reading: Exhibit | null;
+  /** Upstairs: the floors, storey height, the floor you're on, all floors' collision merged. */
+  floors: Floor[];
+  storey: number;
+  level: number;
+  collision: THREE.BufferGeometry | null;
+  /** The real rooftop (multi-storey buildings), and where you're going out to (it, or the street). */
+  roof: Pose | null;
+  exit: Pose | null;
 }
 
 interface Area {
@@ -206,6 +303,7 @@ export class InteriorSystem implements InteriorsApi {
   private started = false;
   private view: InteriorsView = {
     prompt: null,
+    exhibit: null,
     inside: null,
     actions: [],
     shop: null,
@@ -296,6 +394,7 @@ export class InteriorSystem implements InteriorsApi {
         probe: this.game.world,
         open: (x, z) => Math.max(Math.abs(x), Math.abs(z)) < soft - 0.3 || inCorridor(x, z),
       });
+      markPropMuseum(doors);
       this.addArea({ id: 'plaza', doors, markers: null, x: 0, z: 0, streams: false });
       console.info(
         `[interiors] plaza: ${doors.length} doors in ${(performance.now() - t0).toFixed(0)} ms`,
@@ -492,8 +591,10 @@ export class InteriorSystem implements InteriorsApi {
 
   // ── Going in ──
 
-  private goIn(door: BuildingDoor) {
+  private goIn(entered: BuildingDoor) {
     const g = this.game;
+    const fromRoof = this.roofDoors.get(entered.id);
+    const door = fromRoof ?? entered;
     const t0 = performance.now();
     const kind = door.kind ?? 'home';
     const fp = door.footprint;
@@ -501,10 +602,36 @@ export class InteriorSystem implements InteriorsApi {
     const along = Math.abs(Math.sin(door.yaw)) > 0.7;
     const frontage = fp === undefined ? undefined : along ? fp.maxZ - fp.minZ : fp.maxX - fp.minX;
     const depth = fp === undefined ? undefined : along ? fp.maxX - fp.minX : fp.maxZ - fp.minZ;
-    const layout = generateLayout({ id: door.id, kind, frontage, depth, height: fp?.height });
+    const museum = isPropMuseum(door)
+      ? { walls: museumWalls ?? SNAPSHOT, plinths: FEATURED }
+      : null;
+    const base = { id: door.id, kind, frontage, depth, height: fp?.height };
+    const plan = planBuilding(base);
+    const multi = plan.floors.length > 1;
+    const layout = generateLayout({
+      ...base,
+      ...(museum !== null ? { theme: 'prop-museum' as const } : {}),
+      ...(multi ? { size: plan.size, level: 0, stairs: plan.floors[0]! } : {}),
+    });
+    // Upstairs: planned now (cheap), built when you get near
+    const uppers = plan.floors.slice(1).map((st, i) =>
+      generateLayout({
+        ...base,
+        size: plan.size,
+        level: i + 1,
+        stairs: st,
+        use: upperUse(kind, i + 1, door.id),
+        roof: i + 1 === plan.floors.length - 1,
+      }),
+    );
     const tLayout = performance.now();
     const tier = this.tier();
-    const atlas = buildArtAtlas(layout, { area: door.area, time: timeOf(g.hud.timeOfDay), tier });
+    const atlas = buildArtAtlas(layout, {
+      area: door.area,
+      time: timeOf(g.hud.timeOfDay),
+      tier,
+      ...(museum !== null ? { museum } : {}),
+    });
     const tAtlas = performance.now();
     const built = buildInterior(layout, atlas, { shadows: g.gfx.quality !== 'low' });
     const tBuild = performance.now();
@@ -609,7 +736,67 @@ export class InteriorSystem implements InteriorsApi {
       outIn: null,
       outWhy: null,
       town: townOf(door.area),
+      windows: new WindowViews(door, layout),
+      atlas,
+      spots: [],
+      spot: null,
+      museum,
+      reading: null,
+      floors: [
+        { level: 0, layout, built, windows: null, spots: [], folk: [] },
+        ...uppers.map((ul, i) => ({
+          level: i + 1,
+          layout: ul,
+          built: null,
+          windows: null,
+          spots: [],
+          folk: [],
+        })),
+      ],
+      storey: multi ? storeyHeight(plan.size.h) : 0,
+      level: 0,
+      collision: null,
+      roof: multi ? this.findRoof(door, layout) : null,
+      exit: null,
     };
+    this.live.floors[0]!.windows = this.live.windows;
+    this.live.spots = this.hotspots(this.live);
+    // The museum's latest props: hung as soon as the API answers
+    if (museum !== null && museumWalls === null) {
+      const room = this.live;
+      void latestProps().then(items => {
+        if (items === null || items.length === 0) return;
+        museumWalls = items;
+        if (this.live !== room) return;
+        room.museum = { walls: items, plinths: FEATURED };
+        room.atlas.paintExhibits?.(items, FEATURED);
+        room.spots = this.hotspots(room);
+      });
+    }
+    // The real city out of the windows (rendered now, refreshed while inside)
+    built.group.add(this.live.windows.group);
+    this.live.windows.renderAll(this.renderOutside);
+    // In from the roof: start at the top, by the hatch
+    if (fromRoof !== undefined && this.live.floors.length > 1) {
+      const L = this.live;
+      const top = L.floors.length - 1;
+      this.buildFloor(L, top);
+      L.level = top;
+      const hatch = L.floors[top]!.layout.items.find(it => it.type === 'roof_ladder');
+      const hx = hatch?.x ?? 0;
+      const hz = hatch?.z ?? L.layout.d / 2;
+      // A step into the room from the ladder
+      const [cx, cz] = [Math.sign(-hx) * 0.9, Math.sign(L.layout.d / 2 - hz) * 0.9];
+      g.player.spawn(
+        new THREE.Vector3(
+          L.origin.x + hx + cx,
+          L.origin.y + top * L.storey + 0.05,
+          L.origin.z + hz + cz,
+        ),
+        0,
+      );
+      g.cam.snap(g.player);
+    }
     this.applyEffects(effects);
     const s = built.stats;
     if (import.meta.env.DEV)
@@ -684,6 +871,9 @@ export class InteriorSystem implements InteriorsApi {
     for (const f of L.folk) this.disposeFolk(f);
     if (L.eat !== null) this.dropFood(L);
     g.world.setDynamic('interior', null);
+    L.windows.dispose();
+    for (const f of L.floors.slice(1)) this.disposeFloor(f);
+    L.collision?.dispose();
     L.built.dispose();
     disposeMaterials(L.built.group);
     const s = L.saved;
@@ -703,11 +893,14 @@ export class InteriorSystem implements InteriorsApi {
     p.softBounds = s.softBounds;
     p.mountain = s.mountain;
     p.homeSpots = s.homeSpots;
-    // Back outside the door, facing the street, on foot
+    // Back outside the door, facing the street (or out on the roof), on foot
     const d = L.door;
     const nx = Math.sin(d.yaw);
     const nz = Math.cos(d.yaw);
-    p.spawn(new THREE.Vector3(d.x + nx * 1.8, d.y + 0.3, d.z + nz * 1.8), d.yaw);
+    if (L.exit !== null) {
+      p.spawn(new THREE.Vector3(L.exit.x, L.exit.y + 0.3, L.exit.z), L.exit.yaw);
+      this.addRoofDoor(d, L.exit);
+    } else p.spawn(new THREE.Vector3(d.x + nx * 1.8, d.y + 0.3, d.z + nz * 1.8), d.yaw);
     p.mode = 'foot';
     g.cam.snap(p);
     g.cam.pitch = this.savedPitch;
@@ -727,6 +920,65 @@ export class InteriorSystem implements InteriorsApi {
     this.shopOpen = false;
     this.giftTo = null;
   }
+
+  /**
+   * Render the city as it is outside into a window's view: the world shown,
+   * the outdoor light, fog and sky back, the room hidden, for this one
+   * render; the shadow map isn't redrawn for it (its frustum is up here).
+   */
+  private renderOutside = (camera: THREE.PerspectiveCamera, target: THREE.WebGLRenderTarget) => {
+    const L = this.live;
+    if (L === null) return;
+    const g = this.game;
+    const gfx = g.gfx;
+    const s = L.saved;
+    const r = gfx.renderer;
+    const fog = gfx.scene.fog;
+    const background = gfx.scene.background;
+    const sky = gfx.sky.visible;
+    const sunC = _sunC.copy(gfx.sun.color);
+    const sunI = gfx.sun.intensity;
+    const hemiC = _hemiC.copy(gfx.hemi.color);
+    const hemiG = _hemiG.copy(gfx.hemi.groundColor);
+    const hemiI = gfx.hemi.intensity;
+    const remotes = [...g.remotes.values()].map(q => q.character.root);
+    for (const o of s.hidden) o.visible = true;
+    for (const o of remotes) o.visible = true;
+    const shown = L.floors.map(f => f.built?.group.visible ?? false);
+    for (const f of L.floors) if (f.built !== null) f.built.group.visible = false;
+    gfx.scene.fog = s.fog;
+    gfx.scene.background = s.background;
+    gfx.sky.visible = s.skyVisible;
+    gfx.sun.color.copy(s.sunColor);
+    gfx.sun.intensity = s.sunIntensity;
+    gfx.hemi.color.copy(s.hemiColor);
+    gfx.hemi.groundColor.copy(s.hemiGround);
+    gfx.hemi.intensity = s.hemiIntensity;
+    const auto = r.shadowMap.autoUpdate;
+    const prev = r.getRenderTarget();
+    r.shadowMap.autoUpdate = false;
+    try {
+      r.setRenderTarget(target);
+      r.clear();
+      r.render(gfx.scene, camera);
+    } finally {
+      r.setRenderTarget(prev);
+      r.shadowMap.autoUpdate = auto;
+      for (const o of s.hidden) o.visible = false;
+      for (const o of remotes) o.visible = false;
+      L.floors.forEach((f, i) => {
+        if (f.built !== null) f.built.group.visible = shown[i]!;
+      });
+      gfx.scene.fog = fog;
+      gfx.scene.background = background;
+      gfx.sky.visible = sky;
+      gfx.sun.color.copy(sunC);
+      gfx.sun.intensity = sunI;
+      gfx.hemi.color.copy(hemiC);
+      gfx.hemi.groundColor.copy(hemiG);
+      gfx.hemi.intensity = hemiI;
+    }
+  };
 
   private disposeFolk(f: Folk) {
     f.bubble.remove();
@@ -764,6 +1016,14 @@ export class InteriorSystem implements InteriorsApi {
       if (r.pointer) r.pointer.style.display = 'none';
     }
     const me = this.toRoom(p.pos, this._rp);
+    this.updateFloors(L, dt);
+    const here = L.floors[L.level]!;
+    here.windows?.update(
+      dt,
+      g.gfx.camera,
+      this.renderOutside,
+      this.windowRefresh && g.gfx.quality !== 'low',
+    );
 
     // Sitting: the rider is drawn on the seat; walking off stands you up
     if (L.sit !== null) {
@@ -790,15 +1050,34 @@ export class InteriorSystem implements InteriorsApi {
     // Eating: food in the hand, bites
     if (L.eat !== null) this.updateFood(L, dt);
 
-    this.dollhouse(L, dt);
-    // Residents: one character built per frame
+    if (!this.poolActive()) this.dollhouse(L, dt);
+    // What you're at: an exhibit, a pool table…
+    L.spot = null;
+    let best = Infinity;
+    for (const h of L.level === 0 ? L.spots : here.spots) {
+      const dd = Math.hypot(me.x - h.x, me.z - h.z);
+      if (dd < h.reach && dd < best) {
+        best = dd;
+        L.spot = h;
+      }
+    }
+    if (L.reading !== null && (L.spot === null || !L.spot.text.includes(`PROP ${L.reading.id}`)))
+      L.reading = null;
+    // Residents: one character built per frame (downstairs first)
     const unbuilt = L.folk.find(f => f.ch === null);
     if (unbuilt !== undefined) unbuilt.ch = this.makeCharacter(unbuilt.def);
+    else this.stepUpFolk(L, here, dt, me);
+    for (const f of L.folk) if (f.ch !== null) f.ch.root.visible = L.level === 0;
     let near: Folk | null = null;
     let nearD = NEAR_FOLK;
     let watched = false;
+    const down = L.level === 0;
     for (const f of L.folk) {
       this.stepFolk(L, f, dt, me);
+      if (!down) {
+        f.bubble.style.display = 'none';
+        continue;
+      }
       const d = Math.hypot(f.pos.x - me.x, f.pos.z - me.z);
       if (d < nearD) {
         nearD = d;
@@ -824,10 +1103,10 @@ export class InteriorSystem implements InteriorsApi {
     // Menu context
     this.ctx = {
       near: near?.def.id ?? null,
-      seat: L.sit !== null ? null : this.nearSeat(L, me),
-      stealable: this.nearStealable(L, me),
+      seat: L.sit !== null || !down ? null : this.nearSeat(L, me),
+      stealable: down ? this.nearStealable(L, me) : null,
       watched,
-      canBuy: this.canBuy(L, me),
+      canBuy: down && this.canBuy(L, me),
     };
   }
 
@@ -863,7 +1142,7 @@ export class InteriorSystem implements InteriorsApi {
     const tx = p.x + fx * ahead;
     const ty = p.y + 1.1 - 0.4 * pushed;
     const tz = p.z + fz * ahead;
-    const y = o.y + Math.max(lay.h + 0.35, 3.6);
+    const y = o.y + L.level * L.storey + Math.max(lay.h + 0.35, 3.6);
     const k = this.camInit ? 1 - Math.exp(-7 * dt) : 1;
     this.camPos.lerp(this._w.set(x, y, z), k);
     this.camLook.lerp(this._w.set(tx, ty, tz), this.camInit ? 1 - Math.exp(-12 * dt) : 1);
@@ -1206,6 +1485,10 @@ export class InteriorSystem implements InteriorsApi {
       case 'close':
         this.shopOpen = false;
         this.giftTo = null;
+        if (L !== null) L.reading = null;
+        return;
+      case 'spot':
+        if (L !== null && this.phase === 'inside' && !this.poolActive()) L.spot?.run();
         return;
       case 'gift':
         if (L !== null && this.giftTo !== null) void this.gift(L, this.giftTo, u.coin);
@@ -1388,17 +1671,39 @@ export class InteriorSystem implements InteriorsApi {
         coin,
         note,
         eating: null,
+        exhibit: null,
       });
       return;
     }
     const me = this.toRoom(this.game.player.pos, this._w);
-    const atDoor = me.z < 1.3 && Math.abs(me.x - L.layout.door.x) < 1.1;
+    const atDoor = L.level === 0 && me.z < 1.3 && Math.abs(me.x - L.layout.door.x) < 1.1;
     const k = KIND_LABEL[L.kind];
-    const actions = this.phase === 'inside' ? menu(L.visit, this.ctx) : [];
+    const pool = this.poolActive();
+    const actions = this.phase === 'inside' && !pool ? menu(L.visit, this.ctx) : [];
+    const spot = this.phase === 'inside' && !pool && !atDoor ? L.spot : null;
+    const r = L.reading;
     const giftF = this.giftTo !== null ? L.folk.find(f => f.def.id === this.giftTo) : undefined;
+    const floorLabel =
+      L.level > 0 && L.floors[L.level]!.layout.use !== undefined
+        ? ` · ${USE_LABEL[L.floors[L.level]!.layout.use!].toUpperCase()}`
+        : '';
     this.setView({
-      prompt: atDoor && this.phase === 'inside' ? { text: 'LEAVE', kind: 'leave' } : null,
-      inside: { name: L.door.name ?? k.label, kind: L.kind, icon: k.icon, label: k.label },
+      prompt:
+        atDoor && this.phase === 'inside' && !pool
+          ? { text: 'LEAVE', kind: 'leave' }
+          : spot !== null
+            ? {
+                text: spot.text,
+                kind: 'spot',
+                ...(spot.sub !== undefined ? { sub: spot.sub } : {}),
+              }
+            : null,
+      inside: {
+        name: `${L.door.name ?? k.label}${floorLabel}`,
+        kind: L.kind,
+        icon: k.icon,
+        label: L.level > 0 ? `FLOOR ${L.level + 1}` : k.label,
+      },
       actions,
       shop: this.shopOpen
         ? { title: L.kind === 'shop' ? 'BUY · INTO THE VAN' : 'MENU', rows: this.shopRows(L) }
@@ -1410,6 +1715,18 @@ export class InteriorSystem implements InteriorsApi {
       coin,
       note,
       eating: L.eat !== null ? { name: L.eat.food.name, icon: L.eat.food.icon } : null,
+      exhibit:
+        r !== null && !pool
+          ? {
+              id: r.id,
+              title: r.title,
+              label: label(r),
+              color: labelColor(label(r)),
+              ask: askText(r),
+              votes: `${r.forVotes} for · ${r.againstVotes} against`,
+              href: `/vote/${r.id}`,
+            }
+          : null,
     });
   }
 
@@ -1476,6 +1793,8 @@ export class InteriorSystem implements InteriorsApi {
       return;
     if (this.game.paused) return;
     const inside = this.live !== null;
+    // The pool game has the keys while you play
+    if (inside && this.poolActive()) return;
     if (e.code === 'KeyE') {
       if (!inside && this.near !== null && this.phase === 'outside') {
         e.stopImmediatePropagation();
@@ -1485,6 +1804,7 @@ export class InteriorSystem implements InteriorsApi {
         e.stopImmediatePropagation();
         e.preventDefault();
         if (this.view.prompt?.kind === 'leave') this.requestLeave();
+        else if (this.view.prompt?.kind === 'spot') this.act({ a: 'spot' });
       }
       return;
     }
@@ -1495,10 +1815,14 @@ export class InteriorSystem implements InteriorsApi {
       e.preventDefault();
       return;
     }
-    if (e.code === 'Escape' && (this.shopOpen || this.giftTo !== null)) {
+    if (
+      e.code === 'Escape' &&
+      (this.shopOpen || this.giftTo !== null || this.live?.reading != null)
+    ) {
       e.stopImmediatePropagation();
       this.shopOpen = false;
       this.giftTo = null;
+      if (this.live !== null) this.live.reading = null;
       return;
     }
     // 1–9: the menu, the gift amounts or the shop rows
@@ -1516,6 +1840,277 @@ export class InteriorSystem implements InteriorsApi {
       } else this.act({ a: 'menu', index: i });
     }
   };
+
+  // ── Upstairs ──
+
+  /** Which floor you're on (by height), the floors shown, the next one built. */
+  private updateFloors(L: Live, dt: number) {
+    void dt;
+    if (L.floors.length < 2) return;
+    const g = this.game;
+    const y = g.player.pos.y - L.origin.y;
+    const level = Math.max(0, Math.min(L.floors.length - 1, Math.floor(y / L.storey + 0.5)));
+    if (level !== L.level) {
+      L.level = level;
+      L.reading = null;
+      if (L.sit !== null) L.sit = null;
+    }
+    L.floors.forEach((f, i) => {
+      if (f.built !== null) f.built.group.visible = i === L.level;
+      for (const u of f.folk) if (u.ch !== null) u.ch.root.visible = i === L.level;
+    });
+    // Build the floor above / below (one per frame, once you've settled in)
+    if (L.t < 0.4) return;
+    for (const k of [L.level + 1, L.level - 1])
+      if (k > 0 && k < L.floors.length && L.floors[k]!.built === null) {
+        this.buildFloor(L, k);
+        return;
+      }
+  }
+
+  private buildFloor(L: Live, k: number) {
+    const g = this.game;
+    const f = L.floors[k]!;
+    const base = k * L.storey;
+    const atlas = buildArtAtlas(f.layout, {
+      area: L.door.area,
+      time: timeOf(g.hud.timeOfDay),
+      tier: this.tier(),
+    });
+    const built = buildInterior(f.layout, atlas, { shadows: g.gfx.quality !== 'low' });
+    if (g.gfx.toon) toonify(built.group);
+    built.group.position.set(L.origin.x, L.origin.y + base, L.origin.z);
+    built.group.visible = k === L.level;
+    g.gfx.scene.add(built.group);
+    f.built = built;
+    f.windows = new WindowViews({ ...L.door, y: L.door.y + base }, f.layout);
+    built.group.add(f.windows.group);
+    built.group.updateMatrixWorld(true);
+    f.windows.renderAll(this.renderOutside);
+    f.spots = this.hotspots(L, f.layout, base);
+    // Someone up here now and then
+    const defs = residentsFor(`${L.door.id}:up${k}`, f.layout, this.tier());
+    const def = defs.find(d => d.role !== 'owner');
+    if (def !== undefined && hash32(`${L.door.id}:upfolk:${k}`) % 3 !== 0) {
+      const spot = f.layout.spots[def.home] ?? { x: 0, z: f.layout.d / 2, yaw: 0 };
+      prefetchGlbHead(def.seed[3], def.seed[4]);
+      f.folk.push({ def, ch: null, x: spot.x, z: spot.z, yaw: spot.yaw });
+    }
+    this.updateCollision(L);
+  }
+
+  /** Every built floor's collision, stacked, as the one dynamic piece. */
+  private updateCollision(L: Live) {
+    const parts: THREE.BufferGeometry[] = [];
+    L.floors.forEach((f, i) => {
+      if (f.built === null) return;
+      const c = f.built.collision.clone();
+      c.translate(0, i * L.storey, 0);
+      parts.push(c);
+    });
+    const merged = mergeGeometries(parts, false);
+    for (const c of parts) c.dispose();
+    if (merged === null) return;
+    this.game.world.setDynamic('interior', merged, L.origin);
+    L.collision?.dispose();
+    L.collision = merged;
+  }
+
+  /** Upstairs residents: built lazily, standing, turning to you when you're close. */
+  private stepUpFolk(L: Live, f: Floor, dt: number, me: THREE.Vector3) {
+    if (f.level === 0) return;
+    const base = f.level * L.storey;
+    for (const u of f.folk) {
+      if (u.ch === null) {
+        u.ch = this.makeCharacter(u.def);
+        return;
+      }
+      if (Math.hypot(me.x - u.x, me.z - u.z) < 3.5)
+        u.yaw = turnTo(u.yaw, Math.atan2(me.x - u.x, me.z - u.z), dt * 5);
+      const o = L.origin;
+      u.ch.root.position.set(o.x + u.x, o.y + base, o.z + u.z);
+      u.ch.root.quaternion.setFromAxisAngle(Y, u.yaw);
+      u.ch.play({ clip: 'idle', fade: 0.25 });
+      u.ch.update(dt, { lean: 0, travelled: 0, riding: false, grounded: true });
+    }
+  }
+
+  private disposeFloor(f: Floor) {
+    for (const u of f.folk) {
+      if (u.ch === null) continue;
+      u.ch.dispose();
+      disposeMaterials(u.ch.body, true);
+      u.ch.root.traverse(o => (o as THREE.SkinnedMesh).skeleton?.dispose());
+    }
+    f.folk.length = 0;
+    f.windows?.dispose();
+    if (f.built !== null) {
+      f.built.dispose();
+      disposeMaterials(f.built.group);
+    }
+    f.built = null;
+  }
+
+  /**
+   * The building's real rooftop: straight down onto it from above, at the
+   * middle of its footprint (or a little off it if the middle is open).
+   */
+  private findRoof(door: BuildingDoor, l: Layout): Pose | null {
+    const fp = door.footprint;
+    const [ix, iz] = [Math.sin(door.yaw + Math.PI), Math.cos(door.yaw + Math.PI)];
+    const cx = fp !== undefined ? (fp.minX + fp.maxX) / 2 : door.x + ix * (l.d / 2);
+    const cz = fp !== undefined ? (fp.minZ + fp.maxZ) / 2 : door.z + iz * (l.d / 2);
+    const tries: [number, number][] = [
+      [cx, cz],
+      [(cx + door.x) / 2, (cz + door.z) / 2],
+      [cx + 1.5, cz],
+      [cx - 1.5, cz],
+      [cx, cz + 1.5],
+      [cx, cz - 1.5],
+    ];
+    for (const [x, z] of tries) {
+      const hit = this.game.world.raycast(
+        this._w.set(x, door.y + 250, z),
+        new THREE.Vector3(0, -1, 0),
+        300,
+      );
+      if (hit !== null && hit.normal.y > 0.7 && hit.point.y > door.y + 2.5)
+        return { x, y: hit.point.y, z, yaw: door.yaw };
+    }
+    return null;
+  }
+
+  /** Doors on the rooftops you've been out on: back in, at the top of the stairs. */
+  private roofDoors = new Map<string, BuildingDoor>();
+
+  private addRoofDoor(d: BuildingDoor, at: Pose) {
+    const id = `${d.id}#roof`;
+    // (towns reload their doors when you come back: look in the area, not the map)
+    const a = this.areas.get(d.area);
+    if (a === undefined || a.doors.some(q => q.id === id)) return;
+    // A little back from where you came out, facing the way you face
+    const roof: BuildingDoor = {
+      id,
+      area: d.area,
+      x: at.x - Math.sin(at.yaw) * 1.2,
+      y: at.y,
+      z: at.z - Math.cos(at.yaw) * 1.2,
+      yaw: at.yaw,
+      width: 1.0,
+      ...(d.kind !== undefined ? { kind: d.kind } : {}),
+      name: `Roof · ${d.name ?? KIND_LABEL[d.kind ?? 'home'].label}`,
+    };
+    this.roofDoors.set(id, d);
+    a.doors.push(roof);
+    if (a.markers !== null) {
+      a.markers.dispose();
+      a.markers = null;
+    }
+    a.markers = buildDoorMarkers(a.doors, o => {
+      if (this.game.gfx.toon) toonify(o);
+    });
+    this.game.gfx.scene.add(a.markers.group);
+  }
+
+  /** Re-render the window views while inside (off: the entry snapshot only). */
+  windowRefresh = true;
+
+  /** Is the pool game running (game.pool, when it exists)? */
+  private poolActive(): boolean {
+    return (this.game as unknown as { pool?: PoolApi }).pool?.active === true;
+  }
+
+  /** The room's hotspots: exhibits (the Prop Museum), pool tables, the roof ladder. */
+  private hotspots(L: Live, l: Layout = L.layout, base = 0): Hotspot[] {
+    const out: Hotspot[] = [];
+    // The way out onto the real roof (top floor)
+    for (const it of l.items) {
+      if (it.type !== 'roof_ladder') continue;
+      out.push({
+        x: it.x,
+        z: it.z,
+        reach: 1.5,
+        text: L.roof !== null ? 'UP TO THE ROOF' : 'ROOF HATCH',
+        sub: '🪜',
+        run: () => {
+          if (L.roof === null) {
+            this.notice('🪜 The hatch is bolted shut.');
+            return;
+          }
+          L.exit = L.roof;
+          this.requestLeave();
+        },
+      });
+    }
+    // Pool tables: E to play (game.pool, when it's there)
+    for (const it of l.items) {
+      if (it.type !== 'pool_table') continue;
+      const r = (it.rot * Math.PI) / 2;
+      out.push({
+        x: it.x,
+        z: it.z,
+        reach: Math.max(it.w, it.d) / 2 + 0.9,
+        text: 'PLAY POOL',
+        sub: '🎱',
+        run: () => {
+          const pool = (this.game as unknown as { pool?: PoolApi }).pool;
+          if (pool === undefined) {
+            this.notice('🎱 The cues are out being chalked. Come back soon!');
+            return;
+          }
+          const long = Math.max(it.w, it.d);
+          const short = Math.min(it.w, it.d);
+          pool.playAt({
+            x: L.origin.x + it.x,
+            y: L.origin.y + base + POOL_FELT_Y,
+            z: L.origin.z + it.z,
+            // Long axis: the item's local x when it's wider than deep
+            yaw: it.w >= it.d ? r + Math.PI / 2 : r,
+            length: long - 0.2,
+            width: short - 0.2,
+          });
+        },
+      });
+    }
+    const m = L.museum;
+    if (m === null || l !== L.layout) return out;
+    // Placards on the walls, in order; plinths in the middle
+    let k = 0;
+    for (const d of l.decor) {
+      if (d.type !== 'placard' || m.walls.length === 0) continue;
+      const e = m.walls[k++ % m.walls.length]!;
+      const [x, z] =
+        d.wall === 'n'
+          ? [d.at, l.d - 0.9]
+          : d.wall === 's'
+            ? [d.at, 0.9]
+            : d.wall === 'e'
+              ? [l.w / 2 - 0.9, d.at]
+              : [-l.w / 2 + 0.9, d.at];
+      out.push(this.readSpot(L, e, x, z));
+    }
+    l.items
+      .filter(it => it.type === 'plinth')
+      .forEach((it, i) => {
+        const e = m.plinths[i % m.plinths.length];
+        if (e !== undefined)
+          out.push(this.readSpot(L, e, it.x, it.z, Math.max(it.w, it.d) / 2 + 0.8));
+      });
+    return out;
+  }
+
+  private readSpot(L: Live, e: Exhibit, x: number, z: number, reach = 1.0): Hotspot {
+    return {
+      x,
+      z,
+      reach,
+      text: `READ PROP ${e.id}`,
+      sub: '📜',
+      run: () => {
+        L.reading = e;
+      },
+    };
+  }
 
   /** Dev / browser checks: walk straight in through a door (by id, or the nearest). */
   debugEnter(id?: string) {
@@ -1542,6 +2137,23 @@ export class InteriorSystem implements InteriorsApi {
       })),
       ctx: this.ctx,
       stats: L.built.stats,
+      windows: {
+        count: L.windows.views.length,
+        renders: L.floors.reduce((n, f) => n + (f.windows?.renders ?? 0), 0),
+        lastMs: L.floors[L.level]!.windows?.lastMs ?? 0,
+      },
+      level: L.level,
+      storey: L.storey,
+      roof: L.roof,
+      spot: L.spot?.text ?? null,
+      floors: L.floors.map(f => ({
+        level: f.level,
+        use: f.layout.use ?? null,
+        built: f.built !== null,
+        stairs: f.layout.stairs ?? null,
+        items: f.layout.items.map(it => ({ type: it.type, x: it.x, z: it.z, w: it.w, d: it.d })),
+        decor: f.layout.decor.map(d => ({ type: d.type, wall: d.wall, at: d.at, y: d.y })),
+      })),
     };
   }
 

@@ -39,6 +39,8 @@ export interface Line {
 export interface AgentHandlers {
   onEnterWorld: () => void;
   onEnterHoops: () => void;
+  /** NOUN DRIVE (optional: older hosts don't pass it) */
+  onEnterDrive?: () => void;
   onEnterWarfare: () => void;
   onOpen: (app: AppKind) => void;
   onNavigate: (path: string) => void;
@@ -54,6 +56,10 @@ export const LOCAL_VERBS = [
   'bball',
   'basketball',
   'noun hoops',
+  'drive',
+  'car',
+  'cars',
+  'noun drive',
   'warfare',
   'paintball',
   'noun warfare',
@@ -108,11 +114,14 @@ export function useNounIRL(h: AgentHandlers) {
     async (raw: string): Promise<boolean> => {
       const text = raw.trim();
       if (text === '') return true;
-      const { onEnterWorld, onEnterHoops, onEnterWarfare, onOpen, onNavigate } = hr.current;
+      const { onEnterWorld, onEnterHoops, onEnterDrive, onEnterWarfare, onOpen, onNavigate } =
+        hr.current;
       const cmd = text.toLowerCase().replace(/^\//, '');
       const world = game('world').loading;
       const hoops = game('hoops').loading;
       const war = game('warfare').loading;
+      const drive = game('drive').loading;
+      const goDrive = onEnterDrive ?? onEnterWorld;
       const local: Record<string, [() => void, string?]> = {
         play: [onEnterWorld, world],
         skate: [onEnterWorld, world],
@@ -122,6 +131,10 @@ export function useNounIRL(h: AgentHandlers) {
         bball: [onEnterHoops, hoops],
         basketball: [onEnterHoops, hoops],
         'noun hoops': [onEnterHoops, hoops],
+        drive: [goDrive, drive],
+        car: [goDrive, drive],
+        cars: [goDrive, drive],
+        'noun drive': [goDrive, drive],
         warfare: [onEnterWarfare, war],
         paintball: [onEnterWarfare, war],
         'noun warfare': [onEnterWarfare, war],

@@ -9,7 +9,8 @@
 // solid item, as one position-only geometry for CollisionWorld.setDynamic.
 
 import type { ArtAtlas } from './art';
-import type { Decor, Item, Layout, Palette } from './layout';
+import type { Box2, Decor, Item, Layout, Palette } from './layout';
+import type { StairPlan } from './storeys';
 
 import * as THREE from 'three';
 
@@ -18,6 +19,7 @@ import { GOOD_IDS } from '../trade/goods';
 import { Kit, box, boxAt, cyl, kitMaterials, panel, ring, shade, sphere } from './kit';
 import { itemBox } from './layout';
 import { mulberry32, pick, type Rng } from './rng';
+import { resolveFights } from './zfight';
 
 /** Walls run this high (above the visible ceiling) so the camera never sees past them. */
 export const WALL_TOP = 4.6;
@@ -47,16 +49,15 @@ const GOOD_COLORS: Record<string, number> = {
 
 const BOOK_COLS = [0xc23a2b, 0x2c6fb0, 0xf2c94c, 0x2f8a5f, 0xf4f1ea, 0x6b4a8a, 0x222222, 0xe8742b];
 
-export function buildInterior(
-  l: Layout,
-  atlas: ArtAtlas,
-  opts: { shadows: boolean },
-): BuiltInterior {
+/** Everything in the room as kit geometry (no materials yet): tests read it. */
+export function buildKit(l: Layout, atlas: Pick<ArtAtlas, 'slots' | 'named'>): Kit {
   const kit = new Kit();
   const P = l.palette;
   const rnd = mulberry32(l.seed ^ 0x5eed);
+  kit.tag = 'shell';
   shell(kit, l, rnd);
   l.items.forEach(it => {
+    kit.tag = it.type;
     kit.frame.compose(
       new THREE.Vector3(it.x, 0, it.z),
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (it.rot * Math.PI) / 2),
@@ -73,12 +74,23 @@ export function buildInterior(
       );
     }
   });
-  l.decor.forEach((d, i) => buildDecor(kit, d, i, l, atlas, mulberry32(d.seed)));
+  l.decor.forEach((d, i) => {
+    kit.tag = `decor:${d.type}`;
+    buildDecor(kit, d, i, l, atlas, mulberry32(d.seed));
+  });
   // Collision: floor, walls, ceiling, partitions + items
   const W = l.w;
   const D = l.d;
+  // The floor slab (with the stairwell cut out upstairs)
+  const hole = l.stairs?.down ?? null;
+  for (const r of subtractRect(
+    { minX: -W / 2 - 1, maxX: W / 2 + 1, minZ: -1, maxZ: D + 1 },
+    hole === null ? null : { minX: hole.x0, maxX: hole.x1, minZ: hole.z0, maxZ: hole.z1 },
+  ))
+    kit.col.push(
+      new THREE.Box3(new THREE.Vector3(r.minX, -0.5, r.minZ), new THREE.Vector3(r.maxX, 0, r.maxZ)),
+    );
   kit.col.push(
-    new THREE.Box3(new THREE.Vector3(-W / 2 - 1, -0.5, -1), new THREE.Vector3(W / 2 + 1, 0, D + 1)),
     new THREE.Box3(new THREE.Vector3(-W / 2 - 1, 0, -1), new THREE.Vector3(W / 2 + 1, WALL_TOP, 0)),
     new THREE.Box3(
       new THREE.Vector3(-W / 2 - 1, 0, D),
@@ -89,11 +101,15 @@ export function buildInterior(
       new THREE.Vector3(-W / 2, WALL_TOP, D + 1),
     ),
     new THREE.Box3(new THREE.Vector3(W / 2, 0, -1), new THREE.Vector3(W / 2 + 1, WALL_TOP, D + 1)),
-    new THREE.Box3(
-      new THREE.Vector3(-W / 2 - 1, COL_CEILING, -1),
-      new THREE.Vector3(W / 2 + 1, COL_CEILING + 0.3, D + 1),
-    ),
   );
+  // A ceiling, unless there's a floor above (its slab is the ceiling, open over the stairs)
+  if (l.stairs?.up == null)
+    kit.col.push(
+      new THREE.Box3(
+        new THREE.Vector3(-W / 2 - 1, COL_CEILING, -1),
+        new THREE.Vector3(W / 2 + 1, COL_CEILING + 0.3, D + 1),
+      ),
+    );
   for (const p of l.partitions) {
     if (p.axis !== 'z') continue;
     kit.col.push(
@@ -111,7 +127,21 @@ export function buildInterior(
       ),
     );
   }
-  const collision = boxesToGeometry(kit.col);
+  // Nothing laid on something else may share its plane (labels, bands,
+  // lamp panels, rugs, art): pull every coplanar overlap apart. (Browser
+  // checks can switch it off to show the before: `__interiorsNoZFix`.)
+  if ((globalThis as { __interiorsNoZFix?: boolean }).__interiorsNoZFix !== true)
+    resolveFights(kit.all());
+  return kit;
+}
+
+export function buildInterior(
+  l: Layout,
+  atlas: ArtAtlas,
+  opts: { shadows: boolean },
+): BuiltInterior {
+  const kit = buildKit(l, atlas);
+  const collision = boxesToGeometry(kit.col, kit.colTris);
 
   const mats = kitMaterials(atlas.texture);
   const built = kit.build(mats, opts.shadows);
@@ -145,9 +175,122 @@ export function buildInterior(
   };
 }
 
+/** `b` minus `hole` as up to four rectangles (all of `b` when they don't meet). */
+export function subtractRect(b: Box2, hole: Box2 | null): Box2[] {
+  if (
+    hole === null ||
+    hole.minX >= b.maxX ||
+    hole.maxX <= b.minX ||
+    hole.minZ >= b.maxZ ||
+    hole.maxZ <= b.minZ
+  )
+    return [b];
+  const out: Box2[] = [];
+  const z0 = Math.max(b.minZ, hole.minZ);
+  const z1 = Math.min(b.maxZ, hole.maxZ);
+  if (hole.minZ > b.minZ) out.push({ ...b, maxZ: hole.minZ });
+  if (hole.maxZ < b.maxZ) out.push({ ...b, minZ: hole.maxZ });
+  if (hole.minX > b.minX) out.push({ minX: b.minX, maxX: hole.minX, minZ: z0, maxZ: z1 });
+  if (hole.maxX < b.maxX) out.push({ minX: hole.maxX, maxX: b.maxX, minZ: z0, maxZ: z1 });
+  return out.filter(r => r.maxX - r.minX > 1e-4 && r.maxZ - r.minZ > 1e-4);
+}
+
+/** A kit whose `add` cuts `hole` (room frame, x/z) out of the axis-aligned boxes it's given. */
+function holed(kit: Kit, hole: Box2 | null): Pick<Kit, 'add'> {
+  if (hole === null) return kit;
+  return {
+    add(g: THREE.BufferGeometry, color: number, bucket?: Parameters<Kit['add']>[2]) {
+      g.computeBoundingBox();
+      const bb = g.boundingBox!;
+      const parts = subtractRect(
+        { minX: bb.min.x, maxX: bb.max.x, minZ: bb.min.z, maxZ: bb.max.z },
+        hole,
+      );
+      if (parts.length === 1 && parts[0]!.minX === bb.min.x && parts[0]!.maxZ === bb.max.z) {
+        kit.add(g, color, bucket);
+        return;
+      }
+      g.dispose();
+      for (const r of parts)
+        kit.add(boxAt(r.minX, r.maxX, bb.min.y, bb.max.y, r.minZ, r.maxZ), color, bucket);
+    },
+  };
+}
+
+/**
+ * A straight flight in its item frame (centre of its footprint), `y0` its
+ * foot: treads, risers, a stringer each side, a handrail on the open side.
+ * `collide`: its ramp (a closed wedge, the feet walk up the slope) goes in.
+ */
+function buildFlight(kit: Kit, st: StairPlan, y0: number, P: Palette, l: Layout, collide = true) {
+  const w = st.x1 - st.x0;
+  const run = st.z1 - st.z0;
+  const n = st.steps;
+  const tread = run / n;
+  const riser = st.rise / n;
+  const wood = shade(P.wood, -0.05);
+  const nose = shade(P.wood, 0.15);
+  for (let i = 0; i < n; i++) {
+    const z = -run / 2 + i * tread;
+    const top = y0 + (i + 1) * riser;
+    // Each step is a block down to the slope below it (no gaps to see through)
+    kit.add(
+      boxAt(-w / 2 + 0.05, w / 2 - 0.05, Math.max(y0, top - riser * 2.2), top, z, z + tread),
+      wood,
+    );
+    kit.add(boxAt(-w / 2 + 0.05, w / 2 - 0.05, top - 0.03, top + 0.005, z - 0.015, z + 0.04), nose);
+  }
+  // Stringers: sloped slabs along both sides
+  const len = Math.hypot(run, st.rise);
+  const ang = Math.atan2(st.rise, run);
+  for (const x of [-w / 2 + 0.025, w / 2 - 0.025])
+    kit.add(
+      new THREE.BoxGeometry(0.05, 0.3, len).rotateX(-ang).translate(x, y0 + st.rise / 2 + 0.05, 0),
+      shade(P.trim, -0.25),
+    );
+  // Handrail on the room side, on posts
+  const open = st.side === 'e' ? -w / 2 + 0.03 : w / 2 - 0.03;
+  kit.add(
+    new THREE.BoxGeometry(0.05, 0.05, len)
+      .rotateX(-ang)
+      .translate(open, y0 + st.rise / 2 + 0.95, 0),
+    0x2b2b2b,
+  );
+  for (let i = 0; i <= 4; i++) {
+    const f = i / 4;
+    const z = -run / 2 + f * run;
+    const yb = y0 + f * st.rise;
+    kit.add(boxAt(open - 0.02, open + 0.02, yb, yb + 0.95, z - 0.02, z + 0.02), 0x2b2b2b);
+  }
+  void l;
+  if (!collide) return;
+  // The ramp underfoot: a closed wedge in the room frame
+  const t = kit.colTris;
+  const [a, b] = [st.x0, st.x1];
+  const quad = (p: number[][]) =>
+    t.push(...p[0]!, ...p[1]!, ...p[2]!, ...p[0]!, ...p[2]!, ...p[3]!);
+  // Slope
+  quad([
+    [a, y0, st.z0],
+    [b, y0, st.z0],
+    [b, y0 + st.rise, st.z1],
+    [a, y0 + st.rise, st.z1],
+  ]);
+  // Sides
+  t.push(a, y0, st.z0, a, y0 + st.rise, st.z1, a, y0, st.z1);
+  t.push(b, y0, st.z0, b, y0, st.z1, b, y0 + st.rise, st.z1);
+  // Back
+  quad([
+    [a, y0, st.z1],
+    [a, y0 + st.rise, st.z1],
+    [b, y0 + st.rise, st.z1],
+    [b, y0, st.z1],
+  ]);
+}
+
 /** Box3 list → one non-indexed position-only geometry. */
-export function boxesToGeometry(boxes: THREE.Box3[]): THREE.BufferGeometry {
-  const pos: number[] = [];
+export function boxesToGeometry(boxes: THREE.Box3[], tris: number[] = []): THREE.BufferGeometry {
+  const pos: number[] = [...tris];
   const tmp = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
   const a = tmp.attributes.position as THREE.BufferAttribute;
   for (const b of boxes) {
@@ -175,7 +318,9 @@ function shell(kit: Kit, l: Layout, rnd: Rng) {
   const H = l.h;
   kit.frame.identity();
   kit.base = 'shell';
+  kit.tag = 'shell:floor';
   floor(kit, l, rnd);
+  kit.tag = 'shell:walls';
   // Walls: inner faces at the room's edges (boxes reaching outward, tall)
   const lower = 1.05;
   const twoTone = l.kind !== 'gallery';
@@ -202,20 +347,24 @@ function shell(kit: Kit, l: Layout, rnd: Rng) {
   // The door you came in by (closed behind you), with a frame, a handle and a mat
   const dx = l.door.x;
   const dw = l.door.width;
-  kit.add(boxAt(dx - dw / 2 - 0.12, dx + dw / 2 + 0.12, 0, 2.38, 0, 0.06), P.trim);
-  kit.add(boxAt(dx - dw / 2, dx + dw / 2, 0, 2.25, 0, 0.08), shade(P.wood, -0.15));
-  for (const y of [0.45, 1.35])
-    kit.add(
-      boxAt(dx - dw / 2 + 0.12, dx + dw / 2 - 0.12, y, y + 0.7, 0.08, 0.1),
-      shade(P.wood, 0.08),
-    );
-  kit.add(sphere(0.045, dx + dw / 2 - 0.15, 1.05, 0.13), 0xd9b45a);
-  kit.add(boxAt(dx - 0.6, dx + 0.6, 0, 0.015, 0.15, 0.95), shade(P.accent, -0.3));
-  // EXIT glow over the door
-  kit.add(boxAt(dx - 0.22, dx + 0.22, 2.48, 2.64, 0.02, 0.06), 0x2fbf71, 'glow');
+  kit.tag = 'shell:door';
+  if ((l.level ?? 0) === 0) {
+    kit.add(boxAt(dx - dw / 2 - 0.12, dx + dw / 2 + 0.12, 0, 2.38, 0, 0.06), P.trim);
+    kit.add(boxAt(dx - dw / 2, dx + dw / 2, 0, 2.25, 0, 0.08), shade(P.wood, -0.15));
+    for (const y of [0.45, 1.35])
+      kit.add(
+        boxAt(dx - dw / 2 + 0.12, dx + dw / 2 - 0.12, y, y + 0.7, 0.08, 0.1),
+        shade(P.wood, 0.08),
+      );
+    kit.add(sphere(0.045, dx + dw / 2 - 0.15, 1.05, 0.13), 0xd9b45a);
+    kit.add(boxAt(dx - 0.6, dx + 0.6, 0, 0.015, 0.15, 0.95), shade(P.accent, -0.3));
+    // EXIT glow over the door
+    kit.add(boxAt(dx - 0.22, dx + 0.22, 2.48, 2.64, 0.02, 0.06), 0x2fbf71, 'glow');
+  }
   // Partition walls (homes): with a doorway and a frame
   for (const p of l.partitions) {
     if (p.axis !== 'z') continue;
+    kit.tag = 'shell:partition';
     const z0 = p.at - 0.06;
     const z1 = p.at + 0.06;
     kit.add(boxAt(p.from, p.gap[0], 0, H, z0, z1), P.wall);
@@ -229,6 +378,7 @@ function shell(kit: Kit, l: Layout, rnd: Rng) {
   }
   // Ceiling fixtures
   for (const li of l.lights) {
+    kit.tag = 'shell:light';
     kit.frame.makeTranslation(li.x, 0, li.z);
     if (li.kind === 'pendant') {
       // Short drops: the camera looks down past them from above
@@ -257,7 +407,12 @@ function shell(kit: Kit, l: Layout, rnd: Rng) {
   kit.base = 'solid';
 }
 
-function floor(kit: Kit, l: Layout, rnd: Rng) {
+function floor(base: Kit, l: Layout, rnd: Rng) {
+  const down = l.stairs?.down ?? null;
+  const kit = holed(
+    base,
+    down === null ? null : { minX: down.x0, maxX: down.x1, minZ: down.z0, maxZ: down.z1 },
+  );
   const P = l.palette;
   const W = l.w;
   const D = l.d;
@@ -271,14 +426,7 @@ function floor(kit: Kit, l: Layout, rnd: Rng) {
           const len = 1.2 + rnd() * 1.4;
           const c = shade(rnd() < 0.5 ? P.floor : P.floor2, (rnd() - 0.5) * 0.12);
           kit.add(
-            boxAt(
-              x + 0.004,
-              Math.min(W / 2, x + pw) - 0.004,
-              y0,
-              0,
-              Math.max(0, z),
-              Math.min(D, z + len) - 0.01,
-            ),
+            boxAt(x, Math.min(W / 2, x + pw), y0, 0, Math.max(0, z), Math.min(D, z + len)),
             c,
           );
           z += len;
@@ -296,17 +444,7 @@ function floor(kit: Kit, l: Layout, rnd: Rng) {
           const z = j * s;
           const alt = l.floorStyle === 'checker' ? (i + j) % 2 === 0 : rnd() < 0.15;
           const c = alt ? P.floor2 : shade(P.floor, (rnd() - 0.5) * 0.04);
-          kit.add(
-            boxAt(
-              x + 0.01,
-              Math.min(W / 2, x + s) - 0.01,
-              y0,
-              0,
-              z + 0.01,
-              Math.min(D, z + s) - 0.01,
-            ),
-            c,
-          );
+          kit.add(boxAt(x, Math.min(W / 2, x + s), y0, 0, z, Math.min(D, z + s)), c);
         }
       kit.add(boxAt(-W / 2, W / 2, y0 - 0.02, y0 + 0.05, 0, D), shade(P.floor, -0.4));
       break;
@@ -385,7 +523,14 @@ function shelvesOf(
   }
 }
 
-function buildItem(kit: Kit, it: Item, P: Palette, rnd: Rng, atlas: ArtAtlas, l: Layout) {
+function buildItem(
+  kit: Kit,
+  it: Item,
+  P: Palette,
+  rnd: Rng,
+  atlas: Pick<ArtAtlas, 'slots' | 'named'>,
+  l: Layout,
+) {
   const { w, d, h } = it;
   const fabric = pick(rnd, [P.fabric, shade(P.fabric, 0.15), P.accent, shade(P.fabric, -0.15)]);
   switch (it.type) {
@@ -1006,8 +1151,83 @@ function buildItem(kit: Kit, it: Item, P: Palette, rnd: Rng, atlas: ArtAtlas, l:
           y += q * 0.8;
         }
       }
-      // A little label
-      kit.add(boxAt(-0.08, 0.08, h * 0.7, h * 0.78, d / 2, d / 2 + 0.005), 0x2b2b2b);
+      // A label: in the Prop Museum, the prop it stands for
+      const k = l.items.filter(q => q.type === 'plinth').indexOf(it);
+      const card = l.theme === 'prop-museum' ? atlas.named.get(`plinth${k}`) : undefined;
+      if (card !== undefined) {
+        const cw = Math.min(w - 0.06, 0.42);
+        kit.add(
+          boxAt(-cw / 2 - 0.015, cw / 2 + 0.015, h * 0.5, h * 0.5 + cw * 0.67, d / 2, d / 2 + 0.01),
+          0x111111,
+        );
+        kit.addArt(panel(cw, cw * 0.64, 0, h * 0.5 + cw * 0.335, d / 2 + 0.014), card);
+      } else kit.add(boxAt(-0.08, 0.08, h * 0.7, h * 0.78, d / 2, d / 2 + 0.005), 0x2b2b2b);
+      break;
+    }
+    case 'stairs': {
+      const st = l.stairs?.up;
+      if (st != null) buildFlight(kit, st, 0, P, l);
+      break;
+    }
+    case 'stairwell': {
+      const st = l.stairs?.down;
+      if (st == null) break;
+      // The flight from below, seen down the hole (its collision is the lower floor's)
+      buildFlight(kit, st, -st.rise, P, l, false);
+      // Rails round the hole, open at the head of the flight
+      const inner = st.side === 'e' ? -w / 2 : w / 2;
+      const rail = shade(P.trim, -0.35);
+      kit.add(boxAt(inner - 0.03, inner + 0.03, 0, 1.0, -d / 2, d / 2), rail);
+      kit.add(boxAt(-w / 2, w / 2, 0.95, 1.0, -d / 2, -d / 2 + 0.06), rail);
+      for (let z = -d / 2; z <= d / 2 + 1e-6; z += d / Math.max(1, Math.round(d / 0.6)))
+        kit.add(boxAt(inner - 0.02, inner + 0.02, 0, 0.97, z - 0.02, z + 0.02), rail);
+      // (no walking into the hole: rail collision along the open side and the far end)
+      const sx = st.side === 'e' ? st.x0 : st.x1;
+      kit.col.push(
+        new THREE.Box3(
+          new THREE.Vector3(sx - 0.05, 0, st.z0),
+          new THREE.Vector3(sx + 0.05, 1.1, st.z1),
+        ),
+        new THREE.Box3(
+          new THREE.Vector3(st.x0, 0, st.z0 - 0.05),
+          new THREE.Vector3(st.x1, 1.1, st.z0 + 0.05),
+        ),
+      );
+      break;
+    }
+    case 'landing':
+      break;
+    case 'roof_ladder': {
+      // A ladder to a hatch in the ceiling
+      const top = l.h;
+      for (const x of [-0.25, 0.25])
+        kit.add(boxAt(x - 0.03, x + 0.03, 0, top, -0.05, 0.01), 0x6b6b6b);
+      for (let y = 0.3; y < top - 0.1; y += 0.3)
+        kit.add(
+          cyl(0.015, 0.015, 0.5, 5)
+            .rotateZ(Math.PI / 2)
+            .translate(0, y, -0.02),
+          0x8a8a8a,
+        );
+      kit.add(boxAt(-0.45, 0.45, top - 0.06, top, -0.3, 0.3), 0x3a3a3a);
+      kit.add(boxAt(-0.4, 0.4, top - 0.07, top - 0.05, -0.25, 0.25), 0xffd400);
+      // ROOF sign
+      kit.add(boxAt(-0.22, 0.22, 2.0, 2.16, 0.02, 0.05), 0x2fbf71, 'glow');
+      break;
+    }
+    case 'esports_rug': {
+      // Off-white pile with its art on top, a hair off the floor
+      kit.add(boxAt(-w / 2, w / 2, 0, 0.012, -d / 2, d / 2), 0xece6d8);
+      const art = atlas.named.get('esports');
+      if (art !== undefined)
+        kit.addArt(
+          // Lying face up, the words reading from the door (top of the art away from it)
+          new THREE.PlaneGeometry(w - 0.04, d - 0.04)
+            .rotateX(-Math.PI / 2)
+            .rotateY(Math.PI)
+            .translate(0, 0.016, 0),
+          art,
+        );
       break;
     }
     case 'bench': {
@@ -1240,7 +1460,14 @@ function decorFrame(kit: Kit, d: Decor, l: Layout) {
   kit.frame.compose(p, q, new THREE.Vector3(1, 1, 1));
 }
 
-function buildDecor(kit: Kit, d: Decor, i: number, l: Layout, atlas: ArtAtlas, rnd: Rng) {
+function buildDecor(
+  kit: Kit,
+  d: Decor,
+  i: number,
+  l: Layout,
+  atlas: Pick<ArtAtlas, 'slots' | 'named'>,
+  rnd: Rng,
+) {
   decorFrame(kit, d, l);
   const P = l.palette;
   const uv = atlas.slots.get(i);
@@ -1299,9 +1526,14 @@ function buildDecor(kit: Kit, d: Decor, i: number, l: Layout, atlas: ArtAtlas, r
       break;
     case 'frame':
     case 'mirror':
+    case 'placard':
       kit.add(
         boxAt(-w / 2 - 0.05, w / 2 + 0.05, y - h / 2 - 0.05, y + h / 2 + 0.05, 0, 0.04),
-        d.type === 'mirror' ? 0xc9a14a : pick(rnd, [0x2b2118, 0xc9a14a, 0x111111, 0xf4f1ea]),
+        d.type === 'mirror'
+          ? 0xc9a14a
+          : d.type === 'placard'
+            ? 0x111111
+            : pick(rnd, [0x2b2118, 0xc9a14a, 0x111111, 0xf4f1ea]),
       );
       if (uv !== undefined) kit.addArt(panel(w, h, 0, y, 0.045), uv, d.type === 'mirror');
       if (l.kind === 'gallery') {

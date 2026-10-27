@@ -12,6 +12,8 @@ import type { TradeClient } from './TradeClient';
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
+import { HudIcon } from '../hud/icons';
+
 import { GOOD_ICON, GOOD_IDS, GOODS } from './goods';
 import { maxBuy, RULES, usedSlots } from './ledger';
 import { locate } from './locate';
@@ -104,7 +106,7 @@ export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
       <div
         data-w2hud="trade"
         data-trade="chip"
-        className={`pointer-events-none absolute left-4 flex max-w-[calc(100vw-32px)] flex-wrap items-center gap-1.5 ${touch ? 'bottom-[118px]' : 'top-[124px]'}`}
+        className={`pointer-events-none absolute flex flex-wrap items-center gap-1.5 ${touch ? 'left-[86px] top-12 max-w-[38vw]' : 'left-[96px] top-3 max-w-[40vw]'}`}
       >
         {st !== null && (
           <CargoChip st={st} town={town} short={touch} onMarket={() => setOpen('market')} />
@@ -121,10 +123,13 @@ export function TradeUi({ game, touch }: { game: Game; touch: boolean }) {
       {stall && open === null && town !== null && (
         <button
           type="button"
-          className="pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
+          className="w2-prompt w2-prompt-at"
+          data-trade="stall"
           onClick={() => setOpen('market')}
         >
-          {TOWN_SPECS[town].name.toUpperCase()} MARKET — {touch ? 'TAP' : 'E / tap'}
+          <kbd>{touch ? 'TAP' : 'E'}</kbd>
+          <HudIcon name="shop" size={18} />
+          {TOWN_SPECS[town].name.toUpperCase()} MARKET
         </button>
       )}
       {open !== null && town !== null && st !== null && (
@@ -165,13 +170,14 @@ function CargoChip({
   const used = usedSlots(st.cargo);
   return (
     <div className="pointer-events-auto flex items-center gap-1.5">
-      <div className="w2-chip text-xs" title="Coin and van cargo">
-        <b className="text-[#ffd400]">{st.coin.toLocaleString()}</b> COIN
-        <span className="opacity-50"> · </span>
+      <div
+        className="w2-chip flex items-center gap-1 !px-2 text-xs"
+        title={`Van cargo ${used}/${st.capacity}, ${st.coin.toLocaleString()} COIN${town !== null ? `, in ${TOWN_SPECS[town].name}` : ''}`}
+      >
+        <HudIcon name="cargo" size={15} />
         <b>
           {used}/{st.capacity}
-        </b>{' '}
-        cargo
+        </b>
         {town !== null && !short && <span className="opacity-60"> · {TOWN_SPECS[town].name}</span>}
       </div>
       {town !== null && (
