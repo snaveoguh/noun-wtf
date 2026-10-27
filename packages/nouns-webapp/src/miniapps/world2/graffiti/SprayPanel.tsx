@@ -12,6 +12,7 @@ import type { Graffiti, SprayTools } from './Graffiti';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useBeats } from '../audio/BeatsScreen';
+import { HudIcon } from '../hud/icons';
 import { useFm } from '../radio/FmPanel';
 import { HudDrag } from '../ui/HudDrag';
 
@@ -29,6 +30,24 @@ function useHudSpray(game: Game) {
     cb => game.subscribe(cb),
     () => game.hud,
   );
+}
+
+const FOLD_KEY = 'noun-world-spray-open';
+/** The desktop panel starts folded behind its can; opening it is remembered. */
+function loadUnfolded(): boolean {
+  try {
+    return localStorage.getItem(FOLD_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function saveUnfolded(on: boolean) {
+  try {
+    if (on) localStorage.setItem(FOLD_KEY, '1');
+    else localStorage.removeItem(FOLD_KEY);
+  } catch {
+    // private mode: it just starts folded
+  }
 }
 
 /** Buttons that never take focus (Space would "click" them mid-jump). */
@@ -180,15 +199,53 @@ export function SprayPanel({ game }: { game: Game }) {
   const fmScreen = useFm(game.fm).screen;
   const beatsScreen = useBeats(game.beats).screen;
   const right = 16 + 248 * (Number(fmScreen) + Number(beatsScreen));
+  const [unfolded, setUnfolded] = useState(loadUnfolded);
+  const fold = (on: boolean) => {
+    setUnfolded(on);
+    saveUnfolded(on);
+  };
   if (g === null || t === null) return null;
   if (hud.mode !== 'foot' && !hud.spray.active) return null;
   if (game.interiors.inside) return null; // no spraying indoors
+  // Folded: a spray can in the corner (spraying itself never needs the panel)
+  if (!unfolded && !hud.spray.active)
+    return (
+      <HudDrag id="spray" className="absolute bottom-24" style={{ right }} handle>
+        <button
+          type="button"
+          {...noFocus}
+          data-w2drag
+          data-spray="fold"
+          data-tip="Spray paint: colours and nozzles (G / drag to spray)"
+          title="Spray paint: colours and nozzles (G / drag to spray)"
+          aria-label="Open the spray panel"
+          className="w2h-ib"
+          onClick={() => fold(true)}
+        >
+          <HudIcon name="spray" size={20} />
+          <i
+            className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-[#0b0b12]"
+            style={{ background: t.hex }}
+          />
+        </button>
+      </HudDrag>
+    );
   return (
     <HudDrag id="spray" className="absolute bottom-24" style={{ right }} handle>
       <div className="sp-panel" data-spray="panel">
         <style>{CSS}</style>
         <div className="sp-head">
           <CustomColour g={g} t={t} big={46} />
+          <button
+            type="button"
+            {...noFocus}
+            className="sp-fold"
+            title="Fold the spray panel"
+            aria-label="Fold the spray panel"
+            onClick={() => fold(false)}
+          >
+            ▾
+          </button>
           <div className="sp-meta" data-w2drag title="drag to move · double-click to reset">
             <b>{t.hex.toUpperCase()}</b>
             <small>
@@ -401,6 +458,7 @@ const CSS = `
 .sp-meta{cursor:grab}
 .sp-panel{width:262px;padding:10px;border-radius:16px;background:rgba(10,12,20,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);font-family:system-ui,sans-serif;color:#fff;display:flex;flex-direction:column;gap:8px;font-size:11px}
 .sp-head{display:flex;align-items:center;gap:10px}
+.sp-fold{order:3;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.12);font-size:13px;flex:none}
 .sp-meta{display:flex;flex-direction:column;min-width:0;flex:1}
 .sp-meta b{font-size:16px;letter-spacing:.04em;font-variant-numeric:tabular-nums}
 .sp-meta small{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

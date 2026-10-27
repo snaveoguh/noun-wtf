@@ -216,6 +216,8 @@ export interface DrawOpts {
   full: boolean;
   /** Clamp the waypoint and the secret spot to the edge (minimap). */
   edgeMarkers: boolean;
+  /** A round minimap: "inside" and the edge pins follow the circle. */
+  round?: boolean;
 }
 
 export function drawMap(
@@ -352,13 +354,21 @@ export function drawMap(
 
   // ── Screen-space markers (never rotated) ──
   const S = (x: number, z: number) => toScreen(v, w, h, x, z);
+  // A round minimap clips to its circle: markers clamp to the rim
+  const radius = Math.min(w, h) / 2;
   const inside = (p: { x: number; y: number }, m = 0) =>
-    p.x >= m && p.y >= m && p.x <= w - m && p.y <= h - m;
+    o.round === true
+      ? Math.hypot(p.x - w / 2, p.y - h / 2) <= radius - m
+      : p.x >= m && p.y >= m && p.x <= w - m && p.y <= h - m;
   // Edge pins: the full map keeps them clear of its header and legend bar
   const padY = o.full ? 72 : 0;
   const edge = (p: { x: number; y: number }, m: number) => {
     const dx = p.x - w / 2;
     const dy = p.y - h / 2;
+    if (o.round === true) {
+      const k = Math.min(1, (radius - m) / Math.max(1e-6, Math.hypot(dx, dy)));
+      return { x: w / 2 + dx * k, y: h / 2 + dy * k };
+    }
     const k = Math.min(
       (w / 2 - m) / Math.abs(dx || 1e-6),
       (h / 2 - m - padY) / Math.abs(dy || 1e-6),

@@ -25,8 +25,10 @@ const BEAT = 0.2;
 const C5 = 523.25;
 
 export class VanAudio {
-  private ctx: AudioContext | null = null;
-  private out: AudioNode | null = null;
+  protected ctx: AudioContext | null = null;
+  protected out: AudioNode | null = null;
+  /** Engine pitch multiplier (cars/ voice their engines off this synth). */
+  pitch = 1;
   private engine: {
     a: OscillatorNode;
     b: OscillatorNode;
@@ -91,7 +93,7 @@ export class VanAudio {
     // Lower gears rev higher-pitched; each gear's band ends a bit higher
     const g = Math.max(1, gear);
     const base = 30 + g * 4;
-    const f = base + rpm * (54 + g * 6) + (air ? 14 * throttle : 0);
+    const f = (base + rpm * (54 + g * 6) + (air ? 14 * throttle : 0)) * this.pitch;
     e.a.frequency.setTargetAtTime(f, t, 0.05);
     e.b.frequency.setTargetAtTime(f * 0.5, t, 0.05);
     e.lp.frequency.setTargetAtTime(260 + throttle * 900 + (boost ? 600 : 0), t, 0.08);

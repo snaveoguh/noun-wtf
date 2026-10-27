@@ -209,6 +209,7 @@ A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews 
 - `view/` procedural breaking on the Noun rig (`pose.ts` → `rig.ts`, no clips: the rig has none), the cypher + crowd + DJ + judges, battle camera, HUD (`BreakHud.tsx`), break beat locked to the battle clock. The crowd builds one Noun a frame (a build is a hitch). Dev: `window.__w2.breakDev()`.
 - `net/` cypher spot, menus, lobby, `BreakMode` (Game hook), host-authoritative sync (`sync.ts`: host clock, ping/pong offset, sim judged 0.15 s behind, ~10 Hz snapshots), `break:*` messages relayed by `packages/nouns-party/src/breakRelay.ts` (online battles need the worker redeployed). `factory.ts` picks the real sim/view (stubs stand in until the view chunk loads).
 - Results report `break_win` / `break_loss` to respect.
+- **Freestyle anywhere** (`breakdance/freestyle/`, `game.freestyle`): `,` (comma; every letter is taken) or the 🕺 button breakdances on the spot, anywhere outside (not inside, on the Big Drop, in hoops / a battle, the van or the dragon). It auto-dances a flowing set (`planner.ts`); battle key patterns (`keys.ts`, the sim's MOVE_LIST) cut in on the next beat. The beat is NOUN BEATS' generated song's when it's on (`GameRadio.beatsSong`), else 95 bpm, with an optional quiet break loop when nothing else plays. Others see it through the pose blob's `fs: [move, seq, beat, n, bpm]` (`wire.ts`, WIRE_MOVES is append-only). Leave with `,`, Esc, holding a direction or the stick. The pose code (`dance.ts`) is its own chunk.
 
 ### Respect
 

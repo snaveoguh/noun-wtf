@@ -7,7 +7,7 @@ import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
 
 import { hostOf, KIND_LABEL, type CommunityEntry } from './community';
 
-export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'drop';
+export type GameId = 'world' | 'hoops' | 'warfare' | 'breaks' | 'hideseek' | 'drop' | 'drive';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -132,6 +132,23 @@ export const GAMES: Game[] = [
     loading: 'clearing the floor. off to the plaza cypher',
   },
   {
+    id: 'hideseek',
+    name: 'Hide & Seek',
+    cover: '/world2/hideseek-cover.webp',
+    card: '/home/covers/hideseek.webp',
+    focus: '60% 55%',
+    teaser:
+      "Hide and seek across the whole plaza city. Climb onto a rooftop, duck behind a wall or slip into a building while the seekers count. Hiders' names are hidden, so stay still and don't get found.",
+    tagline: 'HIDE · SEEK · FOUND',
+    facts: [
+      'VS CPU, or 2–12 players online',
+      'Found hiders join the seekers',
+      'Runs inside Noun World',
+    ],
+    cta: 'HIDE',
+    loading: 'ready or not. off to the plaza',
+  },
+  {
     id: 'warfare',
     name: 'Noun Warfare',
     cover: '/warfare/cover.webp',
@@ -164,6 +181,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'DROP IN',
     loading: 'off to the summit. wrap up warm',
+  },
+  {
+    id: 'drive',
+    name: 'Noun Drive',
+    cover: '/world2/drive-cover.webp',
+    card: '/home/covers/drive.webp',
+    focus: '50% 58%',
+    teaser:
+      'Take any car off the plaza kerb: a roadster that flies, a 1947 racer, a wedge with doors that go up, a lowrider on juice, a monster truck. Drift it, boost it, park it on a roof.',
+    tagline: 'DRIVE · DRIFT · FLY',
+    facts: [
+      'Eight cars, each with its own handling',
+      'The ROADSTAR flies: X at speed',
+      'Runs inside Noun World',
+    ],
+    cta: 'DRIVE',
+    loading: 'keys in. off to the ring road',
   },
 ];
 

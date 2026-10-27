@@ -13,6 +13,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { npcVoice } from '../audio/voice/cast';
 import { lineDuration } from '../audio/voice/voiceParams';
 import { SCENE_IDS, SCENE_TITLES } from '../cutscene/scenes';
+import { IconButton } from '../hud/IconButton';
 
 import { MISSIONS, NPCS, TIER_NAMES, type MissionDef, type NpcId } from './defs';
 import { DONE_LINE, GREETING, LOCKED_LINE, ORACLE_RIDDLES } from './dialogue';
@@ -41,8 +42,8 @@ const nameOf = (t: Talkable) => (t === 'door' ? 'the door' : NPCS[t].name);
 
 export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
   const sys = useMissions(game.missions);
-  // Phones start folded (the left edge holds the touch buttons)
-  const [hidden, setHidden] = useState(touch);
+  // Starts folded behind its icon (the HUD keeps the screen clear)
+  const [hidden, setHidden] = useState(true);
   const ticking = sys.parcel !== null || sys.race !== null || sys.toast !== null;
   useTick(250, ticking);
 
@@ -86,41 +87,47 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
       {/* Tracker */}
       <div
         data-w2hud="missions"
-        className={`w2-mtrack pointer-events-auto absolute ${touch ? 'left-2 top-[212px] w-[190px]' : 'left-3 top-[30%] w-[250px]'}`}
+        className={`w2h-left pointer-events-auto absolute flex flex-col items-start gap-1.5 ${touch ? 'left-2 top-12' : 'left-3 top-3'}`}
       >
-        <button type="button" className="w2-mhead" onClick={() => sys.openPanel('journal')}>
-          <span>⌐◨-◨ MISSIONS</span>
-          <i>{touch ? 'tap' : 'X'}</i>
-        </button>
-        <button
-          type="button"
-          className="w2-mfold"
+        <IconButton
+          icon="missions"
+          on={!hidden}
+          label={hidden ? 'Missions: show the tracker (X: journal)' : 'Missions: fold the tracker'}
+          badge={tracked.length + toMeet.length > 0 ? tracked.length + toMeet.length : undefined}
           onClick={() => setHidden(h => !h)}
-          aria-label={hidden ? 'Show missions' : 'Fold missions'}
-        >
-          {hidden ? '▸' : '▾'}
-        </button>
+        />
+        {hidden && sys.parcel !== null && (
+          <div className="w2-mtrack w2-mrow w2-mhot">
+            📦 {mmss((sys.parcel.until - now) / 1000)}
+          </div>
+        )}
         {!hidden && (
-          <div className="w2-mlist">
-            {title && <div className="w2-mtitle">“{title}”</div>}
-            {sys.ud.active && <div className="w2-mud">❄ the Big Drop — nothing here counts</div>}
-            {sys.parcel !== null && (
-              <div className="w2-mrow w2-mhot">
-                📦 Parcel for Cap · {mmss((sys.parcel.until - now) / 1000)}
-              </div>
-            )}
-            {tracked.slice(0, touch ? 1 : 4).map(m => (
-              <TrackRow key={m.id} sys={sys} m={m} />
-            ))}
-            {toMeet.slice(0, touch ? 1 : 2).map(n => (
-              <div key={n} className="w2-mrow w2-mmeet">
-                Talk to <b>{NPCS[n].name}</b>
-                <small>{NPCS[n].where}</small>
-              </div>
-            ))}
-            {tracked.length === 0 && toMeet.length === 0 && (
-              <div className="w2-mrow">All done. You are The One?</div>
-            )}
+          <div className={`w2-mtrack ${touch ? 'w-[190px]' : 'w-[250px]'}`}>
+            <button type="button" className="w2-mhead" onClick={() => sys.openPanel('journal')}>
+              <span>⌐◨-◨ JOURNAL</span>
+              <i>{touch ? 'tap' : 'X'}</i>
+            </button>
+            <div className="w2-mlist">
+              {title && <div className="w2-mtitle">“{title}”</div>}
+              {sys.ud.active && <div className="w2-mud">❄ the Big Drop — nothing here counts</div>}
+              {sys.parcel !== null && (
+                <div className="w2-mrow w2-mhot">
+                  📦 Parcel for Cap · {mmss((sys.parcel.until - now) / 1000)}
+                </div>
+              )}
+              {tracked.slice(0, touch ? 1 : 4).map(m => (
+                <TrackRow key={m.id} sys={sys} m={m} />
+              ))}
+              {toMeet.slice(0, touch ? 1 : 2).map(n => (
+                <div key={n} className="w2-mrow w2-mmeet">
+                  Talk to <b>{NPCS[n].name}</b>
+                  <small>{NPCS[n].where}</small>
+                </div>
+              ))}
+              {tracked.length === 0 && toMeet.length === 0 && (
+                <div className="w2-mrow">All done. You are The One?</div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -137,17 +144,13 @@ export function MissionsUi({ game, touch }: { game: Game; touch: boolean }) {
 
       {/* Talk prompt */}
       {sys.near !== null && sys.panel === null && (
-        <button
-          type="button"
-          className="w2-talk pointer-events-auto absolute left-1/2 top-[34%] -translate-x-1/2"
-          onClick={() => sys.talk()}
-        >
+        <button type="button" className="w2-prompt w2-prompt-at" onClick={() => sys.talk()}>
+          <kbd>{touch ? 'TAP' : 'E'}</kbd>
           {sys.near === 'door'
             ? sys.ud.active
               ? 'THE DOOR: GO BACK'
               : 'THE DEEPEST DOOR'
-            : `TALK TO ${NPCS[sys.near].name.toUpperCase()}`}{' '}
-          — {touch ? 'TAP' : 'E'}
+            : `TALK TO ${NPCS[sys.near].name.toUpperCase()}`}
         </button>
       )}
 
