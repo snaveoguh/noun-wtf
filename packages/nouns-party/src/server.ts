@@ -2,6 +2,7 @@ import type { Connection, Party } from './room';
 
 import { BreakRelay } from './breakRelay';
 import { FmRelay } from './fmRelay';
+import { HideSeekRelay } from './hideseekRelay';
 import { HoopsRelay } from './hoopsRelay';
 import { PoolRelay } from './poolRelay';
 import { WarfareRelay } from './warfareRelay';
@@ -37,6 +38,9 @@ import { WarfareRelay } from './warfareRelay';
  *
  * 7. Noun Pool (pool: prefix, world v2): 8-ball frames, relayed only to the
  *    players a message is for (see poolRelay.ts), nothing persisted.
+ *
+ * 8. Noun Hide & Seek (hideseek: prefix, world v2): relayed only to the
+ *    players a message is for (see hideseekRelay.ts), nothing persisted.
  */
 
 const WARFARE_ROOM = 'noun-warfare';
@@ -94,6 +98,7 @@ interface RoomState {
   _hoops?: HoopsRelay;
   _break?: BreakRelay;
   _pool?: PoolRelay;
+  _hideseek?: HideSeekRelay;
   _warfare?: WarfareRelay;
 }
 
@@ -227,6 +232,14 @@ export const handlers = {
         if (message.length > 8192) return;
         rs._pool ??= new PoolRelay();
         rs._pool.handle(data, connection, room.getConnections());
+        return;
+      }
+
+      // ── Noun Hide & Seek (hideseek: prefix) ─────────────────────────
+      if (typeof data.type === 'string' && data.type.startsWith('hideseek:')) {
+        if (message.length > 16384) return;
+        rs._hideseek ??= new HideSeekRelay();
+        rs._hideseek.handle(data, connection, room.getConnections());
         return;
       }
 
@@ -583,6 +596,7 @@ export const handlers = {
     rs._hoops?.close(connection.id, room.getConnections());
     rs._break?.close(connection.id, room.getConnections());
     rs._pool?.close(connection.id, room.getConnections());
+    rs._hideseek?.close(connection.id, room.getConnections());
     void fmRelays.get(room.id)?.then(fm => fm.close(connection.id));
 
     const count = [...room.getConnections()].length;

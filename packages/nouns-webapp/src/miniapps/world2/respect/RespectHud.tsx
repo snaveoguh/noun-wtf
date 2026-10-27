@@ -14,6 +14,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { createPortal } from 'react-dom';
 
+import { HudIcon } from '../hud/icons';
+
 import { NOGGLES_SRC } from './effects';
 import { RESPECT_CSS, TIER_COLOR } from './hudStyle';
 import { nextTier, TIER_NAME, tickerText, TIERS } from './rules';
@@ -93,13 +95,15 @@ export function RespectMeter({ respect }: { respect: RespectSystem }) {
         type="button"
         className="w2-chip w2-respect pointer-events-auto"
         onClick={() => setOpen(o => !o)}
-        title="Respect: tap for details"
+        title={`Respect: ${TIER_NAME[s.tier]}, ${Math.round(s.score)} (tap for details)`}
+        aria-label={`Respect: ${TIER_NAME[s.tier]}`}
         aria-expanded={open}
+        onPointerDown={e => e.stopPropagation()}
       >
         {s.tier === 'legend' && (
           <img src={NOGGLES_SRC} alt="" width={18} height={7} className="w2-respect-nog" />
         )}
-        <span className="w2-respect-label">RESPECT</span>
+        <HudIcon name="respect" size={15} />
         <span className="w2-respect-tier" style={{ color }}>
           {TIER_NAME[s.tier]}
         </span>

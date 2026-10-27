@@ -20,6 +20,14 @@
 import type { InteriorKind } from './contract';
 
 import { hash32, int, mulberry32, pick, type Rng } from './rng';
+import {
+  LANDING,
+  MULTI_CEILING,
+  buildingStairs,
+  type FloorStairs,
+  type StairPlan,
+  type UpperUse,
+} from './storeys';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -73,7 +81,16 @@ export type ItemType =
   | 'water_cooler'
   | 'side_table'
   | 'wardrobe'
-  | 'bag';
+  | 'bag'
+  /** The Prop Museum's centrepiece: an off-white rug reading “ESPORTS”. */
+  | 'esports_rug'
+  /** Upstairs: a flight up (on the lower floor), the hole it arrives through (railed, on the upper one), */
+  | 'stairs'
+  | 'stairwell'
+  /** …the floor kept clear at either end of a flight, */
+  | 'landing'
+  /** …and the way up onto the roof (top floor). */
+  | 'roof_ladder';
 
 export type Wall = 'n' | 'e' | 's' | 'w';
 
@@ -124,7 +141,9 @@ export type DecorType =
   | 'clock'
   | 'wall_shelf'
   | 'window'
-  | 'upper_cabinets';
+  | 'upper_cabinets'
+  /** A museum placard: one proposal, framed (the Prop Museum). */
+  | 'placard';
 
 export interface Decor {
   type: DecorType;
@@ -185,11 +204,28 @@ export interface Layout {
   decor: Decor[];
   /** Ceiling lights (room frame x, z). */
   lights: { x: number; z: number; kind: 'pendant' | 'panel' | 'bulb' | 'neon' }[];
+  /** A special room: the Prop Museum (a gallery of real proposals). */
+  theme?: 'prop-museum';
+  /** Upstairs (level ≥ 1: no street door; you arrive up the stairs), its stairs and what it's for. */
+  level?: number;
+  stairs?: FloorStairs;
+  use?: UpperUse;
+  /** Where you arrive and what stays clear there (upper floors; the door otherwise). */
+  entry?: [number, number];
+  keep?: Box2;
 }
 
 export interface LayoutInput {
   id: string;
   kind: InteriorKind;
+  theme?: 'prop-museum';
+  /** A floor of a multi-storey building: its level, stairs, use, and the shared plan (w, d, h). */
+  level?: number;
+  stairs?: FloorStairs;
+  use?: UpperUse;
+  /** The top floor: a way onto the roof. */
+  roof?: boolean;
+  size?: { w: number; d: number; h: number };
   /** The building's frontage (along the door wall) and depth, and its height, in m. */
   frontage?: number;
   depth?: number;
@@ -446,6 +482,11 @@ const SIZE: Record<ItemType, [number, number, number]> = {
   side_table: [0.5, 0.5, 0.55],
   wardrobe: [1.2, 0.6, 2.0],
   bag: [0.6, 0.6, 1.9],
+  esports_rug: [3.6, 2.4, 0.02],
+  stairs: [1.1, 4.6, 3.7],
+  stairwell: [1.1, 4.6, 1.0],
+  landing: [1.1, 1.3, 0.01],
+  roof_ladder: [0.9, 0.6, 3.4],
 };
 
 const FLAT = new Set<ItemType>(['rug', 'mat']);
@@ -941,6 +982,114 @@ const cooler: Maker = () => ({
 });
 
 /** Each kind's sets: [maker, weight, max count, required]. */
+/** Nothing may stand on these (not even a rug). */
+const KEEP_CLEAR: ReadonlySet<ItemType> = new Set(['stairs', 'stairwell', 'landing']);
+
+/** The way onto the roof: a ladder up to a hatch (top floors). */
+const roofLadder: Maker = () => ({
+  parts: [{ type: 'roof_ladder', x: 0, z: 0.3 }],
+  spots: [{ x: 0, z: 1.1, rot: 2, kind: 'look' }],
+  wall: true,
+});
+
+/** What's upstairs. */
+const UPPER_SETS: Record<UpperUse, [Maker, number, number, boolean][]> = {
+  bedroom: [
+    [bedroom, 1, 2, true],
+    [wardrobe, 1, 2, false],
+    [books, 0.8, 2, false],
+    [armchairNook, 0.6, 1, false],
+    [plantCorner, 0.6, 2, false],
+    [lampCorner, 0.5, 2, false],
+  ],
+  office: [
+    [deskSet, 1, 3, true],
+    [books, 1, 3, false],
+    [armchairNook, 0.5, 1, false],
+    [plantCorner, 0.7, 2, false],
+    [lampCorner, 0.5, 1, false],
+  ],
+  storeroom: [
+    [shopShelf, 1.4, 5, true],
+    [crates, 1, 3, false],
+    [deskSet, 0.5, 1, false],
+    [plantCorner, 0.3, 1, false],
+  ],
+  lounge: [
+    [lounge, 1, 1, true],
+    [armchairNook, 1, 2, false],
+    [books, 0.6, 2, false],
+    [booth, 0.6, 1, false],
+    [plantCorner, 0.7, 2, false],
+  ],
+  rehearsal: [
+    [decks, 1, 1, true],
+    [records, 0.8, 2, false],
+    [armchairNook, 0.6, 1, false],
+    [lampCorner, 0.5, 1, false],
+  ],
+  gameroom: [
+    [poolTable, 1, 1, true],
+    [jukebox, 0.8, 1, false],
+    [armchairNook, 0.8, 2, false],
+    [vending, 0.6, 1, false],
+    [plantCorner, 0.5, 1, false],
+  ],
+};
+
+/**
+ * Put a floor's stairs in: the flight up (solid; residents walk round it)
+ * with its foot landing, the railed hole the flight from below comes up
+ * through with its head landing. Windows behind them go.
+ */
+function addStairs(l: Layout, grid: Grid, st: FloorStairs | undefined) {
+  if (st === undefined) return;
+  const add = (type: ItemType, b: Box2, h: number, solid: boolean, tag: string) => {
+    const it: Item = {
+      type,
+      x: (b.minX + b.maxX) / 2,
+      z: (b.minZ + b.maxZ) / 2,
+      rot: 0,
+      w: b.maxX - b.minX,
+      d: b.maxZ - b.minZ,
+      h,
+      solid,
+      seed: hash32(`${l.id}:${tag}`),
+    };
+    l.items.push(it);
+    if (solid) grid.block(itemBox(it));
+  };
+  const span = (s: StairPlan): Box2 => ({ minX: s.x0, maxX: s.x1, minZ: s.z0, maxZ: s.z1 });
+  if (st.up !== null) {
+    add('stairs', span(st.up), st.up.rise, true, 'stairs');
+    add('landing', footLanding(st.up), 0.01, false, 'foot');
+  }
+  if (st.down !== null) {
+    add('stairwell', span(st.down), 1.0, true, 'stairwell');
+    add('landing', headLanding(st.down), 0.01, false, 'head');
+  }
+  // No window behind a flight or a stairwell
+  const runs = [st.up, st.down].filter((s): s is StairPlan => s !== null);
+  l.decor = l.decor.filter(
+    dd =>
+      !runs.some(
+        s =>
+          dd.wall === s.side &&
+          dd.at + dd.w / 2 > s.z0 - LANDING &&
+          dd.at - dd.w / 2 < s.z1 + LANDING,
+      ),
+  );
+}
+
+/** The Prop Museum: the famous props on plinths, benches to read them from. */
+const MUSEUM_SETS: [Maker, number, number, boolean][] = [
+  [deskSet, 1, 1, true],
+  [plinth, 1.5, 8, true],
+  [galleryBench, 1, 2, true],
+  [plantCorner, 0.6, 2, false],
+  [lampCorner, 0.4, 1, false],
+];
+
 const SETS: Record<InteriorKind, [Maker, number, number, boolean][]> = {
   home: [
     [lounge, 1, 1, true],
@@ -999,6 +1148,7 @@ const SETS: Record<InteriorKind, [Maker, number, number, boolean][]> = {
     [counterSet(0, 'neon'), 1, 1, true],
     [cabinetRow, 1.5, 4, true],
     [claw, 0.8, 1, false],
+    [poolTable, 0.7, 1, false],
     [vending, 0.6, 1, false],
   ],
   barber: [
@@ -1284,7 +1434,8 @@ export function roomSize(i: LayoutInput, rnd: Rng): { w: number; d: number; h: n
 // ── Generator ────────────────────────────────────────────────────────────
 
 /** Where the door opens and what must stay clear in front of it. */
-export function doorKeepOut(l: Pick<Layout, 'door'>): Box2 {
+export function doorKeepOut(l: Pick<Layout, 'door' | 'keep'>): Box2 {
+  if (l.keep !== undefined) return l.keep;
   return {
     minX: l.door.x - l.door.width / 2 - 0.45,
     maxX: l.door.x + l.door.width / 2 + 0.45,
@@ -1294,8 +1445,31 @@ export function doorKeepOut(l: Pick<Layout, 'door'>): Box2 {
 }
 
 /** Where you stand on coming in (just inside the door). */
-export function entryPoint(l: Pick<Layout, 'door'>): [number, number] {
-  return [l.door.x, 1.0];
+export function entryPoint(l: Pick<Layout, 'door' | 'entry'>): [number, number] {
+  return l.entry ?? [l.door.x, 1.0];
+}
+
+/**
+ * A building's floors: the shared plan (the ground floor's room size, the
+ * ceiling capped when there's an upstairs) and each floor's stairs.
+ */
+export function planBuilding(input: LayoutInput): {
+  size: { w: number; d: number; h: number };
+  floors: FloorStairs[];
+} {
+  // (the same first draws generateLayout makes, so the ground floor matches)
+  const size = roomSize(input, mulberry32(hash32(`room:${input.id}:${input.kind}`)));
+  const floors = buildingStairs(input.kind, input.height, size.w, size.d, size.h, input.id);
+  const h = floors.length > 1 ? Math.min(size.h, MULTI_CEILING) : size.h;
+  return { size: { ...size, h }, floors };
+}
+
+/** The landing at the foot of a flight (on its lower floor) and at its head (on the upper one). */
+export function footLanding(s: StairPlan): Box2 {
+  return { minX: s.x0, maxX: s.x1, minZ: s.z0 - LANDING, maxZ: s.z0 };
+}
+export function headLanding(s: StairPlan): Box2 {
+  return { minX: s.x0, maxX: s.x1, minZ: s.z1, maxZ: s.z1 + LANDING };
 }
 
 interface Placed {
@@ -1306,7 +1480,10 @@ interface Placed {
 export function generateLayout(input: LayoutInput): Layout {
   const seed = hash32(`room:${input.id}:${input.kind}`);
   const rnd = mulberry32(seed);
-  const { w, d, h } = roomSize(input, rnd);
+  // (always drawn, so a given size leaves the rest of the room as it would be)
+  const drawn = roomSize(input, rnd);
+  const { w, d, h } = input.size ?? drawn;
+  const level = input.level ?? 0;
   const palette = pick(rnd, PALETTES[input.kind]);
   const floorStyle = pick(rnd, FLOORS[input.kind]);
   // Door: off-centre in a third of the wall, homes and shops alike
@@ -1329,10 +1506,27 @@ export function generateLayout(input: LayoutInput): Layout {
     spots: [],
     decor: [],
     lights: [],
+    ...(input.theme !== undefined ? { theme: input.theme } : {}),
   };
+  if (level > 0) {
+    // Upstairs: no street door; you arrive at the head of the flight from below
+    const down = input.stairs!.down!;
+    const hl = headLanding(down);
+    layout.level = level;
+    layout.door = { x: 0, width: 0 };
+    layout.entry = [(hl.minX + hl.maxX) / 2, (hl.minZ + hl.maxZ) / 2];
+    layout.keep = { minX: hl.minX - 0.3, maxX: hl.maxX + 0.3, minZ: hl.minZ, maxZ: hl.maxZ + 0.3 };
+    if (input.use !== undefined) layout.use = input.use;
+    // Whole floor for any set (bedroom sets included)
+    layout.regions = [
+      { name: 'main', minX: -w / 2, maxX: w / 2, minZ: 0, maxZ: d },
+      { name: 'bedroom', minX: -w / 2, maxX: w / 2, minZ: 0, maxZ: d },
+    ];
+  }
+  if (input.stairs !== undefined) layout.stairs = input.stairs;
   const grid = new Grid(w, d);
   // Homes: a bedroom behind a partition along the back, with a doorway
-  if (input.kind === 'home') {
+  if (input.kind === 'home' && level === 0) {
     const split = Math.round((d - Math.max(3.2, d * 0.38)) * 10) / 10;
     const gx = Math.round(clamp((rnd() - 0.5) * (w - 2.4), -w / 2 + 1.1, w / 2 - 2.1) * 10) / 10;
     layout.partitions.push({ axis: 'z', at: split, from: -w / 2, to: w / 2, gap: [gx, gx + 1.0] });
@@ -1349,14 +1543,24 @@ export function generateLayout(input: LayoutInput): Layout {
   // Windows first (decor reserves wall space): on the door wall either
   // side of the door, and on a side or back wall
   addWindows(layout, rnd);
+  // Stairs: the flight up and the hole from below, with their landings kept clear
+  addStairs(layout, grid, input.stairs);
 
   // Sets: required ones first, then by weight while there's floor
-  const defs = SETS[input.kind];
+  const defs =
+    level > 0 && input.use !== undefined
+      ? UPPER_SETS[input.use]
+      : input.theme === 'prop-museum'
+        ? MUSEUM_SETS
+        : SETS[input.kind];
   const area = w * d;
   const budget = Math.round(area / (input.kind === 'home' ? 7 : 6.5));
   const counts = new Map<Maker, number>();
   // Required sets get several goes (each go is a fresh variant), first
-  const required = defs.filter(s => s[3]).map(s => s[0]);
+  const required = [
+    ...(input.roof === true ? [roofLadder] : []),
+    ...defs.filter(s => s[3]).map(s => s[0]),
+  ];
   let attempts = 0;
   for (const maker of required)
     for (let go = 0; go < 6; go++) {
@@ -1387,6 +1591,24 @@ export function generateLayout(input: LayoutInput): Layout {
       counts.set(maker, (counts.get(maker) ?? 0) + 1);
       placedN++;
     }
+  }
+
+  // The Prop Museum's rug, centre stage (walkable: things may stand on it)
+  if (input.theme === 'prop-museum') {
+    const rw = Math.min(3.6, w - 2);
+    const rd = Math.min(2.4, d - 3);
+    const rz = clamp(d * 0.55, keep.maxZ + rd / 2 + 0.3, d - rd / 2 - 0.6);
+    layout.items.push({
+      type: 'esports_rug',
+      x: 0,
+      z: Math.round(rz * 10) / 10,
+      rot: 0,
+      w: rw,
+      d: rd,
+      h: 0.02,
+      solid: false,
+      seed: hash32(`${input.id}:esports`),
+    });
   }
 
   // Free-standing spots for residents to mill about (open floor, reachable)
@@ -1577,6 +1799,11 @@ function placeSet(
         fits = false;
         break;
       }
+      // Stairs, stairwells and landings stay clear (rugs and all)
+      if (l.items.some(o => KEEP_CLEAR.has(o.type) && boxesOverlap(b, itemBox(o)))) {
+        fits = false;
+        break;
+      }
       // Nothing tall standing in front of a window
       if (it.solid && blocksWindow(l, b, it.h)) {
         fits = false;
@@ -1670,6 +1897,9 @@ function placeSet(
     // (the owner's place behind a counter is the staff's, not the public's)
     for (const s of [...l.spots, ...spots])
       if (s.owner !== true && !grid.reached(seen, s.x, s.z)) reach = false;
+    // …and both ends of every flight of stairs
+    for (const o of l.items)
+      if (o.type === 'landing' && !grid.reached(seen, o.x, o.z)) reach = false;
     if (!reach) {
       for (const c of cells) grid.unblock(c);
       continue;
@@ -1753,8 +1983,10 @@ function addWindows(l: Layout, rnd: Rng) {
 
 /** Posters, frames, clocks, wall shelves on what bare wall is left. */
 function addWallArt(l: Layout, rnd: Rng) {
-  const types: DecorType[] =
-    l.kind === 'gallery'
+  const museum = l.theme === 'prop-museum';
+  const types: DecorType[] = museum
+    ? ['placard']
+    : l.kind === 'gallery'
       ? ['frame', 'frame', 'frame']
       : l.kind === 'home'
         ? ['poster', 'frame', 'wall_shelf', 'clock']
@@ -1768,22 +2000,35 @@ function addWallArt(l: Layout, rnd: Rng) {
     // One clock is plenty
     if (type === 'clock' && l.decor.some(q => q.type === 'clock')) continue;
     const big = l.kind === 'gallery' ? 0.9 + rnd() * 0.9 : 0.6 + rnd() * 0.5;
-    const w = type === 'clock' ? 0.45 : type === 'wall_shelf' ? 1.2 : type === 'neon' ? 1.4 : big;
+    const w =
+      type === 'placard'
+        ? 0.95
+        : type === 'clock'
+          ? 0.45
+          : type === 'wall_shelf'
+            ? 1.2
+            : type === 'neon'
+              ? 1.4
+              : big;
     const h =
-      type === 'clock'
-        ? 0.45
-        : type === 'wall_shelf'
-          ? 0.3
-          : type === 'neon'
-            ? 0.5
-            : big * (type === 'poster' ? 1.35 : 1.0);
+      type === 'placard'
+        ? 1.2
+        : type === 'clock'
+          ? 0.45
+          : type === 'wall_shelf'
+            ? 0.3
+            : type === 'neon'
+              ? 0.5
+              : big * (type === 'poster' ? 1.35 : 1.0);
     const len = wall === 'n' || wall === 's' ? l.w : l.d;
     const a = (rnd() - 0.5) * (len - w - 0.6);
     const at = wall === 'n' || wall === 's' ? a : l.d / 2 + a;
     const y =
       type === 'clock'
         ? Math.min(l.h - 0.5, 2.55)
-        : Math.min(l.h - h / 2 - 0.25, 1.55 + rnd() * 0.3);
+        : type === 'placard'
+          ? 1.5
+          : Math.min(l.h - h / 2 - 0.25, 1.55 + rnd() * 0.3);
     const dd: Decor = { type, wall, at, y, w, h, seed: hash32(`${l.id}:art:${k}`) };
     if (decorClash(l, dd)) continue;
     // Not behind something tall standing against that wall

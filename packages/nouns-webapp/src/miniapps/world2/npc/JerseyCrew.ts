@@ -502,6 +502,21 @@ export class JerseyCrew {
     this.updateLabels(cam);
   }
 
+  /**
+   * Someone's dancing at `at` (breakdance/freestyle): hangout members within
+   * `r` m wave them on. Returns how many did.
+   */
+  cheer(at: THREE.Vector3, r: number): number {
+    let n = 0;
+    for (const npc of this.npcs) {
+      if (npc.hang === null || this.away.has(npc)) continue;
+      if (Math.hypot(npc.pos.x - at.x, npc.pos.z - at.z) > r) continue;
+      npc.waveT = Math.max(npc.waveT, 2.6);
+      n++;
+    }
+    return n;
+  }
+
   /** Crew members off playing Noun Hoops (hoops/net): hidden, not stepped. */
   private away = new Set<Npc>();
 
