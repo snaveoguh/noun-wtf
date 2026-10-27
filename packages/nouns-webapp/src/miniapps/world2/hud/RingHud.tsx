@@ -70,6 +70,10 @@ const HELP_KEY = 'noun-world-help-seen';
  */
 export function initialHelp(): boolean {
   if (window.matchMedia?.('(pointer: coarse)').matches === true) return false;
+  // Launched straight into a game (a homepage tile: ?play=parkour, ?drop=1…):
+  // its menu comes first, and the card waits for a free-roam visit
+  const q = new URLSearchParams(window.location.search);
+  if (q.has('play') || q.has('drop')) return false;
   try {
     if (localStorage.getItem(HELP_KEY) !== null) return false;
     localStorage.setItem(HELP_KEY, '1');
