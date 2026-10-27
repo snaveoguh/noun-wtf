@@ -43,6 +43,11 @@ const VIEW_BY_QUALITY: Record<Quality, number> = { low: 460, medium: 760, high: 
 const LOD_RANGE = [210, 420, Infinity];
 /** Props (and their colliders) exist on chunks at or below this LOD. */
 const PROP_LOD = 1;
+/**
+ * A chunk whose props (trees, rocks, their colliders) aren't built yet and
+ * whose centre is this close (m) gets them this frame, whatever else did.
+ */
+const URGENT_PROPS = CHUNK * 1.2;
 
 export interface ChunkContext {
   ix: number;
@@ -151,6 +156,8 @@ export class MountainStream {
   readonly network = tracks;
   /** Max ms of meshing work per frame (scaled up with speed). */
   budgetMs = 3;
+  /** In `prime`: build every prop chunk in range now, not one a frame. */
+  private priming = false;
   private frameBudget = 3;
   private chunks = new Map<string, Chunk>();
   private material: THREE.Material;
@@ -263,13 +270,21 @@ export class MountainStream {
       if (c.job === null || c.job.lod !== w.want) c.job = this.newJob(w.want);
       if (this.advance(c, t0)) this.finish(c);
     }
-    // Props on near chunks (after their terrain mesh exists), nearest first
+    // Props on near chunks (after their terrain mesh exists), nearest first.
+    // One a frame: a chunk's props are built in one go (3-8 ms, its collider
+    // BVH included), and at speed, with the budget raised, two or three used
+    // to land in the same frame: the hitch you felt riding fast. They're
+    // queued ~400 m out, seconds ahead even at 200 m/s, so one a frame keeps
+    // up; only one you're nearly on goes ahead even past the budget.
     const propWork = [...this.chunks.values()]
       .filter(c => c.props === null && c.mesh !== null && this.lodFor(c) <= PROP_LOD)
       .sort((a, b) => Math.min(a.dist, a.ahead) - Math.min(b.dist, b.ahead));
+    let built = 0;
     for (const c of propWork) {
-      if (performance.now() - t0 > budget) break;
+      const near = Math.min(c.dist, c.ahead) < URGENT_PROPS;
+      if (!this.priming && !near && (built > 0 || performance.now() - t0 > budget)) break;
       this.buildProps(c);
+      built++;
     }
     const ms = performance.now() - t0;
     this.stats.lastFrameMs = ms;
@@ -289,7 +304,9 @@ export class MountainStream {
   prime(focus: THREE.Vector3) {
     const budget = this.budgetMs;
     this.budgetMs = 1e9;
+    this.priming = true;
     this.update(focus);
+    this.priming = false;
     this.budgetMs = budget;
   }
 
