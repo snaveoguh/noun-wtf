@@ -7,7 +7,7 @@ Everything here is re-runnable: change a shot or an edit list, render, cut.
 | File | What |
 | --- | --- |
 | `shots.mjs` | Every shot: its scene, frame count, and a page-side `setup(arg)` that stages the moment and installs `window.__sizzleFrame` (advance one 1/30 s frame, leave it drawn). |
-| `scenes.mjs` | Scene openers: Noun World (`world`), the Big Drop (`bigdrop`), a Noun Breaks battle (`breaks`), Noun Hoops (`hoops`), the 3D Grand Exchange (`exchange`), the pool hall (`pool`), NOUN PARKOUR (`parkour`). They stop the game loop and install `__sz` / `__bd` / `__d` / `__gx` / `__pl` / `__pk` helpers. |
+| `scenes.mjs` | Scene openers: Noun World (`world`), the Big Drop (`bigdrop`), a Noun Breaks battle (`breaks`), Noun Hoops (`hoops`), the 3D Grand Exchange (`exchange`), the pool hall (`pool`), NOUN PARKOUR (`parkour`), Noun Warfare (`warfare`, `__wf`: slow motion via `frame(speed)`). They stop the game loop and install `__sz` / `__bd` / `__d` / `__gx` / `__pl` / `__pk` helpers. |
 | `edits/*.json` | Edit lists: which shots, in and out points, crossfades, grade, exact length, poster time. One per clip. |
 | `render.mjs` | Renders the shots an edit list (or `--shots a,b`) needs into `.frames/<shot>/f0000.jpg…` (git-ignored), opening each scene once. |
 | `cut.mjs` | Cuts the frames into `<name>.webm` (VP9) + `<name>.mp4` (H.264, faststart) + `<name>-poster.jpg` in `public/home/`, at 1920×1080, with a bitrate ceiling (`maxrate`, default 2.4 Mbit/s) so a 12 s clip stays under ~4 MB. |
@@ -51,6 +51,7 @@ time.
 | `hero-exchange` | `edits/exchange.json` | `exchange` |
 | `hero-parkour` | `edits/parkour.json` | `parkour` |
 | `hero-pool` | `edits/pool.json` | `pool` |
+| `hero-warfare` | `edits/warfare.json` | `warfare` |
 
 ### Music
 
@@ -61,7 +62,7 @@ the last 0.9 s, loudness-normalised to −16 LUFS). Set `audio: true` on the
 slide's clip in `home/rows.ts`: the hero plays it only once the visitor
 turns sound on. `music/` holds excerpts of the owner's Suno tracks, each
 already starting where it should (the Drop from 0:59.3 of the full song,
-Breaks, Grand Exchange and Sink the Eight (pool) from 0:00, Beat Your Ghost (parkour, the second take) from 0:30). To add music to a clip whose frames
+Breaks, Grand Exchange and Sink the Eight (pool) from 0:00, Beat Your Ghost (parkour, the second take) from 0:30, Imperial March to the Core (warfare) from 0:00). To add music to a clip whose frames
 are gone, `sh scripts/sizzle/mux.sh public/home/<clip> scripts/sizzle/music/<track>.mp3`
 swaps the audio in without touching the video.
 

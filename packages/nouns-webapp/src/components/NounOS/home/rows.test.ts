@@ -268,7 +268,8 @@ describe('HERO_SLIDES', () => {
     const warfare = HERO_SLIDES.find(s => s.key === 'warfare')!;
     const g = GAMES.find(x => x.id === 'warfare')!;
     expect(warfare.teaser).toBe(g.teaser);
-    expect(warfare.still).toBe(g.cover);
+    expect(warfare.tagline).toBe(g.tagline);
+    expect(warfare.clip).toBe(CLIPS.warfare);
   });
 
   it("has every clip's webm, mp4 and poster on disk", () => {
@@ -277,7 +278,14 @@ describe('HERO_SLIDES', () => {
       for (const f of [s.clip.webm, s.clip.mp4, s.clip.poster])
         expect(existsSync(resolve(publicDir, `.${f}`)), f).toBe(true);
     }
-    for (const c of [CLIPS.bigDrop, CLIPS.breaks, CLIPS.exchange, CLIPS.parkour, CLIPS.pool])
+    for (const c of [
+      CLIPS.bigDrop,
+      CLIPS.breaks,
+      CLIPS.exchange,
+      CLIPS.parkour,
+      CLIPS.pool,
+      CLIPS.warfare,
+    ])
       expect(HERO_SLIDES.some(s => s.clip === c)).toBe(true);
   });
 });
@@ -291,6 +299,7 @@ describe('game card hover previews', () => {
     expect(pv('drop')).toBe(CLIPS.bigDrop);
     expect(pv('parkour')).toBe(CLIPS.parkour);
     expect(pv('pool')).toBe(CLIPS.pool);
+    expect(pv('warfare')).toBe(CLIPS.warfare);
     const play = buildRows(CATALOG)[0]!;
     expect(play.items.find(i => i.key === 'game:pool')!.preview).toBe(CLIPS.pool);
   });
@@ -333,7 +342,7 @@ describe('hero slides', () => {
   it('each game slide shows its own game, not whatever sits at that index', () => {
     for (const s of HERO_SLIDES) {
       if (s.key === 'warfare') {
-        expect(s.still).toBe('/warfare/cover.webp');
+        expect(s.clip).toBe(CLIPS.warfare);
         expect(s.tagline).toBe(GAMES.find(g => g.id === 'warfare')!.tagline);
       }
     }

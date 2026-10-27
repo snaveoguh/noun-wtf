@@ -79,6 +79,23 @@ it and the reels that use it. ✅ = checked frame by frame in a contact sheet;
 | `pk-pole` ⚠️ | 150 | NORTH ROOFS: over the parapet onto the pole, down to the street. A palm hides some of it, and a player's mural is in the first frames. | — |
 | `pk-roll` ✅ | 105 | LAMP LINE: off the big mast, roll the landing. | (spare) |
 
+## Noun Warfare (`warfare`, `/warfare`, a bots-only Team Splat on Noun City)
+
+Slow motion: the sim steps at half speed and the renderer interpolates
+between ticks. The local player is played by a bot brain too, so the
+camera follows real fights. The seeds and times come from scanning each
+match's kill events for the local player's splats.
+
+| Shot | Frames | What | Used in |
+| --- | --- | --- | --- |
+| `wf-tp-kill` ✅ | 90 | Third person behind the rider, chasing down a coin-head Noun (seed 13, 3.6 s). | warfare 0:00 |
+| `wf-fp-double` ✅ | 90 | First person, the splatter firing down the street (seed 13, 6.3 s). | warfare |
+| `wf-tp-head` ✅ | 80 | Third person in the dark side street, a headshot (seed 7, 34.1 s). | warfare |
+| `wf-fp-head` ✅ | 90 | First person by the SPLAT BAR sign, firing into the pack (seed 21, 45.7 s). | warfare |
+| `wf-tp-slow` ⚠️ | 80 | Third person at 0.33×. The props hide most of the action. | — |
+
+The first ~0.3 s of every warfare shot is the camera settling after the match starts, so cut in from 0.3 s or later.
+
 ## The reels
 
 ### hero-big-drop (12.83 s)
@@ -92,6 +109,9 @@ freeze → judges' cards.
 ### hero-exchange (10.63 s)
 drop through the roof → pit 3 shouting → pit 0 → (crossfade) the pull-out
 past the board and over the walls to VAST.
+
+### hero-warfare (9.1 s, Imperial March to the Core)
+third person → first person → third person → first person, all at half speed.
 
 ### hero-pool
 the hall → the break (low, then high) → lining up → the straight pot from

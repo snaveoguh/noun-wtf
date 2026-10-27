@@ -492,6 +492,76 @@ export function installParkour() {
   window.__pk = pkx;
 }
 
+/**
+ * Noun Warfare (`/warfare`), its rAF loop stopped, with `__wf` helpers:
+ * `match(seed)` starts a bots-only Team Splat on Noun City in which a bot
+ * brain plays the local player too (so the camera has someone to follow),
+ * `frame(speed)` advances the sim by `speed` × 1/30 s (0.5 = half-speed
+ * slow motion; the renderer interpolates between ticks) and draws it.
+ */
+export async function openWarfare(p, base) {
+  await p.goto(`${base}/warfare?q=high`, { timeout: 1_200_000, waitUntil: 'commit' });
+  await p.waitForFunction(() => window.__warfare?.game?.assets, null, { timeout: 900_000, polling: 2000 });
+  await p.evaluate(installWarfare);
+  await cleanFrame(p);
+}
+
+/** Runs in the page. */
+export async function installWarfare() {
+  const W = window.__warfare;
+  const g = W.game;
+  W.noLock(true);
+  W.manual(true);
+  cancelAnimationFrame(g.raf);
+  g.frame = () => {};
+  const { createBotMem, thinkBot } = await import('/src/miniapps/warfare/sim/bots.ts');
+  const DT = 1 / 60;
+  const wf = {
+    g,
+    mem: null,
+    acc: 0,
+    match(seed = 7) {
+      g.startMatch({
+        mode: 'tdm',
+        map: 'nouncity',
+        teamSize: 4,
+        difficulty: 2,
+        name: 'noun',
+        look: '0-12-40-123-7',
+        weapons: ['splatter', 'hopper', 'shotgun', 'longsplat', 'launcher'],
+        seed,
+      });
+      wf.mem = createBotMem(g.sim, g.sim.state.players[g.me]);
+      wf.acc = 0;
+    },
+    /** One sim tick, the local player driven by its bot brain. */
+    tick() {
+      const sim = g.sim;
+      const me = sim.state.players[g.me];
+      g.stepTicks(1, me.alive ? thinkBot(sim, me, wf.mem) : {});
+    },
+    /** Silent seconds. */
+    run(secs) {
+      for (let i = 0; i < Math.round(secs / DT); i++) wf.tick();
+    },
+    /** One output frame (1/30 s of screen time) at `speed` × real time. */
+    frame(speed = 0.5, tp = g.tp) {
+      g.tp = tp;
+      wf.acc += speed * (1 / 30);
+      while (wf.acc >= DT) {
+        wf.tick();
+        wf.acc -= DT;
+      }
+      // Interpolate between the last two ticks (render reads acc when not manual)
+      g.manual = false;
+      g.acc = wf.acc;
+      g.render(speed / 30);
+      g.manual = true;
+    },
+  };
+  window.__wf = wf;
+}
+
 /** Noun World with a Noun Breaks battle mounted in the plaza (`window.__d`, view/dev.ts). */
 export async function openBreaks(p, base) {
   await openWorld(p, base);

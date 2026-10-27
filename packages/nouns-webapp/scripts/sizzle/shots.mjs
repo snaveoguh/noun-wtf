@@ -3,7 +3,7 @@
 // installs `window.__sizzleFrame(i)` (advance one frame, leave it drawn).
 // Setups run in the browser, so each one is self-contained. See README.md.
 
-import { openBigDrop, openBreaks, openExchange, openParkour, openPool, openWorld } from './scenes.mjs';
+import { openBigDrop, openBreaks, openExchange, openParkour, openPool, openWarfare, openWorld } from './scenes.mjs';
 
 export const SCENES = {
   world: openWorld,
@@ -12,6 +12,7 @@ export const SCENES = {
   exchange: openExchange,
   pool: openPool,
   parkour: openParkour,
+  warfare: openWarfare,
 };
 
 // ── Noun Breaks (scene: breaks; window.__d is the breakDev() harness) ──
@@ -502,7 +503,32 @@ const pk = (frames, route, arg, extra = {}) => ({
   ...extra,
 });
 
+// ── Noun Warfare (scene: warfare; window.__wf, scenes.mjs) ──
+
+/**
+ * A slice of a bots-only Team Splat (the local player played by a bot
+ * brain too): `seed` picks the match, `at` s of it run silently first,
+ * then `speed` × real time (0.5: half-speed slow motion), in third person
+ * (`tp`, the game's over-the-shoulder camera) or first person.
+ */
+function wfShot(o) {
+  const wf = window.__wf;
+  wf.match(o.seed ?? 7);
+  wf.run(o.at ?? 8);
+  window.__sizzleFrame = () => wf.frame(o.speed ?? 0.5, o.tp ?? false);
+  window.__sizzleSkip = window.__sizzleFrame;
+}
+
+const wf = (frames, arg) => ({ scene: 'warfare', frames, setup: wfShot, arg });
+
 export const SHOTS = {
+  // Moments the local player splats someone (found by scanning the matches' kill events)
+  'wf-tp-kill': wf(90, { seed: 13, at: 3.6, speed: 0.5, tp: true }),
+  'wf-fp-double': wf(90, { seed: 13, at: 6.3, speed: 0.5, tp: false }),
+  'wf-tp-head': wf(80, { seed: 7, at: 34.1, speed: 0.5, tp: true }),
+  'wf-fp-head': wf(90, { seed: 21, at: 45.7, speed: 0.5, tp: false }),
+  'wf-tp-slow': wf(80, { seed: 13, at: 11.6, speed: 0.33, tp: true }),
+
   'pk-facade': pk(120, 'north', { from: 0.6, cam: ['fixed', { at: [-17.2, 1.6, -71.6] }] }),
   'pk-wallrun': pk(100, 'gauntlet', { from: 0.45, cam: null }),
   'pk-climb': pk(90, 'gauntlet', { from: 4.25, cam: ['fixed', { at: [34.5, 2.2, 17.5] }] }),

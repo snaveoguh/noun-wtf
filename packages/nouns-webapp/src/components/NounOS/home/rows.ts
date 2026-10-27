@@ -80,6 +80,12 @@ export const CLIPS = {
     poster: '/home/hero-parkour-poster.jpg',
     audio: true,
   },
+  warfare: {
+    webm: '/home/hero-warfare.webm',
+    mp4: '/home/hero-warfare.mp4',
+    poster: '/home/hero-warfare-poster.jpg',
+    audio: true,
+  },
   pool: {
     webm: '/home/hero-pool.webm',
     mp4: '/home/hero-pool.mp4',
@@ -177,6 +183,7 @@ export const GAMES: Game[] = [
   {
     id: 'warfare',
     name: 'Noun Warfare',
+    preview: CLIPS.warfare,
     cover: '/warfare/cover.webp',
     card: '/home/covers/warfare.webp',
     focus: '72% 58%',
@@ -437,10 +444,10 @@ export const HERO_SLIDES: Slide[] = [
     tagline: game('warfare').tagline,
     teaser: game('warfare').teaser,
     accent: '#3dff8a',
-    still: game('warfare').cover,
-    focus: game('warfare').focus,
+    clip: CLIPS.warfare,
+    focus: '50% 50%',
     game: 'warfare',
-    ms: 9000,
+    ms: 9100,
   },
 ];
 
