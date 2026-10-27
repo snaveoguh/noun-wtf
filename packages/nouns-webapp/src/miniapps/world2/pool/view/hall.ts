@@ -219,7 +219,7 @@ export function buildHall(): Hall {
 
   // ── Lights ──
   const lights: THREE.Light[] = [];
-  const spot = new THREE.SpotLight(0xfff0d0, 22, 5, 0.9, 0.55, 1.4);
+  const spot = new THREE.SpotLight(0xfff0d0, 12, 5, 0.9, 0.55, 1.4);
   spot.position.set(0, lampY - 0.1, 0);
   spot.target.position.set(0, 0, 0);
   spot.castShadow = false;

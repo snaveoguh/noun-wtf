@@ -44,6 +44,7 @@ import { HEAD_X, L, R, W } from '../sim/table';
 
 import { PoolLobby, type LobbyResult } from './lobby';
 import { PoolSession, type Role, type SessionEvent } from './session';
+import { tableOf } from './tableOf';
 import { NetTransport, type PoolTransport } from './transport';
 
 export type PoolPhase = 'idle' | 'menu' | 'playing' | 'results';
@@ -131,6 +132,8 @@ interface Saved {
   quat: THREE.Quaternion;
   fov: number;
   meVisible: boolean;
+  /** The name-tag layer's visibility (its tags freeze while the room waits). */
+  labels: string;
   /** The pool hall: what it changed about the world. */
   hall: null | {
     pos: THREE.Vector3;
@@ -212,6 +215,9 @@ export class PoolMode implements PoolApi {
   private vsCpuDiff: Difficulty | null = null;
   private refreshAcc = 0;
   private hidden = new Set<string>();
+  private padPrev: boolean[] = [];
+  private hallKeep = new Set<THREE.Object3D>();
+  private padPull = 0;
 
   constructor(
     private game: Game,
@@ -253,7 +259,10 @@ export class PoolMode implements PoolApi {
 
   // ── PoolApi: in and out ──
 
-  playAt(table: PoolTable): boolean {
+  playAt(table: PoolTable): boolean;
+  playAt(at: { x: number; y: number; z: number }, yaw: number): boolean;
+  playAt(at: PoolTable | { x: number; y: number; z: number }, yaw?: number): boolean {
+    const table = tableOf(at, yaw);
     if (this.active || this.loading || this.game.me === null) return false;
     this.loading = true;
     void viewMod().then(
@@ -310,8 +319,12 @@ export class PoolMode implements PoolApi {
       quat: cam.quaternion.clone(),
       fov: cam.fov,
       meVisible: g.me?.root.visible ?? true,
+      labels: g.labelLayerEl.style.visibility,
       hall: null,
     };
+    // NPC / rider name tags stop following their owners while pool has the
+    // frame (their systems wait), so they'd hang on the screen: hide them
+    g.labelLayerEl.style.visibility = 'hidden';
     this.table = { ...table, id: table.id ?? `t${Math.round(table.x)},${Math.round(table.z)}` };
     const view = new m.PoolView(
       {
@@ -349,12 +362,14 @@ export class PoolMode implements PoolApi {
     const gfx = g.gfx;
     const p = g.player;
     const hidden: THREE.Object3D[] = [];
-    const keep = new Set<THREE.Object3D>([gfx.sun, gfx.sun.target, view.root, g.particles.group]);
-    for (const o of gfx.scene.children)
-      if (o.visible && !keep.has(o) && !(o as THREE.Light).isLight && o !== gfx.sky) {
-        o.visible = false;
-        hidden.push(o);
-      }
+    this.hallKeep = new Set<THREE.Object3D>([
+      gfx.sun,
+      gfx.sun.target,
+      view.root,
+      g.particles.group,
+      gfx.sky,
+    ]);
+    this.hideWorld(hidden);
     this.saved!.hall = {
       pos: p.pos.clone(),
       yaw: p.mode === 'foot' ? p.footYaw : Math.atan2(p.fwd.x, p.fwd.z),
@@ -380,6 +395,15 @@ export class PoolMode implements PoolApi {
     const t = this.table!;
     p.spawn(new THREE.Vector3(t.x + 2.4, t.y + 0.05, t.z + 1.6), Math.PI);
     this.set({ hall: true });
+  }
+
+  /** Hide every world object at the top of the scene (lights, the sky and the hall stay). */
+  private hideWorld(into: THREE.Object3D[]) {
+    for (const o of this.game.gfx.scene.children)
+      if (o.visible && !this.hallKeep.has(o) && !(o as THREE.Light).isLight) {
+        o.visible = false;
+        into.push(o);
+      }
   }
 
   private leaveHall() {
@@ -437,6 +461,7 @@ export class PoolMode implements PoolApi {
         cam.updateProjectionMatrix();
       }
       if (g.me !== null) g.me.root.visible = sv.meVisible;
+      g.labelLayerEl.style.visibility = sv.labels;
     }
     this.saved = null;
     this.lobby.cancel();
@@ -720,6 +745,9 @@ export class PoolMode implements PoolApi {
       this.refreshAcc = 0;
       if (this.lobby.tick()) this.refreshNear();
       this.refreshNear();
+      // The hall: anything the world finished loading since goes too
+      const h = this.saved?.hall;
+      if (h !== null && h !== undefined) this.hideWorld(h.hidden);
     }
     // My aim, for the others (throttled)
     this.aimSendAcc += dt;
@@ -736,6 +764,7 @@ export class PoolMode implements PoolApi {
         });
       }
     }
+    this.pollPad(dt);
     if (this.escArmed > 0) this.escArmed -= dt;
     this.publishAcc += dt;
     if (this.publishAcc >= 1 / 15) {
@@ -1078,6 +1107,64 @@ export class PoolMode implements PoolApi {
     this.place = null;
     this.set({ power });
     return true;
+  }
+
+  /**
+   * A gamepad: left stick aims (LB held: fine), RT pulls the cue back and
+   * letting go shoots (A shoots at the set power), D-pad ↑/↓ power, right
+   * stick spin, RB + left stick moves the cue ball in hand, Y the camera,
+   * X fast-forward, B leave (twice mid-frame, like ESC).
+   */
+  private pollPad(dt: number) {
+    const gp = Array.from(navigator.getGamepads?.() ?? []).find(q => q?.connected === true);
+    if (gp === undefined || gp === null) return;
+    const btn = (i: number) => gp.buttons[i]?.pressed === true;
+    const was = this.padPrev;
+    const tap = (i: number) => btn(i) && was[i] !== true;
+    const dz = (v: number) => (Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v) * 0.18) / 0.82);
+    const lx = dz(gp.axes[0] ?? 0);
+    const ly = dz(gp.axes[1] ?? 0);
+    const rx = dz(gp.axes[2] ?? 0);
+    const ry = dz(gp.axes[3] ?? 0);
+    const rt = gp.buttons[7]?.value ?? 0;
+    const s = this.session;
+    const mine = s !== null && s.canShoot();
+    if (mine) {
+      const st = s.state;
+      if (btn(5) && st.inHand !== null && (lx !== 0 || ly !== 0)) {
+        // Ball in hand: the stick slides the cue ball (screen-ish: table x / y)
+        const at = this.place ?? st.balls[0] ?? { x: HEAD_X - 0.2, y: 0 };
+        const lim = { x: L / 2 - R - 0.003, y: W / 2 - R - 0.003 };
+        let x = Math.max(-lim.x, Math.min(lim.x, at.x + lx * 0.6 * dt));
+        const y = Math.max(-lim.y, Math.min(lim.y, at.y + ly * 0.6 * dt));
+        if (st.inHand === 'kitchen') x = Math.min(x, HEAD_X);
+        this.place = { x, y };
+        this.placing = true;
+      } else if (lx !== 0) this.turn(-lx * (btn(4) ? 0.12 : 1.1) * dt);
+      if (rx !== 0 || ry !== 0) this.setSpin(rx, -ry);
+      if (btn(12)) this.setPower(this.ui.power + 0.6 * dt);
+      if (btn(13)) this.setPower(this.ui.power - 0.6 * dt);
+      if (rt > 0.05) {
+        this.padPull = Math.max(this.padPull, rt);
+        this.setPower(rt);
+      } else if (this.padPull > 0.05) {
+        const k = this.padPull;
+        this.padPull = 0;
+        this.shoot(k);
+      }
+      if (tap(0)) this.shoot();
+    } else this.padPull = 0;
+    if (tap(3)) this.toggleCam();
+    if (tap(2) && s !== null && s.play !== null) this.toggleFast();
+    if (tap(1)) {
+      if (this.ui.phase !== 'playing' || s === null || s.role === 'spectator') this.leave();
+      else if (this.escArmed > 0) this.leave();
+      else {
+        this.escArmed = 2.5;
+        this.toast('B again to leave the table (a forfeit)');
+      }
+    }
+    this.padPrev = gp.buttons.map(b => b.pressed);
   }
 
   private onDown = (e: PointerEvent) => {

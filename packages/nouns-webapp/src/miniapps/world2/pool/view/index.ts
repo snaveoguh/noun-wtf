@@ -338,7 +338,7 @@ export class PoolView {
       shooter = { seat: shooterSeat, x: st.x, z: st.z, dx: this.lastAim.dx, dz: this.lastAim.dz };
     }
     const holding = this.cue.group.visible && shooter !== null && f.placing === null;
-    this.players.update(dt, shooter, holding ? this.cue.hands(_hands) : null);
+    this.players.update(dt, shooter, holding ? this.cue.hands(_hands) : null, this.cam.eye);
 
     // ── Camera ──
     const lead = this.leadAt;

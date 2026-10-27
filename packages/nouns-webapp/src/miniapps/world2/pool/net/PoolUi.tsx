@@ -5,8 +5,8 @@
 // is, the last foul, a pull-back power bar (drag down, let go to shoot),
 // the cue ball spin picker, the camera toggle and fast-forward.
 
-import type { Game } from '../../Game';
 import type { PoolMode, PoolUiState } from './PoolMode';
+import type { Game } from '../../Game';
 import type { BallId } from '../contract';
 import type { Difficulty } from '../sim/cpu';
 
@@ -453,13 +453,13 @@ body[data-pool] [data-nounfm="off"]{display:none!important}
 .pl-power-cue{position:absolute;left:50%;width:10px;height:30%;margin-left:-5px;border-radius:5px;background:linear-gradient(#2f6fd0 0 6%,#f4f0e6 6% 12%,#e8cf9a 12% 70%,#5a2410 70%);box-shadow:0 0 0 2px rgba(0,0,0,.4)}
 .pl-power span{position:absolute;bottom:22px;left:0;right:0;text-align:center;color:#fff;font-weight:900;font-size:16px;text-shadow:0 1px 0 #000}
 .pl-power em{position:absolute;bottom:6px;left:0;right:0;text-align:center;color:#ffd400;font-style:normal;font-weight:800;font-size:9px;letter-spacing:.12em}
-.pl-spin-wrap{position:absolute;right:82px;bottom:calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:4px}
+.pl-spin-wrap{position:absolute;right:82px;bottom:calc(84px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:4px}
 .pl-spin{position:relative;width:76px;height:76px;border-radius:999px;background:radial-gradient(circle at 35% 30%,#fff,#e9e4d6 55%,#b8b2a2);box-shadow:0 3px 0 rgba(0,0,0,.4);touch-action:none;cursor:crosshair}
 .pl-spin:before,.pl-spin:after{content:'';position:absolute;background:rgba(0,0,0,.15)}
 .pl-spin:before{left:50%;top:10%;bottom:10%;width:1px}.pl-spin:after{top:50%;left:10%;right:10%;height:1px}
 .pl-spin i{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:999px;background:#d22209;box-shadow:0 0 0 2px #fff}
 .pl-mini{background:rgba(0,0,0,.6);color:#fff;font-size:10px;font-weight:800;letter-spacing:.1em;padding:3px 8px;border-radius:999px}
-.pl-shoot{position:absolute;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));background:#1d7a4c;color:#fff;font-weight:900;font-style:italic;padding:10px 12px;border-radius:10px;box-shadow:0 4px 0 #0d3f26;font-size:12px}
+.pl-shoot{position:absolute;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));background:#1d7a4c;color:#fff;font-weight:900;font-style:italic;padding:10px 12px;border-radius:10px;box-shadow:0 4px 0 #0d3f26;font-size:12px}
 .pl-results{background:rgba(0,0,0,.85);color:#fff;padding:18px 24px;border-radius:16px;box-shadow:8px 8px 0 #1d7a4c;max-width:calc(100vw - 32px)}
 .pl-big{font-size:min(14vw,64px);font-weight:900;font-style:italic;color:#ffd400;text-shadow:0 5px 0 #1d7a4c;line-height:1}
 .pl-lose{color:#ff6a5a;text-shadow:0 5px 0 #5a0f08}
@@ -468,7 +468,8 @@ body[data-pool] [data-nounfm="off"]{display:none!important}
 @media (max-width:640px){
   .pl-plate{width:38vw;padding:5px 8px}
   .pl-top{max-width:calc(100vw - 16px);top:58px}
-  .pl-line{top:150px;font-size:15px}
+  .pl-tools{top:132px!important;flex-direction:row!important;left:50%!important;transform:translateX(-50%);white-space:nowrap}
+  .pl-line{top:176px;font-size:15px}
   .pl-power{width:48px;right:10px}
   .pl-spin-wrap{right:auto;left:12px}
   .pl-spin{width:68px;height:68px}

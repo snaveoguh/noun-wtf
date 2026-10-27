@@ -1,330 +1,88 @@
 <!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Rubik+Mono+One&family=Permanent+Marker&display=block"
-      rel="stylesheet"
-    />
-    <style>
-      @font-face {
-        font-family: 'Pip3';
-        src: url(../../../packages/nouns-webapp/public/fonts/Pip3-Regular.931624c1.woff2)
-          format('woff2');
-      }
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      html,
-      body {
-        width: 1200px;
-        height: 960px;
-        overflow: hidden;
-        background: #000;
-      }
-      .c {
-        position: relative;
-        width: 1200px;
-        height: 960px;
-        overflow: hidden;
-        border: 14px solid #0b0b0f;
-      }
-      .bg {
-        position: absolute;
-        inset: 0;
-        background: var(--bg);
-      }
-      .dots {
-        position: absolute;
-        inset: 0;
-        background-image: radial-gradient(rgba(0, 0, 0, 0.18) 2.4px, transparent 2.6px);
-        background-size: 16px 16px;
-        -webkit-mask-image: linear-gradient(160deg, #000 0%, transparent 70%);
-        mask-image: linear-gradient(160deg, #000 0%, transparent 70%);
-      }
-      .burst {
-        position: absolute;
-        inset: -30%;
-        background: repeating-conic-gradient(
-          from 0deg at 72% 58%,
-          rgba(255, 255, 255, 0.13) 0 6deg,
-          transparent 6deg 16deg
-        );
-      }
-      .blob {
-        position: absolute;
-        border-radius: 46% 54% 60% 40%/50% 42% 58% 50%;
-        border: 6px solid #0b0b0f;
-      }
-      .shot {
-        position: absolute;
-        filter: brightness(var(--br, 1.5)) saturate(1.3) contrast(1.05);
-        left: var(--sx);
-        top: var(--sy);
-        width: var(--sw);
-        aspect-ratio: 5/4;
-        transform: rotate(var(--sr));
-        border: 10px solid #fff;
-        outline: 7px solid #0b0b0f;
-        box-shadow: 22px 26px 0 #0b0b0f;
-        background: #222 center/cover no-repeat;
-        background-image: var(--img);
-      }
-      .shot::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(
-          180deg,
-          rgba(255, 255, 255, 0.08),
-          transparent 40%,
-          rgba(0, 0, 0, 0.18)
-        );
-      }
-      .title {
-        position: absolute;
-        left: 42px;
-        top: 34px;
-        font-family: 'Pip3';
-        text-transform: uppercase;
-        font-size: var(--ts, 200px);
-        line-height: 0.8;
-        color: #fff;
-        -webkit-text-stroke: 9px #0b0b0f;
-        paint-order: stroke fill;
-        letter-spacing: 0.01em;
-        transform: rotate(-4deg);
-        text-shadow:
-          8px 8px 0 #ff2f8e,
-          15px 15px 0 #20d6ff,
-          22px 22px 0 #0b0b0f;
-      }
-      .title .l2 {
-        color: var(--accent);
-        display: block;
-        margin-left: var(--l2x, 60px);
-      }
-      .tag {
-        position: absolute;
-        right: 46px;
-        bottom: 96px;
-        font-family: 'Rubik Mono One';
-        font-size: 34px;
-        color: var(--accent);
-        background: #0b0b0f;
-        padding: 12px 22px;
-        transform: rotate(-2deg);
-        box-shadow: 8px 8px 0 #ff2f8e;
-      }
-      .url {
-        position: absolute;
-        right: 58px;
-        bottom: 38px;
-        font-family: 'Rubik Mono One';
-        font-size: 24px;
-        color: #fff;
-        background: #ff2f8e;
-        padding: 9px 18px;
-        transform: rotate(-2deg);
-        border: 4px solid #0b0b0f;
-      }
-      .badge {
-        position: absolute;
-        left: 44px;
-        bottom: 40px;
-        width: 150px;
-        height: 150px;
-        border-radius: 50%;
-        background: var(--badge, #ff2f8e);
-        border: 7px solid #0b0b0f;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        transform: rotate(-10deg);
-        box-shadow: 8px 8px 0 #0b0b0f;
-      }
-      .badge svg {
-        width: 96px;
-      }
-      .badge b {
-        font-family: 'Permanent Marker';
-        font-size: 20px;
-        color: #fff;
-        -webkit-text-stroke: 1px #0b0b0f;
-        margin-top: 4px;
-      }
-      .prop {
-        position: absolute;
-        filter: drop-shadow(10px 12px 0 #0b0b0f);
-      }
-      .prop svg {
-        width: 100%;
-        display: block;
-      }
-      .speed {
-        position: absolute;
-        height: 12px;
-        border-radius: 6px;
-        background: #0b0b0f;
-      }
-      .cap {
-        position: absolute;
-        font-family: 'Permanent Marker';
-        font-size: 36px;
-        color: #0b0b0f;
-        transform: rotate(var(--r, 6deg));
-      }
-    </style>
-  </head>
-  <body>
-    <div class="c" id="c"></div>
-    <script>
-      const q = new URLSearchParams(location.search);
-      const kind = q.get('k') || 'hoops';
-      const NOG =
-        '<svg viewBox="0 0 17 6" shape-rendering="crispEdges"><g fill="#e8262c"><rect x="0" y="2" width="4" height="1"/><rect x="0" y="2" width="1" height="3"/><rect x="4" y="0" width="6" height="6"/><rect x="10" y="2" width="1" height="1"/><rect x="11" y="0" width="6" height="6"/></g><g fill="#fff"><rect x="5" y="1" width="2" height="4"/><rect x="12" y="1" width="2" height="4"/></g><g fill="#0b0b0f"><rect x="7" y="1" width="2" height="4"/><rect x="14" y="1" width="2" height="4"/></g></svg>';
-      const SPLAT = c =>
-        '<svg viewBox="-60 -60 120 120"><path fill="' +
-        c +
-        '" stroke="#0b0b0f" stroke-width="5" stroke-linejoin="round" d="M0-38C10-38 12-52 20-50S22-34 30-28 50-34 50-24 36-12 40 0 56 10 50 18 34 14 30 26 34 46 24 48 10 34 0 38-14 54-22 48-16 32-28 26-50 30-50 20-36 8-40-2-54-16-46-22-30-14-28-26-38-44-28-46-10-38 0-38Z"/><circle cx="46" cy="-44" r="6" fill="' +
-        c +
-        '" stroke="#0b0b0f" stroke-width="4"/><circle cx="-48" cy="44" r="8" fill="' +
-        c +
-        '" stroke="#0b0b0f" stroke-width="4"/></svg>';
-      const BALL =
-        '<svg viewBox="-60 -60 120 120"><circle r="52" fill="#ff7a1a" stroke="#0b0b0f" stroke-width="7"/><path d="M-52 0H52M0-52V52M-37-37C-12-14-12 14-37 37M37-37C12-14 12 14 37 37" fill="none" stroke="#0b0b0f" stroke-width="5"/><path d="M-30-38a48 48 0 0 1 30-12" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" opacity=".7"/></svg>';
-      const FLAKE =
-        '<svg viewBox="-60 -60 120 120"><g stroke="#0b0b0f" stroke-width="15" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g><g stroke="#e9fbff" stroke-width="8" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g></svg>';
-      const VINYL =
-        '<svg viewBox="-60 -60 120 120"><circle r="54" fill="#141418" stroke="#0b0b0f" stroke-width="6"/><g fill="none" stroke="#3a3a46" stroke-width="2"><circle r="46"/><circle r="40"/><circle r="34"/><circle r="28"/></g><path d="M-40-22a46 46 0 0 1 30-22" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".55"/><circle r="17" fill="#ffe23a" stroke="#0b0b0f" stroke-width="4"/><circle r="3.5" fill="#0b0b0f"/></svg>';
-      const K = {
-        hoops: {
-          bg: 'linear-gradient(150deg,#ff8a1f 0%,#ff5a3c 45%,#7b3cff 100%)',
-          accent: '#ffe23a',
-          badge: '#20d6ff',
-          t1: 'NOUN',
-          t2: 'HOOPS',
-          tag: 'DUNK · CROSS · SWISH',
-          url: 'NOUN.WTF/WORLD',
-          bdg: '3 ON 3',
-          sx: '440px',
-          sy: '250px',
-          sw: '700px',
-          sr: '3deg',
-          cap: ['ankles broken!', 'left:880px;top:196px', '5deg'],
-          prop:
-            '<div class="speed" style="left:40px;top:470px;width:120px;transform:rotate(-24deg)"></div><div class="speed" style="left:30px;top:530px;width:150px;transform:rotate(-24deg)"></div><div class="prop" style="left:150px;top:380px;width:280px;transform:rotate(-18deg)">' +
-            BALL +
-            '</div>',
-        },
-        warfare: {
-          bg: 'linear-gradient(135deg,#ff2d3a 0%,#ff2d3a 46%,#1f6bff 54%,#1f6bff 100%)',
-          accent: '#7cff3a',
-          badge: '#ffe23a',
-          t1: 'NOUN',
-          t2: 'WARFARE',
-          tag: 'SPLAT · CAPTURE · REPEAT',
-          url: 'NOUN.WTF/WARFARE',
-          bdg: 'RED v BLU',
-          sx: '420px',
-          sy: '262px',
-          sw: '720px',
-          sr: '-2.5deg',
-          cap: [
-            'GET<br>PAINTED!',
-            'left:118px;top:452px;font-size:46px;line-height:1;text-align:center',
-            '-12deg',
-          ],
-          ts: '180px',
-          l2x: '30px',
-          br: '1.05',
-          prop:
-            '<div class="prop" style="left:40px;top:360px;width:330px;transform:rotate(-12deg)">' +
-            SPLAT('#7cff3a') +
-            '</div><div class="prop" style="left:250px;top:560px;width:150px;transform:rotate(30deg)">' +
-            SPLAT('#ffe23a') +
-            '</div>',
-        },
-        bigdrop: {
-          bg: 'linear-gradient(160deg,#5fd3ff 0%,#8f7bff 48%,#ff6fae 100%)',
-          accent: '#e9fbff',
-          badge: '#ff2f8e',
-          t1: 'THE BIG',
-          t2: 'DROP',
-          tag: 'CARVE · LOOP · FLY',
-          url: 'NOUN.WTF/WORLD',
-          bdg: '1,000 KM',
-          sx: '430px',
-          sy: '262px',
-          sw: '715px',
-          sr: '2.5deg',
-          cap: ['send it!', 'left:860px;top:205px', '6deg'],
-          ts: '190px',
-          l2x: '120px',
-          br: '1.08',
-          prop:
-            '<div class="speed" style="left:46px;top:452px;width:130px;transform:rotate(-48deg)"></div><div class="speed" style="left:28px;top:520px;width:170px;transform:rotate(-48deg)"></div><div class="prop" style="left:150px;top:380px;width:270px;transform:rotate(-14deg)">' +
-            FLAKE +
-            '</div>',
-        },
-        breaks: {
-          bg: 'linear-gradient(155deg,#ff2f8e 0%,#7b3cff 55%,#1b1464 100%)',
-          accent: '#ffe23a',
-          badge: '#20d6ff',
-          t1: 'NOUN',
-          t2: 'BREAKS',
-          tag: 'TOPROCK · POWER · FREEZE',
-          url: 'NOUN.WTF/WORLD',
-          bdg: '1V1 · CREWS',
-          sx: '430px',
-          sy: '262px',
-          sw: '715px',
-          sr: '2.5deg',
-          cap: ['ohhhh!', 'left:70px;top:372px', '-8deg'],
-          ts: '200px',
-          l2x: '110px',
-          br: '1.05',
-          prop:
-            '<div class="prop" style="left:70px;top:430px;width:300px;transform:rotate(-12deg)">' +
-            VINYL +
-            '</div>',
-          portrait: {
-            sx: '52px',
-            sy: '380px',
-            sw: '640px',
-            sr: '-2.5deg',
-            ts: '132px',
-            l2x: '24px',
-            cap: ['ohhhh!', 'left:520px;top:340px', '6deg'],
-            prop:
-              '<div class="prop" style="left:560px;top:860px;width:190px;transform:rotate(14deg)">' +
-              VINYL +
-              '</div>',
-          },
-        },
-      }[kind];
-      const img = q.get('img');
-      const c = document.getElementById('c');
-      // ?p=1: the homepage shelf card (800×1200, like home/covers/hoops.webp)
-      if (q.get('p') === '1') {
-        document.documentElement.style.cssText = 'width:800px;height:1200px';
-        document.body.style.cssText = 'width:800px;height:1200px';
-        c.style.width = '800px';
-        c.style.height = '1200px';
-        Object.assign(K, K.portrait || {});
-        const st = document.createElement('style');
-        st.textContent = '.tag{font-size:25px;right:36px;bottom:104px}.url{right:44px;bottom:44px}';
-        document.head.appendChild(st);
-      }
-      c.style.setProperty('--bg', K.bg);
-      c.style.setProperty('--accent', K.accent);
-      c.style.setProperty('--badge', K.badge);
-      if (K.ts) c.style.setProperty('--ts', K.ts);
-      if (K.l2x) c.style.setProperty('--l2x', K.l2x);
-      c.innerHTML = `
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Rubik+Mono+One&family=Permanent+Marker&display=block" rel="stylesheet">
+<style>
+@font-face{font-family:'Pip3';src:url(../../../packages/nouns-webapp/public/fonts/Pip3-Regular.931624c1.woff2) format('woff2')}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1200px;height:960px;overflow:hidden;background:#000}
+.c{position:relative;width:1200px;height:960px;overflow:hidden;border:14px solid #0b0b0f}
+.bg{position:absolute;inset:0;background:var(--bg)}
+.dots{position:absolute;inset:0;background-image:radial-gradient(rgba(0,0,0,.18) 2.4px,transparent 2.6px);background-size:16px 16px;
+  -webkit-mask-image:linear-gradient(160deg,#000 0%,transparent 70%);mask-image:linear-gradient(160deg,#000 0%,transparent 70%)}
+.burst{position:absolute;inset:-30%;background:repeating-conic-gradient(from 0deg at 72% 58%,rgba(255,255,255,.13) 0 6deg,transparent 6deg 16deg)}
+.blob{position:absolute;border-radius:46% 54% 60% 40%/50% 42% 58% 50%;border:6px solid #0b0b0f}
+.shot{position:absolute;filter:brightness(var(--br,1.5)) saturate(1.3) contrast(1.05);left:var(--sx);top:var(--sy);width:var(--sw);aspect-ratio:5/4;transform:rotate(var(--sr));
+  border:10px solid #fff;outline:7px solid #0b0b0f;box-shadow:22px 26px 0 #0b0b0f;background:#222 center/cover no-repeat;background-image:var(--img)}
+.shot::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 40%,rgba(0,0,0,.18))}
+.title{position:absolute;left:42px;top:34px;font-family:'Pip3';text-transform:uppercase;font-size:var(--ts,200px);line-height:.8;color:#fff;
+  -webkit-text-stroke:9px #0b0b0f;paint-order:stroke fill;letter-spacing:.01em;transform:rotate(-4deg);
+  text-shadow:8px 8px 0 #ff2f8e,15px 15px 0 #20d6ff,22px 22px 0 #0b0b0f}
+.title .l2{color:var(--accent);display:block;margin-left:var(--l2x,60px)}
+.tag{position:absolute;right:46px;bottom:96px;font-family:'Rubik Mono One';font-size:34px;color:var(--accent);background:#0b0b0f;
+  padding:12px 22px;transform:rotate(-2deg);box-shadow:8px 8px 0 #ff2f8e}
+.url{position:absolute;right:58px;bottom:38px;font-family:'Rubik Mono One';font-size:24px;color:#fff;background:#ff2f8e;padding:9px 18px;
+  transform:rotate(-2deg);border:4px solid #0b0b0f}
+.badge{position:absolute;left:44px;bottom:40px;width:150px;height:150px;border-radius:50%;background:var(--badge,#ff2f8e);border:7px solid #0b0b0f;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-10deg);box-shadow:8px 8px 0 #0b0b0f}
+.badge svg{width:96px}
+.badge b{font-family:'Permanent Marker';font-size:20px;color:#fff;-webkit-text-stroke:1px #0b0b0f;margin-top:4px}
+.prop{position:absolute;filter:drop-shadow(10px 12px 0 #0b0b0f)}
+.prop svg{width:100%;display:block}
+.speed{position:absolute;height:12px;border-radius:6px;background:#0b0b0f}
+.cap{position:absolute;font-family:'Permanent Marker';font-size:36px;color:#0b0b0f;transform:rotate(var(--r,6deg))}
+</style></head>
+<body><div class="c" id="c"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const kind = q.get('k') || 'hoops';
+const NOG = '<svg viewBox="0 0 17 6" shape-rendering="crispEdges"><g fill="#e8262c"><rect x="0" y="2" width="4" height="1"/><rect x="0" y="2" width="1" height="3"/><rect x="4" y="0" width="6" height="6"/><rect x="10" y="2" width="1" height="1"/><rect x="11" y="0" width="6" height="6"/></g><g fill="#fff"><rect x="5" y="1" width="2" height="4"/><rect x="12" y="1" width="2" height="4"/></g><g fill="#0b0b0f"><rect x="7" y="1" width="2" height="4"/><rect x="14" y="1" width="2" height="4"/></g></svg>';
+const SPLAT = c => '<svg viewBox="-60 -60 120 120"><path fill="' + c + '" stroke="#0b0b0f" stroke-width="5" stroke-linejoin="round" d="M0-38C10-38 12-52 20-50S22-34 30-28 50-34 50-24 36-12 40 0 56 10 50 18 34 14 30 26 34 46 24 48 10 34 0 38-14 54-22 48-16 32-28 26-50 30-50 20-36 8-40-2-54-16-46-22-30-14-28-26-38-44-28-46-10-38 0-38Z"/><circle cx="46" cy="-44" r="6" fill="' + c + '" stroke="#0b0b0f" stroke-width="4"/><circle cx="-48" cy="44" r="8" fill="' + c + '" stroke="#0b0b0f" stroke-width="4"/></svg>';
+const BALL = '<svg viewBox="-60 -60 120 120"><circle r="52" fill="#ff7a1a" stroke="#0b0b0f" stroke-width="7"/><path d="M-52 0H52M0-52V52M-37-37C-12-14-12 14-37 37M37-37C12-14 12 14 37 37" fill="none" stroke="#0b0b0f" stroke-width="5"/><path d="M-30-38a48 48 0 0 1 30-12" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" opacity=".7"/></svg>';
+const FLAKE = '<svg viewBox="-60 -60 120 120"><g stroke="#0b0b0f" stroke-width="15" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g><g stroke="#e9fbff" stroke-width="8" stroke-linecap="round"><path d="M0-50V50M-43-25L43 25M-43 25L43-25"/><path d="M0-34l-12-12M0-34l12-12M0 34l-12 12M0 34l12 12M-29-17l-16-3M-29-17l-5-15M29 17l16 3M29 17l5 15M29-17l16-3M29-17l5-15M-29 17l-16 3M-29 17l-5 15"/></g></svg>';
+const VINYL = '<svg viewBox="-60 -60 120 120"><circle r="54" fill="#141418" stroke="#0b0b0f" stroke-width="6"/><g fill="none" stroke="#3a3a46" stroke-width="2"><circle r="46"/><circle r="40"/><circle r="34"/><circle r="28"/></g><path d="M-40-22a46 46 0 0 1 30-22" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".55"/><circle r="17" fill="#ffe23a" stroke="#0b0b0f" stroke-width="4"/><circle r="3.5" fill="#0b0b0f"/></svg>';
+const EIGHT = '<svg viewBox="-60 -60 120 120"><circle r="52" fill="#141418" stroke="#0b0b0f" stroke-width="7"/><circle cx="-6" cy="-8" r="22" fill="#f4f1e8" stroke="#0b0b0f" stroke-width="4"/><text x="-6" y="3" text-anchor="middle" font-family="Bowlby One" font-size="30" fill="#0b0b0f">8</text><path d="M-34-30a44 44 0 0 1 26-16" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" opacity=".6"/></svg>';
+const CUE = '<svg viewBox="0 0 400 24"><rect x="2" y="5" width="396" height="14" rx="7" fill="#e8cf9a" stroke="#0b0b0f" stroke-width="4"/><rect x="250" y="4" width="148" height="16" rx="8" fill="#5a2410" stroke="#0b0b0f" stroke-width="4"/><rect x="2" y="5" width="14" height="14" rx="4" fill="#2f6fd0" stroke="#0b0b0f" stroke-width="4"/></svg>';
+const K = {
+  hoops: { bg: 'linear-gradient(150deg,#ff8a1f 0%,#ff5a3c 45%,#7b3cff 100%)', accent: '#ffe23a', badge: '#20d6ff',
+    t1: 'NOUN', t2: 'HOOPS', tag: 'DUNK · CROSS · SWISH', url: 'NOUN.WTF/WORLD', bdg: '3 ON 3',
+    sx: '440px', sy: '250px', sw: '700px', sr: '3deg', cap: ['ankles broken!', 'left:880px;top:196px', '5deg'],
+    prop: '<div class="speed" style="left:40px;top:470px;width:120px;transform:rotate(-24deg)"></div><div class="speed" style="left:30px;top:530px;width:150px;transform:rotate(-24deg)"></div><div class="prop" style="left:150px;top:380px;width:280px;transform:rotate(-18deg)">' + BALL + '</div>' },
+  warfare: { bg: 'linear-gradient(135deg,#ff2d3a 0%,#ff2d3a 46%,#1f6bff 54%,#1f6bff 100%)', accent: '#7cff3a', badge: '#ffe23a',
+    t1: 'NOUN', t2: 'WARFARE', tag: 'SPLAT · CAPTURE · REPEAT', url: 'NOUN.WTF/WARFARE', bdg: 'RED v BLU',
+    sx: '420px', sy: '262px', sw: '720px', sr: '-2.5deg', cap: ['GET<br>PAINTED!', 'left:118px;top:452px;font-size:46px;line-height:1;text-align:center', '-12deg'], ts: '180px', l2x: '30px', br: '1.05',
+    prop: '<div class="prop" style="left:40px;top:360px;width:330px;transform:rotate(-12deg)">' + SPLAT('#7cff3a') + '</div><div class="prop" style="left:250px;top:560px;width:150px;transform:rotate(30deg)">' + SPLAT('#ffe23a') + '</div>' },
+  bigdrop: { bg: 'linear-gradient(160deg,#5fd3ff 0%,#8f7bff 48%,#ff6fae 100%)', accent: '#e9fbff', badge: '#ff2f8e',
+    t1: 'THE BIG', t2: 'DROP', tag: 'CARVE · LOOP · FLY', url: 'NOUN.WTF/WORLD', bdg: '1,000 KM',
+    sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['send it!', 'left:860px;top:205px', '6deg'], ts: '190px', l2x: '120px', br: '1.08',
+    prop: '<div class="speed" style="left:46px;top:452px;width:130px;transform:rotate(-48deg)"></div><div class="speed" style="left:28px;top:520px;width:170px;transform:rotate(-48deg)"></div><div class="prop" style="left:150px;top:380px;width:270px;transform:rotate(-14deg)">' + FLAKE + '</div>' },
+  breaks: { bg: 'linear-gradient(155deg,#ff2f8e 0%,#7b3cff 55%,#1b1464 100%)', accent: '#ffe23a', badge: '#20d6ff',
+    t1: 'NOUN', t2: 'BREAKS', tag: 'TOPROCK · POWER · FREEZE', url: 'NOUN.WTF/WORLD', bdg: '1V1 · CREWS',
+    sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['ohhhh!', 'left:70px;top:372px', '-8deg'], ts: '200px', l2x: '110px', br: '1.05',
+    prop: '<div class="prop" style="left:70px;top:430px;width:300px;transform:rotate(-12deg)">' + VINYL + '</div>',
+    portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '132px', l2x: '24px', cap: ['ohhhh!', 'left:520px;top:340px', '6deg'],
+      prop: '<div class="prop" style="left:560px;top:860px;width:190px;transform:rotate(14deg)">' + VINYL + '</div>' } },
+  pool: { bg: 'linear-gradient(150deg,#19c06d 0%,#0e7448 46%,#10224f 100%)', accent: '#ffe23a', badge: '#ff2f8e',
+    t1: 'NOUN', t2: 'POOL', tag: 'BREAK · CUT · SINK THE 8', url: 'NOUN.WTF/WORLD', bdg: '8-BALL',
+    sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['call it!', 'left:860px;top:205px', '6deg'], ts: '210px', l2x: '120px', br: '1.15',
+    prop: '<div class="prop" style="left:10px;top:520px;width:430px;transform:rotate(-28deg)">' + CUE + '</div><div class="prop" style="left:120px;top:380px;width:260px;transform:rotate(-10deg)">' + EIGHT + '</div>',
+    portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '150px', l2x: '40px', cap: ['call it!', 'left:520px;top:330px', '6deg'],
+      prop: '<div class="prop" style="left:560px;top:860px;width:190px;transform:rotate(14deg)">' + EIGHT + '</div>' } },
+}[kind];
+const img = q.get('img');
+const c = document.getElementById('c');
+// ?p=1: the homepage shelf card (800×1200, like home/covers/hoops.webp)
+if (q.get('p') === '1') {
+  document.documentElement.style.cssText = 'width:800px;height:1200px';
+  document.body.style.cssText = 'width:800px;height:1200px';
+  c.style.width = '800px'; c.style.height = '1200px';
+  Object.assign(K, K.portrait || {});
+  const st = document.createElement('style');
+  st.textContent = '.tag{font-size:25px;right:36px;bottom:104px}.url{right:44px;bottom:44px}';
+  document.head.appendChild(st);
+}
+c.style.setProperty('--bg', K.bg); c.style.setProperty('--accent', K.accent); c.style.setProperty('--badge', K.badge);
+if (K.ts) c.style.setProperty('--ts', K.ts); if (K.l2x) c.style.setProperty('--l2x', K.l2x);
+c.innerHTML = `
   <div class="bg"></div><div class="burst"></div><div class="dots"></div>
   <div class="blob" style="right:-60px;top:-50px;width:260px;height:200px;background:#20d6ff"></div>
   <div class="blob" style="left:-90px;top:640px;width:260px;height:200px;background:#ff2f8e"></div>
@@ -334,6 +92,4 @@
   <div class="cap" style="${K.cap[1]};--r:${K.cap[2]}">${K.cap[0]}</div>
   <div class="tag">${K.tag}</div><div class="url">${K.url}</div>
   <div class="badge">${NOG}<b>${K.bdg}</b></div>`;
-    </script>
-  </body>
-</html>
+</script></body></html>

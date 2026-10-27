@@ -49,6 +49,9 @@ interface Body {
   aim: number;
 }
 
+/** A body closer than this (m, across the floor) to the camera is hidden: a Noun head is ~1.3 m wide. */
+const EYE_CLEAR = 0.8;
+
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -104,22 +107,25 @@ export class TablePlayers {
     ch.root.position.copy(this.bodies[i]!.pos);
   }
 
-  /** The non-shooter's corner (seat 0 at the head end, seat 1 at the foot). */
+  /** The non-shooter's corner (seat 0 at the head end, seat 1 at the foot), back off the rail. */
   waitSpot(i: 0 | 1) {
-    const x = (i === 0 ? -1 : 1) * (HX + 0.45);
-    const z = (i === 0 ? 1 : -1) * (HZ + 0.25);
+    const x = (i === 0 ? -1 : 1) * (HX + 0.75);
+    const z = (i === 0 ? 1 : -1) * (HZ + 0.55);
     return { x, z, yaw: Math.atan2(-x, -z) };
   }
 
   /**
    * Per frame. `shooter`: the seat at the table and where it stands / faces
    * (null: everyone waits); `hands`: where its hands go on the cue (local),
-   * or null when it isn't holding one up.
+   * or null when it isn't holding one up. `eye`: the camera (local); a
+   * body it's inside (the low cue view stands right in the shooter's big
+   * Noun head) isn't drawn.
    */
   update(
     dt: number,
     shooter: { seat: 0 | 1; x: number; z: number; dx: number; dz: number } | null,
     hands: { bridge: THREE.Vector3; back: THREE.Vector3 } | null,
+    eye?: THREE.Vector3,
   ) {
     const k = 1 - Math.exp(-5 * dt);
     for (const i of [0, 1] as const) {
@@ -143,6 +149,8 @@ export class TablePlayers {
       b.aim += (want - b.aim) * (1 - Math.exp(-8 * dt));
       b.lean = b.aim * 0.42;
       const ch = b.ch;
+      ch.root.visible =
+        eye === undefined || Math.hypot(eye.x - b.pos.x, eye.z - b.pos.z) > EYE_CLEAR;
       ch.root.position.copy(b.pos);
       ch.root.rotation.set(0, b.yaw, 0);
       ch.play(moving ? { clip: 'walk', fade: 0.2, timeScale: 0.9 } : { clip: 'idle', fade: 0.3 });

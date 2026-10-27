@@ -20,6 +20,7 @@
 // When the player presses E at a pool table prop:
 //
 //   game.pool?.playAt({ x, y, z, yaw, length, width })
+//   game.pool?.playAt(tableWorldPos, yaw)      (same thing, the prop's size)
 //
 // x / y / z: the table's centre in world space, y = the FLOOR under it.
 // yaw: the table's rotation about +Y (three.js convention), with the table's
@@ -175,8 +176,13 @@ export interface PoolTable {
 export interface PoolApi {
   /** True from playAt until you're back to walking around (menu included). */
   readonly active: boolean;
-  /** Start pool on this table (opens the menu). False if it can't right now. */
+  /**
+   * Start pool on this table (opens the menu). False if it can't right now.
+   * Either a whole PoolTable, or the table's world position (y = the floor
+   * under it, a THREE.Vector3 is fine) plus its yaw: the bar prop's size.
+   */
   playAt(table: PoolTable): boolean;
+  playAt(at: { x: number; y: number; z: number }, yaw: number): boolean;
   /** Leave the table (a forfeit mid-frame). */
   leave(): void;
 }
