@@ -103,6 +103,14 @@ const FOUL_TEXT: Record<string, string> = {
   bad_break: 'SOFT BREAK',
 };
 
+/** sim/rules.ts end reasons that are the loser's doing. */
+const LOSER_REASONS = new Set([
+  '8 down too early',
+  'scratched on the 8',
+  'fouled on the 8',
+  '8 in the wrong pocket',
+]);
+
 /** Respect for a win (game.respect; the rules clamp custom to ±10 and rate-limit it). */
 export const WIN_RESPECT: Record<Difficulty | 'human', number> = {
   easy: 2,
@@ -866,12 +874,18 @@ export class PoolMode implements PoolApi {
       respect = r?.add({ kind: 'custom', label: 'won at pool', amount }) ?? null;
     }
     const wname = winner === null ? '' : s.config.players[winner].name;
+    // The frame ended on the loser's mistake: say whose ("you · 8 down too early")
+    const loser = winner === null ? null : winner === 0 ? 1 : 0;
+    const why =
+      loser !== null && LOSER_REASONS.has(reason)
+        ? `${loser === mine ? 'you' : s.config.players[loser].name} · ${reason}`
+        : reason;
     this.set({
       phase: 'results',
       results: {
         won,
         winner: wname,
-        reason,
+        reason: why,
         respect,
         host: s.role === 'host',
         vsCpu: !s.config.players.every(p => p.human),
@@ -1050,6 +1064,8 @@ export class PoolMode implements PoolApi {
       calling: myTurn && onEight(st, st.turn),
       call: this.call,
       line,
+      // What's on screen (ball in hand shows the top view whatever the choice)
+      cam: this.view?.cam.mode === 'top' ? 'top' : 'aim',
     };
     const key = JSON.stringify(next);
     if (!force && key === this.lastKey) return;
@@ -1072,7 +1088,8 @@ export class PoolMode implements PoolApi {
   toggleCam() {
     const v = this.view;
     if (v === null) return;
-    v.aimMode = v.aimMode === 'aim' ? 'top' : 'aim';
+    // From what's on screen (ball in hand shows the top view whatever the choice)
+    v.aimMode = v.cam.mode === 'top' ? 'aim' : 'top';
     if (this.session?.play == null && this.ui.phase === 'playing') v.setCam(v.aimMode);
     this.set({ cam: v.aimMode });
   }
@@ -1196,8 +1213,13 @@ export class PoolMode implements PoolApi {
         y: e.clientY,
         mode: v.aimMode === 'top' || v.cam.mode === 'top' ? 'top' : 'aim',
       };
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     this.onMove(e);
+    // (Capture can throw for a touch that's already lifted: a quick tap)
+    try {
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {
+      /* the tap still aimed */
+    }
   };
 
   private onMove = (e: PointerEvent) => {

@@ -16,6 +16,8 @@ export interface Hall {
   group: THREE.Group;
   /** Lights (added to the group). */
   lights: THREE.Light[];
+  /** The lamp over the table (hidden for the top view: it hangs right in the way). */
+  lamp: THREE.Object3D[];
   /** Neon flicker etc. */
   update(dt: number): void;
   dispose(): void;
@@ -213,9 +215,12 @@ export function buildHall(): Hall {
   // ── The lamp over the table ──
   const shadeM = std(0x1f5a3a, 0.5, { side: THREE.DoubleSide });
   const lampY = 1.95;
-  box(1.9, 0.18, 0.45, shadeM, 0, lampY, 0, false);
-  box(1.8, 0.02, 0.38, glow(0xfff2c8), 0, lampY - 0.09, 0, false);
-  for (const x of [-0.7, 0.7]) box(0.012, H - lampY, 0.012, legM, x, (H + lampY) / 2, 0, false);
+  const lamp = [
+    box(1.9, 0.18, 0.45, shadeM, 0, lampY, 0, false),
+    box(1.8, 0.02, 0.38, glow(0xfff2c8), 0, lampY - 0.09, 0, false),
+  ];
+  for (const x of [-0.7, 0.7])
+    lamp.push(box(0.012, H - lampY, 0.012, legM, x, (H + lampY) / 2, 0, false));
 
   // ── Lights ──
   const lights: THREE.Light[] = [];
@@ -238,6 +243,7 @@ export function buildHall(): Hall {
   return {
     group,
     lights,
+    lamp,
     update(dt) {
       time += dt;
       // The odd neon flicker

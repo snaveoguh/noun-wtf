@@ -119,13 +119,15 @@ export class TablePlayers {
    * (null: everyone waits); `hands`: where its hands go on the cue (local),
    * or null when it isn't holding one up. `eye`: the camera (local); a
    * body it's inside (the low cue view stands right in the shooter's big
-   * Noun head) isn't drawn.
+   * Noun head) isn't drawn, nor is anyone in the top view (their big
+   * heads would stand between it and the cloth).
    */
   update(
     dt: number,
     shooter: { seat: 0 | 1; x: number; z: number; dx: number; dz: number } | null,
     hands: { bridge: THREE.Vector3; back: THREE.Vector3 } | null,
     eye?: THREE.Vector3,
+    top = false,
   ) {
     const k = 1 - Math.exp(-5 * dt);
     for (const i of [0, 1] as const) {
@@ -150,7 +152,7 @@ export class TablePlayers {
       b.lean = b.aim * 0.42;
       const ch = b.ch;
       ch.root.visible =
-        eye === undefined || Math.hypot(eye.x - b.pos.x, eye.z - b.pos.z) > EYE_CLEAR;
+        !top && (eye === undefined || Math.hypot(eye.x - b.pos.x, eye.z - b.pos.z) > EYE_CLEAR);
       ch.root.position.copy(b.pos);
       ch.root.rotation.set(0, b.yaw, 0);
       ch.play(moving ? { clip: 'walk', fade: 0.2, timeScale: 0.9 } : { clip: 'idle', fade: 0.3 });

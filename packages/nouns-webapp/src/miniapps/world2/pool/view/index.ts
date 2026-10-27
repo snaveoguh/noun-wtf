@@ -115,7 +115,8 @@ export class PoolView {
     // Fit the prop's footprint (never smaller, so the prop never shows through)
     const s = Math.max(1, place.length / (HX * 2), place.width / (HZ * 2)) * 1.02;
     const top = place.height ?? 0.86;
-    this.feltY = (top + 0.035) / s;
+    // Clear of the prop's own clutter (its leaning cue rises ~0.05 over its top)
+    this.feltY = (top + 0.06) / s;
     this.root.name = 'noun-pool';
     this.root.position.set(place.x, place.y, place.z);
     this.root.rotation.y = place.yaw;
@@ -220,6 +221,7 @@ export class PoolView {
     this.time += dt;
     this.audio.frame();
     this.hall?.update(dt);
+    if (this.hall !== null) for (const m of this.hall.lamp) m.visible = this.cam.mode !== 'top';
     // ── Events: strokes and sounds ──
     for (const e of f.events) {
       if (e.e === 'shot') {
@@ -338,7 +340,13 @@ export class PoolView {
       shooter = { seat: shooterSeat, x: st.x, z: st.z, dx: this.lastAim.dx, dz: this.lastAim.dz };
     }
     const holding = this.cue.group.visible && shooter !== null && f.placing === null;
-    this.players.update(dt, shooter, holding ? this.cue.hands(_hands) : null, this.cam.eye);
+    this.players.update(
+      dt,
+      shooter,
+      holding ? this.cue.hands(_hands) : null,
+      this.cam.eye,
+      this.cam.mode === 'top',
+    );
 
     // ── Camera ──
     const lead = this.leadAt;

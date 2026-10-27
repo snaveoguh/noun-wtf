@@ -18,6 +18,11 @@ import { HX, HZ } from './table';
 
 export type CamMode = 'aim' | 'top' | 'follow' | 'orbit';
 
+/** The lens at the table (PoolMode sets it; the top view widens it on a phone). */
+export const FOV = 50;
+/** The top view's most height over the cloth (local m): under a bar's or the hall's ceiling. */
+const TOP_MAX_H = 1.75;
+
 const _eye = new THREE.Vector3();
 const _look = new THREE.Vector3();
 const _m = new THREE.Matrix4();
@@ -57,6 +62,7 @@ export class PoolCamera {
   ) {
     const fy = this.feltY;
     let rate = 4.5;
+    let fov = FOV;
     const portrait = cam.aspect < 1;
     switch (this.mode) {
       case 'aim': {
@@ -68,12 +74,17 @@ export class PoolCamera {
         break;
       }
       case 'top': {
-        const v = THREE.MathUtils.degToRad(cam.fov) / 2;
-        const tan = Math.tan(v);
+        let tan = Math.tan(THREE.MathUtils.degToRad(FOV) / 2);
         // The table's long side along the screen's long side
         const along = portrait ? HZ : HX;
         const across = portrait ? HX : HZ;
-        const h = Math.max(across / tan, along / (tan * cam.aspect)) * 1.06;
+        let h = Math.max(across / tan, along / (tan * cam.aspect)) * 1.06;
+        // Stay under the ceiling (a phone would need ~3 m): wider lens instead
+        if (h > TOP_MAX_H) {
+          tan = (Math.max(across, along / cam.aspect) * 1.06) / TOP_MAX_H;
+          h = TOP_MAX_H;
+        }
+        fov = THREE.MathUtils.radToDeg(2 * Math.atan(tan));
         _eye.set(0, fy + h, 0.0001);
         _look.set(0, fy, 0);
         rate = 5;
@@ -101,6 +112,11 @@ export class PoolCamera {
     }
     const k = this.first ? 1 : 1 - Math.exp(-rate * dt);
     this.first = false;
+    const f = Math.abs(fov - cam.fov) < 0.05 ? fov : cam.fov + (fov - cam.fov) * k;
+    if (f !== cam.fov) {
+      cam.fov = f;
+      cam.updateProjectionMatrix();
+    }
     this.eye.lerp(_eye, k);
     this.look.lerp(_look, k);
     // Screen-up: straight down needs an explicit up (table +X on a phone, −Z on a laptop)

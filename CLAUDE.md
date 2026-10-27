@@ -209,6 +209,14 @@ A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews 
 - `net/` cypher spot, menus, lobby, `BreakMode` (Game hook), host-authoritative sync (`sync.ts`: host clock, ping/pong offset, sim judged 0.15 s behind, ~10 Hz snapshots), `break:*` messages relayed by `packages/nouns-party/src/breakRelay.ts` (online battles need the worker redeployed). `factory.ts` picks the real sim/view (stubs stand in until the view chunk loads).
 - Results report `break_win` / `break_loss` to respect.
 
+### Noun Pool (8-ball: bar tables + the pool hall)
+
+8-ball on any bar's pool table (interiors call `game.pool.playAt(tablePos, yaw)` or `playAt({x,y,z,yaw,length,width})`, y = the floor) and as its own game (`/world?play=pool`: a pool hall floating over the plaza, the world hidden). VS CPU (easy / normal / hard / pro), 1v1 with someone in the same room, WATCH. Contract `world2/pool/contract.ts`; three parts like hoops/:
+- `sim/` pure + deterministic: physics (`physics.ts`, spin, cushions, pockets), 8-ball rules (`rules.ts`: break, open table / groups, fouls → ball in hand, call the 8), rack, CPU (`cpu.ts`, a generator so it thinks over frames).
+- `view/` the table drawn over the bar prop (a touch taller, so its clutter hides), balls, cue, the two players (the one the camera is inside isn't drawn), cameras (cue / top / follow / orbit), aim guide, sound, the hall.
+- `net/` `PoolMode` (Game hook, owns the frame while `active`), `PoolUi` (menu, HUD: drag to aim, pull the power bar, spin ball), lockstep sync (`session.ts`: only shots travel, every client plays them with the same sim, the host judges and sends the rounded state), `pool:*` relayed by `packages/nouns-party/src/poolRelay.ts` (online play needs the worker redeployed; an old worker drops `pool:*`, so VS CPU still works).
+- Gamepad: stick aims, RT pull-and-release, right stick spin, RB + stick ball in hand. Wins add respect.
+
 ### Respect
 
 One score for how you act (`world2/respect/`, contract in `interiors/contract.ts` `RespectApi`, on `game.respect`). Rules in `respect/rules.ts` (pure, shared with `netlify/functions/world-respect.ts`): gifts, eating/thanks, buying local, helping, clean big combos, graffiti pieces, serving, hoops/break wins up; stealing, bailing into people, tagging homes, refusing food, overstaying down. Per-kind rate limits + ±minute caps; tiers outcast / stranger / local (50) / regular (200) / legend (600) with hysteresis; slow drift above the tier floor. The client sends events only; the server re-scores them (Blobs store `noun-world-respect`). HUD meter top-right, tier banners, legend noggles badge on name labels.
