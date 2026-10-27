@@ -47,6 +47,21 @@ export const CLIPS = {
     mp4: '/home/hero-hoops.mp4',
     poster: '/home/hero-hoops-poster.jpg',
   },
+  bigDrop: {
+    webm: '/home/hero-big-drop.webm',
+    mp4: '/home/hero-big-drop.mp4',
+    poster: '/home/hero-big-drop-poster.jpg',
+  },
+  breaks: {
+    webm: '/home/hero-breaks.webm',
+    mp4: '/home/hero-breaks.mp4',
+    poster: '/home/hero-breaks-poster.jpg',
+  },
+  exchange: {
+    webm: '/home/hero-exchange.webm',
+    mp4: '/home/hero-exchange.mp4',
+    poster: '/home/hero-exchange-poster.jpg',
+  },
 } satisfies Record<string, Clip>;
 
 export interface Game {
@@ -152,12 +167,27 @@ export const GAMES: Game[] = [
   },
 ];
 
+/** A game by id (the slides borrow their copy; GAMES' order is the shelf's). */
+export function gameOf(id: GameId): Game {
+  const g = GAMES.find(x => x.id === id);
+  if (g === undefined) throw new Error(`no game ${id}`);
+  return g;
+}
+
 /**
  * The hero's rotation. Adding footage later is just another entry here: a
  * `clip` plays (muted unless sound is on, poster only for reduced motion /
  * save-data), otherwise `still` gets the slow Ken Burns.
  */
-export interface Slide {
+export type Slide = SlideBase & SlideTarget;
+
+/**
+ * What PLAY does: launch one of the games (MORE INFO describes it), or
+ * open a page that isn't a game (the Grand Exchange), with no MORE INFO.
+ */
+export type SlideTarget = { game: GameId; href?: never } | { href: string; game?: never };
+
+export interface SlideBase {
   key: string;
   /** Title (first word white, the rest in the accent colour) */
   title: string;
@@ -169,9 +199,7 @@ export interface Slide {
   still?: string;
   /** object-position for the cropped media */
   focus: string;
-  /** The game PLAY launches (and MORE INFO describes) */
-  game: GameId;
-  /** Label for the primary button (defaults to the game's CTA) */
+  /** Label for the primary button (defaults to the game's CTA; needed for an `href`) */
   cta?: string;
   /** Brand slide: the second button browses the shelves instead of MORE INFO */
   browse?: boolean;
@@ -213,11 +241,51 @@ export const HERO_SLIDES: Slide[] = [
     ms: 26300,
   },
   {
+    key: 'big-drop',
+    title: 'The Big Drop',
+    eyebrow: 'NEW GAME',
+    tagline: 'DROP · CARVE · SEND',
+    teaser:
+      'Behind the deepest door in Noun World: 1,000 km of snow mountain. Huge airs, loop-de-loops, no top speed, and herds of noggle yaks waiting at the bottom.',
+    accent: '#9fe8ff',
+    clip: CLIPS.bigDrop,
+    focus: '50% 50%',
+    game: 'drop',
+    ms: 12000,
+  },
+  {
+    key: 'breaks',
+    title: 'Noun Breaks',
+    eyebrow: 'NEW GAME',
+    tagline: 'TOPROCK · POWER · FREEZE',
+    teaser:
+      'Breakdance battles in the plaza cypher. Headspins, windmills and freezes on the beat while the DJ spins, the crowd goes off and three judges raise their cards.',
+    accent: '#ff2f8e',
+    clip: CLIPS.breaks,
+    focus: '50% 50%',
+    game: 'breaks',
+    ms: 12000,
+  },
+  {
+    key: 'exchange',
+    title: 'Grand Exchange',
+    eyebrow: 'NEW',
+    tagline: 'SHOUT · SHAKE · TRADE',
+    teaser:
+      'A trading floor that goes on forever. Bots and riders shout their orders, shake on the deal and the coin flies. Watch the real order book play out, live.',
+    accent: '#ffc83d',
+    clip: CLIPS.exchange,
+    focus: '50% 50%',
+    href: '/exchange',
+    cta: 'ENTER THE FLOOR',
+    ms: 12000,
+  },
+  {
     key: 'world-vhs',
     title: 'Noun World',
     eyebrow: 'FEATURED GAME · FOUND TAPE, OCT 1996',
     tagline: 'SKATE · SPRAY · TALK',
-    teaser: GAMES[0]!.teaser,
+    teaser: gameOf('world').teaser,
     accent: '#ffd400',
     clip: CLIPS.worldVhs,
     focus: '50% 50%',
@@ -228,8 +296,8 @@ export const HERO_SLIDES: Slide[] = [
     key: 'hoops',
     title: 'Noun Hoops',
     eyebrow: 'FEATURED GAME',
-    tagline: GAMES[1]!.tagline,
-    teaser: GAMES[1]!.teaser,
+    tagline: gameOf('hoops').tagline,
+    teaser: gameOf('hoops').teaser,
     accent: '#ff9a1f',
     clip: CLIPS.hoops,
     focus: '50% 50%',
@@ -241,11 +309,11 @@ export const HERO_SLIDES: Slide[] = [
     key: 'warfare',
     title: 'Noun Warfare',
     eyebrow: 'FEATURED GAME',
-    tagline: GAMES[2]!.tagline,
-    teaser: GAMES[2]!.teaser,
+    tagline: gameOf('warfare').tagline,
+    teaser: gameOf('warfare').teaser,
     accent: '#3dff8a',
-    still: GAMES[2]!.cover,
-    focus: GAMES[2]!.focus,
+    still: gameOf('warfare').cover,
+    focus: gameOf('warfare').focus,
     game: 'warfare',
     ms: 9000,
   },

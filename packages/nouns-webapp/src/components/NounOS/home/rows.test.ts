@@ -12,6 +12,7 @@ import {
   BIG_DROP_URL,
   buildRows,
   CLIENTS,
+  CLIPS,
   coverForPath,
   GAMES,
   HERO_SLIDES,
@@ -223,11 +224,54 @@ describe('searchItems', () => {
 });
 
 describe('HERO_SLIDES', () => {
-  it('every slide has media and a game to launch', () => {
+  const publicDir = resolve(__dirname, '../../../../public');
+
+  it('every slide has media and a game (or a page) to launch', () => {
     for (const s of HERO_SLIDES) {
       expect(s.clip !== undefined || s.still !== undefined).toBe(true);
-      expect(GAMES.map(g => g.id)).toContain(s.game);
+      if (s.href !== undefined) {
+        expect(s.game).toBeUndefined();
+        expect(s.href).toMatch(/^\//);
+        expect(s.cta, s.key).toBeTruthy();
+      } else expect(GAMES.map(g => g.id)).toContain(s.game);
       expect(s.ms).toBeGreaterThan(3000);
     }
+  });
+
+  it('keeps the opening sizzle first, then the three new reels, then the rest', () => {
+    expect(HERO_SLIDES.map(s => s.key)).toEqual([
+      'sizzle',
+      'big-drop',
+      'breaks',
+      'exchange',
+      'world-vhs',
+      'hoops',
+      'warfare',
+    ]);
+  });
+
+  it('launches the Big Drop (locked or not, AgentHome decides), Noun Breaks and the Grand Exchange', () => {
+    const by = (k: string) => HERO_SLIDES.find(s => s.key === k)!;
+    expect(by('big-drop').game).toBe('drop');
+    expect(by('breaks').game).toBe('breaks');
+    expect(by('exchange').href).toBe('/exchange');
+    expect(by('exchange').game).toBeUndefined();
+  });
+
+  it("borrows each game's copy by id, not by its place on the shelf", () => {
+    const warfare = HERO_SLIDES.find(s => s.key === 'warfare')!;
+    const g = GAMES.find(x => x.id === 'warfare')!;
+    expect(warfare.teaser).toBe(g.teaser);
+    expect(warfare.still).toBe(g.cover);
+  });
+
+  it("has every clip's webm, mp4 and poster on disk", () => {
+    for (const s of HERO_SLIDES) {
+      if (s.clip === undefined) continue;
+      for (const f of [s.clip.webm, s.clip.mp4, s.clip.poster])
+        expect(existsSync(resolve(publicDir, `.${f}`)), f).toBe(true);
+    }
+    for (const c of [CLIPS.bigDrop, CLIPS.breaks, CLIPS.exchange])
+      expect(HERO_SLIDES.some(s => s.clip === c)).toBe(true);
   });
 });
