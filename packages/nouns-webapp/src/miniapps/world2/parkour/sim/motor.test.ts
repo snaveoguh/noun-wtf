@@ -320,6 +320,39 @@ describe('pole to pole', () => {
     }
     expect(caught).toBe(true);
   });
+
+  it('from the top of a tall mast, down to a shorter pole (swinging the wrong way)', () => {
+    // The plaza's 8 m mast, then a 6.5 m lamp post: from up high the lamp's
+    // top is below your hips, and the swing carries you sideways
+    const { w } = level(
+      [],
+      [
+        [15, 15, 0.1, 8],
+        [15, 7.5, 0.09, 6.5],
+      ],
+    );
+    const r = new Rig(w, 15, 0, 16.6, Math.PI);
+    r.b.grounded = false;
+    r.b.vel.y = 5;
+    r.b.vel.z = -3;
+    expect(r.until('pole', 40, input())).toBe(true);
+    r.run(200, input({ moveY: 1 }));
+    expect(r.b.pos.y).toBeGreaterThan(6);
+    for (let k = 0; k < 400; k++) {
+      const m = r.motor.move;
+      if (m !== null && m.k === 'pole' && Math.cos(m.ang) < -0.85) break;
+      r.step(input({ moveX: 1, moveY: 1 }));
+    }
+    r.step(input({ jump: true }));
+    expect(r.b.has('poleLaunch')).toBe(true);
+    let caught = false;
+    for (let k = 0; k < 120 && !caught; k++) {
+      r.step(input());
+      const m = r.motor.move;
+      caught = m !== null && m.k === 'pole' && Math.abs(m.cz - 7.5) < 0.3;
+    }
+    expect(caught).toBe(true);
+  });
 });
 
 describe('ground moves', () => {

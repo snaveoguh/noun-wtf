@@ -57,11 +57,11 @@ const GAUNTLET: Route = {
     // The pole
     { k: 'pole', x: 40, z: 33.1, y0: 0, y1: 6.5, r: 0.08 },
     // Slide bar on two uprights
-    { k: 'box', x: 40, y: 1.2, z: 41.5, sx: 3.6, sy: 0.35, sz: 0.3, color: RED },
-    { k: 'box', x: 38.1, y: 0.6, z: 41.5, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
-    { k: 'box', x: 41.9, y: 0.6, z: 41.5, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
+    { k: 'box', x: 40, y: 1.2, z: 44, sx: 3.6, sy: 0.35, sz: 0.3, color: RED },
+    { k: 'box', x: 38.1, y: 0.6, z: 44, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
+    { k: 'box', x: 41.9, y: 0.6, z: 44, sx: 0.2, sy: 1.2, sz: 0.3, color: RED },
     // Low wall to vault
-    { k: 'box', x: 40, y: 0.45, z: 45.5, sx: 3.6, sy: 0.9, sz: 0.4, color: WALL },
+    { k: 'box', x: 40, y: 0.45, z: 48, sx: 3.6, sy: 0.9, sz: 0.4, color: WALL },
   ],
   checkpoints: [
     { x: 24, y: 2.7, z: 19.2, r: 1.2, hint: 'SPRINT + JUMP BY THE WALL: WALL RUN' },
@@ -69,10 +69,10 @@ const GAUNTLET: Route = {
     { x: 40, y: 4.4, z: 21.5, r: 1.6, hint: 'RUN OFF ITS END, JUMP AT THE TOWER, PULL UP' },
     { x: 40, y: 4.1, z: 29.3, r: 0.9, hint: 'POST TO POST' },
     { x: 40, y: 3.0, z: 33.1, r: 1.4, hint: 'CATCH THE POLE' },
-    { x: 40, y: 1.0, z: 41.7, r: 1.4, hint: 'Q WHILE RUNNING: SLIDE UNDER' },
-    { x: 40, y: 1.3, z: 48.0, r: 1.6, hint: 'VAULT · FINISH' },
+    { x: 40, y: 1.0, z: 44.2, r: 1.4, hint: 'Q WHILE RUNNING: SLIDE UNDER' },
+    { x: 40, y: 1.3, z: 50.5, r: 1.6, hint: 'VAULT · FINISH' },
   ],
-  medals: { gold: 30, silver: 40, bronze: 60 },
+  medals: { gold: 21, silver: 28, bronze: 42 },
 };
 
 /**
@@ -102,7 +102,7 @@ const NORTH: Route = {
     { x: -50, y: 12.6, z: -72.6, r: 1.8, hint: 'OFF THE EDGE: CATCH THE POLE' },
     { x: -50, y: 1.2, z: -68.5, r: 2.2, hint: 'SLIDE DOWN · FINISH' },
   ],
-  medals: { gold: 30, silver: 40, bronze: 60 },
+  medals: { gold: 18, silver: 25, bronze: 38 },
 };
 
 /**
@@ -131,7 +131,7 @@ const LAMPS: Route = {
     { x: 15, y: 4.2, z: -15, r: 1.8, hint: 'THE BIG MAST' },
     { x: 15, y: 1.5, z: -27, r: 2.4, hint: 'LAUNCH OFF, Q TO ROLL · FINISH' },
   ],
-  medals: { gold: 30, silver: 40, bronze: 60 },
+  medals: { gold: 26, silver: 34, bronze: 50 },
 };
 
 export const ROUTES: Route[] = [GAUNTLET, NORTH, LAMPS];

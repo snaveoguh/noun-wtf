@@ -408,12 +408,15 @@ export class ParkourMotor {
   private poleAhead(x: number, y: number, z: number, yaw: number): PoleHit | null {
     // Poles are thin (a 0.18 m lamp post is ~0.025 rad wide at 7 m): sweep
     // finer than that, nearest the aim first. Most rays miss outright, so
-    // this is at most ~70 cheap rays, once per launch.
-    for (let k = 0; k <= 66; k++) {
-      const off = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * 0.018;
-      const a = yaw + off;
-      const pl = poleAlong(this.w, x, y, z, Math.sin(a), Math.cos(a), 10);
-      if (pl !== null && pl.top > y) return pl;
+    // this is at most ~70 cheap rays a height, once per launch. Lower too:
+    // high on a tall mast, a shorter pole's top is below your hips.
+    for (const dy of [0, -1.5, -3]) {
+      for (let k = 0; k <= 66; k++) {
+        const off = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * 0.018;
+        const a = yaw + off;
+        const pl = poleAlong(this.w, x, y + dy, z, Math.sin(a), Math.cos(a), 10);
+        if (pl !== null && pl.top > y - 2.2) return pl;
+      }
     }
     return null;
   }
@@ -938,22 +941,29 @@ export class ParkourMotor {
       dx /= dl;
       dz /= dl;
       // Pole to pole: another pole within ~35° of the launch gets aimed at
-      const next = this.poleAhead(p.x + ox * R, p.y, p.z + oz * R, Math.atan2(dx, dz));
+      const lx = m.cx + ox * (R + 0.08);
+      const lz = m.cz + oz * (R + 0.08);
+      const next = this.poleAhead(lx, p.y, lz, Math.atan2(dx, dz));
+      const sp = PK.poleLaunchOut + Math.abs(m.spin) * R * 0.9;
+      let vy = PK.poleLaunchUp;
       if (next !== null) {
-        const ax = next.cx - p.x;
-        const az = next.cz - p.z;
+        const ax = next.cx - lx;
+        const az = next.cz - lz;
         const al = Math.hypot(ax, az);
         dx = ax / al;
         dz = az / al;
+        // Arrive with the hands under its top (a lower pole: a flatter arc)
+        const t = Math.max(0.3, (al - next.r - PK.poleGap) / sp);
+        const want = Math.min(p.y, next.top - 1.9);
+        vy = clamp((want - p.y) / t + 0.5 * PK.gravity * t, -2, PK.poleLaunchUp);
       }
-      const sp = PK.poleLaunchOut + Math.abs(m.spin) * R * 0.9;
       b.vel.x = dx * sp;
       b.vel.z = dz * sp;
-      b.vel.y = PK.poleLaunchUp;
+      b.vel.y = vy;
       b.yaw = Math.atan2(dx, dz);
       // Out of the pole's reach before anything else can catch it
-      p.x = m.cx + ox * (R + 0.08);
-      p.z = m.cz + oz * (R + 0.08);
+      p.x = lx;
+      p.z = lz;
       this.poleCool = 0.45;
       this.flip(0.55, Math.abs(m.spin) > 2 ? 0 : 0.5, m.spin >= 0 ? 1 : -1);
       this.sinceJump = 0;
