@@ -945,7 +945,7 @@ export class ParkourMotor {
       const lz = m.cz + oz * (R + 0.08);
       const next = this.poleAhead(lx, p.y, lz, Math.atan2(dx, dz));
       const sp = PK.poleLaunchOut + Math.abs(m.spin) * R * 0.9;
-      let vy = PK.poleLaunchUp;
+      let vy: number = PK.poleLaunchUp;
       if (next !== null) {
         const ax = next.cx - lx;
         const az = next.cz - lz;
