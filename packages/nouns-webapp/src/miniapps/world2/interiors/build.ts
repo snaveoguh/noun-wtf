@@ -64,7 +64,10 @@ export function buildKit(l: Layout, atlas: Pick<ArtAtlas, 'slots' | 'named'>): K
       new THREE.Vector3(1, 1, 1),
     );
     buildItem(kit, it, P, mulberry32(it.seed), atlas, l);
-    if (it.solid) {
+    // Stairs and the stairwell are 'solid' for the planner (nothing gets put
+    // on them) but not walls: the flight's collision is its ramp (buildFlight),
+    // and a box over it stopped you dead at the foot of the stairs
+    if (it.solid && !WALK_THROUGH.has(it.type)) {
       const b = itemBox(it);
       kit.col.push(
         new THREE.Box3(
@@ -216,6 +219,9 @@ function holed(kit: Kit, hole: Box2 | null): Pick<Kit, 'add'> {
     },
   };
 }
+
+/** Items the planner keeps clear but you walk on / through (their own collision, if any). */
+export const WALK_THROUGH: ReadonlySet<string> = new Set(['stairs', 'stairwell']);
 
 /**
  * A straight flight in its item frame (centre of its footprint), `y0` its
