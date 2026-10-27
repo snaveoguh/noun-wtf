@@ -4,26 +4,39 @@
 // floor UI doesn't care which it has. `?offline=1` uses LocalExchange: the
 // engine and the bots run in this tab with no network (dev, tests, demos).
 
+import { maskOwner } from '../exchange3d/sim/feed';
+
 import {
+  dealAct,
+  dealsView,
   genesis,
   playerAct,
   riderAccount,
   snapshot,
   tick,
+  type DealAction,
+  type DealsView,
   type ExchangeAction,
   type ExchangeSnapshot,
   type ExchangeState,
   type GeFill,
   type GoodId,
+  type PublicDeal,
 } from './engine';
 
-export type ClientAction = ExchangeAction | { t: 'join' };
+export type ClientAction = ExchangeAction | DealAction | { t: 'join' };
+
+const isDealAction = (a: ClientAction): a is DealAction =>
+  a.t === 'offer' || a.t === 'accept' || a.t === 'decline';
 
 export interface ActReply {
   ok: boolean;
   reason?: string;
   fills: GeFill[];
   snapshot: ExchangeSnapshot;
+  /** Direct deals (engine/deals.ts): the offer made / the deal settled. */
+  deal?: PublicDeal;
+  deals?: DealsView;
 }
 
 export interface ExchangeClient {
@@ -109,14 +122,19 @@ export class LocalExchange implements ExchangeClient {
   async act(a: ClientAction, good: GoodId, tf: 'm' | 'h'): Promise<ActReply> {
     const now = this.now();
     tick(this.state, now, { maxSteps: 400 });
+    const tagOf = (o: string) => maskOwner(o, null);
     const r =
       a.t === 'join'
         ? { ok: true, fills: [] as GeFill[] }
-        : playerAct(this.state, this.owner, a, now);
+        : isDealAction(a)
+          ? dealAct(this.state, this.owner, a, now, tagOf)
+          : playerAct(this.state, this.owner, a, now);
     return {
       ok: r.ok,
       ...('reason' in r && r.reason !== undefined ? { reason: r.reason } : {}),
       fills: r.fills,
+      ...('deal' in r && r.deal !== undefined ? { deal: r.deal } : {}),
+      deals: dealsView(this.state, this.owner, now, tagOf),
       snapshot: snapshot(this.state, { good, tf, owner: this.owner }),
     };
   }
