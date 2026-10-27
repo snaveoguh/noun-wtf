@@ -591,6 +591,8 @@ export class NounCharacter {
   private scooter: ScooterRig | null = null;
   private blades: THREE.Group[] = [];
   private snowboard: THREE.Group | null = null;
+  /** How far the snowboard's base sits above the ground at deck height (m). */
+  private snowSink = 0;
   private bladeWheels: THREE.Object3D[] = [];
   /** Clip the game asked for (before the ride-mode remap). */
   private requested = '';
@@ -905,6 +907,9 @@ export class NounCharacter {
     if (this.hoverFx !== null) this.hoverFx.visible = t === 'hover';
     if (t !== 'hover') this.lift.position.y = 0;
     if (t === 'snowboard' && this.snowboard === null) this.buildSnowboard();
+    // The snowboard has no wheels: the rider and board drop so its base
+    // sits on the snow (built at deck height, it floated 6 cm over it)
+    if (t === 'snowboard') this.lift.position.y = -this.snowSink;
     if (this.snowboard !== null) this.snowboard.visible = t === 'snowboard';
     // Scooter / blades / snowboard swap the skateboard out entirely
     if (this.boardModel !== null) this.boardModel.visible = t === 'skate' || t === 'hover';
@@ -950,6 +955,8 @@ export class NounCharacter {
     };
     add(new THREE.BoxGeometry(0.3, 0.025, 1.12), top, 0, y, 0);
     add(new THREE.BoxGeometry(0.31, 0.008, 1.12), base, 0, y - 0.016, 0);
+    // The base plate's underside: what the snow should touch
+    this.snowSink = y - 0.016 - 0.004;
     // A white stripe down the middle of the topsheet
     add(new THREE.BoxGeometry(0.06, 0.004, 1.0), base, 0, y + 0.014, 0);
     for (const s of [1, -1]) {
