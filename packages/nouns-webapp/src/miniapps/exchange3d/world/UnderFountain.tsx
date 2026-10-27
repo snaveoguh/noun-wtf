@@ -275,6 +275,7 @@ export default function UnderFountain({ game, touch }: { game: Game; touch: bool
           >
             <Exchange3D
               intro="descent"
+              me={{ seed: game.seed, name: game.name, weight: game.weight }}
               onExit={exit}
               onFlat={() => setBook(b => !b)}
               bookOpen={book}

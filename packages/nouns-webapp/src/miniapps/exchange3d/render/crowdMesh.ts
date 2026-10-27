@@ -1,7 +1,11 @@
 // ── 3D Grand Exchange: the instanced crowd ──────────────────────────────
 //
 // Every trader that isn't a full rig is one instance of a low-poly Noun:
-// a body block and a head block, both wearing that trader's real Noun art.
+// a body block and a head block, both wearing that trader's real Noun art,
+// on two legs (trousers + shoes, coloured per trader by sim/outfit.ts) that
+// swing from the hip in the vertex shader with the trader's walk phase. So
+// a walker handed from its rig to the crowd keeps walking on its legs (it
+// used to turn into a legless block between pits).
 // The art comes from one atlas texture (a 32×32 cell per trader, decoded
 // from the on-chain run-length parts), picked per instance by `aCell`. So
 // the whole crowd is ONE draw call (plus one for the blob shadows),
@@ -13,6 +17,7 @@ import * as THREE from 'three';
 
 import { getToonRamp } from '../../world2/render/Toon';
 import { rasterNoun, SPRITE, type Seed } from '../sim/looks';
+import { type Outfit } from '../sim/outfit';
 
 /** Art counts for seeding (sim traders get seeds inside these). */
 export const ART = {
@@ -116,9 +121,33 @@ export const LOW = {
   headH: 0.89,
   headD: 0.82,
   headY: 1.06,
+  /** Legs: the hip (their pivot, the torso's bottom); each leg's width / depth / x. */
+  hipY: 0.52,
+  legW: 0.27,
+  legD: 0.3,
+  legX: 0.18,
+  /** Shoes: height, and how far they stick out in front. */
+  shoeH: 0.12,
+  shoeFront: 0.1,
   /** Height of the top of the head (labels sit above this). */
   top: 1.95,
 } as const;
+
+/** Vertex parts: the Noun art (atlas), trousers, shoes. */
+export const PART = { art: 0, trouser: 1, shoe: 2 } as const;
+
+/** Most a leg swings each way (rad) at a full stride. */
+export const LEG_SWING = 0.55;
+
+/** A flat-colour box (legs, shoes): any rect, the shader paints over it. */
+const PLAIN: BoxUV = {
+  px: [1, 1, 2, 2],
+  nx: [1, 1, 2, 2],
+  py: [1, 1, 2, 2],
+  ny: [1, 1, 2, 2],
+  pz: [1, 1, 2, 2],
+  nz: [1, 1, 2, 2],
+};
 
 function addBox(
   pos: number[],
@@ -208,16 +237,29 @@ function addBox(
   );
 }
 
+/**
+ * The low-poly Noun: torso and head wear the art; two legs (trousers +
+ * shoes) hang from the hip. `aPart` says which (PART), `aSide` which leg
+ * (-1 left, +1 right, 0 not a leg) so the shader can swing it.
+ */
 export function lowNounGeometry(): THREE.BufferGeometry {
   const pos: number[] = [];
   const uv: number[] = [];
   const nrm: number[] = [];
+  const part: number[] = [];
+  const side: number[] = [];
   const L = LOW;
+  const tag = (p: number, sd: number) => {
+    while (part.length < pos.length / 3) {
+      part.push(p);
+      side.push(sd);
+    }
+  };
   addBox(
     pos,
     uv,
     nrm,
-    [-L.bodyW / 2, 0, -L.bodyD / 2],
+    [-L.bodyW / 2, L.hipY, -L.bodyD / 2],
     [L.bodyW / 2, L.bodyH, L.bodyD / 2],
     BODY_UV,
   );
@@ -229,12 +271,44 @@ export function lowNounGeometry(): THREE.BufferGeometry {
     [L.headW / 2, L.headY + L.headH, L.headD / 2 + 0.06],
     HEAD_UV,
   );
+  tag(PART.art, 0);
+  for (const sd of [-1, 1]) {
+    const x = sd * L.legX;
+    addBox(
+      pos,
+      uv,
+      nrm,
+      [x - L.legW / 2, L.shoeH, -L.legD / 2],
+      [x + L.legW / 2, L.hipY + 0.02, L.legD / 2],
+      PLAIN,
+    );
+    tag(PART.trouser, sd);
+    addBox(
+      pos,
+      uv,
+      nrm,
+      [x - L.legW / 2 - 0.01, 0, -L.legD / 2 - 0.02],
+      [x + L.legW / 2 + 0.01, L.shoeH, L.legD / 2 + L.shoeFront],
+      PLAIN,
+    );
+    tag(PART.shoe, sd);
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('aPart', new THREE.Float32BufferAttribute(part, 1));
+  g.setAttribute('aSide', new THREE.Float32BufferAttribute(side, 1));
   g.computeBoundingSphere();
   return g;
+}
+
+/** Where a leg vertex goes for a swing angle (what the vertex shader does; tests use it). */
+export function swingLeg(y: number, z: number, angle: number): { y: number; z: number } {
+  const ly = y - LOW.hipY;
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return { y: LOW.hipY + ly * c - z * s, z: ly * s + z * c };
 }
 
 function crowdMaterial(atlas: Atlas): THREE.MeshToonMaterial {
@@ -244,16 +318,71 @@ function crowdMaterial(atlas: Atlas): THREE.MeshToonMaterial {
     alphaTest: 0.5,
   });
   const uCells = { value: atlas.cells };
+  const hip = LOW.hipY.toFixed(3);
+  const swing = [
+    `float sw = aSide * sin(aGait.x) * aGait.y * ${LEG_SWING.toFixed(3)};`,
+    'float cs = cos(sw);',
+    'float sn = sin(sw);',
+  ].join('\n');
   m.onBeforeCompile = sh => {
     sh.uniforms.uCells = uCells;
     sh.vertexShader = sh.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec2 aCell;\nuniform float uCells;',
+        [
+          '#include <common>',
+          'attribute vec2 aCell;',
+          'attribute float aPart;',
+          'attribute float aSide;',
+          'attribute vec2 aGait;',
+          'attribute vec3 aTrouser;',
+          'attribute vec3 aShoe;',
+          'uniform float uCells;',
+          'varying float vPart;',
+          'varying vec3 vTrouser;',
+          'varying vec3 vShoe;',
+        ].join('\n'),
       )
       .replace(
         '#include <uv_vertex>',
-        '#include <uv_vertex>\n#ifdef USE_MAP\nvMapUv = (vMapUv + aCell) / uCells;\n#endif',
+        [
+          '#include <uv_vertex>',
+          '#ifdef USE_MAP',
+          'vMapUv = (vMapUv + aCell) / uCells;',
+          '#endif',
+          'vPart = aPart;',
+          'vTrouser = aTrouser;',
+          'vShoe = aShoe;',
+        ].join('\n'),
+      )
+      // Legs swing about the hip (the x axis), their normals with them
+      .replace(
+        '#include <beginnormal_vertex>',
+        [
+          '#include <beginnormal_vertex>',
+          swing,
+          'if (aSide != 0.0) objectNormal = vec3(objectNormal.x, objectNormal.y * cs - objectNormal.z * sn, objectNormal.y * sn + objectNormal.z * cs);',
+        ].join('\n'),
+      )
+      .replace(
+        '#include <begin_vertex>',
+        [
+          '#include <begin_vertex>',
+          'if (aSide != 0.0) {',
+          `  float ly = transformed.y - ${hip};`,
+          `  transformed.y = ${hip} + ly * cs - transformed.z * sn;`,
+          '  transformed.z = ly * sn + transformed.z * cs;',
+          '}',
+        ].join('\n'),
+      );
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying float vPart;\nvarying vec3 vTrouser;\nvarying vec3 vShoe;',
+      )
+      .replace(
+        '#include <map_fragment>',
+        '#include <map_fragment>\nif (vPart > 0.5) diffuseColor = vec4(vPart > 1.5 ? vShoe : vTrouser, opacity);',
       );
   };
   m.customProgramCacheKey = () => 'gx3d-crowd';
@@ -290,7 +419,12 @@ export interface Pose {
   /** Lean forward (rad): a shout or a shake. */
   pitch: number;
   hidden: boolean;
+  /** Walk cycle phase (rad) and how much of a stride is showing (0 standing … 1). */
+  phase: number;
+  stride: number;
 }
+
+const _c = new THREE.Color();
 
 export class CrowdMesh {
   readonly mesh: THREE.InstancedMesh;
@@ -299,6 +433,9 @@ export class CrowdMesh {
   readonly geometry: THREE.BufferGeometry;
   readonly material: THREE.MeshToonMaterial;
   private cellAttr: THREE.InstancedBufferAttribute;
+  private gaitAttr: THREE.InstancedBufferAttribute;
+  private trouserAttr: THREE.InstancedBufferAttribute;
+  private shoeAttr: THREE.InstancedBufferAttribute;
   private copies: THREE.InstancedMesh[] = [];
   readonly capacity: number;
 
@@ -309,6 +446,20 @@ export class CrowdMesh {
     const cells = new Float32Array(capacity * 2);
     this.cellAttr = new THREE.InstancedBufferAttribute(cells, 2);
     this.geometry.setAttribute('aCell', this.cellAttr);
+    this.gaitAttr = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 2), 2);
+    this.gaitAttr.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('aGait', this.gaitAttr);
+    // Linear-space colours (what the shader works in); default denim + black
+    const tr = new Float32Array(capacity * 3);
+    const sh = new Float32Array(capacity * 3);
+    _c.set('#2c3e66');
+    for (let i = 0; i < capacity; i++) _c.toArray(tr, i * 3);
+    _c.set('#151515');
+    for (let i = 0; i < capacity; i++) _c.toArray(sh, i * 3);
+    this.trouserAttr = new THREE.InstancedBufferAttribute(tr, 3);
+    this.shoeAttr = new THREE.InstancedBufferAttribute(sh, 3);
+    this.geometry.setAttribute('aTrouser', this.trouserAttr);
+    this.geometry.setAttribute('aShoe', this.shoeAttr);
     this.material = crowdMaterial(this.atlas);
     this.mesh = new THREE.InstancedMesh(this.geometry, this.material, capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -341,21 +492,47 @@ export class CrowdMesh {
     this.cellAttr.needsUpdate = true;
   }
 
+  /** Trader i's trousers and shoes (sRGB hex, see sim/outfit.ts). */
+  setOutfit(i: number, o: Outfit) {
+    _c.set(o.trouser);
+    this.trouserAttr.setXYZ(i, _c.r, _c.g, _c.b);
+    _c.set(o.shoe);
+    this.shoeAttr.setXYZ(i, _c.r, _c.g, _c.b);
+    this.trouserAttr.needsUpdate = true;
+    this.shoeAttr.needsUpdate = true;
+  }
+
   commitLooks() {
     this.atlas.commit();
   }
 
   /** Write every trader's pose (n = live traders). */
   update(n: number, pose: (i: number, out: Pose) => void) {
-    const p: Pose = { x: 0, y: 0, z: 0, yaw: 0, lift: 0, roll: 0, pitch: 0, hidden: false };
+    const p: Pose = {
+      x: 0,
+      y: 0,
+      z: 0,
+      yaw: 0,
+      lift: 0,
+      roll: 0,
+      pitch: 0,
+      hidden: false,
+      phase: 0,
+      stride: 0,
+    };
     this.mesh.count = n;
     this.shadows.count = n;
+    const gait = this.gaitAttr.array as Float32Array;
     for (let i = 0; i < n; i++) {
       p.lift = 0;
       p.roll = 0;
       p.pitch = 0;
       p.hidden = false;
+      p.phase = 0;
+      p.stride = 0;
       pose(i, p);
+      gait[i * 2] = p.phase;
+      gait[i * 2 + 1] = p.stride;
       _p.set(p.x, p.y + p.lift, p.z);
       _e.set(p.pitch, p.yaw, p.roll);
       _q.setFromEuler(_e);
@@ -371,6 +548,9 @@ export class CrowdMesh {
     }
     this.mesh.instanceMatrix.needsUpdate = true;
     this.shadows.instanceMatrix.needsUpdate = true;
+    this.gaitAttr.clearUpdateRanges();
+    this.gaitAttr.addUpdateRange(0, n * 2);
+    this.gaitAttr.needsUpdate = true;
     for (const c of this.copies) c.count = n;
   }
 

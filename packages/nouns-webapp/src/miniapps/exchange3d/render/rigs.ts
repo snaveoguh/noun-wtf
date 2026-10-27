@@ -7,6 +7,7 @@
 // it's the expensive bit.
 
 import type { Trader } from '../sim/crowd';
+import type { Outfit } from '../sim/outfit';
 
 import * as THREE from 'three';
 
@@ -17,6 +18,26 @@ import {
   type CharacterAssets,
 } from '../../world2/character/NounCharacter';
 import { toonify } from '../../world2/render/Toon';
+
+/**
+ * Give a crowd rig the trader's trousers and shoes (the same colours its
+ * instanced self wears, so the LOD swap doesn't change its clothes). The
+ * rig's materials are its own clones, so this touches no one else.
+ */
+export function dressRig(root: THREE.Object3D, o: Outfit) {
+  root.traverse(obj => {
+    const m = obj as THREE.Mesh;
+    if (!m.isMesh) return;
+    for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+      const mm = mat as THREE.MeshToonMaterial;
+      const hex = /pants/i.test(mm.name) ? o.trouser : /shoe/i.test(mm.name) ? o.shoe : null;
+      if (hex === null || mm.color === undefined) continue;
+      mm.map = null;
+      mm.color.set(hex);
+      mm.needsUpdate = true;
+    }
+  });
+}
 
 export type RigAct = 'idle' | 'walk' | 'run' | 'wave' | 'celebrate' | 'dance';
 
@@ -34,7 +55,10 @@ export class RigPool {
   private frame = 0;
   failed = false;
 
-  constructor(private readonly keep: number) {
+  constructor(
+    private readonly keep: number,
+    private readonly outfit: (t: Trader) => Outfit,
+  ) {
     this.group.name = 'gx3d-rigs';
     NounCharacter.castShadows = false;
     loadCharacterAssets()
@@ -81,7 +105,8 @@ export class RigPool {
     for (const i of want) {
       const t = traders[i];
       if (t === undefined) continue;
-      const key = seedKey(t.seed);
+      // Seed and id: a reused slot (a new rider) gets a fresh rig and outfit
+      const key = seedKey(t.seed) + '|' + t.id;
       let r = this.rigs.get(i);
       if (r !== undefined && r.key !== key) {
         this.drop(i);
@@ -121,6 +146,7 @@ export class RigPool {
     ch.setBoardType('skate');
     ch.board.visible = false;
     toonify(ch.root);
+    dressRig(ch.root, this.outfit(t));
     ch.root.traverse(o => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {

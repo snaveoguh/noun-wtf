@@ -10,9 +10,13 @@
 //   vast   — a high aerial: the floor tiles off to the horizon
 //   follow — locked onto one trader
 //   free   — wherever you drag / pinch / scroll it, close-up to VAST
+//   walk   — behind your own rider, on foot (drag to look round)
 
-export type CamMode = 'floor' | 'wide' | 'vast' | 'follow' | 'free';
-export const CAM_MODES: readonly CamMode[] = ['floor', 'wide', 'vast', 'follow', 'free'];
+export type CamMode = 'floor' | 'wide' | 'vast' | 'follow' | 'free' | 'walk';
+export const CAM_MODES: readonly CamMode[] = ['walk', 'floor', 'wide', 'vast', 'follow', 'free'];
+
+/** The WALK camera's zoom range (m behind your rider). */
+export const WALK_R = { min: 2.5, max: 18, start: 6.5 } as const;
 
 export interface Orbit {
   tx: number;
@@ -44,6 +48,8 @@ export interface PresetCtx {
   pit: { x: number; z: number };
   /** The followed trader (null: none). */
   follow: { x: number; y: number; z: number } | null;
+  /** You, walking (null: not walking). */
+  me?: { x: number; y: number; z: number; heading: number } | null;
   /** Viewport width / height: tall phones pull wide shots back further. */
   aspect: number;
   /** Keep this azimuth (rad) where the preset doesn't care. */
@@ -63,6 +69,11 @@ export function preset(mode: CamMode, c: PresetCtx): Orbit {
     case 'follow': {
       const f = c.follow ?? { x: c.pit.x, y: 0, z: c.pit.z };
       return { tx: f.x, ty: f.y + 1.7, tz: f.z, r: 11 * Math.sqrt(fit), az: c.az, el: 0.42 };
+    }
+    case 'walk': {
+      const m = c.me ?? { x: c.pit.x, y: 0, z: c.pit.z, heading: c.az + Math.PI };
+      // Behind you: the camera sits opposite the way you face
+      return { tx: m.x, ty: m.y + 1.5, tz: m.z, r: WALK_R.start, az: m.heading + Math.PI, el: 0.3 };
     }
     case 'free':
     default:
@@ -100,6 +111,15 @@ export function orbitEye(o: Orbit): { x: number; y: number; z: number } {
     y: o.ty + Math.sin(o.el) * o.r,
     z: o.tz + Math.cos(o.az) * h,
   };
+}
+
+/**
+ * Swing the WALK camera round behind you as you walk (not while you're
+ * dragging it): az eases toward heading + PI at `rate` (1/s).
+ */
+export function chaseAz(az: number, heading: number, dt: number, rate = 1.6): number {
+  const k = 1 - Math.exp(-rate * Math.max(0, dt));
+  return az + angleTo(az, heading + Math.PI) * k;
 }
 
 /** Close enough to call the transition finished. */
@@ -143,15 +163,21 @@ export function pan(o: Orbit, px: number, py: number, fov: number, h: number): O
   };
 }
 
-/** Which mode a key picks (1–5, F/W/V/T/O), null for others. */
-export function modeForKey(key: string): CamMode | null {
+/**
+ * Which mode a key picks (1–6, F/W/V/T/O/G), null for others. While you're
+ * walking, WASD steer you, so only the digits and V (the VAST toggle) do.
+ */
+export function modeForKey(key: string, walking = false): CamMode | null {
   const k = key.toLowerCase();
+  if (walking && !/^[1-6v]$/.test(k)) return null;
   const map: Record<string, CamMode> = {
     '1': 'floor',
     '2': 'wide',
     '3': 'vast',
     '4': 'follow',
     '5': 'free',
+    '6': 'walk',
+    g: 'walk',
     f: 'floor',
     w: 'wide',
     v: 'vast',
