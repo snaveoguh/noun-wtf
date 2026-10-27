@@ -2,6 +2,7 @@
   "name": "hero-pool",
   "poster": 2.4,
   "grade": "eq=contrast=1.05:saturation=1.1,unsharp=5:5:0.4",
+  "music": { "file": "scripts/sizzle/music/sink-the-eight.mp3", "in": 0 },
   "cuts": [
     { "shot": "pl-hall", "in": 0.2, "dur": 1.6 },
     { "shot": "pl-break", "in": 0.3, "dur": 2.0, "fade": 0.2 },

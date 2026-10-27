@@ -84,6 +84,7 @@ export const CLIPS = {
     webm: '/home/hero-pool.webm',
     mp4: '/home/hero-pool.mp4',
     poster: '/home/hero-pool-poster.jpg',
+    audio: true,
   },
 } satisfies Record<string, Clip>;
 
