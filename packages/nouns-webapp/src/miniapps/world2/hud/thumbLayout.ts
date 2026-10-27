@@ -4,8 +4,9 @@
 // persistent touch control sits in the bottom band or in the side strips.
 // Right thumb: an L round the bottom-right corner (OLLIE in the corner,
 // PUSH and STOP along the bottom, FLIP and GRAB up the edge). Left thumb:
-// the round minimap in the corner, the board / spray / respawn column above
-// it. Landscape phones stack the right buttons up the right strip instead.
+// the corner stays free for the stick, the board / spray / respawn column
+// sits above it (the minimap lives top-right, ringLayout.ts). Landscape
+// phones stack the right buttons up the right strip instead.
 // Offsets are px from the screen's bottom-right (pad) or bottom-left (side)
 // corner; the components add the safe-area insets on top.
 
@@ -60,9 +61,11 @@ export function thumbPad(W: number, H: number): PadButton[] {
   ];
 }
 
-/** The round minimap (with its speed ring) in the bottom-left corner. */
-export function mapCluster(W: number, H: number): SideSlot {
-  // As big as fits in the corner without reaching into the play zone
+/**
+ * The bottom-left corner the left thumb's stick keeps (it held the minimap
+ * before the ring HUD; the side buttons stay where riders know them).
+ */
+export function stickCorner(W: number, H: number): SideSlot {
   const size = isLandscapePhone(W, H)
     ? Math.min(96, Math.floor(W * 0.15) - 8)
     : Math.min(108, Math.floor(H * 0.15) - 8);
@@ -70,11 +73,11 @@ export function mapCluster(W: number, H: number): SideSlot {
 }
 
 /**
- * The left column (board, spray, respawn, spray colour) above the map, bottom
- * up. `n` slots, each `size` px.
+ * The left column (board, spray, respawn, spray colour) above the stick's
+ * corner, bottom up. `n` slots, each `size` px.
  */
 export function sideColumn(W: number, H: number, n = 4): SideSlot[] {
-  const map = mapCluster(W, H);
+  const map = stickCorner(W, H);
   const size = 44;
   const gap = 8;
   if (isLandscapePhone(W, H)) {
@@ -100,11 +103,6 @@ export function touchRects(W: number, H: number): { id: string; r: Rect }[] {
       id: b.id,
       r: { x: W - b.right - b.size, y: H - b.bottom - b.size, w: b.size, h: b.size },
     });
-  const map = mapCluster(W, H);
-  out.push({
-    id: 'map',
-    r: { x: map.left, y: H - map.bottom - map.size, w: map.size, h: map.size },
-  });
   sideColumn(W, H).forEach((s, i) =>
     out.push({ id: `side${i}`, r: { x: s.left, y: H - s.bottom - s.size, w: s.size, h: s.size } }),
   );

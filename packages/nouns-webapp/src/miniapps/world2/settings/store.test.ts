@@ -24,7 +24,7 @@ describe('defaults', () => {
     const d = defaultSettings(false);
     expect(d.v).toBe(SETTINGS_VERSION);
     expect(d.audio).toEqual({ master: 1, sfx: 1, radio: 1, voice: 1, npc: 1, muted: false });
-    for (const h of HUD_ITEMS) expect(d.hud[h.id]).toBe(true);
+    for (const h of HUD_ITEMS) expect([h.id, d.hud[h.id]]).toEqual([h.id, h.id !== 'fps']);
     expect(d.hudScale).toBe(1);
     expect(d.quality).toBe('auto');
     expect(d.camMode).toBe('follow');
@@ -116,13 +116,26 @@ describe('versioned load / migrate', () => {
 
   it('lifts the v0 flat audio shape into audio{}', () => {
     const m = migrate({ master: 0.5, sfx: 0.25, muted: true, hudScale: 1.25 });
-    expect(m.v).toBe(1);
+    expect(m.v).toBe(SETTINGS_VERSION);
     expect(m.audio).toMatchObject({ master: 0.5, sfx: 0.25, muted: true });
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({ master: 0.5, radio: 0.3 }));
     const s = loadSettings();
     expect(s.audio.master).toBe(0.5);
     expect(s.audio.radio).toBe(0.3);
     expect(s.audio.sfx).toBe(1);
+  });
+
+  it('turns the v1 default-on FPS line off, keeps the other HUD choices', () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ v: 1, hud: { fps: true, chat: false, speed: true } }),
+    );
+    const s = loadSettings();
+    expect(s.hud.fps).toBe(false);
+    expect(s.hud.chat).toBe(false);
+    expect(s.hud.speed).toBe(true);
+    // a v2 choice to show it sticks
+    expect(sanitize({ v: 2, hud: { fps: true } }).hud.fps).toBe(true);
   });
 
   it('a future version keeps the fields it understands', () => {
@@ -144,8 +157,8 @@ describe('boot quality', () => {
 });
 
 describe('HUD stylesheet', () => {
-  it('is empty at defaults', () => {
-    expect(hudCss(defaultSettings(false))).toBe('');
+  it('only hides the dev FPS line at defaults', () => {
+    expect(hudCss(defaultSettings(false))).toBe('[data-w2hud="fps"]{display:none!important}');
   });
 
   it('hides the chosen blocks, keeps the cog, scales', () => {
@@ -157,14 +170,15 @@ describe('HUD stylesheet', () => {
     s.hudScale = 1.25;
     const css = hudCss(s);
     expect(css).toContain('[data-w2hud="speed"]{display:none!important}');
-    expect(css).toContain('.w2-minimap,.w2h-void{display:none!important}');
+    expect(css).toContain('.w2-minimap,.w2h-void,.w2h-mapdisc{display:none!important}');
     expect(css).toContain(':not([data-w2cog])');
     expect(css).toContain('.w2-nametag>span');
     expect(css).toContain('.w2-speedlines{display:none!important}');
-    expect(css).toContain('[data-w2hud="cluster"]{scale:1.25;transform-origin:bottom left}');
-    expect(css).toContain('[data-w2hud="system"]{scale:1.25;transform-origin:top right}');
-    // (session and speed live inside the corners: scaling them too would double up)
+    expect(css).toContain('[data-w2hud="ring"]{scale:1.25;transform-origin:top right}');
+    expect(css).toContain('.w2h-toasts{scale:1.25;transform-origin:top center}');
+    // (session, speed and the icon row live inside the ring: scaling them too would double up)
     expect(css).not.toContain('[data-w2hud="session"]{scale');
+    expect(css).not.toContain('[data-w2hud="system"]{scale');
     expect(css).not.toContain('[data-w2hud="chat"]{display');
   });
 

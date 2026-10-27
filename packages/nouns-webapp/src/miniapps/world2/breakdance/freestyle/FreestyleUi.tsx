@@ -1,9 +1,10 @@
 // ── Freestyle HUD: the 🕺 button, the move readout, a key card, the pad ──
 //
+// The chip / button sits in the ring HUD's mode row (hud/slots.tsx).
 // Desktop: a ", FREESTYLE" chip (click or press comma); while dancing a
 // strip low in the middle with the move, the beat, the keys you've typed,
 // "nice!" on clean hits, a few move patterns and the loop toggle. Phones: a
-// round 🕺 button on the right (STOP while dancing) and the battle's pad
+// round 🕺 button (STOP while dancing) and the battle's pad
 // (four directions + A / B) over the skate buttons; the stick walks off.
 
 import type { Game } from '../../Game';
@@ -12,6 +13,7 @@ import type { FreestyleMode, FreestyleUiState } from './FreestyleMode';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import { HudSlot } from '../../hud/slots';
 import { MOVES } from '../sim/moves';
 
 import { FREESTYLE_LABEL } from './FreestyleMode';
@@ -84,29 +86,35 @@ export function FreestyleUi({ game, touch }: { game: Game; touch: boolean }) {
     <>
       <style>{FS_CSS}</style>
       {toast !== null && !ui.on && (
-        <div className="fs-toast pointer-events-none absolute left-1/2 -translate-x-1/2">
-          {toast}
-        </div>
+        <HudSlot name="toasts">
+          <div className="fs-toast pointer-events-none absolute left-1/2 -translate-x-1/2">
+            {toast}
+          </div>
+        </HudSlot>
       )}
       {!touch && !ui.on && can && (
-        <button
-          type="button"
-          data-freestyle="start"
-          className="fs-chip pointer-events-auto absolute"
-          onClick={() => f.start()}
-        >
-          <b>{FREESTYLE_LABEL}</b> 🕺 FREESTYLE
-        </button>
+        <HudSlot name="modes">
+          <button
+            type="button"
+            data-freestyle="start"
+            className="fs-chip pointer-events-auto absolute"
+            onClick={() => f.start()}
+          >
+            <b>{FREESTYLE_LABEL}</b> 🕺 FREESTYLE
+          </button>
+        </HudSlot>
       )}
       {touch && (ui.on || can) && (
-        <button
-          type="button"
-          data-freestyle="toggle"
-          className={`fs-round pointer-events-auto absolute ${ui.on ? 'fs-stop' : ''}`}
-          onClick={() => f.toggle()}
-        >
-          {ui.on ? 'STOP' : '🕺'}
-        </button>
+        <HudSlot name="modes">
+          <button
+            type="button"
+            data-freestyle="toggle"
+            className={`fs-round pointer-events-auto absolute ${ui.on ? 'fs-stop' : ''}`}
+            onClick={() => f.toggle()}
+          >
+            {ui.on ? 'STOP' : '🕺'}
+          </button>
+        </HudSlot>
       )}
       {ui.on && (
         <div

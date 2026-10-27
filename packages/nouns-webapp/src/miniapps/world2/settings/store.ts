@@ -8,18 +8,19 @@
 // settings last for this page only.
 
 export const SETTINGS_KEY = 'noun-world-settings';
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 
 export const HUD_ITEMS = [
   { id: 'speed', label: 'Speedometer' },
   { id: 'session', label: 'Score & session' },
-  { id: 'system', label: 'Top-right buttons' },
+  { id: 'system', label: 'Icons under the map' },
   { id: 'minimap', label: 'Minimap' },
   { id: 'compass', label: 'Landmarks compass' },
   { id: 'chat', label: 'Chat feed' },
   { id: 'combo', label: 'Combo' },
   { id: 'toasts', label: 'Now-playing toasts' },
-  { id: 'fps', label: 'FPS / quality' },
+  // A dev readout: off unless asked for
+  { id: 'fps', label: 'FPS / quality (dev)', off: true },
   { id: 'nametags', label: 'Name tags' },
   { id: 'missions', label: 'Missions tracker' },
 ] as const;
@@ -93,7 +94,7 @@ function prefersReducedMotion(): boolean {
 
 export function defaultSettings(reduceMotion = prefersReducedMotion()): WorldSettings {
   const hud = {} as Record<HudItem, boolean>;
-  for (const h of HUD_ITEMS) hud[h.id] = true;
+  for (const h of HUD_ITEMS) hud[h.id] = !('off' in h);
   return {
     v: SETTINGS_VERSION,
     audio: { master: 1, sfx: 1, radio: 1, voice: 1, npc: 1, muted: false },
@@ -131,12 +132,15 @@ const obj = (v: unknown): Record<string, unknown> =>
 /**
  * Older shapes → the current one. Each step takes version n to n + 1.
  * v0: the pre-release flat shape (`{master, sfx, radio, voice, muted, ...}`).
+ * v1: the FPS / quality line was on by default; v2 makes it a dev readout
+ *     (off), so a stored `true` from v1 was the old default, not a choice.
  */
 const MIGRATIONS: Record<number, (o: Record<string, unknown>) => Record<string, unknown>> = {
   0: o => {
     const { master, sfx, radio, voice, muted, ...rest } = o;
     return { ...rest, v: 1, audio: { ...obj(o.audio), master, sfx, radio, voice, muted } };
   },
+  1: o => ({ ...o, v: 2, hud: { ...obj(o.hud), fps: false } }),
 };
 
 export function migrate(raw: unknown): Record<string, unknown> {

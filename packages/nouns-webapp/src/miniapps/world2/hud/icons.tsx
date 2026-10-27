@@ -56,6 +56,8 @@ export type IconName =
   | 'cargo'
   | 'shop'
   | 'decks'
+  | 'chat'
+  | 'fm'
   | 'cog';
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -301,6 +303,23 @@ const PATHS: Record<IconName, ReactNode> = {
       <rect x="2.5" y="6" width="19" height="12" rx="2" fill={CYAN} {...S} />
       <circle cx="8" cy="12" r="3" fill={YELLOW} {...S} />
       <circle cx="16" cy="12" r="3" fill={YELLOW} {...S} />
+    </>
+  ),
+  chat: (
+    <>
+      <path
+        d="M3 5.5a2.5 2.5 0 0 1 2.5-2.5h13A2.5 2.5 0 0 1 21 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-5 4.5V16h-.5A2.5 2.5 0 0 1 3 13.5z"
+        fill={WHITE}
+        {...S}
+      />
+      <path d="M7.5 8h9M7.5 11.5h6" fill="none" {...S} strokeWidth={2} />
+    </>
+  ),
+  fm: (
+    <>
+      <path d="M8 2.5l4 4 4-4" fill="none" {...S} strokeWidth={2} />
+      <rect x="2.5" y="6.5" width="19" height="14" rx="3" fill={PINK} {...S} />
+      <path d="M10 10v6.5l5.5-3.25z" fill={YELLOW} {...S} strokeWidth={2} />
     </>
   ),
   cog: (
