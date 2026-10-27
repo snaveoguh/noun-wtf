@@ -230,6 +230,22 @@ describe('HERO_SLIDES', () => {
   });
 });
 
+describe('NOUN POOL card', () => {
+  it('is a game in Play now, hot, with its posters on disk', () => {
+    const pool = buildRows(CATALOG)[0]!.items.find(i => i.key === 'game:pool')!;
+    expect(pool).toMatchObject({
+      title: 'NOUN POOL',
+      hot: true,
+      cover: '/home/covers/pool.webp',
+      action: { t: 'game', id: 'pool' },
+    });
+    expect(pool.locked).toBeUndefined();
+    const g = GAMES.find(x => x.id === 'pool')!;
+    const pub = resolve(__dirname, '../../../../public');
+    for (const f of [g.card, g.cover]) expect(existsSync(resolve(pub, `.${f}`)), f).toBe(true);
+  });
+});
+
 describe('ART / CULTURE row', () => {
   it('opens with the book, pip3, the van and the booth', () => {
     const art = buildRows(CATALOG).find(r => r.id === 'art')!;

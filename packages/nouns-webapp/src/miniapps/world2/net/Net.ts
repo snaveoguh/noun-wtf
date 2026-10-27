@@ -34,6 +34,7 @@
 
 import type { BreakMsg } from '../breakdance/contract';
 import type { HoopsMsg } from '../hoops/contract';
+import type { PoolMsg } from '../pool/contract';
 
 import PartySocket from 'partysocket';
 import * as THREE from 'three';
@@ -195,6 +196,8 @@ export class Net {
   onHoops?: (m: HoopsMsg) => void;
   /** Noun Breaks (breakdance/net): every `break:*` message, raw (its codec checks it). */
   onBreak?: (m: Record<string, unknown>) => void;
+  /** Noun Pool (pool/net): every `pool:*` message, raw (its codec checks it). */
+  onPool?: (m: Record<string, unknown>) => void;
   /** Noun Hide & Seek (hideseek/net): every `hideseek:*` message, raw (its codec checks it). */
   onHideSeek?: (m: Record<string, unknown>) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
@@ -258,6 +261,10 @@ export class Net {
     }
     if (type.startsWith('break:')) {
       this.onBreak?.(d);
+      return;
+    }
+    if (type.startsWith('pool:')) {
+      this.onPool?.(d);
       return;
     }
     if (type.startsWith('hideseek:')) {
@@ -548,6 +555,10 @@ export class Net {
   }
 
   sendBreak(m: BreakMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendPool(m: PoolMsg) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
