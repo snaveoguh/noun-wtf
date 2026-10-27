@@ -81,6 +81,7 @@ function fakeGame() {
     missions: { ud: { active: false } },
     hoops: { active: false },
     replay: { active: false },
+    cars: { inCar: false },
     showroom: false,
     audio: { ctx: null, master: null, noise: null, start: () => undefined },
     fm: { vanPos: new THREE.Vector3() },
