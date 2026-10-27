@@ -30,7 +30,7 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
           type="button"
           data-interiors="prompt"
           className="pointer-events-auto absolute left-1/2 top-[30%] -translate-x-1/2 bg-[#ffd400] px-5 py-3 text-center text-lg font-black italic text-black shadow-[6px_6px_0_#d22209]"
-          onClick={() => act({ a: v.prompt!.kind === 'enter' ? 'enter' : 'leave' })}
+          onClick={() => act({ a: v.prompt!.kind })}
         >
           {v.prompt.text} — {touch ? 'TAP' : 'E'}
           {v.prompt.sub !== undefined && (
@@ -119,6 +119,30 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
                 {!touch && <kbd className="text-[10px] opacity-60">{i + 1}</kbd>}🪙 {n}
               </button>
             ))}
+          </div>
+        </Sheet>
+      )}
+
+      {v.exhibit !== null && (
+        <Sheet title={`📜 PROP ${v.exhibit.id}`} onClose={() => act({ a: 'close' })} touch={touch}>
+          <div data-interiors="exhibit" className="flex flex-col gap-2 text-black">
+            <span
+              className="self-start px-2 py-0.5 text-xs font-black text-white"
+              style={{ background: v.exhibit.color }}
+            >
+              {v.exhibit.label}
+            </span>
+            <b className="text-base leading-snug">{v.exhibit.title}</b>
+            <span className="text-sm font-bold">{v.exhibit.ask}</span>
+            <span className="text-xs font-semibold opacity-70">{v.exhibit.votes}</span>
+            <a
+              href={v.exhibit.href}
+              target="_blank"
+              rel="noreferrer"
+              className={`${BTN} justify-center bg-[#ffd400] text-sm`}
+            >
+              VIEW PROP {v.exhibit.id} ↗
+            </a>
           </div>
         </Sheet>
       )}

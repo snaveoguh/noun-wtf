@@ -155,16 +155,19 @@ export const VAN = {
   boostFill: 0.1,
   /** Cosmetic gears: upper speed of each forward gear (m/s). */
   gears: [8, 15, 22, 30, 38, 60],
+  /** Lowest the CoM may sit above the surface under it (the floor pan). */
+  floorClear: 0.42,
+  maxSpeed: 75,
+  /** Air self-righting stiffness (N·m per unit tilt) and tumble damping. */
+  airLevel: 60000,
+  airDamp: 14000,
 };
+
+/** A vehicle's numbers for VanSim (cars/specs.ts builds one per car). */
+export type VanParams = typeof VAN;
 
 /** Raise the wheel rays' start this far above the mount, so deep landings still find the ground. */
 const RAY_LIFT = 1.0;
-/** Lowest the CoM may sit above the surface under it (the floor pan). */
-const FLOOR_CLEAR = 0.42;
-const MAX_SPEED = 75;
-/** Air self-righting stiffness (N·m per unit tilt) and tumble damping. */
-const AIR_LEVEL = 60000;
-const AIR_DAMP = 14000;
 
 export interface WheelState {
   /** Mount point (body frame). */
@@ -222,15 +225,19 @@ export class VanSim {
   /** Seconds upside down / on a side while slow (auto-righting hint). */
   stuck = 0;
 
-  constructor() {
+  /** The vehicle's numbers (the ice cream van by default; cars/ pass their own). */
+  readonly S: VanParams;
+
+  constructor(spec: VanParams = VAN) {
+    this.S = spec;
     for (const [front, z] of [
-      [true, VAN.frontZ],
-      [false, VAN.rearZ],
+      [true, this.S.frontZ],
+      [false, this.S.rearZ],
     ] as const) {
       for (const left of [true, false]) {
         this.wheels.push({
-          mx: left ? VAN.halfTrack : -VAN.halfTrack,
-          my: VAN.restLen + VAN.wheelR - staticSag() - VAN.comH,
+          mx: left ? this.S.halfTrack : -this.S.halfTrack,
+          my: this.S.restLen + this.S.wheelR - staticSag(this.S) - this.S.comH,
           mz: z,
           front,
           left,
@@ -250,7 +257,7 @@ export class VanSim {
   /** Put the van at rest with its wheels on a ground point (origin = between the tyres). */
   place(x: number, groundY: number, z: number, yaw: number) {
     this.pos.x = x;
-    this.pos.y = groundY + VAN.comH;
+    this.pos.y = groundY + this.S.comH;
     this.pos.z = z;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.w.x = this.w.y = this.w.z = 0;
@@ -264,7 +271,7 @@ export class VanSim {
     this.rearGrip = 1;
     this.reversing = false;
     for (const wh of this.wheels) {
-      wh.x = wh.prevX = staticSag();
+      wh.x = wh.prevX = staticSag(this.S);
       wh.contact = true;
       wh.spinRate = 0;
       wh.slip = 0;
@@ -278,7 +285,7 @@ export class VanSim {
     this.q.y = q.y;
     this.q.z = q.z;
     this.q.w = q.w;
-    rotate(this.q, 0, VAN.comH, VAN.comZ, _m);
+    rotate(this.q, 0, this.S.comH, this.S.comZ, _m);
     this.pos.x = ox + _m.x;
     this.pos.y = oy + _m.y;
     this.pos.z = oz + _m.z;
@@ -307,7 +314,7 @@ export class VanSim {
 
   /** Model origin (ground level between the tyres at rest) in world space. */
   origin(out: Vec3): Vec3 {
-    rotate(this.q, 0, -VAN.comH, -VAN.comZ, out);
+    rotate(this.q, 0, -this.S.comH, -this.S.comZ, out);
     out.x += this.pos.x;
     out.y += this.pos.y;
     out.z += this.pos.z;
@@ -320,7 +327,7 @@ export class VanSim {
    */
   recover(ground: VanGround) {
     const yaw = this.heading;
-    let gy = this.pos.y - VAN.comH;
+    let gy = this.pos.y - this.S.comH;
     if (ground.ray(this.pos.x, this.pos.y + 6, this.pos.z, 0, -1, 0, 30, _hit)) gy = _hit.y;
     this.place(this.pos.x, gy + 0.6, this.pos.z, yaw);
     for (const wh of this.wheels) {
@@ -333,7 +340,7 @@ export class VanSim {
   step(h: number, c: VanControls, ground: VanGround) {
     const P = this.pos;
     const V = this.vel;
-    const m = VAN.mass;
+    const m = this.S.mass;
     rotate(this.q, 1, 0, 0, _r);
     rotate(this.q, 0, 1, 0, _u);
     rotate(this.q, 0, 0, 1, _f);
@@ -348,7 +355,7 @@ export class VanSim {
     if (this.reversing && (throttle > 0.1 || vFwd > 1.5)) this.reversing = false;
     let drive = 0;
     if (this.reversing) {
-      drive = vFwd > -VAN.reverseSpeed ? -brake * 0.6 * VAN.accel : 0;
+      drive = vFwd > -this.S.reverseSpeed ? -brake * 0.6 * this.S.accel : 0;
       brake = throttle > 0.1 ? throttle : 0;
       throttle = 0;
     } else if (throttle > 0 && vFwd < -0.8) {
@@ -356,11 +363,11 @@ export class VanSim {
       throttle = 0;
     }
     this.boosting = c.boost && throttle > 0.1 && this.boostTank > 0 && !this.reversing;
-    if (this.boosting) this.boostTank = Math.max(0, this.boostTank - VAN.boostDrain * h);
-    else this.boostTank = Math.min(1, this.boostTank + VAN.boostFill * h);
+    if (this.boosting) this.boostTank = Math.max(0, this.boostTank - this.S.boostDrain * h);
+    else this.boostTank = Math.min(1, this.boostTank + this.S.boostFill * h);
     if (throttle > 0) {
-      const cap = this.boosting ? VAN.boostAccel : VAN.accel;
-      const pw = this.boosting ? VAN.boostPower : VAN.power;
+      const cap = this.boosting ? this.S.boostAccel : this.S.accel;
+      const pw = this.boosting ? this.S.boostPower : this.S.power;
       drive = throttle * Math.min(cap, pw / Math.max(1, Math.abs(vFwd)));
       // A blip of no drive on each upshift (it feels like gears)
       if (this.shiftT > 0) drive *= 0.35;
@@ -371,22 +378,22 @@ export class VanSim {
     const sIn = clamp(c.steer, -1, 1);
     const rate = Math.abs(sIn) > Math.abs(this.steerIn) && sIn * this.steerIn >= 0 ? 3.2 : 6;
     this.steerIn += clamp(sIn - this.steerIn, -rate * h, rate * h);
-    const sMax = VAN.steerMax / (1 + Math.abs(vFwd) / VAN.steerFade);
+    const sMax = this.S.steerMax / (1 + Math.abs(vFwd) / this.S.steerFade);
     this.steerAngle = this.steerIn * sMax;
 
     // Handbrake: rears lose side grip, recovering over ~0.6 s after release
-    if (c.handbrake) this.rearGrip = VAN.hbGrip;
+    if (c.handbrake) this.rearGrip = this.S.hbGrip;
     else this.rearGrip = Math.min(1, this.rearGrip + h * 1.1);
 
     // ── Forces ──
     let Fx = 0;
-    let Fy = -m * VAN.gravity;
+    let Fy = -m * this.S.gravity;
     let Fz = 0;
     let Tx = 0;
     let Ty = 0;
     let Tz = 0;
     this.grounded = 0;
-    const span = VAN.restLen + VAN.wheelR;
+    const span = this.S.restLen + this.S.wheelR;
     const mw = m / 4;
 
     // Suspension pass: compressions + loads
@@ -427,7 +434,7 @@ export class VanSim {
     for (let a = 0; a < 2; a++) {
       const L = this.wheels[a * 2];
       const R = this.wheels[a * 2 + 1];
-      const diff = (L.x - R.x) * VAN.antiRoll;
+      const diff = (L.x - R.x) * this.S.antiRoll;
       L.load = R.load = 0;
       if (L.contact) L.load += diff;
       if (R.contact) R.load -= diff;
@@ -440,11 +447,11 @@ export class VanSim {
       }
       this.grounded++;
       const xdot = (wh.x - wh.prevX) / h;
-      let F = VAN.spring * wh.x + VAN.damper * clamp(xdot, -6, 6) + wh.load;
-      if (wh.x > VAN.travel) {
+      let F = this.S.spring * wh.x + this.S.damper * clamp(xdot, -6, 6) + wh.load;
+      if (wh.x > this.S.travel) {
         // Bump stop
-        const over = wh.x - VAN.travel;
-        F += VAN.spring * 8 * over + VAN.damper * 3 * Math.max(0, xdot);
+        const over = wh.x - this.S.travel;
+        F += this.S.spring * 8 * over + this.S.damper * 3 * Math.max(0, xdot);
       }
       wh.load = Math.max(0, F);
     }
@@ -499,20 +506,20 @@ export class VanSim {
       const vLong = pvx * hx + pvy * hy + pvz * hz;
       const vLat = pvx * sx + pvy * sy + pvz * sz;
       const N = wh.load;
-      const mu = VAN.mu * wh.grip;
+      const mu = this.S.mu * wh.grip;
       let latMu = mu;
       if (!wh.front) latMu *= this.rearGrip;
 
       // Longitudinal: drive, brakes, handbrake lock, rolling resistance
       let FL = 0;
-      const share = wh.front ? VAN.frontDrive : 1 - VAN.frontDrive;
+      const share = wh.front ? this.S.frontDrive : 1 - this.S.frontDrive;
       FL += (m * drive * share) / 2;
       const stopF = (mw * Math.abs(vLong)) / h;
-      if (brake > 0) FL -= Math.sign(vLong) * Math.min(stopF, mw * VAN.brake * brake);
+      if (brake > 0) FL -= Math.sign(vLong) * Math.min(stopF, mw * this.S.brake * brake);
       if (hbOn && !wh.front) {
         FL = -Math.sign(vLong) * Math.min(stopF, mu * N * 0.9);
       }
-      FL -= Math.sign(vLong) * Math.min(stopF * 0.5, VAN.rolling * N);
+      FL -= Math.sign(vLong) * Math.min(stopF * 0.5, this.S.rolling * N);
       // Parked on a slope: hold it (no creep) when nothing's pressed
       if (throttle === 0 && drive === 0 && Math.abs(vLong) < 0.6) FL = -(mw * vLong) / h;
 
@@ -522,7 +529,7 @@ export class VanSim {
       const latLim = latMu * N;
       let sliding = 0;
       if (Math.abs(FS) > latLim) {
-        FS = Math.sign(FS) * latLim * VAN.slide;
+        FS = Math.sign(FS) * latLim * this.S.slide;
         sliding = Math.min(1, Math.abs(vLat) / 6);
       }
       const tot = Math.hypot(FL, FS);
@@ -535,7 +542,7 @@ export class VanSim {
       wh.slip = sliding;
 
       // Apply at the contact point lifted toward the CoM (less tipping leverage)
-      const lift = (1 - VAN.rollInfluence) * VAN.comH;
+      const lift = (1 - this.S.rollInfluence) * this.S.comH;
       const ax = st.x + _u.x * lift;
       const ay = st.y + _u.y * lift;
       const az = st.z + _u.z * lift;
@@ -568,16 +575,16 @@ export class VanSim {
       Tz += mrx * uy - mry * ux;
 
       // Visual spin: rolls with the ground (locked rears under the handbrake)
-      wh.spinRate = hbOn && !wh.front ? 0 : vLong / VAN.wheelR;
+      wh.spinRate = hbOn && !wh.front ? 0 : vLong / this.S.wheelR;
       if (!wh.front && drive > 0 && sliding > 0.3) wh.spinRate += 12;
     }
 
     // Air drag + downforce (grounded only)
-    Fx -= m * VAN.drag * V.x * vAbs;
-    Fy -= m * VAN.drag * V.y * vAbs;
-    Fz -= m * VAN.drag * V.z * vAbs;
+    Fx -= m * this.S.drag * V.x * vAbs;
+    Fy -= m * this.S.drag * V.y * vAbs;
+    Fz -= m * this.S.drag * V.z * vAbs;
     if (this.grounded >= 2) {
-      const dn = m * VAN.downforce * vFwd * vFwd;
+      const dn = m * this.S.downforce * vFwd * vFwd;
       Fx -= _u.x * dn;
       Fy -= _u.y * dn;
       Fz -= _u.z * dn;
@@ -592,19 +599,19 @@ export class VanSim {
     this.drifting =
       this.grounded >= 2 && vAbs > 8 && (slipNow > 0.22 || (hbOn && Math.abs(this.steerIn) > 0.3));
     if (this.grounded >= 2) {
-      const I = VAN.inertia.y;
+      const I = this.S.inertia.y;
       if (hbOn && vAbs > 5) {
         // Handbrake turn: kick the tail out toward the steer
-        const kick = -this.steerIn * VAN.hbYaw * Math.min(1, vAbs / 15);
+        const kick = -this.steerIn * this.S.hbYaw * Math.min(1, vAbs / 15);
         const k = (kick - wUp) * I * 2.2;
         Tx += _u.x * k;
         Ty += _u.y * k;
         Tz += _u.z * k;
       } else if (!this.drifting || slipNow < 0.35) {
         // Yaw-rate helper toward the steered line (keeps the van predictable)
-        const L = VAN.frontZ - VAN.rearZ;
+        const L = this.S.frontZ - this.S.rearZ;
         // (never more than the tyres could hold: mu·g / v, plus a little)
-        const cap = Math.min(1.6, (1.25 * VAN.mu * VAN.gravity) / Math.max(1, vAbs));
+        const cap = Math.min(1.6, (1.25 * this.S.mu * this.S.gravity) / Math.max(1, vAbs));
         const want = clamp((vFwd * Math.tan(-this.steerAngle)) / L, -cap, cap);
         const k = (want - wUp) * I * 2.0;
         Tx += _u.x * k;
@@ -623,11 +630,11 @@ export class VanSim {
       // In the air: ease pitch + roll back toward level so jumps land on the
       // wheels (torque along up × worldUp), and damp the tumble a touch
       if (_u.y > -0.2) {
-        Tx += -_u.z * AIR_LEVEL;
-        Tz += _u.x * AIR_LEVEL;
+        Tx += -_u.z * this.S.airLevel;
+        Tz += _u.x * this.S.airLevel;
       }
-      Tx -= this.w.x * AIR_DAMP;
-      Tz -= this.w.z * AIR_DAMP;
+      Tx -= this.w.x * this.S.airDamp;
+      Tz -= this.w.z * this.S.airDamp;
     }
     // Overall rotational damping (keeps the stiff springs tame)
     Tx -= this.w.x * 900;
@@ -639,8 +646,8 @@ export class VanSim {
     V.y += (Fy / m) * h;
     V.z += (Fz / m) * h;
     const sp = Math.hypot(V.x, V.y, V.z);
-    if (sp > MAX_SPEED) {
-      const k = MAX_SPEED / sp;
+    if (sp > this.S.maxSpeed) {
+      const k = this.S.maxSpeed / sp;
       V.x *= k;
       V.y *= k;
       V.z *= k;
@@ -649,9 +656,9 @@ export class VanSim {
     const tbx = Tx * _r.x + Ty * _r.y + Tz * _r.z;
     const tby = Tx * _u.x + Ty * _u.y + Tz * _u.z;
     const tbz = Tx * _f.x + Ty * _f.y + Tz * _f.z;
-    const dwx = (tbx / VAN.inertia.x) * h;
-    const dwy = (tby / VAN.inertia.y) * h;
-    const dwz = (tbz / VAN.inertia.z) * h;
+    const dwx = (tbx / this.S.inertia.x) * h;
+    const dwy = (tby / this.S.inertia.y) * h;
+    const dwz = (tbz / this.S.inertia.z) * h;
     this.w.x += _r.x * dwx + _u.x * dwy + _f.x * dwz;
     this.w.y += _r.y * dwx + _u.y * dwy + _f.y * dwz;
     this.w.z += _r.z * dwx + _u.z * dwy + _f.z * dwz;
@@ -684,9 +691,9 @@ export class VanSim {
     const P = this.pos;
     const V = this.vel;
     for (const side of [-1, 1]) {
-      bodyToWorld(this.q, P, side * VAN.bodyX, VAN.bodyY, VAN.bodyZ0, _a);
-      bodyToWorld(this.q, P, side * VAN.bodyX, VAN.bodyY, VAN.bodyZ1, _b);
-      if (!ground.push(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z, VAN.bodyR, _push)) continue;
+      bodyToWorld(this.q, P, side * this.S.bodyX, this.S.bodyY, this.S.bodyZ0, _a);
+      bodyToWorld(this.q, P, side * this.S.bodyX, this.S.bodyY, this.S.bodyZ1, _b);
+      if (!ground.push(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z, this.S.bodyR, _push)) continue;
       const nx = _push.nx;
       const ny = _push.ny;
       const nz = _push.nz;
@@ -724,9 +731,9 @@ export class VanSim {
     const P = this.pos;
     // From just above the CoM (inside the body: nothing else can be there),
     // so a deck overhead is never mistaken for the ground
-    if (!ground.ray(P.x, P.y + 0.6, P.z, 0, -1, 0, 0.6 + VAN.comH + 0.3, _hit)) return;
+    if (!ground.ray(P.x, P.y + 0.6, P.z, 0, -1, 0, 0.6 + this.S.comH + 0.3, _hit)) return;
     if (_hit.ny < 0.3) return;
-    const floor = _hit.y + FLOOR_CLEAR;
+    const floor = _hit.y + this.S.floorClear;
     if (P.y >= floor) return;
     P.y = floor;
     if (this.vel.y < 0) {
@@ -745,11 +752,11 @@ export class VanSim {
     this.shiftT = Math.max(0, this.shiftT - h);
     if (this.reversing) {
       this.gear = -1;
-      this.rpm = clamp01(Math.abs(vFwd) / VAN.reverseSpeed);
+      this.rpm = clamp01(Math.abs(vFwd) / this.S.reverseSpeed);
       return;
     }
     const v = Math.max(0, vFwd);
-    const G = VAN.gears;
+    const G = this.S.gears;
     let g = Math.max(1, this.gear);
     // Up at the top of the band, down with some hysteresis
     while (g < G.length && v > G[g - 1]) g++;
@@ -763,8 +770,8 @@ export class VanSim {
 }
 
 /** Static compression per wheel at rest. */
-function staticSag(): number {
-  return (VAN.mass * VAN.gravity) / 4 / VAN.spring;
+function staticSag(S: VanParams): number {
+  return (S.mass * S.gravity) / 4 / S.spring;
 }
 
 // ── Allocation-free scratch + math ──

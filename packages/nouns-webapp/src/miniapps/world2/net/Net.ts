@@ -19,6 +19,11 @@
 //       without it, listeners speak their chat lines in the house voice
 // Respect (respect/): `rs: 'L'` only while the rider is a legend (the
 // noggles badge on their name tag; cosmetic, not checked by the server).
+// Freestyle (breakdance/freestyle/wire.ts): `fs: [move, seq, beat, n, bpm]`
+// only while the rider is breakdancing on the spot.
+// Outfit (character/outfit.ts): `of`, four base-36 chars (trousers, their
+// colour, shoes, their colour), only once the rider picked one; without it
+// a rider wears their seed's default (`outfitFromSeed`).
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -31,8 +36,10 @@ import * as THREE from 'three';
 import { PARTYKIT_HOST } from '../../world/engine/types';
 import { CHAT_ID_RE, TAG_RE } from '../audio/voice/booth/clips';
 import { type CalloutEvent } from '../audio/voice/callouts';
+import { decodeFs, type FsState, type FsWire } from '../breakdance/freestyle/wire';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
+import { OUTFIT_KEY_RE } from '../character/outfit';
 
 import { Voice } from './Voice';
 
@@ -60,13 +67,15 @@ export interface NetPose {
    * dragon itself is placed from those, see dragon/mesh.ts).
    */
   vehicle?: Vehicle;
+  /** Driving a car (cars/netCar.ts): its id + flags, e.g. "toro.2.0". */
+  car?: string;
 }
 
-export type Vehicle = 'van' | 'dragon';
+export type Vehicle = 'van' | 'dragon' | 'car';
 
 /** A blob's `vh` → the vehicle (anything else, or nothing: on foot / board). */
 export function parseVehicle(v: unknown): Vehicle | undefined {
-  return v === 'van' || v === 'dragon' ? v : undefined;
+  return v === 'van' || v === 'dragon' || v === 'car' ? v : undefined;
 }
 
 /** Callout events by their wire code (co[1]). */
@@ -98,6 +107,11 @@ export function parseChatVoice(v: unknown): { tag: string; id: string; seq: numb
   return { tag, id, seq };
 }
 
+/** A blob's `of` → the outfit wire key ('' for anything malformed or missing). */
+export function parseOutfitKey(v: unknown): string {
+  return typeof v === 'string' && OUTFIT_KEY_RE.test(v) ? v : '';
+}
+
 export interface RemotePlayer {
   id: string;
   /** Their public voice tag (Voice Booth), '' when they don't share one. */
@@ -117,6 +131,10 @@ export interface RemotePlayer {
   deck?: string;
   /** Respect badge ('L' = legend), '' = none. */
   respectBadge?: string;
+  /** Freestyling: the move + its beat phase (null = not dancing). */
+  freestyle?: FsState | null;
+  /** Outfit wire key (character/outfit.ts `decodeOutfit`), '' = their seed's default. */
+  outfit?: string;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -165,6 +183,8 @@ export class Net {
   onHoops?: (m: HoopsMsg) => void;
   /** Noun Breaks (breakdance/net): every `break:*` message, raw (its codec checks it). */
   onBreak?: (m: Record<string, unknown>) => void;
+  /** Noun Hide & Seek (hideseek/net): every `hideseek:*` message, raw (its codec checks it). */
+  onHideSeek?: (m: Record<string, unknown>) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
   onFm?: (m: Record<string, unknown>) => void;
   /** Voice Booth: a remote rider's callout fired. */
@@ -181,9 +201,13 @@ export class Net {
   ownChat = false;
   /** My respect badge ('L' while a legend), relayed in the blob. */
   respectBadge = '';
+  /** My freestyle (breakdance/freestyle), relayed in the blob while dancing. */
+  freestyle: FsWire | null = null;
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
+  /** My outfit's wire key (character/outfit.ts `encodeOutfit`), '' = seed default. */
+  outfit = '';
 
   connect() {
     if (this.ws) return;
@@ -218,6 +242,10 @@ export class Net {
     }
     if (type.startsWith('break:')) {
       this.onBreak?.(d);
+      return;
+    }
+    if (type.startsWith('hideseek:')) {
+      this.onHideSeek?.(d);
       return;
     }
     if (type.startsWith('fm:')) {
@@ -306,6 +334,7 @@ export class Net {
     pose.boardType = parseBoardType(blob.bt);
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.vehicle = parseVehicle(blob.vh);
+    if (typeof blob.cr === 'string') pose.car = blob.cr.slice(0, 20);
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     const co = parseCallout(blob.co);
     const cv = parseChatVoice(blob.cv);
@@ -346,6 +375,8 @@ export class Net {
     rp.voiceTag = typeof blob.vo === 'string' && TAG_RE.test(blob.vo) ? blob.vo : '';
     rp.respectBadge = blob.rs === 'L' ? 'L' : '';
     rp.ownChat = blob.mv === 1;
+    rp.freestyle = decodeFs(blob.fs);
+    rp.outfit = parseOutfitKey(blob.of);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -393,6 +424,7 @@ export class Net {
       c.name = b.pose.name;
       c.seedKey = b.pose.seedKey;
       c.vehicle = b.pose.vehicle;
+      c.car = b.pose.car;
     }
     void dt;
   }
@@ -424,12 +456,15 @@ export class Net {
       // Only while riding, so older clients' blobs are unchanged otherwise
       // (an older client reads 'dragon' as nothing: the rider, no dragon)
       ...(pose.vehicle !== undefined ? { vh: pose.vehicle } : {}),
+      ...(pose.car !== undefined ? { cr: pose.car } : {}),
       // Voice Booth (see the header): only when set
       ...(this.voiceTag !== '' ? { vo: this.voiceTag } : {}),
       ...(this.callout !== null ? { co: this.callout } : {}),
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
       ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
+      ...(this.freestyle !== null ? { fs: this.freestyle } : {}),
+      ...(this.outfit !== '' ? { of: this.outfit } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',
@@ -490,6 +525,10 @@ export class Net {
   }
 
   sendBreak(m: BreakMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendHideSeek(m: { type: string }) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
