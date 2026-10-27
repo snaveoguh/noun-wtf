@@ -398,6 +398,8 @@ export class ParkourMotor {
   }
 
   private assistAcc = 0;
+  /** Where the air pole scan's fan is up to. */
+  private poleFan = 0;
 
   private sameWall(nx: number, nz: number) {
     const m = this.memoN;
@@ -422,8 +424,16 @@ export class ParkourMotor {
   }
 
   private scanPole(b: PkBody, hs: number): PoleHit | null {
+    // A thin pole is only ~0.08 rad wide at 2 m: a fan 0.07 rad apart, ±0.84,
+    // five rays a scan (straight ahead every time), the whole fan in 1/6 s
     const base = hs > 0.8 ? Math.atan2(b.vel.x, b.vel.z) : b.yaw;
-    for (const off of [0, 0.45, -0.45, 0.9, -0.9]) {
+    for (let k = 0; k < 5; k++) {
+      let off = 0;
+      if (k > 0) {
+        this.poleFan = (this.poleFan + 1) % 24;
+        const n = (this.poleFan >> 1) + 1;
+        off = (this.poleFan & 1 ? -1 : 1) * n * 0.07;
+      }
       const a = base + off;
       const pl = poleAlong(this.w, b.pos.x, b.pos.y, b.pos.z, Math.sin(a), Math.cos(a), 2.4);
       if (pl !== null) return pl;
