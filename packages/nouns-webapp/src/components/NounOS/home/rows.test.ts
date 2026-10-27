@@ -47,9 +47,7 @@ describe('buildRows', () => {
     );
     expect(play.items.slice(0, n).every(i => i.cover !== undefined)).toBe(true);
     const paths = play.items.flatMap(i => (i.action.t === 'entry' ? [i.action.entry.path] : []));
-    expect(paths).toEqual(
-      expect.arrayContaining(['/world/voice', '/icecreamvan', '/playground', '/crystal-ball']),
-    );
+    expect(paths).toEqual(['/exchange', '/world/voice', '/playground', '/crystal-ball']);
     const booth = play.items.find(i => i.key === 'play:/world/voice')!;
     expect(booth.cover).toBe('/home/covers/voice-booth.webp');
     expect(booth.action).toMatchObject({ t: 'entry', entry: { path: '/world/voice' } });
@@ -228,6 +226,34 @@ describe('HERO_SLIDES', () => {
       expect(s.clip !== undefined || s.still !== undefined).toBe(true);
       expect(GAMES.map(g => g.id)).toContain(s.game);
       expect(s.ms).toBeGreaterThan(3000);
+    }
+  });
+});
+
+describe('ART / CULTURE row', () => {
+  it('opens with the book, pip3, the van and the booth', () => {
+    const art = buildRows(CATALOG).find(r => r.id === 'art')!;
+    const paths = art.items.map(i => (i.action.t === 'entry' ? i.action.entry.path : i.key));
+    expect(paths.slice(0, 8)).toEqual([
+      '/books/meme-value',
+      '/pip3',
+      '/icecreamvan',
+      '/world/voice',
+      '/cc0',
+      '/playground',
+      '/studio',
+      '/terraforms',
+    ]);
+  });
+});
+
+describe('hero slides', () => {
+  it('each game slide shows its own game, not whatever sits at that index', () => {
+    for (const s of HERO_SLIDES) {
+      if (s.key === 'warfare') {
+        expect(s.still).toBe('/warfare/cover.webp');
+        expect(s.tagline).toBe(GAMES.find(g => g.id === 'warfare')!.tagline);
+      }
     }
   });
 });

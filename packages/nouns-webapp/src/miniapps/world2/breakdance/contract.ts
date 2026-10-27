@@ -137,6 +137,13 @@ export interface BattleConfig {
    * load the file: the generated break beat.
    */
   track?: string;
+  /**
+   * (Added: chart judging.) 'strict': a human's key counts only when it's the
+   * chart note due right then; anything else is a miss (a `hit` with `wrong`).
+   * Absent: humans may freestyle any move and the chart redraws to follow.
+   * Lobby battles are strict; the host's sim is the judge either way.
+   */
+  chart?: 'strict';
 }
 
 // ── Inputs ──────────────────────────────────────────────────────────────
@@ -243,7 +250,8 @@ export interface SimState {
 export type SimEvent =
   | { e: 'beat'; beat: number; downbeat: boolean }
   | { e: 'turn'; id: string; round: number }
-  | { e: 'hit'; id: string; grade: HitGrade; key: BreakKey }
+  /** `wrong`: a human pressed `key` but the chart wanted this one (a miss). */
+  | { e: 'hit'; id: string; grade: HitGrade; key: BreakKey; wrong?: BreakKey }
   | { e: 'move'; id: string; move: MoveId; landed: boolean; points: number }
   | { e: 'crash'; id: string }
   | { e: 'freeze'; id: string; move: MoveId; onBeat: boolean }
