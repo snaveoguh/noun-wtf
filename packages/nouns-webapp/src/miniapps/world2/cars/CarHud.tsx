@@ -6,6 +6,9 @@
 // edge. H honks and X fires the special while driving (caught on window,
 // in the capture phase, ahead of the missions journal's X and the help's H).
 // Kenney-bodied cars show their credit line (CC0, credited anyway).
+// Riding together: beside someone's car, RIDE WITH <name> (E / tap); in
+// their passenger seat, a small panel with GET OUT (E / tap); the driver
+// sees who's riding along under the speedo.
 
 import type { Game } from '../Game';
 
@@ -47,8 +50,81 @@ export function CarHud({ game, touch }: { game: Game; touch: boolean }) {
     t.gas = t.brake = t.handbrake = t.boost = false;
   }, [ui.driving, cars]);
 
+  const notice = ui.notice !== '' && (
+    <div key={ui.notice} className="w2-car-status w2-car-notice absolute left-1/2 -translate-x-1/2">
+      {ui.notice}
+    </div>
+  );
+
+  if (ui.ride !== null) {
+    const r = ui.ride;
+    return (
+      <div className="pointer-events-none absolute inset-0" data-car="ride">
+        <style>{CAR_CSS}</style>
+        {notice}
+        <div
+          className={`w2-car-speedo absolute left-1/2 -translate-x-1/2 ${touch ? 'w2-car-touch' : ''}`}
+        >
+          <div className="w2-car-name">
+            {r.car} · {r.pending ? 'GETTING IN…' : `SEAT ${r.seat + 1}`}
+            {r.flying && <em> · FLYING</em>}
+          </div>
+          <div className="w2-car-row">
+            <b>{ui.kmh}</b>
+            <span>km/h</span>
+          </div>
+          <div className="w2-car-ride">RIDING WITH {r.who}</div>
+        </div>
+        {!touch && (
+          <div className="w2-car-hint absolute left-1/2 -translate-x-1/2">
+            {r.leaving ? (
+              'OUT AT THE NEXT STOP'
+            ) : (
+              <>
+                <b>E</b> get out · <b>C</b> camera
+              </>
+            )}
+          </div>
+        )}
+        {touch && (
+          <div className="w2-car-side pointer-events-auto absolute flex flex-col gap-2">
+            <button
+              type="button"
+              className="w2-cbtn w2-cbtn-sm"
+              data-car="get-out"
+              onClick={() => cars.requestToggle()}
+            >
+              {r.leaving ? 'OUT NOW' : 'GET OUT'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (!ui.driving) {
-    if (ui.near === null) return null;
+    if (ui.nearRide !== null)
+      return (
+        <>
+          <style>{CAR_CSS}</style>
+          {notice}
+          <div className="w2-car-enter-wrap pointer-events-none absolute left-1/2 top-[34%] -translate-x-1/2">
+            <button
+              type="button"
+              data-car="ride"
+              className="w2-car-enter pointer-events-auto"
+              onClick={() => {
+                game.unlockAudio();
+                cars.requestToggle();
+              }}
+            >
+              🧍 RIDE WITH {ui.nearRide.who} <span>{touch ? 'TAP' : 'E'}</span>
+            </button>
+            <div className="w2-car-tag">Hop in the passenger seat of their {ui.nearRide.car}</div>
+          </div>
+        </>
+      );
+    if (ui.near === null) return ui.notice !== '' ? notice : null;
     return (
       <>
         <style>{CAR_CSS}</style>
@@ -98,6 +174,7 @@ export function CarHud({ game, touch }: { game: Game; touch: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-0" data-car="hud">
       <style>{CAR_CSS}</style>
+      {notice}
       {status !== null && (
         <div key={status} className="w2-car-status absolute left-1/2 -translate-x-1/2">
           {status}
@@ -124,6 +201,7 @@ export function CarHud({ game, touch }: { game: Game; touch: boolean }) {
           <div style={{ width: `${Math.round(ui.boost * 100)}%` }} />
         </div>
         {car !== null && car.credit !== '' && <div className="w2-car-credit">{car.credit}</div>}
+        {ui.crew.length > 0 && <div className="w2-car-ride">WITH {ui.crew.join(' · ')}</div>}
       </div>
       {!touch && (
         <div className="w2-car-hint absolute left-1/2 -translate-x-1/2">
@@ -241,6 +319,8 @@ const CAR_CSS = `
 .w2-car-enter{background:#ffd400;color:#111;padding:12px 20px;font-size:18px;font-weight:900;font-style:italic;box-shadow:6px 6px 0 #e8352c;white-space:nowrap}
 .w2-car-enter span{margin-left:8px;padding:2px 7px;background:#111;color:#ffd400;font-style:normal;font-size:13px}
 .w2-car-tag{font:600 12px/1.3 system-ui,sans-serif;color:#fff;text-shadow:0 1px 2px #000;text-align:center}
+.w2-car-notice{top:22%;font-size:24px}
+.w2-car-ride{font:800 10px/1.3 system-ui,sans-serif;letter-spacing:.06em;color:#7fe9ff;margin-top:4px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .w2-car-credit{font:500 10px/1.2 system-ui,sans-serif;opacity:.6;color:#fff;text-shadow:0 1px 2px #000;margin-top:3px}
 .w2-car-speedo{bottom:calc(82px + env(safe-area-inset-bottom));min-width:180px;padding:6px 14px 8px;border-radius:14px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16);font-family:system-ui,sans-serif}
 .w2-car-name{font-size:11px;font-weight:900;font-style:italic;letter-spacing:.1em;color:#ffd400;white-space:nowrap}

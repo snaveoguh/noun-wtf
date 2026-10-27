@@ -26,6 +26,9 @@
 // Outfit (character/outfit.ts): `of`, four base-36 chars (trousers, their
 // colour, shoes, their colour), only once the rider picked one; without it
 // a rider wears their seed's default (`outfitFromSeed`).
+// Riding together (cars/seats.ts, cars/netCar.ts): `rd: [driverId, seat]`
+// while the rider asks for / sits in someone's passenger seat; `ps`, the
+// driver's passenger list by seat, while they drive a car with seats.
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -39,6 +42,7 @@ import { PARTYKIT_HOST } from '../../world/engine/types';
 import { CHAT_ID_RE, TAG_RE } from '../audio/voice/booth/clips';
 import { type CalloutEvent } from '../audio/voice/callouts';
 import { decodeFs, type FsState, type FsWire } from '../breakdance/freestyle/wire';
+import { decodeCrew, decodeRide, type NetRide } from '../cars/netCar';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
 import { OUTFIT_KEY_RE } from '../character/outfit';
@@ -139,6 +143,10 @@ export interface RemotePlayer {
   freestyle?: FsState | null;
   /** Outfit wire key (character/outfit.ts `decodeOutfit`), '' = their seed's default. */
   outfit?: string;
+  /** In (or asking for) someone's passenger seat (`rd`), else null. */
+  ride?: NetRide | null;
+  /** Driving: their passenger list by seat (`ps`), null when they don't send one. */
+  crew?: string[] | null;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -212,6 +220,10 @@ export class Net {
   deck = '';
   /** My outfit's wire key (character/outfit.ts `encodeOutfit`), '' = seed default. */
   outfit = '';
+  /** My passenger seat ask `[driverId, seat]` (cars/netCar.ts), relayed while riding. */
+  ride: [string, number] | null = null;
+  /** My passenger list while driving a car with seats, relayed as `ps`. */
+  crew: string[] | null = null;
 
   connect() {
     if (this.ws) return;
@@ -382,6 +394,8 @@ export class Net {
     rp.ownChat = blob.mv === 1;
     rp.freestyle = decodeFs(blob.fs);
     rp.outfit = parseOutfitKey(blob.of);
+    rp.ride = decodeRide(blob.rd);
+    rp.crew = decodeCrew(blob.ps);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -472,6 +486,8 @@ export class Net {
       ...(pose.pk !== undefined ? { pk: pose.pk } : {}),
       ...(this.freestyle !== null ? { fs: this.freestyle } : {}),
       ...(this.outfit !== '' ? { of: this.outfit } : {}),
+      ...(this.ride !== null ? { rd: this.ride } : {}),
+      ...(this.crew !== null ? { ps: this.crew } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

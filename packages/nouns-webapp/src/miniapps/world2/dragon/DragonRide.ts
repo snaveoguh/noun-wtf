@@ -142,7 +142,14 @@ export class DragonRide {
 
   private blocked(): boolean {
     const g = this.game;
-    return g.hoops.active || g.replay.active || g.showroom || g.van2.driving || g.cutscene.active;
+    return (
+      g.hoops.active ||
+      g.replay.active ||
+      g.showroom ||
+      g.van2.driving ||
+      g.cars.inCar ||
+      g.cutscene.active
+    );
   }
 
   /** Is the rider at the Roost's door (Noggle City)? */

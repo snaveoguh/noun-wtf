@@ -1001,8 +1001,10 @@ export class Game {
       this.handlePlayerEvents();
     }
 
+    // In a vehicle my character isn't stepped: keep a parked pose fresh for the room
+    if (driving) this.animTime += dt;
     if (this.van2.driving) this.van2.drive(dt, input, now);
-    else if (this.cars.driving) this.cars.drive(dt, input, now);
+    else if (this.cars.inCar) this.cars.drive(dt, input, now);
     else if (this.dragon.riding) this.dragon.fly(dt, input, now);
     else {
       this.cam.update(dt, this.player, input.lookX, input.lookY, now);
@@ -1016,7 +1018,7 @@ export class Game {
         p.mode === 'board' &&
         p.state !== 'bail' &&
         !this.van2.driving &&
-        !this.cars.driving &&
+        !this.cars.inCar &&
         !this.dragon.riding;
       this.rider.tick(dt, p.speed, riding);
     }
@@ -1619,7 +1621,7 @@ export class Game {
   } {
     const p = this.player;
     // In the saddle: sat still (the rig has no seated clip; idle beats legs sprinting in the air)
-    if (this.dragon.riding || this.cars.driving) return { clip: 'idle', fade: 0.3 };
+    if (this.dragon.riding || this.cars.inCar) return { clip: 'idle', fade: 0.3 };
     const pk = this.parkour.clip();
     if (pk !== null) return pk;
     if (p.climb !== null) {
