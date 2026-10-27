@@ -199,6 +199,20 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // HIDE & SEEK: Noun World at the plaza's hide & seek spot with the menu open
+  // (`?play=hideseek`, read when the game starts, so a running one reloads)
+  const goHideSeek = useCallback(() => {
+    const url = '/world?play=hideseek';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // THE BIG DROP: Noun World straight onto the mountain (`?drop=1`, read when
   // the game starts, so a running one reloads, like Hoops)
   const goDrop = useCallback(() => {
@@ -354,6 +368,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           onEnterWorld={goNounWorld}
           onEnterHoops={goHoops}
           onEnterBreaks={goBreaks}
+          onEnterHideSeek={goHideSeek}
           onEnterDrop={goDrop}
           onEnterWarfare={goWarfare}
           onOpen={id => os.open(id)}

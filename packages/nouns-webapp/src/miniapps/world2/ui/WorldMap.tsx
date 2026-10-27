@@ -19,6 +19,8 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint'], full = false): MapS
   const p = game.player.pos;
   const riders = [];
   for (const [id, r] of game.remotes) {
+    // Hide & seek: no dot for a hider (hideseek/policy.ts)
+    if (game.hideseek.labelFor(id) !== 'show') continue;
     const pos = r.character.root.position;
     riders.push({ x: pos.x, z: pos.z, name: game.net.players.get(id)?.name || 'noun' });
   }

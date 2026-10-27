@@ -42,6 +42,7 @@ import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
+import { HideSeekMode } from './hideseek/net/HideSeekMode';
 import { HoopsMode } from './hoops/net/HoopsMode';
 import { InteriorSystem } from './interiors/InteriorSystem';
 import { MissionSystem } from './missions/MissionSystem';
@@ -319,6 +320,8 @@ export class Game {
   readonly breaks: BreakMode = new BreakMode(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
   readonly freestyle: FreestyleMode = new FreestyleMode(this);
+  /** Noun Hide & Seek (hideseek/net/HideSeekMode.ts): played in the normal game; hides hiders' tags. */
+  readonly hideseek: HideSeekMode = new HideSeekMode(this);
   /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
   readonly trade: TradeClient;
   /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
@@ -618,7 +621,7 @@ export class Game {
       this.net.onCallout = (id, c) => void this.remoteCallout(id, c);
       this.net.onChatVoice = (id, tag, clip) => {
         const rp = this.net.players.get(id);
-        if (rp === undefined) return;
+        if (rp === undefined || this.hideseek.labelFor(id) === 'hide') return;
         void this.voices.playRemoteChat(tag, clip, rp.transcript, this.hearOf(rp.current.pos));
       };
       this.net.onLeave = id => this.removeRemote(id);
@@ -1025,6 +1028,7 @@ export class Game {
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
+    this.hideseek.update(dt);
   }
 
   /**
@@ -1582,6 +1586,7 @@ export class Game {
       const hs = Math.hypot(p.vel.x, p.vel.z);
       if (p.emote)
         return { clip: ['', 'wave', 'dance', 'celebrate'][p.emote] ?? 'wave', fade: 0.25 };
+      if (this.hideseek.blending) return { clip: 'skate_crouch', fade: 0.35 };
       if (hs > 5.6) return { clip: 'sprint', timeScale: hs / 6.5 };
       if (hs > 2.6) return { clip: 'run', timeScale: hs / 5.2 };
       if (hs > 0.25) return { clip: 'walk', timeScale: Math.max(0.6, hs / 1.9) };
@@ -1800,7 +1805,7 @@ export class Game {
 
   private async remoteCallout(id: string, c: RemoteCallout) {
     const rp = this.net.players.get(id);
-    if (rp === undefined) return;
+    if (rp === undefined || this.hideseek.labelFor(id) === 'hide') return;
     const hear = this.hearOf(rp.current.pos);
     if (hear.gain <= 0.02) return;
     const tag = rp.voiceTag;
@@ -1890,7 +1895,8 @@ export class Game {
         riding: c.mode === 'board' && !c.anim.includes('bail'),
       });
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
-      // Name tag
+      // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
+      const show = this.hideseek.labelFor(id);
       if (r.label) {
         const v = c.pos
           .clone()
@@ -1898,7 +1904,8 @@ export class Game {
           .project(cam);
         const visible = v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
         const dist = cam.position.distanceTo(c.pos);
-        r.label.style.display = visible && dist < 60 ? 'block' : 'none';
+        r.label.style.display = visible && dist < 60 && show !== 'hide' ? 'block' : 'none';
+        r.label.style.opacity = show === 'faint' ? '0.4' : '';
         if (visible) {
           r.label.style.transform = `translate(-50%, -100%) translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px)`;
           const talk = rp.speaking ? ' 🔊' : '';
@@ -1910,7 +1917,7 @@ export class Game {
           r.label.innerHTML = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${rp.respectBadge === 'L' ? LEGEND_BADGE : ''}${talk}</span>`;
         }
         if (r.pointer) {
-          const close = visible && dist < 60;
+          const close = (visible && dist < 60) || show !== 'show';
           r.pointer.style.display = close ? 'none' : 'block';
           if (!close)
             this.placePointer(r.pointer, c.pos, v, visible, dist, rp.name || 'noun', w, h);
@@ -1975,7 +1982,7 @@ export class Game {
   }
 
   private pushChat(id: string, text: string) {
-    const name = this.net.players.get(id)?.name || 'noun';
+    const name = this.hideseek.chatName(id, this.net.players.get(id)?.name || 'noun');
     const chat = [...this.hud.chat, { id, name, text, at: performance.now() }].slice(-6);
     this.hud = { ...this.hud, chat };
     this.emit();
@@ -2244,6 +2251,7 @@ export class Game {
     this.hoops.dispose();
     this.breaks.dispose();
     this.freestyle.dispose();
+    this.hideseek.dispose();
     this.van2.dispose();
     this.dragon.dispose();
     this.stats.dispose();

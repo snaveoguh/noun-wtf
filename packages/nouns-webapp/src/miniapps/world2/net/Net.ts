@@ -181,6 +181,8 @@ export class Net {
   onHoops?: (m: HoopsMsg) => void;
   /** Noun Breaks (breakdance/net): every `break:*` message, raw (its codec checks it). */
   onBreak?: (m: Record<string, unknown>) => void;
+  /** Noun Hide & Seek (hideseek/net): every `hideseek:*` message, raw (its codec checks it). */
+  onHideSeek?: (m: Record<string, unknown>) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
   onFm?: (m: Record<string, unknown>) => void;
   /** Voice Booth: a remote rider's callout fired. */
@@ -238,6 +240,10 @@ export class Net {
     }
     if (type.startsWith('break:')) {
       this.onBreak?.(d);
+      return;
+    }
+    if (type.startsWith('hideseek:')) {
+      this.onHideSeek?.(d);
       return;
     }
     if (type.startsWith('fm:')) {
@@ -514,6 +520,10 @@ export class Net {
   }
 
   sendBreak(m: BreakMsg) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendHideSeek(m: { type: string }) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 

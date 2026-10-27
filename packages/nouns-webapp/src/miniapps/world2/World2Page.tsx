@@ -15,6 +15,7 @@ import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { DragonHud } from './dragon/DragonHud';
 import { Game, type HudState } from './Game';
+import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
 import { GtaHud, initialHelp } from './hud/GtaHud';
 import { HUD_CSS } from './hud/hudStyle';
@@ -205,6 +206,21 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => window.clearInterval(t);
   }, [game, started, searchParams]);
 
+  // `?play=hideseek` (the homepage's HIDE & SEEK card): at the lobby spot, menu open
+  const hideseekLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || hideseekLaunched.current || searchParams.get('play') !== 'hideseek')
+      return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.hideseek.arrive()) return false;
+      hideseekLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   useEffect(() => {
@@ -340,6 +356,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <HideSeekUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && (
         <RecordsUi game={game} admin={searchParams.get('appeals') === '1'} />
       )}
