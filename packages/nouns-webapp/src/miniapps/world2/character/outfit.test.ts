@@ -12,6 +12,7 @@ import {
   decodeOutfit,
   encodeOutfit,
   isOutfit,
+  keepOutfit,
   outfitFromSeed,
   parseOutfit,
   randomOutfit,
@@ -58,6 +59,21 @@ describe('outfit contract', () => {
     for (let h = 0; h < 200; h++)
       if (sameOutfit(outfitFromSeed(seed(h)), outfitFromSeed(seed(h + 1)))) same++;
     expect(same).toBeLessThan(20);
+  });
+
+  it('a head change keeps the outfit the rider is wearing (keepOutfit)', () => {
+    for (let h = 0; h < 200; h++) {
+      const before = seed(h);
+      // No pick yet: the rider wears its seed's default, and keeps it
+      const worn = outfitFromSeed(before);
+      const after = { ...before, head: h + 1 };
+      expect(keepOutfit(null, before)).toEqual(worn);
+      // ...and stays in it through more head changes
+      expect(keepOutfit(keepOutfit(null, before), after)).toEqual(worn);
+    }
+    // An explicit pick always stays
+    const pick: Outfit = { pants: 'shorts', pantsColor: 10, shoes: 'boot', shoeColor: 8 };
+    expect(keepOutfit(pick, seed(4))).toBe(pick);
   });
 
   it('isOutfit rejects junk', () => {
