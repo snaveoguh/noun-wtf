@@ -90,6 +90,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         ? parseBoardType(searchParams.get('board'))
         : parseBoardType(saved?.board),
       build: saved?.build ?? 2,
+      outfit: saved?.outfit,
     }),
     // Only the first resolution matters; the select screen owns it after that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,6 +121,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       g.showroom = searchParams.get('skip') !== '1';
       g.boardType = initialChar.board ?? 'skate';
       g.weight = BUILDS[initialChar.build ?? 2]?.w ?? 0;
+      g.setOutfit(initialChar.outfit ?? null);
     } catch (e) {
       setError((e as Error).message || 'WebGL unavailable');
       canvas.remove();
@@ -290,6 +292,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     g.setSeed(c.seed);
     g.setBoardType(c.board ?? 'skate');
     g.setWeight(BUILDS[c.build ?? 2]?.w ?? 0);
+    g.setOutfit(c.outfit ?? null);
     g.name = c.name;
     g.enterWorld();
     setPhase('play');

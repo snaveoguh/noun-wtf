@@ -11,6 +11,8 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { inkExcluded } from '../render/Toon';
 
 import { buildBodyTexture, buildNounHead, type NounSeed } from './NounAppearance';
+import { decodeOutfit, encodeOutfit, outfitFromSeed, type Outfit } from './outfit';
+import { OutfitDresser } from './outfitMesh';
 
 export interface CharacterManifest {
   bones?: Record<string, string>;
@@ -623,11 +625,14 @@ export class NounCharacter {
     this.buildBody();
     this.buildBoard();
     this.buildRideKit();
+    // Trousers + shoes: the seed's default until someone picks (character/outfit.ts)
+    this.setOutfit(outfitFromSeed(seed));
     if (!NounCharacter.castShadows) this.setCastShadows(false);
   }
 
   /** Switch this character's shadow casting (parts that never cast stay off). */
   setCastShadows(on: boolean) {
+    this.shadowsOn = on;
     this.root.traverse(o => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
@@ -703,6 +708,8 @@ export class NounCharacter {
       }
       this.mixer = new THREE.AnimationMixer(model);
       this.hasRig = this.assets.clips.size > 0;
+      const dresser = new OutfitDresser(model);
+      if (dresser.ok) this.dresser = dresser;
     } else {
       // Procedural blocky stand-in until the rigged GLB is available.
       const { shirt } = buildBodyTexture(this.seed, {});
@@ -822,6 +829,34 @@ export class NounCharacter {
 
   private headBaseScale = 1;
 
+  /** Trousers + shoes (character/outfit.ts). */
+  outfit: Outfit | null = null;
+  /** `encodeOutfit(outfit)`: compare against a wire key without parsing. */
+  outfitKey = '';
+  private dresser: OutfitDresser | null = null;
+  private shadowsOn = true;
+  private wire: string | null = null;
+
+  /** Dress from a multiplayer wire key (`of`); '' or junk = the seed's default. */
+  setOutfitWire(key: string) {
+    if (key === this.wire) return;
+    const d = outfitFromSeed(this.seed);
+    this.setOutfit(decodeOutfit(key, d) ?? d);
+    this.wire = key;
+  }
+
+  /** Dress this rider (a no-op when it already wears it). */
+  setOutfit(o: Outfit) {
+    const key = encodeOutfit(o);
+    this.wire = null;
+    if (key === this.outfitKey) return;
+    this.outfit = o;
+    this.outfitKey = key;
+    this.dresser?.apply(o);
+    // New pockets / collars follow this rider's shadow setting
+    if (this.dresser !== null && !this.shadowsOn) this.setCastShadows(false);
+  }
+
   setBoardType(t: BoardType) {
     if (t === this.boardType) return;
     this.boardType = t;
@@ -875,6 +910,7 @@ export class NounCharacter {
     if (this.boardModel !== null) this.boardModel.visible = t === 'skate' || t === 'hover';
     if (this.scooter !== null) this.scooter.root.visible = t === 'scooter';
     for (const b of this.blades) b.visible = t === 'blades';
+    this.dresser?.setShoePartsHidden(t === 'blades');
     if (!this.isRideMode()) {
       this.restoreRidePose();
       this.stance.position.set(0, 0, 0);

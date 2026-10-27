@@ -21,6 +21,9 @@
 // noggles badge on their name tag; cosmetic, not checked by the server).
 // Freestyle (breakdance/freestyle/wire.ts): `fs: [move, seq, beat, n, bpm]`
 // only while the rider is breakdancing on the spot.
+// Outfit (character/outfit.ts): `of`, four base-36 chars (trousers, their
+// colour, shoes, their colour), only once the rider picked one; without it
+// a rider wears their seed's default (`outfitFromSeed`).
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
@@ -36,6 +39,7 @@ import { type CalloutEvent } from '../audio/voice/callouts';
 import { decodeFs, type FsState, type FsWire } from '../breakdance/freestyle/wire';
 import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
+import { OUTFIT_KEY_RE } from '../character/outfit';
 
 import { Voice } from './Voice';
 
@@ -101,6 +105,11 @@ export function parseChatVoice(v: unknown): { tag: string; id: string; seq: numb
   return { tag, id, seq };
 }
 
+/** A blob's `of` → the outfit wire key ('' for anything malformed or missing). */
+export function parseOutfitKey(v: unknown): string {
+  return typeof v === 'string' && OUTFIT_KEY_RE.test(v) ? v : '';
+}
+
 export interface RemotePlayer {
   id: string;
   /** Their public voice tag (Voice Booth), '' when they don't share one. */
@@ -122,6 +131,8 @@ export interface RemotePlayer {
   respectBadge?: string;
   /** Freestyling: the move + its beat phase (null = not dancing). */
   freestyle?: FsState | null;
+  /** Outfit wire key (character/outfit.ts `decodeOutfit`), '' = their seed's default. */
+  outfit?: string;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -191,6 +202,8 @@ export class Net {
   connected = false;
   /** My custom deck's share key (see character/deckStore), sent with each pose. */
   deck = '';
+  /** My outfit's wire key (character/outfit.ts `encodeOutfit`), '' = seed default. */
+  outfit = '';
 
   connect() {
     if (this.ws) return;
@@ -354,6 +367,7 @@ export class Net {
     rp.respectBadge = blob.rs === 'L' ? 'L' : '';
     rp.ownChat = blob.mv === 1;
     rp.freestyle = decodeFs(blob.fs);
+    rp.outfit = parseOutfitKey(blob.of);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -439,6 +453,7 @@ export class Net {
       ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
       ...(this.freestyle !== null ? { fs: this.freestyle } : {}),
+      ...(this.outfit !== '' ? { of: this.outfit } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',
