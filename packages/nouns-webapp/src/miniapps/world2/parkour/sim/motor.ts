@@ -412,10 +412,8 @@ export class ParkourMotor {
     for (let k = 0; k <= 66; k++) {
       const off = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * 0.018;
       const a = yaw + off;
-      // A metre lower than us: launched from high up, the next pole's top can
-      // be below our head (it only has to be there to catch)
-      const pl = poleAlong(this.w, x, y - 1.2, z, Math.sin(a), Math.cos(a), 10);
-      if (pl !== null && pl.top > y - 0.5) return pl;
+      const pl = poleAlong(this.w, x, y, z, Math.sin(a), Math.cos(a), 10);
+      if (pl !== null && pl.top > y) return pl;
     }
     return null;
   }

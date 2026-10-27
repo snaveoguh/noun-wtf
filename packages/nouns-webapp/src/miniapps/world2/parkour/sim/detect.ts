@@ -253,7 +253,7 @@ export interface PoleHit {
 
 /**
  * A thin upright (lamp post, sign pole, a rail upright, a tree trunk) along
- * (dx, dz) from chest height: the ray hits it, rays a hand-width either
+ * (dx, dz) from hip height: the ray hits it, rays a hand-width either
  * side miss it, and it's still there a metre up and down. Measured from
  * both sides for its centre and radius.
  */
@@ -266,7 +266,9 @@ export function poleAlong(
   dz: number,
   reach: number,
 ): PoleHit | null {
-  const cy = y + 1.15;
+  // At the hips: you catch a pole with your hands up to its top, so the
+  // body can be level with it (or above the top of a short one)
+  const cy = y + 0.75;
   const f = w.ray(x, cy, z, dx, 0, dz, reach);
   if (f === null || Math.abs(f.ny) > 0.3) return null;
   const fx = f.x;
@@ -289,15 +291,16 @@ export function poleAlong(
   const r = diam / 2;
   const cx = fx + dx * r;
   const cz = fz + dz * r;
-  // Upright: still there 0.8 m below and 0.9 m above the chest
-  for (const dy of [-0.8, 0.9]) {
+  // Upright: still there lower down (poles run to the ground; checking above
+  // would miss a jump near the top of one)
+  for (const dy of [-0.45, -0.9]) {
     const h = w.ray(cx - dx * (r + 0.5), cy + dy, cz - dz * (r + 0.5), dx, 0, dz, 0.8);
     if (h === null || Math.abs(h.d - 0.5) > 0.12) return null;
   }
-  // Top: climb the pole in 0.4 m steps until it ends (≤ 14 m)
-  let top = cy + 0.9;
-  for (let k = 0; k < 34; k++) {
-    const ty = top + 0.4;
+  // Top: climb the pole in 0.2 m steps until it ends (≤ 14 m)
+  let top = cy;
+  for (let k = 0; k < 70; k++) {
+    const ty = top + 0.2;
     const h = w.ray(cx - dx * (r + 0.5), ty, cz - dz * (r + 0.5), dx, 0, dz, 0.8);
     if (h === null || Math.abs(h.d - 0.5) > 0.15) break;
     top = ty;

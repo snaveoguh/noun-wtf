@@ -200,8 +200,8 @@ describe('poles', () => {
   const { w } = level([], [[0, 4, 0.08, 6.5]]);
 
   it('tells a lamp post from a wall or a fat column', () => {
-    expect(poleAlong(w, 0, 0, 3, 0, -1, 1.6)).toBeNull(); // looking away
-    const hit = poleAlong(w, 0, 0, 2.6, 0, 1, 1.6);
+    expect(poleAlong(w, 0, 0.5, 3, 0, -1, 1.6)).toBeNull(); // looking away
+    const hit = poleAlong(w, 0, 0.5, 2.6, 0, 1, 1.6);
     expect(hit).not.toBeNull();
     expect(hit!.cz).toBeCloseTo(4, 1);
     expect(hit!.r).toBeGreaterThan(0.04);
@@ -209,9 +209,9 @@ describe('poles', () => {
     expect(hit!.top).toBeGreaterThan(5.8);
     expect(hit!.base).toBeCloseTo(0, 1);
     const fat = level([], [[0, 4, 0.55, 6]]).w;
-    expect(poleAlong(fat, 0, 0, 2.2, 0, 1, 1.6)).toBeNull();
+    expect(poleAlong(fat, 0, 0.5, 2.2, 0, 1, 1.6)).toBeNull();
     const wall = level([[0, 3, 5, 6, 6, 2]]).w;
-    expect(poleAlong(wall, 0, 0, 2.6, 0, 1, 1.6)).toBeNull();
+    expect(poleAlong(wall, 0, 0.5, 2.6, 0, 1, 1.6)).toBeNull();
   });
 
   it('jump into a lamp post: grab, slide down, swing round, step off at the bottom', () => {
@@ -264,6 +264,13 @@ describe('poles', () => {
 });
 
 describe('pole to pole', () => {
+  it('a jump near the top of a pole still catches it', () => {
+    const { w } = level([], [[0, 3, 0.09, 4]]);
+    // Chest above the top, hands just under it
+    expect(poleAlong(w, 0, 3.0, 1.5, 0, 1, 2.4)).not.toBeNull();
+    expect(poleAlong(w, 0, 3.0, 1.5, 0, 1, 2.4)!.top).toBeCloseTo(4, 0);
+  });
+
   it('the aim assist finds a thin pole 25° off the launch line, 7 m out', () => {
     const { w } = level(
       [],
