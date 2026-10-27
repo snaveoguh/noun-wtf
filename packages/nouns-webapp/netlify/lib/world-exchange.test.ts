@@ -7,6 +7,7 @@ import {
   type ExchangeState,
 } from '../../src/miniapps/exchange/engine';
 import { maskOwner } from '../../src/miniapps/exchange3d/sim/feed';
+import { formAction, openForm } from '../../src/miniapps/exchange3d/sim/tradeForm';
 
 // ── An in-memory Netlify Blobs store (etags and all) ──
 const blobs = new Map<string, { v: string; etag: string }>();
@@ -290,7 +291,13 @@ describe('world-exchange: direct deals (player to player, player to bot)', () =>
     expect(fish).toBeGreaterThanOrEqual(1);
     const o = await offer(R1, {});
     expect(o.out.ok).toBe(true);
-    expect(o.out.deal).toMatchObject({ who: tag(R2), side: 'sell', good: 'FISH', qty: 1, price: 30 });
+    expect(o.out.deal).toMatchObject({
+      who: tag(R2),
+      side: 'sell',
+      good: 'FISH',
+      qty: 1,
+      price: 30,
+    });
     expect(o.out.deals.outgoing).toHaveLength(1);
     // The target polls (a GET, as the floor does) and sees it from R1's tag
     const seen = (await get(`?rider=${R2}&floor=1`)).out;
@@ -324,6 +331,47 @@ describe('world-exchange: direct deals (player to player, player to bot)', () =>
     const a = await post({ rider: R2, action: { t: 'accept', deal: seen.deals.incoming[0].id } });
     expect(JSON.stringify(a.out)).not.toContain(R1);
     expect(JSON.stringify((await get('?floor=1')).out)).not.toContain(R2);
+  });
+
+  it("the target's account stays on the server (toOwner never goes out)", async () => {
+    await setup();
+    const o = await offer(R1, {});
+    expect(saved().deals![0]!.toOwner).toBe(R2);
+    expect(JSON.stringify(o.out)).not.toContain(R2);
+    expect(JSON.stringify((await get(`?rider=${R1}&floor=1`)).out)).not.toContain(R2);
+    expect(JSON.stringify((await get(`?rider=${R2}&floor=1`)).out)).not.toContain(R1);
+  });
+
+  it("the 3D floor's trade panel: its actions go through as they are", async () => {
+    await setup();
+    const tickers = (await get()).out.tickers;
+    const you = (await get(`?rider=${R1}`)).out.you;
+    // Clicked another player (by their public tag): a direct offer
+    const peer = {
+      kind: 'peer' as const,
+      key: 'peer:x',
+      name: 'BOB',
+      tag: tag(R2),
+      seedKey: '0-0-0-0-0',
+    };
+    const f = { ...openForm(peer, tickers, you, 'FISH'), side: 'sell' as const, qty: 1, price: 25 };
+    const sent = await post({ rider: R1, action: formAction(peer, f) });
+    expect(sent.out).toMatchObject({ ok: true, deal: { who: tag(R2), qty: 1, price: 25 } });
+    expect((await get(`?rider=${R2}`)).out.deals.incoming[0]).toMatchObject({ who: tag(R1) });
+    // A simulated trader: a limit order on the real book
+    const sim = { kind: 'sim' as const, key: 'sim:1', name: 'TRADER #1', good: 'WATER' as const };
+    const g = openForm(sim, tickers, you, 'FISH');
+    expect(g.good).toBe('WATER');
+    const order = await post({
+      rider: R1,
+      action: formAction(sim, { ...g, side: 'buy', price: 1 }),
+    });
+    expect(order.out.ok).toBe(true);
+    expect(saved().books.WATER.bids.some(b => b.owner === R1)).toBe(true);
+    // A forged target (a raw rider id instead of a tag) is refused
+    const forged = { ...peer, tag: R2 };
+    expect((await post({ rider: R1, action: formAction(forged, f) })).out.ok).toBe(false);
+    expect(checkInvariants(saved())).toEqual([]);
   });
 
   it('only the target can accept; either side can decline', async () => {

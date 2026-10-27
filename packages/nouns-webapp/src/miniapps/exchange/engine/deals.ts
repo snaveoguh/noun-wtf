@@ -8,8 +8,9 @@
 //
 // Privacy: a rider id is the rider's only key, so deals never carry one
 // out. Targets are public tags (the same masked tag the floor feed shows,
-// `tagOf`), and each side only ever sees the other's tag. Accepting checks
-// that tagOf(acceptor) is the deal's target.
+// `tagOf`), and each side only ever sees the other's tag. The tag is
+// resolved to its account when offered (`toOwner`, kept server-side), and
+// only that account can accept.
 //
 // Bots are targets too: an offer to a bot is answered at once (botTakes):
 // it trades when the price is on its side of fair value and it can cover it.
@@ -200,6 +201,10 @@ const publicOf = (d: Deal, who: string): PublicDeal => ({
   exp: d.at + DEAL_TTL_MS,
 });
 
+/** Is `owner` (whose tag is `me`) the target of this deal? */
+const isTargetOf = (d: Deal, owner: string, me: string) =>
+  d.toOwner !== undefined ? d.toOwner === owner : d.to === me;
+
 /** A rider's offers in and out (tags only). */
 export function dealsView(s: ExchangeState, viewer: string, now: number, tagOf: TagOf): DealsView {
   const me = tagOf(viewer);
@@ -208,16 +213,24 @@ export function dealsView(s: ExchangeState, viewer: string, now: number, tagOf: 
   for (const d of s.deals ?? []) {
     if (now - d.at >= DEAL_TTL_MS) continue;
     if (d.from === viewer) outgoing.push(publicOf(d, d.to));
-    else if (d.to === me) incoming.push(publicOf(d, d.fromTag));
+    else if (isTargetOf(d, viewer, me)) incoming.push(publicOf(d, d.fromTag));
   }
   return { incoming, outgoing };
 }
 
-/** Is any account behind this tag (riders only; bots are checked by id)? */
-function tagExists(s: ExchangeState, tag: string, tagOf: TagOf): boolean {
-  for (const owner of Object.keys(s.accounts))
-    if (!isBot(owner) && tagOf(owner) === tag) return true;
-  return false;
+/**
+ * The rider account behind a tag: the owner, null for none, or 'ambiguous'
+ * when two accounts' tags collide (tags are a short hash; an offer to one
+ * of them would be a guess, so it's refused).
+ */
+function ownerOfTag(s: ExchangeState, tag: string, tagOf: TagOf): string | null | 'ambiguous' {
+  let found: string | null = null;
+  for (const owner of Object.keys(s.accounts)) {
+    if (isBot(owner) || tagOf(owner) !== tag) continue;
+    if (found !== null) return 'ambiguous';
+    found = owner;
+  }
+  return found;
 }
 
 export function dealAct(
@@ -251,8 +264,10 @@ export function dealAct(
       const seller = a.side === 'buy' ? a.to : owner;
       return { ok: true, fills: [settle(s, buyer, seller, a.good, a.qty, a.price, now)] };
     }
-    if (!tagExists(s, a.to, tagOf))
-      return { ok: false, reason: 'no trader by that tag', fills: [] };
+    const target = ownerOfTag(s, a.to, tagOf);
+    if (target === null) return { ok: false, reason: 'no trader by that tag', fills: [] };
+    if (target === 'ambiguous')
+      return { ok: false, reason: 'that tag is ambiguous, try another trader', fills: [] };
     const out = s.deals.filter(d => d.from === owner);
     if (out.length >= MAX_DEALS_OUT) {
       const old = out[0]!;
@@ -268,6 +283,7 @@ export function dealAct(
       from: owner,
       fromTag: me,
       to: a.to,
+      toOwner: target,
       side: a.side,
       good: a.good,
       qty: a.qty,
@@ -281,12 +297,13 @@ export function dealAct(
   const d = s.deals.find(x => x.id === a.deal);
   if (d === undefined) return { ok: false, reason: 'that offer has gone', fills: [] };
   if (a.t === 'decline') {
-    if (d.to !== me && d.from !== owner) return { ok: false, reason: 'not your offer', fills: [] };
+    if (!isTargetOf(d, owner, me) && d.from !== owner)
+      return { ok: false, reason: 'not your offer', fills: [] };
     s.deals = s.deals.filter(x => x !== d);
     return { ok: true, fills: [] };
   }
   // accept
-  if (d.to !== me) return { ok: false, reason: 'not your offer', fills: [] };
+  if (!isTargetOf(d, owner, me)) return { ok: false, reason: 'not your offer', fills: [] };
   if (d.from === owner) return { ok: false, reason: "that's you", fills: [] };
   const buyer = d.side === 'buy' ? d.from : owner;
   const seller = d.side === 'buy' ? owner : d.from;

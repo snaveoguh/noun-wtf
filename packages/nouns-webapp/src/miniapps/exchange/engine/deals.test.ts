@@ -95,4 +95,62 @@ describe('direct deals (engine)', () => {
     expect(r.deals).toEqual({ incoming: [], outgoing: [] });
     expect(checkInvariants(x.state)).toEqual([]);
   });
+  it('only the account a tag resolved to can accept, even if tags collide later', () => {
+    const s = genesis(5, T0, 0);
+    // A tagOf where B and C share a tag (a hash collision, made on purpose)
+    const tg = (o: string) => (o === 'rider-c-000003' ? tagOf('rider-b-000002') : tagOf(o));
+    const a = riderAccount(s, 'rider-a-000001', T0);
+    riderAccount(s, 'rider-b-000002', T0);
+    a.goods.FISH = 2;
+    s.mintedGoods.FISH = (s.mintedGoods.FISH ?? 0) + 2;
+    const offer = {
+      t: 'offer' as const,
+      to: tagOf('rider-b-000002'),
+      side: 'sell' as const,
+      good: 'FISH' as const,
+      qty: 1,
+      price: 9,
+    };
+    const o = dealAct(s, 'rider-a-000001', offer, T0, tg);
+    expect(o.ok).toBe(true);
+    expect(s.deals![0]!.toOwner).toBe('rider-b-000002');
+    // C joins with the same tag: it doesn't see B's offer and can't take it
+    riderAccount(s, 'rider-c-000003', T0);
+    expect(dealsView(s, 'rider-c-000003', T0, tg).incoming).toEqual([]);
+    const id = o.deal!.id;
+    expect(dealAct(s, 'rider-c-000003', { t: 'accept', deal: id }, T0, tg)).toMatchObject({
+      ok: false,
+      reason: 'not your offer',
+    });
+    expect(dealAct(s, 'rider-c-000003', { t: 'decline', deal: id }, T0, tg).ok).toBe(false);
+    // While both exist, an offer to that tag is a guess: refused
+    expect(dealAct(s, 'rider-a-000001', offer, T0, tg).reason).toMatch(/ambiguous/);
+    // B still can
+    expect(dealAct(s, 'rider-b-000002', { t: 'accept', deal: id }, T0, tg).ok).toBe(true);
+    expect(checkInvariants(s)).toEqual([]);
+  });
+
+  it('deals saved before toOwner existed still go to their tag', () => {
+    const s = genesis(6, T0, 0);
+    const a = riderAccount(s, 'rider-a-000001', T0);
+    riderAccount(s, 'rider-b-000002', T0);
+    a.goods.FISH = 1;
+    s.mintedGoods.FISH = (s.mintedGoods.FISH ?? 0) + 1;
+    s.deals = [
+      {
+        id: 'd9001',
+        from: 'rider-a-000001',
+        fromTag: tagOf('rider-a-000001'),
+        to: tagOf('rider-b-000002'),
+        side: 'sell',
+        good: 'FISH',
+        qty: 1,
+        price: 5,
+        at: T0,
+      },
+    ];
+    expect(dealsView(s, 'rider-b-000002', T0, tagOf).incoming).toHaveLength(1);
+    expect(dealAct(s, 'rider-b-000002', { t: 'accept', deal: 'd9001' }, T0, tagOf).ok).toBe(true);
+    expect(checkInvariants(s)).toEqual([]);
+  });
 });

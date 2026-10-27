@@ -124,6 +124,12 @@ export interface Deal {
   fromTag: string;
   /** The target: a rider's public tag ('r:…') or a bot id ('bot:…'). */
   to: string;
+  /**
+   * The account `to` resolved to when it was offered (server-side only,
+   * never sent out). Only that account can accept, even if another one's
+   * tag ever collides. Deals saved before this field fall back to the tag.
+   */
+  toOwner?: string;
   /** What the proposer does: 'sell' = sells to the target. */
   side: Side;
   good: GoodId;
