@@ -10,17 +10,18 @@
 // you animate) is pinned to wherever you walk, and hidden: you are drawn
 // once, as your rider.
 
+import type { LabelSpec } from './labels';
 import type { NounSeed } from '../../world2/character/NounAppearance';
 import type { Trader } from '../sim/crowd';
-import type { LabelSpec } from './labels';
 
 import * as THREE from 'three';
 
 import { seedKey } from '../../world2/character/NounAppearance';
 import { ExchangeNet } from '../net/exchangeNet';
 import { PERSONAL } from '../sim/crowd';
-import { LOW } from './crowdMesh';
 import { NO_INPUT, spawnWalker, stepWalker, walkerClip, type WalkInput } from '../sim/walker';
+
+import { LOW } from './crowdMesh';
 import { Walkers } from './walkers';
 
 export interface MeLook {

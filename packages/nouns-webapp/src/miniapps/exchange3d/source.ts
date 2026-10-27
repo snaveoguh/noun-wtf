@@ -13,8 +13,21 @@
 
 import type { DealsView, YouView } from '../exchange/engine/types';
 
-import { HttpExchange, LocalExchange, riderId, type ActReply, type ClientAction } from '../exchange/client';
-import { botsPublic, dealsView, snapshot, tick, tickers, type ExchangeSnapshot } from '../exchange/engine';
+import {
+  HttpExchange,
+  LocalExchange,
+  riderId,
+  type ActReply,
+  type ClientAction,
+} from '../exchange/client';
+import {
+  botsPublic,
+  dealsView,
+  snapshot,
+  tick,
+  tickers,
+  type ExchangeSnapshot,
+} from '../exchange/engine';
 
 import { maskOwner, publicFloor, type FeedMode, type Floor3d, type FloorFrame } from './sim/feed';
 

@@ -30,6 +30,7 @@ import {
   type CamMode,
   type Orbit,
   chaseAz,
+  fitInHall,
   modeForKey,
   orbitEye,
   pan,
@@ -248,7 +249,16 @@ export class FloorScene {
     this.source = new FloorSource(o.offline, o.speed ?? 1);
     // You: your own rider, walking (the floor's 'you' trader is pinned to you)
     this.walk = new WalkMode(o.me, () => this.source.tag, o.online);
-    if (this.walk.net !== null) this.walk.net.onPinged = () => this.pollNow();
+    const net = this.walk.net;
+    if (net !== null) {
+      net.onPinged = () => this.pinged();
+      // Someone else is here, so they could offer you a deal: open your
+      // account on the live exchange (once). Not for every visitor on load:
+      // accounts are capped, and a spectator doesn't need one.
+      net.onPeers = () => {
+        if (net.peers.size > 0) void this.source.join();
+      };
+    }
     this.youI = this.realTrader('you', 'ICECREAM')?.i ?? -1;
     this.mesh.commitLooks();
     this.scene.add(this.mesh.shadows, this.mesh.mesh);
@@ -294,8 +304,6 @@ export class FloorScene {
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
     if (import.meta.env.DEV) (window as unknown as { __gx3d?: FloorScene }).__gx3d = this;
-    // An account on the live exchange, so other players can offer you deals
-    void this.source.join();
   }
 
   // ── Real traders ──
@@ -713,6 +721,8 @@ export class FloorScene {
       dt,
       this.mode === 'walk' ? 9 : this.mode === 'follow' ? 3.2 : 2.4,
     );
+    // Walking: the camera comes in rather than through a wall or the tower
+    if (this.mode === 'walk') this.cur = fitInHall(this.cur);
     const eye = orbitEye(this.cur);
     this.camera.position.set(eye.x, eye.y, eye.z);
     this.camera.lookAt(this.cur.tx, this.cur.ty, this.cur.tz);
@@ -849,6 +859,8 @@ export class FloorScene {
       }
       // You are drawn as your own rider, never a crowd rig
       if (this.youI >= 0) this.dist[this.youI] = Infinity;
+      // Pulled right out (VAST): no rigs, and the crowd drops to its far LOD
+      this.mesh.setFar(this.cur.r > 200);
       const max = this.cur.r > 200 || !this.rigs.ready ? 0 : this.budget.rigs;
       this.rigWant = pickRigs(
         this.dist.subarray(0, ts.length),
@@ -1237,6 +1249,19 @@ export class FloorScene {
     this.emitHud();
     void this.pollNow();
     return r;
+  }
+
+  private lastPing = 0;
+
+  /**
+   * A player says they just sent you an offer: look now. Anyone can claim
+   * that (it's only a hint in their pose blob), so at most every 2 s.
+   */
+  private pinged() {
+    const now = performance.now();
+    if (now - this.lastPing < 2_000) return;
+    this.lastPing = now;
+    this.pollNow();
   }
 
   /** Poll the exchange now (someone pinged you an offer, or you just traded). */

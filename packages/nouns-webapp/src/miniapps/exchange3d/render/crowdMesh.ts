@@ -241,8 +241,12 @@ function addBox(
  * The low-poly Noun: torso and head wear the art; two legs (trousers +
  * shoes) hang from the hip. `aPart` says which (PART), `aSide` which leg
  * (-1 left, +1 right, 0 not a leg) so the shader can swing it.
+ *
+ * `far`: for the VAST view (and its hall copies), where a leg is a pixel or
+ * two: one trouser block under the torso instead of four boxes, half the
+ * triangles, no swing. Same silhouette, so the switch doesn't pop.
  */
-export function lowNounGeometry(): THREE.BufferGeometry {
+export function lowNounGeometry(far = false): THREE.BufferGeometry {
   const pos: number[] = [];
   const uv: number[] = [];
   const nrm: number[] = [];
@@ -272,7 +276,12 @@ export function lowNounGeometry(): THREE.BufferGeometry {
     HEAD_UV,
   );
   tag(PART.art, 0);
-  for (const sd of [-1, 1]) {
+  if (far) {
+    const w = L.legX + L.legW / 2;
+    addBox(pos, uv, nrm, [-w, 0, -L.legD / 2], [w, L.hipY + 0.02, L.legD / 2], PLAIN);
+    tag(PART.trouser, 0);
+  }
+  for (const sd of far ? [] : [-1, 1]) {
     const x = sd * L.legX;
     addBox(
       pos,
@@ -431,6 +440,8 @@ export class CrowdMesh {
   readonly shadows: THREE.InstancedMesh;
   readonly atlas: Atlas;
   readonly geometry: THREE.BufferGeometry;
+  /** The far LOD (see lowNounGeometry): VAST and the hall copies. */
+  readonly farGeometry: THREE.BufferGeometry;
   readonly material: THREE.MeshToonMaterial;
   private cellAttr: THREE.InstancedBufferAttribute;
   private gaitAttr: THREE.InstancedBufferAttribute;
@@ -460,6 +471,10 @@ export class CrowdMesh {
     this.shoeAttr = new THREE.InstancedBufferAttribute(sh, 3);
     this.geometry.setAttribute('aTrouser', this.trouserAttr);
     this.geometry.setAttribute('aShoe', this.shoeAttr);
+    // The far LOD shares every per-instance attribute (uploaded once)
+    this.farGeometry = lowNounGeometry(true);
+    for (const k of ['aCell', 'aGait', 'aTrouser', 'aShoe'])
+      this.farGeometry.setAttribute(k, this.geometry.getAttribute(k));
     this.material = crowdMaterial(this.atlas);
     this.mesh = new THREE.InstancedMesh(this.geometry, this.material, capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -554,9 +569,14 @@ export class CrowdMesh {
     for (const c of this.copies) c.count = n;
   }
 
-  /** A copy of the crowd for a VAST hall copy (shares matrices and looks). */
+  /** Near (legs that walk) or far (one trouser block) for the real hall's crowd. */
+  setFar(far: boolean) {
+    this.mesh.geometry = far ? this.farGeometry : this.geometry;
+  }
+
+  /** A copy of the crowd for a VAST hall copy (shares matrices and looks; always far). */
   copy(): THREE.InstancedMesh {
-    const c = new THREE.InstancedMesh(this.geometry, this.material, this.capacity);
+    const c = new THREE.InstancedMesh(this.farGeometry, this.material, this.capacity);
     c.instanceMatrix = this.mesh.instanceMatrix;
     c.count = this.mesh.count;
     c.frustumCulled = false;
@@ -566,6 +586,7 @@ export class CrowdMesh {
 
   dispose() {
     this.geometry.dispose();
+    this.farGeometry.dispose();
     this.material.dispose();
     this.atlas.texture.dispose();
     this.shadows.geometry.dispose();

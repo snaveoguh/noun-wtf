@@ -12,6 +12,8 @@
 //   free   — wherever you drag / pinch / scroll it, close-up to VAST
 //   walk   — behind your own rider, on foot (drag to look round)
 
+import { HALL_D, HALL_W, TOWER_H, TOWER_HALF } from './layout';
+
 export type CamMode = 'floor' | 'wide' | 'vast' | 'follow' | 'free' | 'walk';
 export const CAM_MODES: readonly CamMode[] = ['walk', 'floor', 'wide', 'vast', 'follow', 'free'];
 
@@ -111,6 +113,46 @@ export function orbitEye(o: Orbit): { x: number; y: number; z: number } {
     y: o.ty + Math.sin(o.el) * o.r,
     z: o.tz + Math.cos(o.az) * h,
   };
+}
+
+/**
+ * The WALK camera pulled in so it never sits outside the hall or inside
+ * the board tower (standing by the door with the view behind you used to
+ * show nothing but wall). Returns `o` with `r` cut to the first thing the
+ * eye would pass through, less `pad`, but never under `min`.
+ */
+export function fitInHall(o: Orbit, pad = 0.6, min = 1.2): Orbit {
+  const ch = Math.cos(o.el);
+  const dx = Math.sin(o.az) * ch;
+  const dz = Math.cos(o.az) * ch;
+  const dy = Math.sin(o.el);
+  let r = o.r;
+  // Walls: the eye stays inside the hall's footprint
+  const hx = HALL_W / 2 - pad;
+  const hz = HALL_D / 2 - pad;
+  if (dx > 1e-6) r = Math.min(r, (hx - o.tx) / dx);
+  if (dx < -1e-6) r = Math.min(r, (-hx - o.tx) / dx);
+  if (dz > 1e-6) r = Math.min(r, (hz - o.tz) / dz);
+  if (dz < -1e-6) r = Math.min(r, (-hz - o.tz) / dz);
+  // The board tower: a box at the middle; stop at the first face the ray hits
+  const b = TOWER_HALF + pad;
+  let t0 = 0;
+  let t1 = r;
+  for (const [p, d] of [
+    [o.tx, dx],
+    [o.tz, dz],
+  ] as const) {
+    if (Math.abs(d) < 1e-6) {
+      if (p < -b || p > b) t1 = -1;
+      continue;
+    }
+    const a = (-b - p) / d;
+    const c = (b - p) / d;
+    t0 = Math.max(t0, Math.min(a, c));
+    t1 = Math.min(t1, Math.max(a, c));
+  }
+  if (t1 >= t0 && t0 > 0 && o.ty + dy * t0 < TOWER_H) r = Math.min(r, t0 - pad);
+  return r >= o.r ? o : { ...o, r: Math.max(min, r) };
 }
 
 /**

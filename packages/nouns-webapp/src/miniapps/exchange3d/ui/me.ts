@@ -22,7 +22,11 @@ const int = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >
 export function parseSaved(raw: string | null): MeLook | null {
   if (raw === null) return null;
   try {
-    const v = JSON.parse(raw) as { seed?: Record<string, unknown>; name?: unknown; build?: unknown };
+    const v = JSON.parse(raw) as {
+      seed?: Record<string, unknown>;
+      name?: unknown;
+      build?: unknown;
+    };
     const s = v.seed ?? {};
     const seed = {
       background: int(s.background),

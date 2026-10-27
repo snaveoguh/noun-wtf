@@ -36,7 +36,11 @@ export function Stick({ onMove }: { onMove: (side: number, fwd: number) => void 
       className="gx3d-stick"
       onPointerDown={e => {
         id.current = e.pointerId;
-        e.currentTarget.setPointerCapture(e.pointerId);
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // the pointer's already gone (lifted mid-event): still steer
+        }
         at(e);
       }}
       onPointerMove={e => {
@@ -45,7 +49,10 @@ export function Stick({ onMove }: { onMove: (side: number, fwd: number) => void 
       onPointerUp={end}
       onPointerCancel={end}
     >
-      <div className="gx3d-stick-knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+      <div
+        className="gx3d-stick-knob"
+        style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }}
+      />
     </div>
   );
 }

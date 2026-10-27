@@ -37,7 +37,7 @@ export interface PeerPose {
 }
 
 const TAG_RE = /^r:[\da-z]{1,12}$/;
-const SEED_RE = /^\d{1,4}-\d{1,4}-\d{1,4}-\d{1,4}-\d{1,4}$/;
+const SEED_RE = /^(?:\d{1,4}-){4}\d{1,4}$/;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 

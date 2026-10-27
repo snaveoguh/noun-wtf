@@ -116,7 +116,14 @@ export default function Exchange3D({
     }
     sceneRef.current = scene;
     const cam = q.get('cam');
-    if (cam === 'floor' || cam === 'wide' || cam === 'vast' || cam === 'follow' || cam === 'free')
+    if (
+      cam === 'walk' ||
+      cam === 'floor' ||
+      cam === 'wide' ||
+      cam === 'vast' ||
+      cam === 'follow' ||
+      cam === 'free'
+    )
       scene.setMode(cam);
     return () => {
       scene.dispose();
@@ -230,8 +237,8 @@ export default function Exchange3D({
           <div className="gx3d-muted">
             Gold bubbles and ★ names are the real Grand Exchange: its bots (real Nouns) and riders,
             their orders and fills. Everyone else is a simulated crowd trading at the real prices,
-            so the floor is never empty. Other players here walk the floor as their riders: click one
-            to offer them a trade. In-game COIN only, never real money.
+            so the floor is never empty. Other players here walk the floor as their riders: click
+            one to offer them a trade. In-game COIN only, never real money.
           </div>
         </div>
       )}
@@ -292,6 +299,7 @@ export default function Exchange3D({
 
       {hud?.target != null && s !== null && (
         <TradePanel
+          key={hud.target.key}
           target={hud.target}
           tickers={hud.tickers}
           you={hud.you}
@@ -307,7 +315,9 @@ export default function Exchange3D({
           deals={hud.deals}
           now={hud.now}
           nameOf={t => s.nameOf(t)}
-          onAnswer={(id, accept) => s.act(accept ? { t: 'accept', deal: id } : { t: 'decline', deal: id })}
+          onAnswer={(id, accept) =>
+            s.act(accept ? { t: 'accept', deal: id } : { t: 'decline', deal: id })
+          }
         />
       )}
 

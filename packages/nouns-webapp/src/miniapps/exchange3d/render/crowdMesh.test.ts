@@ -51,4 +51,21 @@ describe('exchange3d low-poly Noun', () => {
     // Standing (no swing): unchanged
     expect(swingLeg(0.1, 0.05, 0)).toEqual({ y: expect.closeTo(0.1), z: expect.closeTo(0.05) });
   });
+  it('far LOD: same silhouette on one trouser block, half the triangles, nothing swings', () => {
+    const far = lowNounGeometry(true);
+    const fp = far.getAttribute('position');
+    const fs = far.getAttribute('aSide');
+    expect(fp.count * 2).toBeLessThanOrEqual(pos.count);
+    let minY = Infinity;
+    let maxX = 0;
+    for (let i = 0; i < fp.count; i++) {
+      expect(fs.getX(i)).toBe(0);
+      if (far.getAttribute('aPart').getX(i) !== PART.art) {
+        minY = Math.min(minY, fp.getY(i));
+        maxX = Math.max(maxX, Math.abs(fp.getX(i)));
+      }
+    }
+    expect(minY).toBe(0);
+    expect(maxX).toBeCloseTo(LOW.legX + LOW.legW / 2);
+  });
 });
