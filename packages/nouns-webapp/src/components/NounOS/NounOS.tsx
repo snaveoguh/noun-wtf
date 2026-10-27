@@ -199,6 +199,19 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // NOUN POOL: Noun World in the pool hall with the menu open (`?play=pool`)
+  const goPool = useCallback(() => {
+    const url = '/world?play=pool';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // NOUN BREAKS: Noun World at the plaza cypher with the battle menu open
   // (`?play=breaks`, read when the game starts, so a running one reloads)
   const goBreaks = useCallback(() => {
@@ -397,6 +410,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           onEnterHoops={goHoops}
           onEnterBreaks={goBreaks}
           onEnterParkour={goParkour}
+          onEnterPool={goPool}
           onEnterHideSeek={goHideSeek}
           onEnterDrive={goDrive}
           onEnterDrop={goDrop}

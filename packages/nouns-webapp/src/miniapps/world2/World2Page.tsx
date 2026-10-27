@@ -25,6 +25,7 @@ import { InteriorsUi } from './interiors/InteriorsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import { DROP_PARAM } from './missions/unlocks';
 import { ParkourUi } from './parkour/game/ParkourUi';
+import { PoolUi, usePoolActive } from './pool/net/PoolUi';
 import { applyWorldManifest, registerWorldSw } from './pwa/install';
 import { InstallButton } from './pwa/InstallButton';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
@@ -163,7 +164,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
 
   // A Noun Breaks battle hides the skate HUD the same way hoops does
   const breakOn = useBreakActive(game);
-  const hoopsOn = useHoopsActive(game) || breakOn;
+  const poolOn = usePoolActive(game);
+  const hoopsOn = useHoopsActive(game) || breakOn || poolOn;
   // (flying the dragon keeps the skate stick: it turns and sets the speed)
   const vanDriving = useVanDriving(game);
   const carDriving = useCarDriving(game);
@@ -210,6 +212,20 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     const tryLaunch = () => {
       if (game.me === null || game.hud.loading !== null || !game.breaks.arrive()) return false;
       breaksLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
+  // `?play=pool` (the homepage's NOUN POOL card): into the pool hall, menu open
+  const poolLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || poolLaunched.current || searchParams.get('play') !== 'pool') return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.pool.arrive()) return false;
+      poolLaunched.current = true;
       return true;
     };
     if (tryLaunch()) return;
@@ -399,6 +415,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}
+      {game && started && <PoolUi game={game} />}
       {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <HideSeekUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && (

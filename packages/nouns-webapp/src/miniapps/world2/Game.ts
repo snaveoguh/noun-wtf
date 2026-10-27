@@ -55,6 +55,7 @@ import { JerseyCrew } from './npc/JerseyCrew';
 import { ParkourSystem } from './parkour/ParkourSystem';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
+import { PoolMode } from './pool/net/PoolMode';
 import { FmSpots } from './radio/FmSpots';
 import { NounFm } from './radio/NounFm';
 import {
@@ -331,6 +332,8 @@ export class Game {
   readonly breaks: BreakMode = new BreakMode(this);
   /** Parkour (parkour/): wall runs, ledges, poles… on foot, and NOUN PARKOUR's routes. */
   readonly parkour: ParkourSystem = new ParkourSystem(this);
+  /** Noun Pool (pool/net/PoolMode.ts, PoolApi): bar tables + the pool hall; owns the frame. */
+  readonly pool: PoolMode = new PoolMode(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
   readonly freestyle: FreestyleMode = new FreestyleMode(this);
   /** Noun Hide & Seek (hideseek/net/HideSeekMode.ts): played in the normal game; hides hiders' tags. */
@@ -943,6 +946,16 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    // ── Noun Pool: at a table (a bar's, or the pool hall); the room stays, the skater waits ──
+    if (this.pool.active) {
+      this.input.poll(now);
+      this.pool.step(dt);
+      this.updateFm(dt);
+      this.animTime += dt;
+      this.updateNetwork(dt);
+      this.gfx.render(dt);
+      return;
+    }
     // ── Freestyle: breakdancing on the spot; skater parked, skate camera orbiting ──
     if (this.freestyle.active) {
       const fin = this.input.poll(now);
@@ -1075,6 +1088,7 @@ export class Game {
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
+    this.pool.idle(dt);
     this.hideseek.update(dt);
   }
 
@@ -2313,6 +2327,7 @@ export class Game {
     this.hoops.dispose();
     this.breaks.dispose();
     this.parkour.dispose();
+    this.pool.dispose();
     this.freestyle.dispose();
     this.hideseek.dispose();
     this.van2.dispose();
