@@ -51,6 +51,51 @@ it and the reels that use it. ✅ = checked frame by frame in a contact sheet;
 | `w-cafe` ⚠️ | 60 | In through a cafe or bar door, orbit in the room. | — |
 | `w-fountain` ⚠️ | 84 | Down the Noggles Fountain into the Grand Exchange. Last in its scene. | — |
 
+## Noun Pool (`pool`, `/world?play=pool`, the hall)
+
+| Shot | Frames | What | Used in |
+| --- | --- | --- | --- |
+| `pl-hall` ✅ | 75 | The hall, menu up: a slow orbit round the racked table, both Nouns waiting. | pool 0:00 |
+| `pl-break` ✅ | 80 | The break from low behind the rack: the cue ball comes in, the rack explodes, six drop. | pool |
+| `pl-break-high` ✅ | 90 | The same break from high over the table. | pool |
+| `pl-pot-aim` ✅ | 75 | The game's aim camera behind the cue ball, the stroke, the follow camera. | pool |
+| `pl-pot-top` ✅ | 75 | The game's top view: 10 straight into the corner. | pool |
+| `pl-pot` ✅ | 75 | The same pot from the long rail. | (spare) |
+| `pl-cut` ✅ | 70 | Low at the corner pocket: the 15 cut in at 35°, the shooter behind. | pool |
+| `pl-eight` ✅ | 120 | The 8 called and cut into the near corner, the shooter facing the camera: the win. | pool (poster: the break) |
+
+## NOUN PARKOUR (`parkour`, scripted runs of the routes)
+
+| Shot | Frames | What | Used in |
+| --- | --- | --- | --- |
+| `pk-facade` ✅ | 120 | NORTH ROOFS: up the SK8 facade, run up the wall, leap sill to sill, pull up. | parkour 0:00 |
+| `pk-wallrun` ✅ | 100 | THE GAUNTLET in the game's chase camera: wall run, wall jump across, wall run B, gates. | parkour |
+| `pk-climb` ✅ | 90 | The red tower: hand-over-hand climb and mantle. | parkour |
+| `pk-lamps` ✅ | 180 | LAMP LINE wide: pole to pole, swing and launch with flips. | parkour |
+| `pk-gap` ✅ | 140 | NORTH ROOFS: sprint jump over the alley onto a sill, leap up, pull up. A Pip3 poster is in frame: its GIFs play in real time, so they differ on every render and some have words in them. Check every frame after a render. | parkour |
+| `pk-posts` ✅ | 150 | THE GAUNTLET: post-to-post precision jumps (stick, balance), the pole and the slide down. | parkour |
+| `pk-ghost` ✅ | 120 | LAMP LINE half a second behind the ghost of the best run. | parkour |
+| `pk-slide` ✅ | 90 | Slide under the bar, vault the wall, through the yellow finish gate. | parkour (last) |
+| `pk-pole` ⚠️ | 150 | NORTH ROOFS: over the parapet onto the pole, down to the street. A palm hides some of it, and a player's mural is in the first frames. | — |
+| `pk-roll` ✅ | 105 | LAMP LINE: off the big mast, roll the landing. | (spare) |
+
+## Noun Warfare (`warfare`, `/warfare`, a bots-only Team Splat on Noun City)
+
+Slow motion: the sim steps at half speed and the renderer interpolates
+between ticks. The local player is played by a bot brain too, so the
+camera follows real fights. The seeds and times come from scanning each
+match's kill events for the local player's splats.
+
+| Shot | Frames | What | Used in |
+| --- | --- | --- | --- |
+| `wf-tp-kill` ✅ | 90 | Third person behind the rider, chasing down a coin-head Noun (seed 13, 3.6 s). | warfare 0:00 |
+| `wf-fp-double` ✅ | 90 | First person, the splatter firing down the street (seed 13, 6.3 s). | warfare |
+| `wf-tp-head` ✅ | 80 | Third person in the dark side street, a headshot (seed 7, 34.1 s). | warfare |
+| `wf-fp-head` ✅ | 90 | First person by the SPLAT BAR sign, firing into the pack (seed 21, 45.7 s). | warfare |
+| `wf-tp-slow` ⚠️ | 80 | Third person at 0.33×. The props hide most of the action. | — |
+
+The first ~0.3 s of every warfare shot is the camera settling after the match starts, so cut in from 0.3 s or later.
+
 ## The reels
 
 ### hero-big-drop (12.83 s)
@@ -65,13 +110,24 @@ freeze → judges' cards.
 drop through the roof → pit 3 shouting → pit 0 → (crossfade) the pull-out
 past the board and over the walls to VAST.
 
+### hero-warfare (9.1 s, Imperial March to the Core)
+third person → first person → third person → first person, all at half speed.
+
+### hero-pool
+the hall → the break (low, then high) → lining up → the straight pot from
+above → the cut into the corner → the 8 into the called pocket.
+
+### hero-parkour
+the facade climb → wall run / wall jump / wall run → the tower climb →
+pole to pole → over the alley → post to post → the ghost → slide, vault,
+finish.
+
 ### hero-sizzle-gameplay (26.28 s, not rendered or wired yet)
-Cuts on the VO's pauses (see README). Placeholders, to be swapped for the
-real thing when each game lands:
+Cuts on the VO's pauses (see README). Pool (0:13.2, `pl-break`) and parkour
+(0:20.95, `pk-lamps`) are in. Placeholders, to be swapped for the real
+thing when each game lands:
 
 | At | Cut | Now | Becomes |
 | --- | --- | --- | --- |
 | 0:06.3 | 5 | `bd-chase` | cars |
-| 0:13.2 | 7 | `gx-shout` | pool |
 | 0:17.0 | 9 | `w-skate2` | hide & seek |
-| 0:20.95 | 11 | `bd-basin-air` | parkour |

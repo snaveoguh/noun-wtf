@@ -9,6 +9,7 @@
 //     "length": 12.0,                   // optional: exact length (s); pads by holding the last frame
 //     "poster": 4.2,                    // poster still at this time (s)
 //     "grade": "eq=…,unsharp=…",        // optional ffmpeg filters on the whole cut
+//     "music": { "file": "scripts/sizzle/music/noun-drop.mp3", "in": 0 },  // optional soundtrack
 //     "cuts": [ { "shot": "bd-summit", "in": 0, "dur": 2.0, "fade": 0.2 }, … ] }
 // A cut takes `shot` (rendered frames) or `video` (an existing gameplay clip,
 // path from packages/nouns-webapp, e.g. "public/home/hero-hoops.mp4").
@@ -72,8 +73,10 @@ edit.cuts.forEach((c, i) => {
     total = c.dur;
     return;
   }
-  // Hard cuts are a one-frame "fade" so every join goes through xfade
-  const fade = Math.max(1 / FPS, c.fade ?? 0);
+  // Hard cuts are a one-frame "fade" so every join goes through xfade.
+  // Whole frames only: an offset between frames makes xfade drop the rest
+  // of the reel (a 0.15 s fade cut hero-parkour off at 7.2 s)
+  const fade = Math.max(1, Math.round((c.fade ?? 0) * FPS)) / FPS;
   const off = total - fade;
   chains.push(
     `[${label}][c${i}]xfade=transition=fade:duration=${fade.toFixed(4)}:offset=${off.toFixed(4)}[x${i}]`,
@@ -88,10 +91,28 @@ if (edit.grade) post.push(edit.grade);
 chains.push(`[${label}]${post.length ? post.join(',') : 'null'}[out]`);
 const graph = chains.join(';');
 
-function ff(extra, file) {
+// Music (optional): `"music": { "file": "scripts/sizzle/music/x.mp3", "in": 0 }`,
+// a path from packages/nouns-webapp; faded out over the last 0.9 s and
+// loudness-normalised. The slide's clip then needs `audio: true` in rows.ts
+// (it plays only once the visitor turns sound on).
+const music = edit.music;
+const audioIn = [];
+const audioMap = [];
+if (music !== undefined) {
+  const file = resolve(HERE, '../..', music.file);
+  if (!existsSync(file)) throw new Error(`no music ${file}`);
+  audioIn.push('-ss', String(music.in ?? 0), '-t', length.toFixed(3), '-i', file);
+  audioMap.push(
+    '-map', `${inputs.filter(a => a === '-i').length}:a`,
+    '-af', `afade=t=out:st=${Math.max(0, length - 0.9).toFixed(3)}:d=0.9,loudnorm=I=-16:TP=-1.5:LRA=11`,
+    '-ar', '48000',
+  );
+}
+
+function ff(extra, file, audio) {
   const r = spawnSync(
     'ffmpeg',
-    ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, '-filter_complex', graph, '-map', '[out]', '-t', length.toFixed(3), '-r', String(FPS), ...extra, file],
+    ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, ...audioIn, '-filter_complex', graph, '-map', '[out]', ...audioMap, '-t', length.toFixed(3), '-r', String(FPS), ...extra, ...(music !== undefined ? audio : ['-an']), file],
     { stdio: 'inherit' },
   );
   if (r.status !== 0) throw new Error(`ffmpeg failed for ${file}`);
@@ -102,9 +123,9 @@ const crf = edit.crf ?? {};
 // Quality first (crf), with a bitrate ceiling so a busy reel stays under
 // ~4 MB: 2.4 Mbit/s is 3.6 MB for 12 s (`edit.maxrate` in Mbit/s to change)
 const cap = edit.maxrate ?? 2.4;
-ff(['-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf.mp4 ?? 23), '-maxrate', `${cap}M`, '-bufsize', `${cap * 2}M`, '-pix_fmt', 'yuv420p', '-movflags', '+faststart'], `${base}.mp4`);
+ff(['-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf.mp4 ?? 23), '-maxrate', `${cap}M`, '-bufsize', `${cap * 2}M`, '-pix_fmt', 'yuv420p', '-movflags', '+faststart'], `${base}.mp4`, ['-c:a', 'aac', '-b:a', '128k']);
 // VP9 constrained quality: crf, with -b:v as the ceiling
-ff(['-an', '-c:v', 'libvpx-vp9', '-crf', String(crf.webm ?? 34), '-b:v', `${cap * 0.9}M`, '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-pix_fmt', 'yuv420p'], `${base}.webm`);
+ff(['-c:v', 'libvpx-vp9', '-crf', String(crf.webm ?? 34), '-b:v', `${cap * 0.9}M`, '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-pix_fmt', 'yuv420p'], `${base}.webm`, ['-c:a', 'libopus', '-b:a', '112k']);
 const pr = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(edit.poster ?? 0), '-i', `${base}.mp4`, '-frames:v', '1', '-q:v', '3', `${base}-poster.jpg`], { stdio: 'inherit' });
 if (pr.status !== 0) throw new Error('poster failed');
 console.log(`${edit.name}: ${length.toFixed(2)} s (cuts ${total.toFixed(2)} s) -> ${base}.{mp4,webm}, -poster.jpg`);

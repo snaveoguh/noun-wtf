@@ -60,16 +60,37 @@ export const CLIPS = {
     webm: '/home/hero-big-drop.webm',
     mp4: '/home/hero-big-drop.mp4',
     poster: '/home/hero-big-drop-poster.jpg',
+    audio: true,
   },
   breaks: {
     webm: '/home/hero-breaks.webm',
     mp4: '/home/hero-breaks.mp4',
     poster: '/home/hero-breaks-poster.jpg',
+    audio: true,
   },
   exchange: {
     webm: '/home/hero-exchange.webm',
     mp4: '/home/hero-exchange.mp4',
     poster: '/home/hero-exchange-poster.jpg',
+    audio: true,
+  },
+  parkour: {
+    webm: '/home/hero-parkour.webm',
+    mp4: '/home/hero-parkour.mp4',
+    poster: '/home/hero-parkour-poster.jpg',
+    audio: true,
+  },
+  warfare: {
+    webm: '/home/hero-warfare.webm',
+    mp4: '/home/hero-warfare.mp4',
+    poster: '/home/hero-warfare-poster.jpg',
+    audio: true,
+  },
+  pool: {
+    webm: '/home/hero-pool.webm',
+    mp4: '/home/hero-pool.mp4',
+    poster: '/home/hero-pool-poster.jpg',
+    audio: true,
   },
 } satisfies Record<string, Clip>;
 
@@ -113,6 +134,7 @@ export const GAMES: Game[] = [
   {
     id: 'hoops',
     name: 'Noun Hoops',
+    preview: CLIPS.hoops,
     cover: '/world2/hoops-cover.webp',
     card: '/home/covers/hoops.webp',
     focus: '72% 58%',
@@ -126,6 +148,7 @@ export const GAMES: Game[] = [
   {
     id: 'breaks',
     name: 'Noun Breaks',
+    preview: CLIPS.breaks,
     cover: '/world2/breaks-cover.webp',
     card: '/home/covers/breaks.webp',
     focus: '50% 58%',
@@ -160,6 +183,7 @@ export const GAMES: Game[] = [
   {
     id: 'warfare',
     name: 'Noun Warfare',
+    preview: CLIPS.warfare,
     cover: '/warfare/cover.webp',
     card: '/home/covers/warfare.webp',
     focus: '72% 58%',
@@ -177,6 +201,7 @@ export const GAMES: Game[] = [
   {
     id: 'drop',
     name: 'The Big Drop',
+    preview: CLIPS.bigDrop,
     cover: BIG_DROP_COVER,
     card: BIG_DROP_CARD,
     focus: '50% 50%',
@@ -194,6 +219,7 @@ export const GAMES: Game[] = [
   {
     id: 'parkour',
     name: 'Noun Parkour',
+    preview: CLIPS.parkour,
     cover: '/world2/parkour-cover.webp',
     card: '/home/covers/parkour.webp',
     focus: '50% 55%',
@@ -228,6 +254,7 @@ export const GAMES: Game[] = [
   {
     id: 'pool',
     name: 'Noun Pool',
+    preview: CLIPS.pool,
     cover: '/world2/pool-cover.webp',
     card: '/home/covers/pool.webp',
     focus: '50% 55%',
@@ -370,6 +397,34 @@ export const HERO_SLIDES: Slide[] = [
     ms: 10630,
   },
   {
+    key: 'parkour',
+    title: 'Noun Parkour',
+    eyebrow: 'NEW GAME',
+    tagline: game('parkour').tagline,
+    teaser:
+      'Run the roofs against the clock. Wall runs, ledge leaps, lamp-post launches and rolls, gate to gate, chasing the ghost of your best run.',
+    accent: '#20d6ff',
+    clip: CLIPS.parkour,
+    focus: '50% 45%',
+    game: 'parkour',
+    cta: 'RUN',
+    ms: 13530,
+  },
+  {
+    key: 'pool',
+    title: 'Noun Pool',
+    eyebrow: 'NEW GAME',
+    tagline: game('pool').tagline,
+    teaser:
+      'Eight-ball in the pool hall. Break the rack, cut it in the corner, call your pocket and sink the 8. Play the CPU on four levels or rack up against a friend.',
+    accent: '#3ddc84',
+    clip: CLIPS.pool,
+    focus: '50% 50%',
+    game: 'pool',
+    cta: 'RACK EM',
+    ms: 12030,
+  },
+  {
     key: 'hoops',
     title: 'Noun Hoops',
     eyebrow: 'FEATURED GAME',
@@ -379,7 +434,7 @@ export const HERO_SLIDES: Slide[] = [
     clip: CLIPS.hoops,
     focus: '50% 50%',
     game: 'hoops',
-    bed: { track: '/home/hoops-track.mp3', ambience: 'court' },
+    bed: { track: '/home/hoops-ball-up.mp3', ambience: 'court' },
     ms: 7500,
   },
   {
@@ -389,10 +444,10 @@ export const HERO_SLIDES: Slide[] = [
     tagline: game('warfare').tagline,
     teaser: game('warfare').teaser,
     accent: '#3dff8a',
-    still: game('warfare').cover,
-    focus: game('warfare').focus,
+    clip: CLIPS.warfare,
+    focus: '50% 50%',
     game: 'warfare',
-    ms: 9000,
+    ms: 9100,
   },
 ];
 

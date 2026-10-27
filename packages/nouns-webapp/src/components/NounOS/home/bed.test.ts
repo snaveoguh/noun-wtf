@@ -11,7 +11,7 @@ describe('hero sound bed', () => {
     expect(hoops.clip?.mp4).toBe('/home/hero-hoops.mp4');
     expect(hoops.clip?.webm).toBe('/home/hero-hoops.webm');
     expect(hoops.clip?.audio).toBeUndefined(); // the bed is the sound, not the file
-    expect(hoops.bed).toEqual({ track: '/home/hoops-track.mp3', ambience: 'court' });
+    expect(hoops.bed).toEqual({ track: '/home/hoops-ball-up.mp3', ambience: 'court' });
   });
 
   it('no slide has both a voice-over and a bed', () => {
