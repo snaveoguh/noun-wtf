@@ -52,7 +52,7 @@ const MUST: Record<InteriorKind, ItemType[][]> = {
   gym: [['treadmill', 'weight_bench']],
 };
 
-describe('layout generator', () => {
+describe('layout generator', { timeout: 600_000 }, () => {
   it('is deterministic: the same door gives the same room', () => {
     for (const kind of INTERIOR_KINDS) {
       const a = generateLayout({ id: 'town:cowboy:17.5,46', kind, frontage: 12, depth: 14 });

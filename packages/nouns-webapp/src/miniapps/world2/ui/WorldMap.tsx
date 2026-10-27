@@ -19,6 +19,8 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint'], full = false): MapS
   const p = game.player.pos;
   const riders = [];
   for (const [id, r] of game.remotes) {
+    // Hide & seek: no dot for a hider (hideseek/policy.ts)
+    if (game.hideseek.labelFor(id) !== 'show') continue;
     const pos = r.character.root.position;
     riders.push({ x: pos.x, z: pos.z, name: game.net.players.get(id)?.name || 'noun' });
   }
@@ -45,7 +47,16 @@ function fit(canvas: HTMLCanvasElement) {
   return { w, h, dpr };
 }
 
-export function WorldMap({ game, touch }: { game: Game; touch: boolean }) {
+export function WorldMap({
+  game,
+  touch,
+  docked = false,
+}: {
+  game: Game;
+  touch: boolean;
+  /** Round, inside the HUD's map cluster (hud/GtaHud), which places it. */
+  docked?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [waypoint, setWaypoint] = useState<{ x: number; z: number } | null>(null);
   const miniRef = useRef<HTMLCanvasElement>(null);
@@ -107,7 +118,7 @@ export function WorldMap({ game, touch }: { game: Game; touch: boolean }) {
             dpr,
             { cx: scene.me.x, cz: scene.me.z, s: miniS.current, rot: Math.PI + scene.me.yaw },
             scene,
-            { full: false, edgeMarkers: true },
+            { full: false, edgeMarkers: true, round: docked },
           );
         }
       }
@@ -122,7 +133,7 @@ export function WorldMap({ game, touch }: { game: Game; touch: boolean }) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [game, open, touch]);
+  }, [game, open, touch, docked]);
 
   // ── Full map gestures ──
   const ptrs = useRef(new Map<number, { x: number; y: number }>());
@@ -200,13 +211,17 @@ export function WorldMap({ game, touch }: { game: Game; touch: boolean }) {
       {!open && (
         <button
           type="button"
-          className={`w2-minimap pointer-events-auto absolute z-30 ${touch ? 'w2-minimap-touch' : ''}`}
+          className={
+            docked
+              ? 'w2-minimap w2-minimap-dock pointer-events-auto'
+              : `w2-minimap pointer-events-auto absolute z-30 ${touch ? 'w2-minimap-touch' : ''}`
+          }
           onPointerDown={e => e.stopPropagation()}
           onClick={() => setOpen(true)}
           title="Map (B)"
         >
           <canvas ref={miniRef} />
-          {!touch && <span className="w2-minimap-key">B · MAP</span>}
+          {!touch && <span className="w2-minimap-key">{docked ? 'B' : 'B · MAP'}</span>}
         </button>
       )}
       {open &&

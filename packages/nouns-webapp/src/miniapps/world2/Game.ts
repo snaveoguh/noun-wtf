@@ -23,6 +23,7 @@ import { TtsEngine } from './audio/voice/TtsEngine';
 import { HOUSE_VOICE, hyped, RIDER_VOICE, ttsVoiceOf } from './audio/voice/ttsVoice';
 import { VoiceBox } from './audio/voice/VoiceBox';
 import { readDeviceNet, realVoicesOn, type VoiceModeLike } from './audio/voice/voicePrefs';
+import { FreestyleMode } from './breakdance/freestyle/FreestyleMode';
 import { BreakMode } from './breakdance/net/BreakMode';
 import { DeckSync } from './character/deckStore';
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from './character/NounAppearance';
@@ -33,13 +34,16 @@ import {
   type BoardType,
   type CharacterAssets,
 } from './character/NounCharacter';
+import { encodeOutfit, type Outfit } from './character/outfit';
 import { Input, type InputFrame } from './core/Input';
+import { CarSystem } from './cars/Cars';
 import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
+import { HideSeekMode } from './hideseek/net/HideSeekMode';
 import { HoopsMode } from './hoops/net/HoopsMode';
 import { InteriorSystem } from './interiors/InteriorSystem';
 import { MissionSystem } from './missions/MissionSystem';
@@ -88,6 +92,7 @@ import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
 import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
+import { FacadeSystem } from './world/facades/FacadeSystem';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
 import { landmarksDecorator } from './world/landmarks/decorator';
 import { LandmarkSystem } from './world/landmarks/LandmarkSystem';
@@ -312,18 +317,26 @@ export class Game {
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Enterable buildings (interiors/): doors, rooms, residents; InteriorsApi. */
   readonly interiors: InteriorSystem = new InteriorSystem(this);
+  /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
+  readonly facades: FacadeSystem = new FacadeSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
   readonly breaks: BreakMode = new BreakMode(this);
   /** Parkour (parkour/): wall runs, ledges, poles… on foot, and NOUN PARKOUR's routes. */
   readonly parkour: ParkourSystem = new ParkourSystem(this);
+  /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
+  readonly freestyle: FreestyleMode = new FreestyleMode(this);
+  /** Noun Hide & Seek (hideseek/net/HideSeekMode.ts): played in the normal game; hides hiders' tags. */
+  readonly hideseek: HideSeekMode = new HideSeekMode(this);
   /** Noun Trade (trade/): server-held coin + van cargo; towns/ calls trade.act for street sales. */
   readonly trade: TradeClient;
   /** Noun Trade: the drivable ice cream van (van/; trade/contract.ts VanDriveApi). */
   readonly van2: VanDrive;
   /** The Noun dragon (dragon/): bought at the Dragon Roost, called with Z, flown. */
   readonly dragon: DragonRide;
+  /** The cars (cars/): kerbside fleet + slow traffic on the ring road; E takes one. */
+  readonly cars: CarSystem;
   /** RESPECT (respect/): the score, tiers, persistence; the hooks report the street's events. */
   readonly respect: RespectSystem;
   readonly respectHooks: RespectHooks;
@@ -384,6 +397,7 @@ export class Game {
     this.cam = new SkateCamera(this.gfx.camera, this.world);
     this.van2 = new VanDrive(this);
     this.dragon = new DragonRide(this);
+    this.cars = new CarSystem(this);
     this.gfx.scene.add(this.particles.group);
     inkExcluded.add(this.particles.group);
     this.hud = {
@@ -480,12 +494,14 @@ export class Game {
         }
       });
     }
+    this.cars.stripBaked(level);
     this.world.build(level.collisionMeshes);
     this.player.softBounds = level.softBounds ?? Infinity;
     if (level.mountain !== undefined) this.buildMountain(level);
     const fountain = level.spawns.find(s => /fountain/i.test(s.name ?? ''));
     if (fountain) this.player.homeSpots.push({ pos: fountain.position.clone(), yaw: fountain.yaw });
     this.placeIceCreamVan(level);
+    this.cars.start(level);
     this.rails.load(level.rails);
     this.placeMegaRamp(level);
     this.graffiti = new Graffiti(
@@ -511,6 +527,7 @@ export class Game {
       this.buildDressingDemo(level);
     void this.billboards.attach(level.root);
     this.interiors.start(level);
+    this.facades.start(level);
 
     // Local-only NPC crew at the secret Noun Jersey park (spawns within ~400 m)
     if (this.mountain !== null)
@@ -564,6 +581,7 @@ export class Game {
     this.towns?.on('enter', t => this.sfx.setBed(t === 'cowboy' || t === 'beach' ? t : null));
     this.towns?.on('leave', () => this.sfx.setBed(null));
     this.me = new NounCharacter(this.seed, assets);
+    if (this.outfit !== null) this.me.setOutfit(this.outfit);
     this.me.setBoardType(this.boardType);
     this.me.setCastShadows(true);
     if (this.gfx.toon) toonify(this.me.root);
@@ -616,7 +634,7 @@ export class Game {
       this.net.onCallout = (id, c) => void this.remoteCallout(id, c);
       this.net.onChatVoice = (id, tag, clip) => {
         const rp = this.net.players.get(id);
-        if (rp === undefined) return;
+        if (rp === undefined || this.hideseek.labelFor(id) === 'hide') return;
         void this.voices.playRemoteChat(tag, clip, rp.transcript, this.hearOf(rp.current.pos));
       };
       this.net.onLeave = id => this.removeRemote(id);
@@ -834,6 +852,16 @@ export class Game {
     this.me?.setWeight(w);
   }
 
+  /** My trousers + shoes (null = my seed's default); sent to the room as `of`. */
+  outfit: Outfit | null = null;
+
+  setOutfit(o: Outfit | null) {
+    this.outfit = o;
+    this.net.outfit = o !== null ? encodeOutfit(o) : '';
+    if (o !== null) this.me?.setOutfit(o);
+    else this.me?.setOutfitWire('');
+  }
+
   setBoardType(t: BoardType) {
     // The Big Drop is snowboards only (peak.ts sets it and restores yours after)
     if (this.missions.ud.active && t !== 'snowboard') return;
@@ -841,6 +869,15 @@ export class Game {
     this.me?.setBoardType(t);
   }
   showroomYaw = 0.5;
+  /** Select screen: extra turn from dragging the preview (radians). */
+  showroomSpin = 0;
+  /** Select screen: auto-sway amplitude (0 once the player drags). */
+  showroomSway = 0.7;
+  /**
+   * Select screen: where on the canvas to frame the rider (centre + size,
+   * fractions of the canvas): top on phones, left on desktop.
+   */
+  showroomFrame = { x: 0.66, y: 0.5, w: 0.6, h: 1 };
 
   /** Custom deck graphics (board shop) on my board and everyone else's. */
   private decks = new DeckSync();
@@ -888,11 +925,31 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    // ── Freestyle: breakdancing on the spot; skater parked, skate camera orbiting ──
+    if (this.freestyle.active) {
+      const fin = this.input.poll(now);
+      if (this.freestyle.frame(dt, fin, now)) {
+        this.updateFm(dt);
+        this.animTime += dt;
+        this.updateNetwork(dt);
+        this.crew?.update(dt, this.player.pos);
+        this.missions.update(dt);
+        this.towns?.update(dt);
+        this.mountain?.update(this.player.pos, this.player.vel);
+        this.nature?.update(dt, this.player.pos);
+        this.billboards.update(dt);
+        this.gfx.followShadow(this.player.pos);
+        this.gfx.render(dt);
+        this.updateHud(dt, fin);
+        return;
+      }
+    }
     if (this.cutscene.active) return this.stepCutscene(dt, now);
     this.cutscene.tick();
     const input = this.input.poll(now);
     // Driving the ice cream van: E / R / spray are the van's this frame
-    const driving = this.van2.preStep(input) || this.dragon.preStep(input);
+    const driving =
+      this.van2.preStep(input) || this.cars.preStep(input) || this.dragon.preStep(input);
     // On foot (and on walls) the mouse is a free cursor for painting
     this.input.freeCursor = !driving && this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
@@ -927,6 +984,7 @@ export class Game {
     }
 
     if (this.van2.driving) this.van2.drive(dt, input, now);
+    else if (this.cars.driving) this.cars.drive(dt, input, now);
     else if (this.dragon.riding) this.dragon.fly(dt, input, now);
     else {
       this.cam.update(dt, this.player, input.lookX, input.lookY, now);
@@ -937,22 +995,32 @@ export class Game {
     {
       const p = this.player;
       const riding =
-        p.mode === 'board' && p.state !== 'bail' && !this.van2.driving && !this.dragon.riding;
+        p.mode === 'board' &&
+        p.state !== 'bail' &&
+        !this.van2.driving &&
+        !this.cars.driving &&
+        !this.dragon.riding;
       this.rider.tick(dt, p.speed, riding);
     }
     this.updateFm(dt);
     this.updateGraffiti(dt, input);
     this.updateNetwork(dt);
     this.van2.update(dt);
+    this.cars.update(dt);
     this.dragon.update(dt);
     // On the Big Drop the world you left waits: nothing down there streams
     // or triggers round a rider who's somewhere else entirely
     const away = this.missions.ud.active || this.interiors.inside;
+    // Indoors (or on the Big Drop) the street's name tags and pointers go:
+    // the Oracle's tag over a shop's ceiling is nonsense (the room's own
+    // labels live in interiors' .ni-layer and stay)
+    this.labelLayer.toggleAttribute('data-away', away);
     // A van ride can't touch a drop (its proof would be a 140 km/h walk)
     if (!driving && !away) this.drops?.update(dt, this.player);
     if (!away) this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
     this.interiors.update(dt);
+    if (!away) this.facades.update(dt);
     if (!away) {
       this.towns?.update(dt);
       this.landmarks?.update(dt);
@@ -987,6 +1055,7 @@ export class Game {
     this.updateHud(dt, input);
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
+    this.hideseek.update(dt);
   }
 
   /**
@@ -1002,6 +1071,7 @@ export class Game {
     this.updateFm(dt);
     this.updateNetwork(dt);
     this.van2.update(wdt);
+    this.cars.update(wdt);
     const away = this.missions.ud.active || this.interiors.inside;
     if (!away) this.crew?.update(wdt, this.player.pos);
     this.missions.update(wdt);
@@ -1037,16 +1107,32 @@ export class Game {
     const riderYaw = Math.atan2(p.fwd.x, p.fwd.z);
     // Rider stands sideways on the board (chest toward -X of the board
     // frame), so orbit around the chest side with a gentle sway.
-    const a = riderYaw - Math.PI / 2 + Math.sin(this.showroomYaw) * 0.7;
-    const target = p.pos.clone().add(new THREE.Vector3(0, 1.35, 0));
+    const a =
+      riderYaw - Math.PI / 2 + this.showroomSpin + Math.sin(this.showroomYaw) * this.showroomSway;
+    // Rider + board are ~2.3 m tall: aim at their middle
+    const target = p.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
     const cam = this.gfx.camera;
     const dist = 4.4;
     cam.position.set(target.x + Math.sin(a) * dist, target.y + 0.35, target.z + Math.cos(a) * dist);
-    // Frame the Noun on the right third of the screen (menu panel on the left)
+    // Zoom so the rider fills showroomFrame, then look off-centre so it sits there
+    const f = this.showroomFrame;
+    const aspect = Math.max(0.2, cam.aspect);
+    const needH = Math.max(2.6 / Math.max(0.15, f.h), 1.7 / Math.max(0.15, f.w) / aspect);
+    const fov = THREE.MathUtils.clamp(
+      THREE.MathUtils.radToDeg(2 * Math.atan(needH / 2 / dist)),
+      28,
+      84,
+    );
+    const halfH = dist * Math.tan(THREE.MathUtils.degToRad(fov) / 2);
     const right = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
-    cam.lookAt(target.clone().addScaledVector(right, -0.75));
-    if (Math.abs(cam.fov - 45) > 0.01) {
-      cam.fov = 45;
+    cam.lookAt(
+      target
+        .clone()
+        .addScaledVector(right, -(f.x * 2 - 1) * halfH * aspect)
+        .add(new THREE.Vector3(0, (f.y * 2 - 1) * halfH, 0)),
+    );
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
     this.updateMyCharacter(dt);
@@ -1515,7 +1601,7 @@ export class Game {
   } {
     const p = this.player;
     // In the saddle: sat still (the rig has no seated clip; idle beats legs sprinting in the air)
-    if (this.dragon.riding) return { clip: 'idle', fade: 0.3 };
+    if (this.dragon.riding || this.cars.driving) return { clip: 'idle', fade: 0.3 };
     const pk = this.parkour.clip();
     if (pk !== null) return pk;
     if (p.climb !== null) {
@@ -1530,6 +1616,7 @@ export class Game {
       const hs = Math.hypot(p.vel.x, p.vel.z);
       if (p.emote)
         return { clip: ['', 'wave', 'dance', 'celebrate'][p.emote] ?? 'wave', fade: 0.25 };
+      if (this.hideseek.blending) return { clip: 'skate_crouch', fade: 0.35 };
       if (hs > 5.6) return { clip: 'sprint', timeScale: hs / 6.5 };
       if (hs > 2.6) return { clip: 'run', timeScale: hs / 5.2 };
       if (hs > 0.25) return { clip: 'walk', timeScale: Math.max(0.6, hs / 1.9) };
@@ -1749,7 +1836,7 @@ export class Game {
 
   private async remoteCallout(id: string, c: RemoteCallout) {
     const rp = this.net.players.get(id);
-    if (rp === undefined) return;
+    if (rp === undefined || this.hideseek.labelFor(id) === 'hide') return;
     const hear = this.hearOf(rp.current.pos);
     if (hear.gain <= 0.02) return;
     const tag = rp.voiceTag;
@@ -1803,7 +1890,14 @@ export class Game {
         seedKey: seedKey(this.seed),
         boardType: this.boardType,
         weight: this.weight,
-        vehicle: this.van2.driving ? 'van' : this.dragon.riding ? 'dragon' : undefined,
+        vehicle: this.van2.driving
+          ? 'van'
+          : this.cars.driving
+            ? 'car'
+            : this.dragon.riding
+              ? 'dragon'
+              : undefined,
+        car: this.cars.netKey,
         pk: this.parkour.netKey(),
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
@@ -1833,13 +1927,16 @@ export class Game {
       r.lastPos.copy(c.pos);
       ch.setBoardType(rp.boardType);
       if (ch.weight !== rp.weight) ch.setWeight(rp.weight);
+      ch.setOutfitWire(rp.outfit ?? '');
       ch.update(dt, {
         lean: c.lean,
         travelled: c.mode === 'board' ? travelled : 0,
         riding: c.mode === 'board' && !c.anim.includes('bail'),
       });
       this.parkour.remote(id, ch, c.pk, dt);
-      // Name tag
+      this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
+      // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
+      const show = this.hideseek.labelFor(id);
       if (r.label) {
         const v = c.pos
           .clone()
@@ -1847,7 +1944,8 @@ export class Game {
           .project(cam);
         const visible = v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
         const dist = cam.position.distanceTo(c.pos);
-        r.label.style.display = visible && dist < 60 ? 'block' : 'none';
+        r.label.style.display = visible && dist < 60 && show !== 'hide' ? 'block' : 'none';
+        r.label.style.opacity = show === 'faint' ? '0.4' : '';
         if (visible) {
           r.label.style.transform = `translate(-50%, -100%) translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px)`;
           const talk = rp.speaking ? ' 🔊' : '';
@@ -1859,7 +1957,7 @@ export class Game {
           r.label.innerHTML = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${rp.respectBadge === 'L' ? LEGEND_BADGE : ''}${talk}</span>`;
         }
         if (r.pointer) {
-          const close = visible && dist < 60;
+          const close = (visible && dist < 60) || show !== 'show';
           r.pointer.style.display = close ? 'none' : 'block';
           if (!close)
             this.placePointer(r.pointer, c.pos, v, visible, dist, rp.name || 'noun', w, h);
@@ -1924,7 +2022,7 @@ export class Game {
   }
 
   private pushChat(id: string, text: string) {
-    const name = this.net.players.get(id)?.name || 'noun';
+    const name = this.hideseek.chatName(id, this.net.players.get(id)?.name || 'noun');
     const chat = [...this.hud.chat, { id, name, text, at: performance.now() }].slice(-6);
     this.hud = { ...this.hud, chat };
     this.emit();
@@ -1964,6 +2062,7 @@ export class Game {
       this.me.dispose();
     }
     this.me = new NounCharacter(seed, this.assets);
+    if (this.outfit !== null) this.me.setOutfit(this.outfit);
     this.me.setBoardType(this.boardType);
     this.me.setCastShadows(true);
     if (this.gfx.toon) toonify(this.me.root);
@@ -1985,6 +2084,7 @@ export class Game {
     makeRider: () => {
       if (!this.assets) return null;
       const r = new NounCharacter(this.seed, this.assets);
+      if (this.outfit !== null) r.setOutfit(this.outfit);
       r.setBoardType(this.boardType);
       if (this.gfx.toon) toonify(r.root);
       return r;
@@ -2188,10 +2288,14 @@ export class Game {
     this.sfx.dispose();
     this.missions.dispose();
     this.interiors.dispose();
+    this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
     this.parkour.dispose();
+    this.freestyle.dispose();
+    this.hideseek.dispose();
     this.van2.dispose();
+    this.cars.dispose();
     this.dragon.dispose();
     this.stats.dispose();
     this.drops?.dispose();

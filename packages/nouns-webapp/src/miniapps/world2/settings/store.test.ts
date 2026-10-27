@@ -157,11 +157,14 @@ describe('HUD stylesheet', () => {
     s.hudScale = 1.25;
     const css = hudCss(s);
     expect(css).toContain('[data-w2hud="speed"]{display:none!important}');
-    expect(css).toContain('.w2-minimap{display:none!important}');
+    expect(css).toContain('.w2-minimap,.w2h-void{display:none!important}');
     expect(css).toContain(':not([data-w2cog])');
     expect(css).toContain('.w2-nametag>span');
     expect(css).toContain('.w2-speedlines{display:none!important}');
-    expect(css).toContain('[data-w2hud="session"]{scale:1.25;transform-origin:top left}');
+    expect(css).toContain('[data-w2hud="cluster"]{scale:1.25;transform-origin:bottom left}');
+    expect(css).toContain('[data-w2hud="system"]{scale:1.25;transform-origin:top right}');
+    // (session and speed live inside the corners: scaling them too would double up)
+    expect(css).not.toContain('[data-w2hud="session"]{scale');
     expect(css).not.toContain('[data-w2hud="chat"]{display');
   });
 

@@ -4,6 +4,7 @@ import type { Game } from '../Game';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import { IconButton } from '../hud/IconButton';
 import { appealsAdmin, type AppealInfo } from '../net/Appeals';
 import { fetchStats, type RideRun } from '../net/Stats';
 
@@ -56,15 +57,13 @@ export function RecordsUi({ game, admin }: { game: Game; admin: boolean }) {
     <>
       {!replaying && <RecordCardView game={game} />}
       {!replaying && (
-        <div className="pointer-events-auto absolute left-4 top-[10rem] z-10 flex flex-col items-start gap-1">
-          <button
-            type="button"
-            className="w2-chip text-xs"
-            title="Replay your last run in slow motion (Y)"
+        <div className="w2h-left w2h-replay pointer-events-auto absolute z-10 flex flex-col items-start gap-1">
+          <IconButton
+            icon="replay"
+            on={menu}
+            label="Replays: your last run in slow motion (Y)"
             onClick={() => setMenu(m => !m)}
-          >
-            ⟲ REPLAY
-          </button>
+          />
           {menu && <ReplayMenu game={game} onClose={() => setMenu(false)} />}
         </div>
       )}
