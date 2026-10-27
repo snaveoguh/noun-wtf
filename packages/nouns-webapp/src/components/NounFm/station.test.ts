@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   afterPlay,
-  FULL_JINGLE_EVERY,
   jingleFor,
   parsePlaylist,
   pickNext,
@@ -105,14 +104,14 @@ describe('jingleFor', () => {
     { id: 'j2', title: 'two', sting: '/j2s.mp3', full: '/j2.mp3' },
   ];
 
-  it('plays the full jingle every Nth break and a sting otherwise', () => {
-    expect(jingleFor(jingles, 0, '', seq(0))?.url).toBe('/j1.mp3');
-    expect(jingleFor(jingles, 1, '', seq(0))?.url).toBe('/j1s.mp3');
-    expect(jingleFor(jingles, FULL_JINGLE_EVERY, '', seq(0.9))?.url).toBe('/j2.mp3');
+  it('plays the full interlude between songs and the sting on a skip', () => {
+    expect(jingleFor(jingles, false, '', seq(0))?.url).toBe('/j1.mp3');
+    expect(jingleFor(jingles, true, '', seq(0))?.url).toBe('/j1s.mp3');
+    expect(jingleFor(jingles, false, '', seq(0.9))?.url).toBe('/j2.mp3');
   });
 
   it("doesn't repeat the last jingle when there's another", () => {
-    expect(jingleFor(jingles, 1, 'j1', seq(0))?.jingle.id).toBe('j2');
-    expect(jingleFor([], 0, '', seq(0))).toBeNull();
+    expect(jingleFor(jingles, true, 'j1', seq(0))?.jingle.id).toBe('j2');
+    expect(jingleFor([], false, '', seq(0))).toBeNull();
   });
 });

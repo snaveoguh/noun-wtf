@@ -15,6 +15,8 @@
 //       only, never audio; listeners play that rider's clip or their TTS
 //   cv  [tag, id, seq] their last chat line spoken in their own voice (an
 //       ephemeral clip on the world-voice function)
+//   mv  1 while their typed chat comes as `cv` clips (their own model, shared);
+//       without it, listeners speak their chat lines in the house voice
 // Respect (respect/): `rs: 'L'` only while the rider is a legend (the
 // noggles badge on their name tag; cosmetic, not checked by the server).
 // The relay passes the blob through untouched and older clients ignore
@@ -104,6 +106,8 @@ export interface RemotePlayer {
   /** Last callout / voiced chat seq seen (so a joiner doesn't replay old ones). */
   coSeq: number;
   cvSeq: number;
+  /** Their typed chat arrives as their own voice clips (`mv`), so don't speak it. */
+  ownChat: boolean;
   seedKey: string;
   name: string;
   // Interpolation buffer
@@ -176,6 +180,8 @@ export class Net {
   callout: [number, number, number, number] | null = null;
   /** My last voiced chat line, relayed in the blob. */
   chatVoice: [string, string, number] | null = null;
+  /** My typed chat goes out as my own voice clips (`mv`). */
+  ownChat = false;
   /** My respect badge ('L' while a legend), relayed in the blob. */
   respectBadge = '';
   connected = false;
@@ -318,6 +324,7 @@ export class Net {
         voiceTag: '',
         coSeq: co?.seq ?? -1,
         cvSeq: cv?.seq ?? -1,
+        ownChat: false,
         seedKey: pose.seedKey,
         name: pose.name,
         samples: [],
@@ -345,6 +352,7 @@ export class Net {
     rp.deck = typeof blob.dk === 'string' && SHARE_RE.test(blob.dk) ? blob.dk : '';
     rp.voiceTag = typeof blob.vo === 'string' && TAG_RE.test(blob.vo) ? blob.vo : '';
     rp.respectBadge = blob.rs === 'L' ? 'L' : '';
+    rp.ownChat = blob.mv === 1;
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -427,6 +435,7 @@ export class Net {
       ...(this.voiceTag !== '' ? { vo: this.voiceTag } : {}),
       ...(this.callout !== null ? { co: this.callout } : {}),
       ...(this.chatVoice !== null ? { cv: this.chatVoice } : {}),
+      ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
     });
     const msg = JSON.stringify({

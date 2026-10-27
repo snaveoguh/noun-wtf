@@ -16,9 +16,9 @@ const DT = 1 / 120;
 /** Run h0's first turn; `press` decides, for each upcoming lane note, whether to hit it (and with which key). */
 function playTurn(
   press: (n: LaneNote, st: SimState) => BreakKey | null | 'skip',
-  opts: { until?: number; extra?: { key: BreakKey; beat: number }[] } = {},
+  opts: { until?: number; extra?: { key: BreakKey; beat: number }[]; strict?: boolean } = {},
 ) {
-  const sim = new BreakBattle(duelConfig(1));
+  const sim = new BreakBattle(duelConfig(1, opts.strict === true ? { chart: 'strict' } : {}));
   const done = new Set<string>();
   const snaps: SimState[] = [];
   const events = [];
@@ -159,5 +159,44 @@ describe('rhythm lane', () => {
     expect(left.every(n => n.dead === true)).toBe(true);
     // The redrawn plan still ends the turn on a freeze, landed on the beat
     expect(eventsOf(mine, 'freeze').pop()?.onBeat).toBe(true);
+  });
+});
+
+describe('strict chart (lobby battles)', () => {
+  const other = (k: BreakKey): BreakKey => (k === 'left' ? 'right' : 'left');
+
+  it('following the chart still lands PERFECT', () => {
+    const { events } = playTurn(n => n.key, { until: 6, strict: true });
+    const hits = eventsOf(events, 'hit');
+    expect(hits.length).toBeGreaterThan(2);
+    expect(hits.every(h => h.grade === 'perfect' && h.wrong === undefined)).toBe(true);
+  });
+
+  it('the wrong key is a miss that names the right one, and the note is marked MISS', () => {
+    const ref = playTurn(n => n.key, { until: 0.05, strict: true });
+    const first = (ref.snaps[ref.snaps.length - 1].lane ?? [])[0];
+    const run = playTurn(n => (n.beat === first.beat ? other(n.key) : n.key), {
+      until: 3,
+      strict: true,
+    });
+    const h = eventsOf(run.events, 'hit')[0];
+    expect(h).toMatchObject({ grade: 'miss', key: other(first.key), wrong: first.key });
+    const after = run.snaps.find(s => s.beat > first.beat + 0.5)!;
+    expect((after.lane ?? []).find(n => n.beat === first.beat)?.grade).toBe('miss');
+  });
+
+  it('mashing wrong keys never scores a move', () => {
+    const { events } = playTurn(n => other(n.key), { strict: true });
+    expect(eventsOf(events, 'hit').every(h => h.grade === 'miss')).toBe(true);
+    expect(eventsOf(events, 'move').filter(m => m.landed && m.id === 'h0')).toHaveLength(0);
+  });
+
+  it('a key between notes is a miss too', () => {
+    const { events } = playTurn(() => 'skip', {
+      until: 3,
+      strict: true,
+      extra: [{ key: 'a', beat: 0.5 }],
+    });
+    expect(eventsOf(events, 'hit')[0]).toMatchObject({ grade: 'miss' });
   });
 });

@@ -437,7 +437,13 @@ export class BreakView implements BattleView {
         if (e.id !== up) break;
         const isLocal = local(e.id);
         this.hud.set({
-          flash: { id: ++this.calls, grade: e.grade, local: isLocal, at: performance.now() },
+          flash: {
+            id: ++this.calls,
+            grade: e.grade,
+            local: isLocal,
+            at: performance.now(),
+            ...(e.wrong !== undefined ? { wrong: e.wrong } : {}),
+          },
         });
         // (The lane bursts the note that was hit: SimState.lane carries its grade.)
         if (isLocal) this.audio.tick(e.grade);

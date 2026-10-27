@@ -14,7 +14,7 @@ import { GameRadio, type RadioMode } from './audio/GameRadio';
 import { NounBeats } from './audio/NounBeats';
 import { Sfx } from './audio/sfx/Sfx';
 import { SkateAudio } from './audio/SkateAudio';
-import { resolveCallout } from './audio/voice/booth/clips';
+import { bleep, resolveCallout } from './audio/voice/booth/clips';
 import { HEAR_RANGE, PlayerVoices, type RemoteHear } from './audio/voice/booth/runtime';
 import { myTag, voiceNet } from './audio/voice/booth/voiceSync';
 import { seedVoice } from './audio/voice/cast';
@@ -620,7 +620,16 @@ export class Game {
         void this.voices.playRemoteChat(tag, clip, rp.transcript, this.hearOf(rp.current.pos));
       };
       this.net.onLeave = id => this.removeRemote(id);
-      this.net.onChat = (id, text) => this.pushChat(id, text);
+      this.net.onChat = (id, text) => {
+        this.pushChat(id, text);
+        // Riders without their own shared voice: speak the line here, in the
+        // house voice, from where they stand
+        const rp = this.net.players.get(id);
+        if (rp === undefined || rp.ownChat || !this.voices.canSpeakFor(rp.voiceTag)) return;
+        const hear = this.hearOf(rp.current.pos);
+        if (hear.gain <= 0.02) return;
+        void this.speakChatLine(text, parseSeedKey(rp.seedKey) ?? randomSeed(), hear, 4_000);
+      };
       this.net.onGraffiti = (id, tags) => this.graffiti?.onTags(id, tags);
       this.net.onOpen = () => {
         this.graffiti?.loadAll();
@@ -1728,6 +1737,22 @@ export class Game {
   }
 
   /** A remote rider's callout: their recording, else their stock voice. */
+  /** A typed chat line, spoken in the house voice (nothing if real voices are off). */
+  private async speakChatLine(text: string, seed: NounSeed, hear: RemoteHear, waitMs: number) {
+    if (!this.realVoicesOn()) return;
+    const house = await this.voices.houseWithin(waitMs);
+    if (house === null) return;
+    const say = settings.get().cleanVoices ? bleep(text) : text;
+    this.voice.speak({
+      text: say,
+      voice: seedVoice([seed.background, seed.body, seed.accessory, seed.head, seed.glasses]),
+      tts: HOUSE_VOICE,
+      engine: house,
+      gain: hear.gain,
+      pan: hear.pan,
+    });
+  }
+
   private async remoteCallout(id: string, c: RemoteCallout) {
     const rp = this.net.players.get(id);
     if (rp === undefined) return;
@@ -1767,6 +1792,7 @@ export class Game {
     const p = this.player;
     // Share my voice tag only while sharing recordings is on
     this.net.voiceTag = settings.get().shareRecordings ? (myTag() ?? '') : '';
+    this.net.ownChat = this.voices.sharesOwnChat();
     const me = this.me;
     if (me) {
       const pose: NetPose = {
@@ -1912,10 +1938,13 @@ export class Game {
     const t = text.trim();
     if (!t) return;
     this.net.sendChat(t);
-    // My own words in my own voice (Voice Booth model), if that's on
-    void this.voices.speakChat(t, riderId()).then(r => {
-      if (r !== null) this.net.chatVoice = [r.tag, r.id, ++this.chatVoiceSeq];
-    });
+    // My own words in my own voice (Voice Booth model) if that's on, else
+    // the house voice like everyone else's
+    if (this.voices.ownChatOn())
+      void this.voices.speakChat(t, riderId()).then(r => {
+        if (r !== null) this.net.chatVoice = [r.tag, r.id, ++this.chatVoiceSeq];
+      });
+    else void this.speakChatLine(t, this.seed, { gain: 1, pan: 0 }, 15_000);
     const chat = [
       ...this.hud.chat,
       { id: 'me', name: this.name, text: t, at: performance.now() },

@@ -19,7 +19,13 @@ This is how Noun Hoops (sim / view / net), Noun Warfare and the scooter / blades
 
 ## 2. Launch
 
-- Use `Agent` with `isolation: "worktree"` and `run_in_background: true`, all launched in one message.
+**The owner's standing rule: new big work runs at full speed, in its own cloud session.**
+- **Why:** background `Agent`s all share this session's one container. On 2026-10-26, ten at once pushed the load average to 87: tsc and vitest took 10+ minutes, and everyone crawled.
+- **How:** each big feature or new game goes to its own session via `create_session` (claude-code-remote MCP; same repo, its own branch). It gets its own container, so it runs at full speed. Hand it the full brief below as the `prompt`, plus "push to branch `claude/<feature>`, don't merge to main". Then `git fetch` + merge its branch here once it reports. Check on it with `get_session` / `list_events`, not by polling.
+- **Small things stay local:** quick follow-ups, one-file fixes and integration work.
+- **In-session `Agent`s:** at most about 3 at once.
+
+Locally, use `Agent` with `isolation: "worktree"` and `run_in_background: true`, all launched in one message.
 - **Each brief stands alone:**
   - the goal and the contract path;
   - the files it owns;
