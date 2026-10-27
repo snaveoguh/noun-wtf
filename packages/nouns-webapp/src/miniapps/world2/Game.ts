@@ -90,6 +90,7 @@ import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
 import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
+import { FacadeSystem } from './world/facades/FacadeSystem';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
 import { landmarksDecorator } from './world/landmarks/decorator';
 import { LandmarkSystem } from './world/landmarks/LandmarkSystem';
@@ -314,6 +315,8 @@ export class Game {
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Enterable buildings (interiors/): doors, rooms, residents; InteriorsApi. */
   readonly interiors: InteriorSystem = new InteriorSystem(this);
+  /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
+  readonly facades: FacadeSystem = new FacadeSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
   readonly hoops: HoopsMode = new HoopsMode(this);
   /** Noun Breaks (breakdance/net/BreakMode.ts): the plaza cypher; while active it owns the frame. */
@@ -515,6 +518,7 @@ export class Game {
       this.buildDressingDemo(level);
     void this.billboards.attach(level.root);
     this.interiors.start(level);
+    this.facades.start(level);
 
     // Local-only NPC crew at the secret Noun Jersey park (spawns within ~400 m)
     if (this.mountain !== null)
@@ -994,6 +998,7 @@ export class Game {
     if (!away) this.crew?.update(dt, this.player.pos);
     this.missions.update(dt);
     this.interiors.update(dt);
+    if (!away) this.facades.update(dt);
     if (!away) {
       this.towns?.update(dt);
       this.landmarks?.update(dt);
@@ -2248,6 +2253,7 @@ export class Game {
     this.sfx.dispose();
     this.missions.dispose();
     this.interiors.dispose();
+    this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
     this.freestyle.dispose();
