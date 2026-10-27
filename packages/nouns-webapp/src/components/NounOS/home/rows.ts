@@ -427,7 +427,7 @@ export const HERO_SLIDES: Slide[] = [
     clip: CLIPS.hoops,
     focus: '50% 50%',
     game: 'hoops',
-    bed: { track: '/home/hoops-track.mp3', ambience: 'court' },
+    bed: { track: '/home/hoops-ball-up.mp3', ambience: 'court' },
     ms: 7500,
   },
   {
