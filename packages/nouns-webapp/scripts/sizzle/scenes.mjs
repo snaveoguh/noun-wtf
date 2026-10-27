@@ -221,6 +221,277 @@ export async function installBigDrop() {
   window.__bd = { T, PT, B, ud, ALT, peakOf, toLocal, place, cam: sz.rig };
 }
 
+/**
+ * Noun Pool's hall (`/world?play=pool`), the menu open, the loop stopped
+ * (`__sz`), with `__pl` helpers: `stage(state, aim)` starts a frame (you vs
+ * the CPU) from a given table, `shoot()` plays the lined-up shot, and
+ * `__pl.cam` (a function of (t, local)) puts the camera anywhere in the
+ * table's frame (x along the length, y up, z across; the cloth at feltY).
+ */
+export async function openPool(p, base) {
+  await openWorld(p, base, '&play=pool');
+  await p.waitForFunction(() => window.__w2.pool.ui.phase === 'menu' && window.__w2.pool.view !== null, null, {
+    timeout: 300_000,
+    polling: 1000,
+  });
+  await p.evaluate(installPool);
+  // The players' Nouns load their heads
+  await p.waitForTimeout(8000);
+  await cleanFrame(p);
+}
+
+/** Runs in the page. */
+export async function installPool() {
+  const sz = window.__sz;
+  const g = sz.g;
+  const pool = g.pool;
+  const view = pool.view;
+  const { quantize } = await import('/src/miniapps/world2/pool/net/codec.ts');
+  const V = sz.V;
+  const eye = new V();
+  const look = new V();
+  const pl = {
+    pool,
+    view,
+    quantize,
+    t: 0,
+    cam: null,
+    /** The cloth's height in the table frame. */
+    feltY: view.feltY,
+    /** Seat 0's and seat 1's Nouns (fixed, so every render matches). */
+    seeds: [
+      { background: 0, body: 13, accessory: 31, head: 138, glasses: 7 },
+      { background: 1, body: 22, accessory: 88, head: 52, glasses: 3 },
+    ],
+    /**
+     * A frame from `state` (you to shoot, the CPU in seat 1), the cue lined
+     * up: aim (dx, dy), power, spin, cue (ball in hand) and call (the 8).
+     */
+    stage(state, o = {}) {
+      pool.session = null;
+      const me = pool.transport.id;
+      const key = s => `${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}`;
+      pool.begin(
+        {
+          gid: 'sizzle',
+          seed: 1,
+          breaker: 0,
+          players: [
+            { id: me, name: 'you', human: true, seedKey: key(pl.seeds[0]) },
+            { id: 'cpu', name: 'CPU', human: false, skill: 0.97, seedKey: key(pl.seeds[1]) },
+          ],
+          pro: true,
+          table: pool.table.id,
+          place: pool.table,
+        },
+        'host',
+        me,
+        quantize(state),
+      );
+      view.setPlayers(pl.seeds);
+      // One step lines the turn up (setupTurn), then ours goes on top
+      sz.run(1);
+      const d = pool.debug;
+      if (o.cue) d.setPlace(o.cue);
+      if (o.aim) d.setAim(o.aim.dx, o.aim.dy);
+      if (o.call !== undefined) d.setCall(o.call);
+      pool.setPower(o.power ?? 0.5);
+      pool.setSpin(o.side ?? 0, o.top ?? 0);
+      view.aimMode = o.gameCam === 'top' ? 'top' : 'aim';
+      view.setCam(o.gameCam ?? 'aim');
+      view.cam.snap();
+      pl.shot = o;
+    },
+    shoot() {
+      const ok = pool.shoot();
+      if (!ok) throw new Error('pool: the shot was refused');
+    },
+  };
+  // No aiming guide in a sizzle (it's the shooter's HUD); the called pocket stays
+  if (!pool.__szFrameFor) {
+    pool.__szFrameFor = pool.frameFor.bind(pool);
+    pool.frameFor = ev => {
+      const f = pool.__szFrameFor(ev);
+      if (f.aim !== null) f.aim = { ...f.aim, guide: false };
+      return f;
+    };
+  }
+  // Pool's block in Game.step doesn't call camHook: run ours after it
+  if (!pool.__szStep) {
+    pool.__szStep = pool.step.bind(pool);
+    pool.step = dt => {
+      pool.__szStep(dt);
+      // (window.__pl: a re-install replaces it)
+      const pl = window.__pl;
+      pl.t += dt;
+      if (pl.cam === null) return;
+      const c = pl.cam(pl.t);
+      const f = view.frame;
+      f.updateMatrixWorld();
+      eye.set(...c.eye);
+      look.set(...c.look);
+      // The players hide a body the camera is inside: tell them where it is
+      view.cam.eye.copy(eye);
+      eye.applyMatrix4(f.matrixWorld);
+      look.applyMatrix4(f.matrixWorld);
+      const cam = g.gfx.camera;
+      cam.position.copy(eye);
+      cam.up.set(0, 1, 0);
+      cam.lookAt(look);
+      const fov = c.fov ?? 50;
+      if (cam.fov !== fov) {
+        cam.fov = fov;
+        cam.updateProjectionMatrix();
+      }
+    };
+  }
+  window.__pl = pl;
+}
+
+/**
+ * Noun World on foot for NOUN PARKOUR, the loop stopped (`__sz`), with
+ * `__pk` helpers: `route(id)` starts a route (its gates + course props)
+ * and skips the countdown, `place(x, y, z, yaw)` stands the rider
+ * somewhere, `pilot(phases)` scripts the controls (see installParkour).
+ */
+export async function openParkour(p, base) {
+  await openWorld(p, base);
+  // The same rider in every shot (a fresh page rolls a random Noun)
+  await p.evaluate(() => window.__w2.setSeed({ background: 0, body: 13, accessory: 31, head: 138, glasses: 7 }));
+  await p.waitForTimeout(10_000);
+  await p.evaluate(installParkour);
+  await cleanFrame(p);
+}
+
+/**
+ * Runs in the page. A pilot phase drives the stick in world space
+ * (gamepad-style, so the parkour engine gets a wish direction):
+ *   dir [dx, dz] | to [x, z] (steer at a point) | yaw (rad) | none (stick idle);
+ *   move (0..1, default 1), sprint, jump (pressed on the phase's first
+ *   step), hold (jump held: climb), duck (held), duckPress, release;
+ *   stick [x, y] (the raw stick instead, e.g. hanging: x shimmies, y up);
+ *   gate (stage the route clock at that checkpoint when the phase starts);
+ *   dur (s) and/or until (a JS expression over p = player, m = motor move,
+ *   a = anim kind, t = phase time): the phase ends on whichever comes first.
+ * `__pk.log` records each phase change (step, kind, position).
+ */
+export function installParkour() {
+  const sz = window.__sz;
+  const g = sz.g;
+  const pk = g.parkour;
+  const course = pk.course;
+  const pkx = {
+    g,
+    pk,
+    course,
+    log: [],
+    steps: 0,
+    route(id) {
+      course.start(id);
+      // The countdown holds the rider on the line: run it out
+      for (let i = 0; i < 60 * 5 && course.view.phase === 'countdown'; i++) sz.run(1);
+    },
+    place(x, y, z, yaw) {
+      course.place(new sz.V(x, y, z), yaw);
+      pk.motor.reset?.();
+      sz.run(2);
+      g.cam.snap(g.player);
+    },
+    pilot(phases) {
+      // Controls relative to a fixed yaw, not the chase camera's: its yaw
+      // carries over from whatever ran before, and a run must not depend
+      // on that (the camera itself reads yaw + orbitYaw, not this getter)
+      Object.defineProperty(g.cam, 'controlYaw', { get: () => 0, configurable: true });
+      let i = 0;
+      let t = 0;
+      let fresh = true;
+      pkx.log = [];
+      pkx.steps = 0;
+      const conds = phases.map(ph => (ph.until ? new Function('p', 'm', 'a', 't', `return (${ph.until})`) : null));
+      sz.input = () => {
+        pkx.steps++;
+        const p = g.player;
+        // Advance phases whose end has come
+        while (i < phases.length) {
+          const ph = phases[i];
+          const c = conds[i];
+          const done = (ph.dur !== undefined && t >= ph.dur) || (c !== null && c(p, pk.motor.move, pk.anim.kind, t));
+          if (!done) break;
+          i++;
+          t = 0;
+          fresh = true;
+          pkx.log.push({ step: pkx.steps, phase: i, kind: pk.anim.kind, x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2) });
+        }
+        const ph = phases[i] ?? {};
+        t += 1 / 60;
+        let wx = 0;
+        let wz = 0;
+        if (ph.dir) [wx, wz] = ph.dir;
+        else if (ph.to) {
+          wx = ph.to[0] - p.pos.x;
+          wz = ph.to[1] - p.pos.z;
+        } else if (ph.yaw !== undefined) {
+          wx = Math.sin(ph.yaw);
+          wz = Math.cos(ph.yaw);
+        }
+        const l = Math.hypot(wx, wz);
+        const mag = l > 1e-6 ? (ph.move ?? 1) : 0;
+        if (l > 1e-6) {
+          wx /= l;
+          wz /= l;
+        }
+        // World wish → stick at control yaw 0 (Player.updateFoot / ParkourSystem invert this)
+        const fx = 0;
+        const fz = 1;
+        if (ph.gate !== undefined && fresh) pkx.gate(ph.gate);
+        const out = {
+          mode: 'gamepad',
+          // `stick` [x, y]: the raw stick (hanging: x shimmies, y pulls up)
+          moveY: ph.stick ? ph.stick[1] : (wx * fx + wz * fz) * mag,
+          moveX: ph.stick ? ph.stick[0] : (-wx * fz + wz * fx) * mag,
+          sprint: !!ph.sprint,
+          jumpPressed: !!ph.jump && fresh,
+          crouch: !!ph.hold,
+          duck: !!ph.duck,
+          duckPressed: !!ph.duckPress && fresh,
+          boardTogglePressed: !!ph.release && fresh,
+          push: false,
+          pushPressed: false,
+          respawnPressed: false,
+          tricks: [],
+        };
+        fresh = false;
+        return out;
+      };
+    },
+    /**
+     * Stage the route's clock at checkpoint `i` (its gate lit, the next one
+     * faint): shots are cut from separate takes, not one run.
+     */
+    gate(i) {
+      const c = course.clock;
+      if (c === null) return;
+      c.next = i;
+      c.splits = c.splits.slice(0, i);
+      course.gates?.setNext(i);
+      course.view.next = i;
+    },
+    /** Silent steps, returning the anim kinds seen (for scripting). */
+    trace(n) {
+      const seen = [];
+      for (let k = 0; k < n; k++) {
+        sz.run(1);
+        const a = pk.anim.kind;
+        const p = g.player;
+        if (seen.length === 0 || seen[seen.length - 1].a !== a)
+          seen.push({ k, a, x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2) });
+      }
+      return seen;
+    },
+  };
+  window.__pk = pkx;
+}
+
 /** Noun World with a Noun Breaks battle mounted in the plaza (`window.__d`, view/dev.ts). */
 export async function openBreaks(p, base) {
   await openWorld(p, base);

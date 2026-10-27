@@ -71,6 +71,16 @@ export const CLIPS = {
     mp4: '/home/hero-exchange.mp4',
     poster: '/home/hero-exchange-poster.jpg',
   },
+  parkour: {
+    webm: '/home/hero-parkour.webm',
+    mp4: '/home/hero-parkour.mp4',
+    poster: '/home/hero-parkour-poster.jpg',
+  },
+  pool: {
+    webm: '/home/hero-pool.webm',
+    mp4: '/home/hero-pool.mp4',
+    poster: '/home/hero-pool-poster.jpg',
+  },
 } satisfies Record<string, Clip>;
 
 export interface Game {
@@ -368,6 +378,34 @@ export const HERO_SLIDES: Slide[] = [
     href: '/exchange',
     cta: 'ENTER THE FLOOR',
     ms: 10630,
+  },
+  {
+    key: 'parkour',
+    title: 'Noun Parkour',
+    eyebrow: 'NEW GAME',
+    tagline: game('parkour').tagline,
+    teaser:
+      'Run the roofs against the clock. Wall runs, ledge leaps, lamp-post launches and rolls, gate to gate, chasing the ghost of your best run.',
+    accent: '#20d6ff',
+    clip: CLIPS.parkour,
+    focus: '50% 45%',
+    game: 'parkour',
+    cta: 'RUN',
+    ms: 13530,
+  },
+  {
+    key: 'pool',
+    title: 'Noun Pool',
+    eyebrow: 'NEW GAME',
+    tagline: game('pool').tagline,
+    teaser:
+      'Eight-ball in the pool hall. Break the rack, cut it in the corner, call your pocket and sink the 8. Play the CPU on four levels or rack up against a friend.',
+    accent: '#3ddc84',
+    clip: CLIPS.pool,
+    focus: '50% 50%',
+    game: 'pool',
+    cta: 'RACK EM',
+    ms: 12030,
   },
   {
     key: 'hoops',

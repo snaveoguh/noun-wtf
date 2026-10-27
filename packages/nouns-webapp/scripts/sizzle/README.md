@@ -7,7 +7,7 @@ Everything here is re-runnable: change a shot or an edit list, render, cut.
 | File | What |
 | --- | --- |
 | `shots.mjs` | Every shot: its scene, frame count, and a page-side `setup(arg)` that stages the moment and installs `window.__sizzleFrame` (advance one 1/30 s frame, leave it drawn). |
-| `scenes.mjs` | Scene openers: Noun World (`world`), the Big Drop (`bigdrop`), a Noun Breaks battle (`breaks`), Noun Hoops (`hoops`), the 3D Grand Exchange (`exchange`). They stop the game loop and install `__sz` / `__bd` / `__d` / `__gx` helpers. |
+| `scenes.mjs` | Scene openers: Noun World (`world`), the Big Drop (`bigdrop`), a Noun Breaks battle (`breaks`), Noun Hoops (`hoops`), the 3D Grand Exchange (`exchange`), the pool hall (`pool`), NOUN PARKOUR (`parkour`). They stop the game loop and install `__sz` / `__bd` / `__d` / `__gx` / `__pl` / `__pk` helpers. |
 | `edits/*.json` | Edit lists: which shots, in and out points, crossfades, grade, exact length, poster time. One per clip. |
 | `render.mjs` | Renders the shots an edit list (or `--shots a,b`) needs into `.frames/<shot>/f0000.jpg…` (git-ignored), opening each scene once. |
 | `cut.mjs` | Cuts the frames into `<name>.webm` (VP9) + `<name>.mp4` (H.264, faststart) + `<name>-poster.jpg` in `public/home/`, at 1920×1080, with a bitrate ceiling (`maxrate`, default 2.4 Mbit/s) so a 12 s clip stays under ~4 MB. |
@@ -49,6 +49,8 @@ time.
 | `hero-big-drop` | `edits/big-drop.json` | `big-drop` |
 | `hero-breaks` | `edits/breaks.json` | `breaks` |
 | `hero-exchange` | `edits/exchange.json` | `exchange` |
+| `hero-parkour` | `edits/parkour.json` | `parkour` |
+| `hero-pool` | `edits/pool.json` | `pool` |
 
 After cutting, set the slide's `ms` in `rows.ts` to the clip's real length
 (`ffprobe -v error -show_entries format=duration -of csv=p=0 public/home/<name>.mp4`):
@@ -74,6 +76,30 @@ features still being built; they use existing shots for now. When a
 feature lands: add its shots to `shots.mjs`, point the placeholder cut's
 `shot` at them, drop the `placeholder` key, then render and cut again.
 Keep the durations, so the cuts stay on the VO.
+
+### NOUN POOL (`edits/pool.json`)
+
+Every pool shot starts from a table worked out offline with the pure pool
+sim (`POOL` in `shots.mjs`): rack seed 56's break drops six, then a straight
+pot, a 35° cut into a corner and a staged finish on the 8. The sim is
+bit-deterministic, so the page plays exactly those shots. To find new
+ones, run the sim from Node (`tsx`) over `pool/sim/rules.ts` `playShot`
+and `pool/sim/cpu.ts` `candidates` / `powerFor`. `__pl.cam` places the
+camera in the table's frame; the aiming guide is switched off (it's the
+shooter's HUD), the called pocket stays.
+
+### NOUN PARKOUR (`edits/parkour.json`)
+
+The parkour shots are scripted runs of the three routes (`PK_RUNS`):
+pilot phases that hold the stick, sprint, jump and duck like a player
+would, each ending on a condition (`until`) over the rider and the move
+the engine is in. Every move is the engine's own. The pilot pins the
+control yaw to 0 so a run never depends on where the chase camera was
+left, which makes it deterministic across shots. A shot runs its route
+silently for `from` s, then rolls. `pk-ghost` runs LAMP LINE once to set a
+best, then starts 0.5 s behind its ghost. To tune a run, trace it in a
+live page (`__pk.pilot(phases)`, then `__pk.trace(n)` lists the moves with
+the step each began on).
 
 ## Adding a game (cars, pool, hide & seek, parkour…)
 

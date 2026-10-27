@@ -72,8 +72,10 @@ edit.cuts.forEach((c, i) => {
     total = c.dur;
     return;
   }
-  // Hard cuts are a one-frame "fade" so every join goes through xfade
-  const fade = Math.max(1 / FPS, c.fade ?? 0);
+  // Hard cuts are a one-frame "fade" so every join goes through xfade.
+  // Whole frames only: an offset between frames makes xfade drop the rest
+  // of the reel (a 0.15 s fade cut hero-parkour off at 7.2 s)
+  const fade = Math.max(1, Math.round((c.fade ?? 0) * FPS)) / FPS;
   const off = total - fade;
   chains.push(
     `[${label}][c${i}]xfade=transition=fade:duration=${fade.toFixed(4)}:offset=${off.toFixed(4)}[x${i}]`,

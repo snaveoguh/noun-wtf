@@ -243,6 +243,8 @@ describe('HERO_SLIDES', () => {
       'big-drop',
       'breaks',
       'exchange',
+      'parkour',
+      'pool',
       'hoops',
       'warfare',
     ]);
@@ -254,6 +256,12 @@ describe('HERO_SLIDES', () => {
     expect(by('breaks').game).toBe('breaks');
     expect(by('exchange').href).toBe('/exchange');
     expect(by('exchange').game).toBeUndefined();
+  });
+
+  it('launches NOUN PARKOUR and NOUN POOL from their reels', () => {
+    const by = (k: string) => HERO_SLIDES.find(s => s.key === k)!;
+    expect(by('parkour')).toMatchObject({ game: 'parkour', clip: CLIPS.parkour, cta: 'RUN' });
+    expect(by('pool')).toMatchObject({ game: 'pool', clip: CLIPS.pool, cta: 'RACK EM' });
   });
 
   it("borrows each game's copy by id, not by its place on the shelf", () => {
@@ -269,7 +277,7 @@ describe('HERO_SLIDES', () => {
       for (const f of [s.clip.webm, s.clip.mp4, s.clip.poster])
         expect(existsSync(resolve(publicDir, `.${f}`)), f).toBe(true);
     }
-    for (const c of [CLIPS.bigDrop, CLIPS.breaks, CLIPS.exchange])
+    for (const c of [CLIPS.bigDrop, CLIPS.breaks, CLIPS.exchange, CLIPS.parkour, CLIPS.pool])
       expect(HERO_SLIDES.some(s => s.clip === c)).toBe(true);
   });
 });

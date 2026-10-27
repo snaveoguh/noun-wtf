@@ -1,0 +1,16 @@
+{
+  "name": "hero-parkour",
+  "poster": 4.6,
+  "maxrate": 2.2,
+  "grade": "eq=contrast=1.06:saturation=1.12,unsharp=5:5:0.4",
+  "cuts": [
+    { "shot": "pk-facade", "in": 0.8, "dur": 2.0 },
+    { "shot": "pk-wallrun", "in": 0.3, "dur": 2.0 },
+    { "shot": "pk-climb", "in": 0.4, "dur": 1.4 },
+    { "shot": "pk-lamps", "in": 0.3, "dur": 2.0, "fade": 0.15 },
+    { "shot": "pk-gap", "in": 0.2, "dur": 1.8 },
+    { "shot": "pk-posts", "in": 0.4, "dur": 1.6 },
+    { "shot": "pk-ghost", "in": 0.2, "dur": 1.4 },
+    { "shot": "pk-slide", "in": 0.2, "dur": 1.7 }
+  ]
+}
