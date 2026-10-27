@@ -10,6 +10,8 @@ import type { VoxelPixel } from '@nouns/voxel-engine';
 
 import * as THREE from 'three';
 
+import { textureDiet } from '../render/textureDiet';
+
 const S = 4; // sub-samples per pixel
 const N = 32 * S;
 
@@ -301,15 +303,17 @@ export function buildSmoothHead(
   }
   // Soften the pixel art into smooth colour regions: upscale bilinearly,
   // blur, then gently posterise so it reads as painted shapes, not pixels.
+  // 8 px per art pixel (4 on a weak phone's texture diet: render/textureDiet)
+  const up = textureDiet.on ? 4 : 8;
   const big = document.createElement('canvas');
-  big.width = ATLAS_W * 8;
-  big.height = 256;
+  big.width = ATLAS_W * up;
+  big.height = 32 * up;
   const bctx = big.getContext('2d')!;
   bctx.imageSmoothingEnabled = opts.crisp !== true;
   bctx.imageSmoothingQuality = 'high';
   // Light blur only: enough to lose the pixel staircase, not enough to
   // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
-  bctx.filter = opts.crisp === true ? 'none' : `blur(${opts.blur ?? 1.6}px)`;
+  bctx.filter = opts.crisp === true ? 'none' : `blur(${((opts.blur ?? 1.6) * up) / 8}px)`;
   bctx.drawImage(canvas, 0, 0, big.width, big.height);
   bctx.filter = 'none';
   const img = bctx.getImageData(0, 0, big.width, big.height);
@@ -413,7 +417,8 @@ function interpretBack(front: (string | null)[]): (string | null)[] {
       for (const k of cells) out[k] = c;
     r++;
   }
-  if (!out.some(c => c !== null)) for (let i = 0; i < N; i++) if (front[i] === dominant) out[i] = dominant;
+  if (!out.some(c => c !== null))
+    for (let i = 0; i < N; i++) if (front[i] === dominant) out[i] = dominant;
   // Multi-source BFS: every dropped pixel takes its nearest kept colour
   const queue: number[] = [];
   for (let i = 0; i < out.length; i++) if (out[i] !== null) queue.push(i);
