@@ -23,7 +23,7 @@ import type { BoardType } from '../character/NounCharacter';
 import type { Game } from '../Game';
 import type { TerrainCollider } from '../physics/Collision';
 import type { PlayerTerrain } from '../skate/Player';
-import type { PeakCtx, PeakSystem } from './bigdrop/contract';
+import type { PeakCtx, PeakSystem, PeakSystemFactory } from './bigdrop/contract';
 
 import * as THREE from 'three';
 
@@ -41,6 +41,8 @@ import { PEAK, PEAK_LIPSCHITZ, peakHeight, peakNormal, raycastHeight } from './p
 export const PEAK_GRAVITY = 0.4;
 /** Air drag scale inside: the fall line has to feel like one. */
 const PEAK_DRAG = 0.15;
+/** PEAK_SYSTEMS started on the way in (track dressing, course, atmosphere); the rest follow a frame each. */
+const START_NOW = 3;
 /** Recentre once the rider is this far from the origin (m)… */
 const REBASE = 3000;
 /** …on the ground, or anywhere past this. */
@@ -110,6 +112,12 @@ export class Peak {
   private lastRespawns = 0;
   /** The track, scenery, riders… (bigdrop/systems.ts), while inside. */
   private systems: PeakSystem[] = [];
+  /**
+   * Systems still to start, one a frame after the way in. Building all of
+   * them in enter() was one long freeze (the forest, basin life, birds,
+   * loops and riders on top of the course and the atmosphere).
+   */
+  private pending: PeakSystemFactory[] = [];
   /** Colliders the systems added: id → geometry + its offset (peak coordinates). */
   private colliders = new Map<string, THREE.Vector3>();
   private riderPeak = new THREE.Vector3();
@@ -238,12 +246,18 @@ export class Peak {
       p.pos.y + this.origin.y - ALT,
       p.pos.z + this.origin.z,
     );
-    for (const make of PEAK_SYSTEMS)
-      try {
-        this.systems.push(make(this.ctx));
-      } catch (err) {
-        console.warn('[bigdrop] a system failed to start', err);
-      }
+    // The track, the course (its colliders) and the sky/fog now; the
+    // scenery and riders over the next frames
+    this.pending = PEAK_SYSTEMS.slice(START_NOW);
+    for (const make of PEAK_SYSTEMS.slice(0, START_NOW)) this.startSystem(make);
+  }
+
+  private startSystem(make: PeakSystemFactory) {
+    try {
+      this.systems.push(make(this.ctx));
+    } catch (err) {
+      console.warn('[bigdrop] a system failed to start', err);
+    }
   }
 
   exit() {
@@ -259,6 +273,7 @@ export class Peak {
         console.warn('[bigdrop] a system failed to dispose', err);
       }
     this.systems = [];
+    this.pending = [];
     for (const key of this.colliders.keys()) g.world.setDynamic(key, null);
     this.colliders.clear();
     gfx.scene.remove(this.group);
@@ -325,6 +340,8 @@ export class Peak {
       const v = basinBrake(sp, out, dt);
       if (v < sp) p.vel.multiplyScalar(v / sp);
     }
+    const next = this.pending.shift();
+    if (next !== undefined) this.startSystem(next);
     for (const sys of this.systems)
       try {
         sys.update(dt);
