@@ -800,6 +800,14 @@ export class InteriorSystem implements InteriorsApi {
       );
       g.cam.snap(g.player);
     }
+    // The floor above too, now while the screen is black: updateFloors built
+    // it 0.4 s after the fade-in, a ~0.5 s freeze on a desktop, seconds on a phone
+    if (
+      fromRoof === undefined &&
+      this.live.floors.length > 1 &&
+      this.live.floors[1]!.built === null
+    )
+      this.buildFloor(this.live, 1);
     this.applyEffects(effects);
     const s = built.stats;
     if (import.meta.env.DEV)
