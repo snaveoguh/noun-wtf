@@ -37,6 +37,7 @@ import type { PoolView } from '../view';
 import * as THREE from 'three';
 
 import { parseSeedKey, randomSeed, seedKey, type NounSeed } from '../../character/NounAppearance';
+import { clearFog } from '../../render/shaderWarm';
 import { firstHit, pocketAlong } from '../sim/aim';
 import { SKILL, type Difficulty } from '../sim/cpu';
 import { canPlace, defaultCall, legalFirst, newFrame, onEight, remaining } from '../sim/rules';
@@ -361,7 +362,7 @@ export class PoolMode implements PoolApi {
     this.seeds = [g.seed, randomSeed()];
     view.setPlayers(this.seeds);
     this.attachInput();
-    g.gfx.renderer.compile(g.gfx.scene, cam);
+    g.gfx.asDrawn(() => g.gfx.renderer.compile(g.gfx.scene, cam));
   }
 
   /** The hall: hide the world round it, warm lights, the player parked inside. */
@@ -391,7 +392,8 @@ export class PoolMode implements PoolApi {
       hidden,
       statsSuspended: g.stats.suspended,
     };
-    gfx.scene.fog = null;
+    // No fog in the hall, without relinking every program (render/shaderWarm.ts)
+    gfx.scene.fog = clearFog();
     gfx.scene.background = new THREE.Color(0x0e0b09);
     gfx.sky.visible = false;
     gfx.sun.intensity *= 0.35;

@@ -31,6 +31,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { seedVoice } from '../audio/voice/cast';
 import { prefetchGlbHead } from '../character/GlbHead';
 import { NounCharacter } from '../character/NounCharacter';
+import { clearFog, warmHidden } from '../render/shaderWarm';
 import { inkExcluded, toonify } from '../render/Toon';
 import { GROWN_TOWNS, placementOf, townFrame, type GrownTown } from '../towns/site';
 import { GOODS, GOOD_ICON, GOOD_IDS } from '../trade/goods';
@@ -508,8 +509,8 @@ export class InteriorSystem implements InteriorsApi {
         }
       }
     } else if (this.fadeT < 0) {
-      // Fading back in (fadeT runs −FADE_S → 0)
-      this.fadeT = Math.min(0, this.fadeT + dt);
+      // Fading back in (fadeT runs −FADE_S → 0), once the room can draw
+      if (!this.warming) this.fadeT = Math.min(0, this.fadeT + dt);
       this.setFade(-this.fadeT / FADE_S);
     }
     if (this.stepOffT > 0) {
@@ -681,7 +682,8 @@ export class InteriorSystem implements InteriorsApi {
       homeSpots: p.homeSpots,
       hidden,
     };
-    gfx.scene.fog = null;
+    // No fog in here, without relinking every program in view (shaderWarm.ts)
+    gfx.scene.fog = clearFog();
     gfx.scene.background = new THREE.Color(0x14100c);
     gfx.sky.visible = false;
     const dark =
@@ -815,8 +817,20 @@ export class InteriorSystem implements InteriorsApi {
     this.giftTo = null;
     this.phase = 'inside';
     this.fadeT = -FADE_S;
-    g.gfx.renderer.compile(g.gfx.scene, g.gfx.camera);
+    // The room's programs link in the background while the screen is still
+    // black; it fades in once they're ready (a blocking link here was a
+    // 2 s freeze on a weak phone)
+    const room = this.live;
+    this.warming = true;
+    void warmHidden(g.gfx.renderer, built.group, g.gfx.camera, g.gfx.scene, fn =>
+      g.gfx.asDrawn(fn),
+    ).then(() => {
+      if (this.live === room) this.warming = false;
+    });
   }
+
+  /** The room's shaders are still compiling: hold the fade on black. */
+  private warming = false;
 
   /** A resident's character: built one per frame after you're in (heads take a moment). */
   private makeCharacter(def: ResidentDef): NounCharacter | null {
@@ -864,6 +878,7 @@ export class InteriorSystem implements InteriorsApi {
   // ── Going out ──
 
   private goOut() {
+    this.warming = false;
     const L = this.live;
     if (L === null) return;
     const g = this.game;
@@ -1917,6 +1932,8 @@ export class InteriorSystem implements InteriorsApi {
     built.group.add(f.windows.group);
     built.group.updateMatrixWorld(true);
     f.windows.renderAll(this.renderOutside);
+    // Built as you near the stairs: issue its programs now, before you see it
+    g.gfx.asDrawn(() => g.gfx.renderer.compile(built.group, g.gfx.camera, g.gfx.scene));
     f.spots = this.hotspots(L, f.layout, base);
     // Someone up here now and then
     const defs = residentsFor(`${L.door.id}:up${k}`, f.layout, this.tier());

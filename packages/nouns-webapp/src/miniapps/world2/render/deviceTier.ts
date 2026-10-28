@@ -110,33 +110,3 @@ export function stepDown(s: LiteState): LiteState | null {
   if (s.post) return { ...s, post: false };
   return null;
 }
-
-/** Sustained-low-FPS detector: seconds of bad frames before a step. */
-export interface FpsLadder {
-  bad: number;
-  /** Seconds since play started (faster reaction in the first seconds: the probe). */
-  age: number;
-}
-
-/**
- * FPS under this is "bad" on 'low'. Below 30, not at it: iPhones in Low Power
- * Mode cap the frame rate at 30, and that's playable, not a reason to strip
- * the look.
- */
-export const LOW_TIER_BAD_FPS = 26;
-/** Seconds of bad FPS before stepping (2 s while probing the first 20 s, then 4 s). */
-export function stepAfter(age: number): number {
-  return age < 20 ? 2 : 4;
-}
-
-/** Feed one FPS sample covering `dt` seconds; true = step down now. */
-export function ladderTick(l: FpsLadder, fps: number, dt: number): boolean {
-  l.age += dt;
-  if (fps < LOW_TIER_BAD_FPS) l.bad += dt;
-  else l.bad = 0;
-  if (l.bad >= stepAfter(l.age)) {
-    l.bad = 0;
-    return true;
-  }
-  return false;
-}

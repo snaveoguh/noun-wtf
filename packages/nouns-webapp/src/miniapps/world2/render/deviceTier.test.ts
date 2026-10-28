@@ -4,8 +4,6 @@ import {
   autoQuality,
   isMobile,
   isWeakDevice,
-  ladderTick,
-  LOW_TIER_BAD_FPS,
   MIN_SCALE,
   stepDown,
   type LiteState,
@@ -47,19 +45,5 @@ describe('device tier', () => {
     expect(seen.map(x => x.scale)).toEqual([1, 0.85, 0.7, 0.6, 0.6, 0.6]);
     expect(seen.at(-2)).toEqual({ scale: MIN_SCALE, shadows: false, post: true });
     expect(seen.at(-1)).toEqual({ scale: MIN_SCALE, shadows: false, post: false });
-  });
-
-  it('steps after 2 s of bad FPS while probing, 4 s later; good frames reset it', () => {
-    const l = { bad: 0, age: 0 };
-    expect(ladderTick(l, LOW_TIER_BAD_FPS - 5, 1)).toBe(false);
-    expect(ladderTick(l, LOW_TIER_BAD_FPS - 5, 1)).toBe(true);
-    expect(ladderTick(l, 60, 1)).toBe(false);
-    l.age = 30;
-    for (let i = 0; i < 3; i++) expect(ladderTick(l, 20, 1)).toBe(false);
-    expect(ladderTick(l, 20, 1)).toBe(true);
-    // a good sample in between resets the count
-    ladderTick(l, 20, 3);
-    ladderTick(l, 60, 0.5);
-    expect(ladderTick(l, 20, 3)).toBe(false);
   });
 });
