@@ -323,15 +323,17 @@ export function buildBodyTexture(seed: NounSeed, opts: BodyTextureOptions = {}) 
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = `rgb(${br},${bg},${bb})`;
-  ctx.fillRect(0, 0, size, size);
-  // Subtle fabric noise so large flat areas don't look plastic
-  const img = ctx.getImageData(0, 0, size, size);
+  // Base colour with a subtle fabric noise so large flat areas don't look
+  // plastic. Written straight into fresh pixels: filling the canvas and
+  // reading it back (getImageData) stalled on a GPU readback, ~70% of
+  // building a Noun on a weak phone (rooms build their residents in a row)
+  const img = ctx.createImageData(size, size);
   for (let i = 0; i < img.data.length; i += 4) {
     const k = 1 + (Math.random() - 0.5) * 0.06;
-    img.data[i] *= k;
-    img.data[i + 1] *= k;
-    img.data[i + 2] *= k;
+    img.data[i] = br * k;
+    img.data[i + 1] = bg * k;
+    img.data[i + 2] = bb * k;
+    img.data[i + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
 

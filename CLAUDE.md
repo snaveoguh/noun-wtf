@@ -197,6 +197,25 @@ The baked plaza left a 4.5 m dead-end slot between neighbouring blocks on each s
 
 A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Android) goes on the texture diet (`render/textureDiet.ts`, `textureDiet.on`): every upload is capped at 512 px, static textures are shrunk to 256 px on the CPU before upload (`shrinkTexture`: the plaza GLB's materials, nature, skyline; shirts and heads paint smaller), the env map bakes at 64 px, the shadow map is 512, only the mural plays a Giphy video, and a lost WebGL context reloads once. New features that add textures should shrink them under `textureDiet.on` too; dev builds warn when the weak-device estimate passes 50 MB (`checkTextureBudget`). Desktop and normal phones never diet. Measured 2026-10-27 (emulated Moto G06, production build): GL textures ~130 → ~36 MB.
 
+### Noun World performance (?perf=1, shader warm-up, adaptive quality)
+
+- **Measure first:** `?perf=1` (overlay) or `?perf=quiet` (scripts) turns on `world2/perf/PerfProbe.ts`. Game brackets each frame and laps each system (`perf.lap('name')`); you get frame p50/p95/p99, hitches over 50 ms, ms per system, draw calls / triangles / programs and heap, and `window.__w2perf.snapshot()` returns the same. The headless before/after harness and the 2026-10-28 numbers are in `.claude/perf-shots/README.md`. Headless WebGL is SwiftShader: its frame intervals are GPU-bound, so compare CPU ms, draws, programs and hitches, not fps.
+- **Shaders:** precompile through `gfx.asDrawn(() => renderer.compile(...))`. The composer draws into a linear buffer and three keys programs by output colour space, so a compile with no target built sRGB variants the frame never used (programs 92 → 53, and every material still linked on first sight). `render/shaderWarm.ts`:
+  - `ShaderWarmer` issues compiles for streamed or hidden materials about once a second;
+  - `warmHidden` keeps a new set (a room) hidden while it links;
+  - `clearFog()` (FogExp2 at density 0) replaces `scene.fog = null`, which relinks every program in view.
+- **Adaptive quality:** `render/qualityController.ts` (pure, tested) steps on median / p95 frame times.
+  - Phones: render scale → shadows → ink pass.
+  - Desktop: render scale only, never under 1.25 on Retina.
+  - It steps back up only across scale rungs; dropping shadows or post relinks every lit material, one long hitch. An explicit Low (Settings / `?q=low`) stays as chosen.
+- **Phones (low):**
+  - mountain dressing is drawn within 300 m (`LOW_DRESSING_VIEW`);
+  - dressing and the nature showcase don't cast shadows;
+  - remote riders' name tags only touch the DOM when they change.
+- **Rooms:** the z-fight pass (`interiors/zfight.ts`) keys by number, not string (same output, ~2× faster), and the floor above is built in `goIn` behind the fade, not 0.4 s after it.
+- **Big Drop:** `peak.enter()` starts three systems; the rest start one a frame (`START_NOW`).
+- **Site tray:** on touch screens (and anything ≤ 760 px wide) it sits bottom-left in the game, as brand + DESK chips (`NounOS/styles.ts`), clear of the touch buttons.
+
 ### Noun World audio
 
 - **Radio stations** (`world2/audio/GameRadio.ts`): COMMUNITY RADIO (the shared ice-cream-van station: real music from `public/fm/playlist.json` plus jingles), NOUN BEATS (generated hip hop, an AudioWorklet) and optional live streams. The site-wide player outside the game is NOUN FM (`src/components/NounFm`).
