@@ -9,6 +9,7 @@ import {
   checkNow,
   generatePatch,
   getAgentBalance,
+  getGasBudget,
   getAllTraitNames,
   getBuildStatus,
   getDeployHistory,
@@ -119,6 +120,8 @@ export function registerAgentRoutes(app: Hono) {
       settleGuard: watcherState.settleGuard,
       settleGas: watcherState.settleGas,
       balanceEth: Math.round(balance * 10000) / 10000,
+      // How many settles the balance pays for vs the reservations waiting.
+      gasBudget: await getGasBudget().catch(() => null),
       reservations: stats,
       recentSettleAttempts: reservationStore.getRecentSettleAttempts(),
       canDeploy: canDeploy(),
@@ -176,6 +179,8 @@ export function registerAgentRoutes(app: Hono) {
         settleFor,
       });
 
+      const gasBudget = await getGasBudget().catch(() => null);
+
       // Verify tip asynchronously (don't block the response)
       verifyTip(txHash, chainId)
         .then(result => {
@@ -210,6 +215,9 @@ export function registerAgentRoutes(app: Hono) {
           traits: reservation.traits,
           dao: reservation.dao,
           message: 'Reservation created — verifying tip transaction...',
+          // Gas isn't ring-fenced per reservation: say so when the settle
+          // wallet can't cover everything waiting (this one included).
+          gasWarning: gasBudget?.short ? gasBudget.summary : null,
         },
       });
     } catch (err) {

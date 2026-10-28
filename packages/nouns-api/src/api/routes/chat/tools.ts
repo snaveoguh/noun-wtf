@@ -62,7 +62,7 @@ export function buildNounIrlTools(): HubChatRequest['tools'] {
       function: {
         name: 'create_reservation',
         description:
-          'Create a trait reservation for a user. Requires a verified tip transaction. The reservation starts as pending_verification, then auto-activates once the tip is confirmed. The block watcher will then monitor for matching traits and auto-settle when found.',
+          'Create a trait reservation for a user. Requires a verified tip transaction. The reservation starts as pending_verification, then auto-activates once the tip is confirmed. The block watcher will then monitor for matching traits and auto-settle when found. If the result has a gasWarning, pass it on to the user in plain words: the settle wallet cannot currently pay for every reservation waiting.',
         parameters: {
           type: 'object' as const,
           properties: {
@@ -221,7 +221,8 @@ export function buildNounIrlTools(): HubChatRequest['tools'] {
       type: 'function' as const,
       function: {
         name: 'get_agent_balance',
-        description: 'Get the ETH balance of the nounirl.eth wallet on Ethereum mainnet.',
+        description:
+          "Get the ETH balance of the nounirl.eth wallet on Ethereum mainnet, plus gasBudget: how many settles it can pay for, what one costs, and how many paid reservations and standing targets share it. Call this before inviting anyone to tip for a reservation, and whenever someone asks about gas, running out, or what happens if several reservations match.",
         parameters: {
           type: 'object' as const,
           properties: {},

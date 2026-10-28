@@ -22,6 +22,7 @@ import {
   generatePatch,
   getAgentBalance,
   getAllTraitNames,
+  getGasBudget,
   getWatcherState,
   learnFromUrl,
   parseTraitDescription,
@@ -394,6 +395,7 @@ CRITICAL RULES:
                   };
                 } else {
                   // Create reservation
+                  const gasBudget = await getGasBudget().catch(() => null);
                   const reservation = reservationStore.create({
                     wallet: input.wallet,
                     tipTxHash: input.txHash,
@@ -435,6 +437,9 @@ CRITICAL RULES:
                     dao: reservation.dao,
                     message:
                       'Reservation created. Tip is being verified — it will auto-activate once confirmed onchain.',
+                    // Gas isn't ring-fenced per reservation. When the wallet
+                    // can't cover everything waiting, tell the user plainly.
+                    gasWarning: gasBudget?.short ? gasBudget.summary : null,
                   };
                 }
                 break;
@@ -559,9 +564,13 @@ CRITICAL RULES:
 
               case 'get_agent_balance': {
                 const balance = await getAgentBalance();
+                const gasBudget = await getGasBudget().catch(() => null);
                 result = {
                   address: process.env.NOUNIRL_ADDRESS || 'not configured',
                   balanceEth: Math.round(balance * 10000) / 10000,
+                  // Settles the balance pays for vs paid reservations waiting.
+                  // Quote these numbers; never estimate gas from memory.
+                  gasBudget,
                 };
                 break;
               }

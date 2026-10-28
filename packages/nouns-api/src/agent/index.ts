@@ -14,6 +14,7 @@ import {
   getWatcherState,
   checkNow,
   settleAuction,
+  getGasBudget,
 } from './blockWatcher.js';
 import { isBridgeConfigured } from './bridge.js';
 import { generatePatch, applyAndDeploy, getDeployHistory, canDeploy } from './deployer.js';
@@ -99,6 +100,7 @@ export {
   getWatcherState,
   checkNow,
   settleAuction,
+  getGasBudget,
 
   // Reservations
   reservationStore,

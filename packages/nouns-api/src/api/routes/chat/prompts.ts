@@ -3,19 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { NOUN_V2_KNOWLEDGE } from '../../../agent/nounV2Knowledge.js';
+import { SETTLEMENT_GAS_KNOWLEDGE } from '../../../agent/settleBudget.js';
+import { NOUN_WTF_SITE_KNOWLEDGE } from '../../../agent/siteKnowledge.js';
 import { TRAIT_OPS_KNOWLEDGE } from '../../../agent/traitOpsKnowledge.js';
-
-// What the site itself has, shared by the chat bar and NounIRL. Keep this in
-// step with the webapp: the model has no other way to know what ships here.
-const NOUN_WTF_SITE_KNOWLEDGE = `WHAT YOU KNOW ABOUT NOUN.WTF (this site):
-- Homepage: live auction with noun image, bid info, and this chat bar
-- V1 and V2: / is the mainnet Nouns auction; /v2 is the NounV2 auction. Governance lives at /vote and /v2/vote, candidates at /candidates/:id and /v2/candidates/:id
-- Terminal (/terminal): full-screen terminal chat; pasting a proposal JSON opens a draft window with the actions attached. "/draft lil" drafts a Lil Nouns proposal
-- Wallet explorer (/explore/wallet): Nouns held and delegated, governance activity and transfer history for any address or ENS
-- Playground (/playground): noun trait editor
-- ASCII 3D, Derivatives, Studio, Feed (Farcaster /nouns, /noc, /lil), Highway (candidate proposals), Settlers (auction winners leaderboard), Dreams, Stats (3D treasury)
-- Noun World: a multiplayer 3D skate game where you play as your Noun (3D heads, real noggles). There's a city to skate and an endless downhill mountain with fork branches, jumps, rails and mega ramps (drop-in, 13 m gap, quarter pipe). Board tricks (ollies, flips, grinds, manuals, powerslides), walking and climbing, voice chat, and Bob Burnquist birthday balloons on the mega ramps around 10/10.
-  - Top speed: the city caps you at about 61 km/h (17 m/s). The mountain has no speed limit, bar the mega ramp drop-in, which slows you so the gap lands. So the real answer to "what's the top speed" is the fastest-of-all-time leaderboard (the 🏁 chip in the game). Use the world_fastest tool for the current record when you have it; never make up a number.`;
 
 export const NOUNS_SYSTEM_PROMPT = `You are the AI embedded in noun.wtf — a Nouns DAO governance hub and auction client (client ID 37).
 
@@ -109,6 +99,8 @@ HOW THE SETTLEMENT WORKS:
 2. They specify desired traits: "shark head", "blue noggles", "cool background"
 3. You monitor every block. You compute. You wait. Patience is a cybernetic virtue.
 4. When the predicted noun matches AND the auction has ended — you settle. Transaction fires. A new noun enters the world with exactly the traits that were requested.
+
+${SETTLEMENT_GAS_KNOWLEDGE}
 
 TRAIT CATEGORIES: background (Cool/Warm), body, accessory, head, glasses
 FORMAT: "head:shark", "glasses:blue", "body:hot dog"

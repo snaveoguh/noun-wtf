@@ -165,6 +165,12 @@ The webapp's `BurnedNounContent` currently only knows the burn copy; it should n
 
 V4 + auto-settler context lives in `nounwtf_v4_disco_ship_2026-05-25.md` and `nounirl_settlement_bot.md` memories.
 
+### nounirl (the chat agent) knowledge
+
+What the chat bar and nounirl know about the site lives in `packages/nouns-api/src/agent/siteKnowledge.ts` (every game, section and route, plus the only facts it may state about the owner: name or they/them, nothing invented). When you add a game to `home/rows.ts` or a path to `NounOS/catalog.ts`, add a line there; `siteKnowledge.test.ts` fails until you do (`cd packages/nouns-api && npx tsx --test src/agent/*.test.ts`). Like any `nouns-api` change it only goes live after `railway up`.
+
+Settle gas: one wallet pays for every settle (all reservations and the standing targets, both DAOs); nothing is ring-fenced. `agent/settleBudget.ts` counts how many settles the balance covers vs what's pending (`gasBudget` on `/api/agent/status`, the `get_agent_balance` tool, and a `gasWarning` on new reservations). When it runs low the watcher logs it, adds it to the status errors and, if `NOUNIRL_ALERT_WEBHOOK_URL` is set, POSTs `{content, text}` there (Discord / Slack style), at most every 12 h while low.
+
 ### Terminal draft payloads
 
 Pasting a JSON object `{title, body, transactions:[{address,value,signature,calldata}]}` into the terminal prompt opens the draft window with the actions attached (`detectDraftPayload` in `TerminalPrompt.tsx`). Function-call actions in the draft's Add Action modal resolve ABIs from `src/lib/knownAbis.ts` first (Nouns contracts + Client Rewards proxy, no Etherscan key needed) and parse args by ABI type. Prop 1000 (client 37 incentives approval, 2026-09-28) was submitted this way; the payload is `proposal-client-37-draft.json` at the repo root.

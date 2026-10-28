@@ -117,9 +117,10 @@ export async function verifyTip(txHash: string, chainId: number): Promise<TipVer
 }
 
 /**
- * Get the ETH balance of nounirl.eth on Ethereum mainnet.
+ * Get the ETH balance of nounirl.eth on Ethereum mainnet, or null when the
+ * read fails (so callers can tell "empty" from "unknown").
  */
-export async function getAgentBalance(): Promise<number> {
+export async function readAgentBalance(): Promise<number | null> {
   try {
     const client = createPublicClient({
       chain: mainnet,
@@ -131,6 +132,13 @@ export async function getAgentBalance(): Promise<number> {
     return Number(formatEther(balance));
   } catch (err) {
     console.error('[NounIRL] Failed to get agent balance:', err);
-    return 0;
+    return null;
   }
+}
+
+/**
+ * Get the ETH balance of nounirl.eth on Ethereum mainnet (0 when the read fails).
+ */
+export async function getAgentBalance(): Promise<number> {
+  return (await readAgentBalance()) ?? 0;
 }

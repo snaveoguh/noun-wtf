@@ -38,6 +38,7 @@ import {
   http,
   webSocket,
   encodeFunctionData,
+  formatEther,
   parseGwei,
   keccak256,
   type PublicClient,
@@ -60,6 +61,14 @@ import {
   type WatchedDao,
 } from './constants.js';
 import { reservationStore, type Reservation } from './reservations.js';
+import {
+  assessGasBudget,
+  nextAlert,
+  SETTLE_GAS_ESTIMATE,
+  type AlertState,
+  type GasBudget,
+} from './settleBudget.js';
+import { readAgentBalance } from './tipVerifier.js';
 import {
   predictSeed,
   seedToTraitNames,
@@ -209,6 +218,24 @@ function settlementMaxFee(): bigint {
   const dynamic = base * 2n + SETTLEMENT_PRIORITY_FEE;
   if (dynamic < SETTLEMENT_MAX_FEE_FLOOR) return SETTLEMENT_MAX_FEE_FLOOR;
   return dynamic > SETTLEMENT_MAX_FEE_CEILING ? SETTLEMENT_MAX_FEE_CEILING : dynamic;
+}
+
+// What a settle costs right now: the balance the RPC preflight demands before
+// it accepts the tx, and what one actually burns (~350k gas at base + tip).
+export function getSettleFeeQuote(): {
+  preflightEth: number;
+  settleCostEth: number;
+  feeKnown: boolean;
+} {
+  const maxFee = settlementMaxFee();
+  const base = state.lastBaseFeePerGas;
+  let paid = base === null ? maxFee : base + SETTLEMENT_PRIORITY_FEE;
+  if (paid > maxFee) paid = maxFee;
+  return {
+    preflightEth: Number(formatEther(SETTLEMENT_GAS_LIMIT * maxFee)),
+    settleCostEth: Number(formatEther(BigInt(SETTLE_GAS_ESTIMATE) * paid)),
+    feeKnown: base !== null,
+  };
 }
 
 // Pre-encoded calldata — settleCurrentAndCreateNewAuction() takes no args and
@@ -1186,6 +1213,78 @@ function startBackgroundTasks(): void {
   }, PRE_SIGN_TTL);
 
   void refreshPreSignedTxs();
+
+  balanceTimer = setInterval(() => void checkGasBalance(), BALANCE_CHECK_MS);
+  void checkGasBalance();
+}
+
+// ─── Gas budget + low-balance alert ──────────────────────────────────────
+// The settle wallet pays for every reservation and standing target on both
+// DAOs; nothing is ring-fenced. When it can't cover what's pending (or is down
+// to its last settle) the owner hears about it: a warning in the logs and in
+// /api/agent/status errors, plus a POST to NOUNIRL_ALERT_WEBHOOK_URL when set
+// (Discord / Slack style: { content, text }). Never moves funds.
+
+const BALANCE_CHECK_MS = 10 * 60 * 1000;
+let balanceTimer: ReturnType<typeof setInterval> | null = null;
+let alertState: AlertState = { lastAlertAt: 0 };
+
+/** The settle wallet's balance vs what's waiting; null if the balance can't be read. */
+export async function getGasBudget(): Promise<GasBudget | null> {
+  let balanceEth: number | null = null;
+  if (publicClient && agentAccount) {
+    try {
+      balanceEth = Number(
+        formatEther(await publicClient.getBalance({ address: agentAccount.address })),
+      );
+    } catch {
+      /* fall back to the public read */
+    }
+  }
+  if (balanceEth === null) balanceEth = await readAgentBalance();
+  if (balanceEth === null) return null;
+
+  const pendingReservations = reservationStore
+    .getAll()
+    .filter(r => r.status === 'active' || r.status === 'pending_verification').length;
+  const standingTargets = DAOS.reduce((n, d) => n + daoStates[d].standingGroups.length, 0);
+  const quote = getSettleFeeQuote();
+  return assessGasBudget({
+    balanceEth,
+    preflightEth: quote.preflightEth,
+    settleCostEth: quote.settleCostEth,
+    pendingReservations,
+    standingTargets,
+  });
+}
+
+async function checkGasBalance(): Promise<void> {
+  // Only a wallet that can sign settles needs gas.
+  if (!agentAccount) return;
+  const budget = await getGasBudget();
+  if (!budget) return;
+  const step = nextAlert(alertState, budget.low, Date.now());
+  alertState = step.state;
+  if (!step.alert) return;
+
+  const msg = `nounirl.eth settle gas low: ${budget.summary}`;
+  console.warn(`[NounIRL] ⛽ ${msg}`);
+  pushError(msg);
+  const hook = (process.env.NOUNIRL_ALERT_WEBHOOK_URL ?? '').trim();
+  if (!hook) return;
+  try {
+    await fetch(hook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: msg, text: msg }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    console.error(
+      '[NounIRL] Low-gas alert webhook failed:',
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────
@@ -1262,6 +1361,10 @@ export function stopWatcher(): void {
   if (backgroundTimer) {
     clearInterval(backgroundTimer);
     backgroundTimer = null;
+  }
+  if (balanceTimer) {
+    clearInterval(balanceTimer);
+    balanceTimer = null;
   }
   state.running = false;
   state.transportMode = 'none';
