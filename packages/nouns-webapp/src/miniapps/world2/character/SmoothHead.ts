@@ -308,7 +308,8 @@ export function buildSmoothHead(
   const big = document.createElement('canvas');
   big.width = ATLAS_W * up;
   big.height = 32 * up;
-  const bctx = big.getContext('2d')!;
+  // Read back below: a CPU canvas, so getImageData doesn't stall on the GPU
+  const bctx = big.getContext('2d', { willReadFrequently: true })!;
   bctx.imageSmoothingEnabled = opts.crisp !== true;
   bctx.imageSmoothingQuality = 'high';
   // Light blur only: enough to lose the pixel staircase, not enough to

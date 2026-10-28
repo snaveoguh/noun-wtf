@@ -49,10 +49,30 @@ export function facesOf(
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const col = geo.attributes.color as THREE.BufferAttribute | undefined;
     const uv = geo.attributes.uv as THREE.BufferAttribute | undefined;
+    const art = bucket === 'art' || bucket === 'artGlow';
+    // A piece is mostly one colour: reuse the last face's look string while
+    // its colour (and atlas spot) is the same (building it was most of the cost)
+    let lastLook = bucket;
+    let lr = NaN;
+    let lg = NaN;
+    let lb = NaN;
+    let lu = NaN;
+    let lv = NaN;
+    // Plain float arrays (the kit's are): read them directly, not through getX
+    const P =
+      pos.itemSize === 3 &&
+      !pos.normalized &&
+      (pos as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute !== true
+        ? (pos.array as ArrayLike<number>)
+        : null;
+    const at = (i: number): [number, number, number] =>
+      P !== null
+        ? [P[i * 3]!, P[i * 3 + 1]!, P[i * 3 + 2]!]
+        : [pos.getX(i), pos.getY(i), pos.getZ(i)];
     for (let i = 0; i + 2 < pos.count; i += 3) {
-      const a: [number, number, number] = [pos.getX(i), pos.getY(i), pos.getZ(i)];
-      const b: [number, number, number] = [pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1)];
-      const c: [number, number, number] = [pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2)];
+      const a = at(i);
+      const b = at(i + 1);
+      const c = at(i + 2);
       const ux = b[0] - a[0];
       const uy = b[1] - a[1];
       const uz = b[2] - a[2];
@@ -68,14 +88,25 @@ export function facesOf(
       ny /= len;
       nz /= len;
       // Textured faces differ by what part of the atlas they show
-      const tex =
-        bucket === 'art' || bucket === 'artGlow'
-          ? `@${uv?.getX(i).toFixed(3)},${uv?.getY(i).toFixed(3)}`
-          : '';
-      const look =
-        col !== undefined
-          ? `${bucket}:${col.getX(i).toFixed(3)},${col.getY(i).toFixed(3)},${col.getZ(i).toFixed(3)}${tex}`
-          : bucket;
+      let look = bucket;
+      if (col !== undefined) {
+        const cr = col.getX(i);
+        const cg = col.getY(i);
+        const cb = col.getZ(i);
+        const u = art ? (uv?.getX(i) ?? NaN) : 0;
+        const v = art ? (uv?.getY(i) ?? NaN) : 0;
+        // (NaN never equals itself, so a missing uv is rebuilt each time, as before)
+        if (cr !== lr || cg !== lg || cb !== lb || u !== lu || v !== lv) {
+          const tex = art ? `@${uv?.getX(i).toFixed(3)},${uv?.getY(i).toFixed(3)}` : '';
+          lastLook = `${bucket}:${cr.toFixed(3)},${cg.toFixed(3)},${cb.toFixed(3)}${tex}`;
+          lr = cr;
+          lg = cg;
+          lb = cb;
+          lu = u;
+          lv = v;
+        }
+        look = lastLook;
+      }
       out.push({
         n: [nx, ny, nz],
         d: nx * a[0] + ny * a[1] + nz * a[2],
@@ -96,40 +127,56 @@ export function facesOf(
  * and look different.
  */
 export function findFights(faces: Face[], tol = FIGHT_TOL, minArea = 2e-4): Fight[] {
-  // Bucket by quantised normal and plane offset (neighbouring offset cells too)
-  const cell = (f: Face) => Math.round(f.d / tol);
-  const nkey = (f: Face) => f.n.map(v => Math.round(v * 200)).join(',');
-  const groups = new Map<string, Face[]>();
+  // Bucket by quantised normal and plane offset (neighbouring offset cells
+  // too). Numeric keys, groups kept in first-seen order (the order fights
+  // come out in decides which of a pair's planes resolveFights moves first)
+  const nkey = (f: Face) =>
+    ((Math.round(f.n[0] * 200) + 200) * 401 + (Math.round(f.n[1] * 200) + 200)) * 401 +
+    (Math.round(f.n[2] * 200) + 200);
+  const byNormal = new Map<number, Map<number, Face[]>>();
+  const order: { list: Face[]; nk: number; cell: number }[] = [];
   for (const f of faces) {
-    const k = `${nkey(f)}|${cell(f)}`;
-    let g = groups.get(k);
-    if (g === undefined) groups.set(k, (g = []));
+    const nk = nkey(f);
+    // (| 0: a small int, not a boxed double / -0, as the map key; same cell either way)
+    const c = Math.round(f.d / tol) | 0;
+    let cells = byNormal.get(nk);
+    if (cells === undefined) byNormal.set(nk, (cells = new Map()));
+    let g = cells.get(c);
+    if (g === undefined) {
+      cells.set(c, (g = []));
+      order.push({ list: g, nk, cell: c });
+    }
     g.push(f);
   }
   const out: Fight[] = [];
   const seen = new Set<string>();
-  for (const [k, list] of groups) {
-    const [nk, ck] = k.split('|') as [string, string];
-    const others = [Number(ck), Number(ck) + 1].flatMap(c => groups.get(`${nk}|${c}`) ?? []);
-    for (const a of list)
-      for (const b of others) {
-        if (a === b || a.src === b.src || a.look === b.look) continue;
-        // Bounds must overlap (by more than a sliver) across the plane
-        let apart = false;
-        for (let k = 0; k < 3 && !apart; k++) {
-          if (Math.abs(a.n[k]!) > 0.9) continue;
-          apart = Math.min(a.hi[k]!, b.hi[k]!) - Math.max(a.lo[k]!, b.lo[k]!) < 1e-4;
-        }
-        if (apart) continue;
-        const gap = Math.abs(a.d - b.d);
-        if (gap > tol) continue;
-        const area = overlapArea(a, b);
-        if (area <= minArea) continue;
-        const key = a.src < b.src ? `${a.src}:${b.src}` : `${b.src}:${a.src}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ a, b, area, gap });
-      }
+  const none: Face[] = [];
+  const test = (a: Face, b: Face) => {
+    if (a === b || a.src === b.src || a.look === b.look) return;
+    // Bounds must overlap (by more than a sliver) across the plane
+    let apart = false;
+    for (let k = 0; k < 3 && !apart; k++) {
+      if (Math.abs(a.n[k]!) > 0.9) continue;
+      apart = Math.min(a.hi[k]!, b.hi[k]!) - Math.max(a.lo[k]!, b.lo[k]!) < 1e-4;
+    }
+    if (apart) return;
+    const gap = Math.abs(a.d - b.d);
+    if (gap > tol) return;
+    const area = overlapArea(a, b);
+    if (area <= minArea) return;
+    const key = a.src < b.src ? `${a.src}:${b.src}` : `${b.src}:${a.src}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ a, b, area, gap });
+  };
+  for (const { list, nk, cell } of order) {
+    const cells = byNormal.get(nk)!;
+    const near = cells.get(cell) ?? none;
+    const next = cells.get(cell + 1) ?? none;
+    for (const a of list) {
+      for (const b of near) test(a, b);
+      for (const b of next) test(a, b);
+    }
   }
   return out;
 }

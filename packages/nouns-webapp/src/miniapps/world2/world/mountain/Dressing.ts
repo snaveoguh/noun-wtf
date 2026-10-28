@@ -568,6 +568,7 @@ export class MountainDressing {
       meshes.push(m);
       if (far0 > 0) root.tiers.push({ mesh: m, full: m.count, near: near0, far: far0, min });
     };
+    // Low (phones): no dressing casts into the shadow map (the rider's is the one that reads)
     const shadowsLow = this.quality !== 'low';
     // Low (phones): trees and rocks thin out with distance too. They were
     // full count to the horizon, ~250k triangles of the ~550k in view.
@@ -575,7 +576,7 @@ export class MountainDressing {
     const low = this.quality === 'low';
     const treeTier: [number, number, number] = low ? [140, 380, 0.4] : [0, 0, 1];
     const rockTier: [number, number, number] = low ? [100, 300, 0.3] : [0, 0, 1];
-    add(instanced(A.rockGeo, A.rockMat, rocks, 'dressing-rocks', sphere, true), ...rockTier);
+    add(instanced(A.rockGeo, A.rockMat, rocks, 'dressing-rocks', sphere, shadowsLow), ...rockTier);
     add(
       instanced(A.grassGeo, A.grassMat, grass, 'dressing-grass', sphere, false),
       A.grassFade[0] * 0.6,
@@ -601,11 +602,19 @@ export class MountainDressing {
       0.25,
     );
     add(
-      instanced(A.treeWood, F.bark, trees, 'dressing-tree-wood', sphere, true, F.barkDepth),
+      instanced(A.treeWood, F.bark, trees, 'dressing-tree-wood', sphere, shadowsLow, F.barkDepth),
       ...treeTier,
     );
     add(
-      instanced(A.treeLeaves, F.leaf, trees, 'dressing-tree-leaves', sphere, true, F.leafDepth),
+      instanced(
+        A.treeLeaves,
+        F.leaf,
+        trees,
+        'dressing-tree-leaves',
+        sphere,
+        shadowsLow,
+        F.leafDepth,
+      ),
       ...treeTier,
     );
     for (const m of meshes) {

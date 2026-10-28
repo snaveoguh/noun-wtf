@@ -205,12 +205,12 @@ export const NOS_CSS = `
   .nos-auction-card{display:none !important}
   .nos-win.is-mobile{bottom:46px}
 }
-/* Phones in the game (portrait, or landscape where the height is the
-   squeeze): the tray shrinks to the brand + DESK chips, top centre, so it
-   stops covering the game's HUD, touch buttons and character select. */
-@media (max-width:760px),(pointer:coarse) and (max-height:520px){
-  .mode-world .nos-tray{top:calc(6px + env(safe-area-inset-top));bottom:auto;left:50%;right:auto;transform:translateX(-50%);
-    width:max-content;max-width:none;padding:3px;gap:3px;border-radius:14px;overflow:visible;flex-wrap:nowrap}
+/* Phones and tablets in the game: the tray shrinks to the brand + DESK
+   chips in the bottom-left corner, clear of the touch buttons (bottom
+   right), the HUD and minimap (top) and character select. */
+@media (max-width:760px),(pointer:coarse){
+  .mode-world .nos-tray{top:auto;bottom:calc(6px + env(safe-area-inset-bottom));left:calc(6px + env(safe-area-inset-left));right:auto;transform:none;
+    width:max-content;max-width:none;padding:3px;gap:3px;border-radius:14px;overflow:visible;flex-wrap:nowrap;justify-content:flex-start}
   .mode-world .nos-tray .nos-chip{padding:4px 8px;font-size:10px}
   .mode-world .nos-tray > :not(.is-brand):not(.is-mode){display:none !important}
 }

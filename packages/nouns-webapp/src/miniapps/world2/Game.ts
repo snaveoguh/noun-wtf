@@ -54,6 +54,7 @@ import { CALLOUT_CODES, Net, type NetPose, type RemoteCallout } from './net/Net'
 import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { JerseyCrew } from './npc/JerseyCrew';
 import { ParkourSystem } from './parkour/ParkourSystem';
+import { perf, perfParam } from './perf/PerfProbe';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { PoolMode } from './pool/net/PoolMode';
@@ -66,17 +67,20 @@ import {
   type TownThemeState,
 } from './radio/townTheme';
 import { localTransport, netTransport } from './radio/transport';
-import {
-  autoQuality,
-  type FpsLadder,
-  isWeakDevice,
-  ladderTick,
-  readDevice,
-  stepDown,
-  WEAK_BOOT_SCALE,
-} from './render/deviceTier';
+import { autoQuality, isWeakDevice, readDevice, WEAK_BOOT_SCALE } from './render/deviceTier';
 import { Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
+import {
+  desktopRungs,
+  DESKTOP_TUNING,
+  frameWindow,
+  makeController,
+  phoneRungs,
+  PHONE_TUNING,
+  qualityTick,
+  type QualityController,
+} from './render/qualityController';
+import { ShaderWarmer } from './render/shaderWarm';
 import { SkateCamera } from './render/SkateCamera';
 import {
   capUploads,
@@ -150,6 +154,8 @@ const AXIS_Y = new THREE.Vector3(0, 1, 0);
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
 const DOWN = new THREE.Vector3(0, -1, 0);
 const _v = new THREE.Vector3();
+/** Name-tag projection scratch (updateNetwork). */
+const _tagV = new THREE.Vector3();
 const _pivot = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _qInv = new THREE.Quaternion();
@@ -222,6 +228,24 @@ interface RemoteAvatar {
   lastPos: THREE.Vector3;
   /** Hidden for being somewhere else (in a room I'm not in, or the street while I'm inside). */
   apart?: boolean;
+  /** What the name tag last got, so the DOM is only touched when it changes. */
+  tag?: { html: string; display: string; opacity: string; transform: string };
+}
+
+/** Write a name tag's style / contents only where they changed (a DOM write a frame per rider adds up). */
+function setTag(
+  r: RemoteAvatar,
+  el: HTMLDivElement,
+  display: string,
+  opacity: string,
+  transform: string | null,
+  html: string | null,
+) {
+  const t = (r.tag ??= { html: '', display: '', opacity: '', transform: '' });
+  if (t.display !== display) el.style.display = t.display = display;
+  if (t.opacity !== opacity) el.style.opacity = t.opacity = opacity;
+  if (transform !== null && t.transform !== transform) el.style.transform = t.transform = transform;
+  if (html !== null && t.html !== html) el.innerHTML = t.html = html;
 }
 
 export interface GameOptions {
@@ -371,9 +395,14 @@ export class Game {
   private hudAcc = 0;
   private sparkAcc = 0;
   private animTime = 0;
-  private lowFpsTime = 0;
-  /** The low tier's step-down ladder (auto quality on 'low' only). */
-  private ladder: FpsLadder | null = null;
+  /**
+   * Adaptive quality (render/qualityController.ts): auto 'low' steps render
+   * scale → shadows → ink; medium / high step render scale only. Null on
+   * an explicit Low (Settings / ?q=low stays as chosen).
+   */
+  adaptive: QualityController | null = null;
+  /** Raw rAF intervals (ms) since the last quality window. */
+  private frameMs: number[] = [];
   /** A weak phone (booted at a lower render scale, on the texture diet). */
   weakDevice = false;
   private unwatchLoss: (() => void) | null = null;
@@ -397,13 +426,18 @@ export class Game {
     // 'low' picked automatically: a weak phone boots lighter and the ladder
     // may keep stepping down (an explicit Low / ?q=low stays as chosen)
     if (quality === 'low' && opts.quality === undefined) {
-      this.ladder = { bad: 0, age: 0 };
       this.weakDevice = isWeakDevice(readDevice(this.gfx.renderer.getContext()));
       if (this.weakDevice)
         this.gfx.applyLite({
           ...this.gfx.lite,
           scale: Math.min(this.gfx.lite.scale, WEAK_BOOT_SCALE),
         });
+      this.adaptive = makeController(phoneRungs(this.gfx.lite), PHONE_TUNING);
+    } else if (quality !== 'low') {
+      this.adaptive = makeController(
+        desktopRungs(this.gfx.lite, window.devicePixelRatio || 1),
+        DESKTOP_TUNING,
+      );
     }
     // A weak phone also goes on the texture diet (render/textureDiet.ts)
     textureDiet.on = this.weakDevice;
@@ -411,6 +445,11 @@ export class Game {
       capUploads(this.gfx.renderer);
       this.gfx.sun.shadow.mapSize.set(512, 512);
       this.unwatchLoss = watchContextLoss(opts.canvas);
+    }
+    const perfOpts = perfParam();
+    if (perfOpts !== null) {
+      perf.enable(this.gfx.renderer, perfOpts);
+      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}`;
     }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
@@ -647,8 +686,12 @@ export class Game {
     // Mesh the mountain around the spawn (terrain, rocks, ramps) so their
     // shaders are in the precompile below instead of hitching on first sight
     this.mountain?.prime(this.player.pos);
-    // Precompile shaders so the first frames don't hitch
-    this.gfx.renderer.compile(this.gfx.scene, this.gfx.camera);
+    // Precompile shaders so the first frames don't hitch, then keep
+    // compiling whatever streams in before it's first drawn
+    this.gfx.asDrawn(() => this.gfx.renderer.compile(this.gfx.scene, this.gfx.camera));
+    this.warmer = new ShaderWarmer(this.gfx.renderer, this.gfx.scene, this.gfx.camera, fn =>
+      this.gfx.asDrawn(fn),
+    );
 
     if (this.opts.offline === true) voiceNet.enabled = false;
     if (this.opts.offline !== true) {
@@ -848,6 +891,9 @@ export class Game {
     if (p) claimAudio('noun-world-radio', false);
   }
 
+  /** Links streamed-in materials' programs ahead of their first draw (render/shaderWarm.ts). */
+  private warmer: ShaderWarmer | null = null;
+
   private frame = (now: number) => {
     if (!this.running) return;
     this.raf = requestAnimationFrame(this.frame);
@@ -855,10 +901,17 @@ export class Game {
       this.last = now;
       return;
     }
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    const raw = now - this.last;
+    const dt = Math.min(0.05, raw / 1000);
     this.last = now;
+    // (a hidden tab's gap isn't a frame)
+    if (raw > 0 && raw < 1000 && this.frameMs.length < 600) this.frameMs.push(raw);
     if (dt <= 0) return;
+    perf.frameStart(now);
+    this.warmer?.tick(dt);
+    perf.lap('warm');
     this.step(dt, now);
+    perf.frameEnd();
   };
 
   /** Dev: Noun Breaks' battle view on its mock battle, in front of the skater (breakdance/view/dev.ts). */
@@ -913,6 +966,7 @@ export class Game {
       return this.stepReplay(dt, now);
     }
     this.decks.tick(this.me, this.net, this.remotes);
+    perf.lap('decks');
     if (this.showroom) {
       this.input.poll(now);
       this.updateShowroom(dt);
@@ -988,6 +1042,7 @@ export class Game {
     this.input.freeCursor = !driving && this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
     this.handleSprayKeys(input);
+    perf.lap('input');
 
     // Physics in fixed-ish substeps for stability at low FPS — and short
     // enough at mountain speeds (≤ ~0.5 m per step) that nothing tunnels
@@ -1016,6 +1071,7 @@ export class Game {
       this.player.update(h, f, this.cam.controlYaw, now);
       this.handlePlayerEvents();
     }
+    perf.lap('physics');
 
     // In a vehicle my character isn't stepped: keep a parked pose fresh for the room
     if (driving) this.animTime += dt;
@@ -1027,6 +1083,7 @@ export class Game {
       this.updateMyCharacter(dt);
       this.parkour.frame(dt, input);
     }
+    perf.lap('character');
     this.updateAudio(dt);
     {
       const p = this.player;
@@ -1039,11 +1096,15 @@ export class Game {
       this.rider.tick(dt, p.speed, riding);
     }
     this.updateFm(dt);
+    perf.lap('audio');
     this.updateGraffiti(dt, input);
+    perf.lap('graffiti');
     this.updateNetwork(dt);
+    perf.lap('net');
     this.van2.update(dt);
     this.cars.update(dt);
     this.dragon.update(dt);
+    perf.lap('vehicles');
     // On the Big Drop the world you left waits: nothing down there streams
     // or triggers round a rider who's somewhere else entirely
     const away = this.missions.ud.active || this.interiors.inside;
@@ -1054,17 +1115,22 @@ export class Game {
     // A van ride can't touch a drop (its proof would be a 140 km/h walk)
     if (!driving && !away) this.drops?.update(dt, this.player);
     if (!away) this.crew?.update(dt, this.player.pos);
+    perf.lap('crew');
     this.missions.update(dt);
+    perf.lap('missions');
     this.interiors.update(dt);
+    perf.lap('interiors');
     if (!away) this.facades.update(dt);
     if (!away) {
       this.towns?.update(dt);
       this.landmarks?.update(dt);
     }
+    perf.lap('towns');
     this.particles.update(dt, p => {
       const hit = this.world.raycast(_v.set(p.x, p.y + 0.5, p.z), DOWN, 1);
       return hit ? hit.point.y : null;
     });
+    perf.lap('particles');
     this.gfx.followShadow(this.player.pos);
     if (this.mountain !== null && !away) {
       this.mountain.update(this.player.pos, this.player.vel);
@@ -1075,6 +1141,7 @@ export class Game {
       const out = edgeDistance(c.x, c.z) + Math.max(0, c.y - 30);
       setSkyGroundFog(THREE.MathUtils.smoothstep(out, 4, 90));
     }
+    perf.lap('mountain');
     if (this.wild !== null && !away) {
       // Local rider first (the creature name tag follows them), then remotes
       this.riders.length = 0;
@@ -1082,17 +1149,22 @@ export class Game {
       for (const r of this.remotes.values()) this.riders.push(r.character.root.position);
       this.wild.update(dt, this.gfx.camera, this.riders);
     }
+    perf.lap('wild');
     if (!away) {
       this.nature?.update(dt, this.player.pos);
       this.billboards.update(dt);
     }
     this.camHook?.(this.gfx.camera, dt);
+    perf.lap('nature');
     this.gfx.render(dt);
+    perf.lap('render');
     this.updateHud(dt, input);
+    perf.lap('hud');
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
     this.pool.idle(dt);
     this.hideseek.update(dt);
+    perf.lap('modes');
   }
 
   /**
@@ -1337,6 +1409,12 @@ export class Game {
         replaceFallbackTrees(level.root, nature);
       }
       nature.build();
+      // Low (phones): the showcase's trees and rocks don't cast. They were
+      // ~20 of a weak phone's shadow-pass draws; the rider's is the one that reads
+      if (this.gfx.quality === 'low')
+        nature.group.traverse(o => {
+          o.castShadow = false;
+        });
       this.world.build([
         ...level.collisionMeshes,
         ...this.propCollision,
@@ -1984,29 +2062,40 @@ export class Game {
       // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
       const show = this.hideseek.labelFor(id);
       if (apart) {
-        if (r.label) r.label.style.display = 'none';
+        if (r.label) setTag(r, r.label, 'none', r.tag?.opacity ?? '', null, null);
         if (r.pointer) r.pointer.style.display = 'none';
       } else if (r.label) {
         // Indoors the street's tags go (data-away) but a room-mate's stays
-        r.label.toggleAttribute('data-room', room !== null);
-        const v = ch.root.position
-          .clone()
-          .add(new THREE.Vector3(0, 2.05, 0))
-          .project(cam);
+        if (r.label.hasAttribute('data-room') !== (room !== null))
+          r.label.toggleAttribute('data-room', room !== null);
+        const v = _tagV.copy(ch.root.position);
+        v.y += 2.05;
+        v.project(cam);
         const visible = v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
         const dist = cam.position.distanceTo(c.pos);
-        r.label.style.display = visible && dist < 60 && show !== 'hide' ? 'block' : 'none';
-        r.label.style.opacity = show === 'faint' ? '0.4' : '';
-        if (visible) {
-          r.label.style.transform = `translate(-50%, -100%) translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px)`;
+        const shown = visible && dist < 60 && show !== 'hide';
+        let transform: string | null = null;
+        let html: string | null = null;
+        // Off screen or out of range the tag isn't drawn: don't rebuild it
+        if (shown) {
+          // Whole pixels: sub-pixel moves re-layout the tag for nothing
+          transform = `translate(-50%, -100%) translate(${Math.round(((v.x + 1) / 2) * w)}px, ${Math.round(((1 - v.y) / 2) * h)}px)`;
           const talk = rp.speaking ? ' 🔊' : '';
           const said =
             rp.transcript && performance.now() - rp.transcriptAt < 6000
               ? `<div class="w2-said">${escapeHtml(rp.transcript)}</div>`
               : '';
           const trick = c.trick ? `<div class="w2-trick">${escapeHtml(c.trick)}</div>` : '';
-          r.label.innerHTML = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${rp.respectBadge === 'L' ? LEGEND_BADGE : ''}${talk}</span>`;
+          html = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${rp.respectBadge === 'L' ? LEGEND_BADGE : ''}${talk}</span>`;
         }
+        setTag(
+          r,
+          r.label,
+          shown ? 'block' : 'none',
+          show === 'faint' ? '0.4' : '',
+          transform,
+          html,
+        );
         if (r.pointer) {
           const close = (visible && dist < 60) || show !== 'show';
           r.pointer.style.display = close ? 'none' : 'block';
@@ -2180,32 +2269,18 @@ export class Game {
       fps = Math.round(this.fpsFrames / this.fpsAcc);
       this.fpsAcc = 0;
       this.fpsFrames = 0;
-      // Low tier on auto: the step-down ladder (render scale → shadows → post)
-      if (this.ladder !== null) {
-        if (ladderTick(this.ladder, fps, window_)) {
-          const next = stepDown(this.gfx.lite);
-          if (next !== null) {
-            this.gfx.applyLite(next);
-            this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
-            if (import.meta.env.DEV) console.info('[perf] stepped down', next, `${fps} fps`);
-          } else this.ladder = null; // nothing left to drop
+      // Adaptive quality: step down on slow / stuttering frames, back up on headroom
+      if (this.adaptive !== null && this.frameMs.length > 0) {
+        const next = qualityTick(this.adaptive, frameWindow(this.frameMs), window_);
+        if (next !== null) {
+          this.gfx.applyLite(next);
+          this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
+          if (import.meta.env.DEV) console.info('[perf] quality', next, `${fps} fps`);
         }
+        if (perf.on)
+          perf.extra.adaptive = `rung ${this.adaptive.at}/${this.adaptive.rungs.length - 1} ${JSON.stringify(this.gfx.lite)}`;
       }
-      // Adaptive quality: sustained low FPS on high → drop pixel ratio
-      if (fps < 40) this.lowFpsTime += 0.5;
-      else this.lowFpsTime = 0;
-      // Gentle steps with a floor: dropping a Retina screen to 1x is what
-      // made the whole game read as blurry.
-      const floor = window.devicePixelRatio >= 2 ? 1.25 : 1;
-      if (
-        this.gfx.quality !== 'low' &&
-        this.lowFpsTime > 4 &&
-        this.gfx.renderer.getPixelRatio() > floor
-      ) {
-        this.gfx.renderer.setPixelRatio(Math.max(floor, this.gfx.renderer.getPixelRatio() - 0.25));
-        this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
-        this.lowFpsTime = 0;
-      }
+      this.frameMs.length = 0;
     }
     const p = this.player;
     const c = p.combo;

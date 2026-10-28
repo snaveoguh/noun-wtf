@@ -40,8 +40,9 @@ export class Graphics {
   /** Bypass the composer entirely (?diag=1) */
   rawRender = false;
   /**
-   * The low tier's step-down state (render scale, shadows, post). Only the
-   * 'low' tier ever leaves the defaults; medium/high are untouched.
+   * The adaptive step-down state (render scale, shadows, post;
+   * qualityController.ts). Only 'low' drops shadows or post; medium/high
+   * only ever change the render scale.
    */
   lite: LiteState;
   gradePass: EffectPass | null = null;
@@ -351,6 +352,24 @@ export class Graphics {
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h, false);
     this.ao?.setSize(w * this.pixelRatio, h * this.pixelRatio);
+  }
+
+  /**
+   * Run `fn` (a renderer.compile / compileAsync) with the render target the
+   * frame really draws into. Through the composer that's a linear buffer,
+   * and three keys programs by output colour space: compiling with no
+   * target built the sRGB screen variants, which the frame never uses, so
+   * every material still linked on first draw.
+   */
+  asDrawn<T>(fn: () => T): T {
+    const r = this.renderer;
+    const prev = r.getRenderTarget();
+    r.setRenderTarget(this.rawRender || !this.lite.post ? null : this.composer.inputBuffer);
+    try {
+      return fn();
+    } finally {
+      r.setRenderTarget(prev);
+    }
   }
 
   render(dt: number) {

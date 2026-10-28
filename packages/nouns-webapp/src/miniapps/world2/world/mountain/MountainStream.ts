@@ -48,6 +48,13 @@ const PROP_LOD = 1;
  * whose centre is this close (m) gets them this frame, whatever else did.
  */
 const URGENT_PROPS = CHUNK * 1.2;
+/**
+ * Phones (low) draw a chunk's dressing (trees, bushes, rocks, flowers)
+ * only this close (chunk centre → focus, m); colliders stay. From the
+ * plaza the far chunks' dressing was ~80 draws and 100k+ triangles of a
+ * weak phone's frame (?perf=1, 2026-10-28) for trees the fog half hides.
+ */
+const LOW_DRESSING_VIEW = 300;
 
 export interface ChunkContext {
   ix: number;
@@ -209,10 +216,16 @@ export class MountainStream {
     const distTo = (c: { origin: THREE.Vector3 }, px: number, pz: number) =>
       Math.hypot(c.origin.x + CHUNK / 2 - px, c.origin.z + CHUNK / 2 - pz);
     // Dispose chunks that fell out of range (behind us)
+    const low = this.quality === 'low';
     for (const c of this.chunks.values()) {
       c.dist = distTo(c, fx, fz);
       c.ahead = speed > 15 ? distTo(c, lx, lz) : Infinity;
       if (c.dist > VIEW + CHUNK && c.ahead > aheadR + CHUNK) this.disposeChunk(c);
+      else if (low && c.props !== null) {
+        const near = c.dist < LOW_DRESSING_VIEW;
+        for (const o of c.props.group.children)
+          if (o.userData.farCull === true && o.visible !== near) o.visible = near;
+      }
     }
     // Create the ones that came into range around us and ahead of us
     const spawnAround = (px: number, pz: number, radius: number) => {
@@ -554,7 +567,11 @@ export class MountainStream {
       }
       if (deco === null) continue;
       decorations.push(deco);
-      if (deco.object !== undefined) group.add(deco.object);
+      if (deco.object !== undefined) {
+        // Scenery only (no ramps, towns, landmarks): phones cull it far off
+        if (d.id === 'dressing') deco.object.userData.farCull = true;
+        group.add(deco.object);
+      }
       if (deco.collision !== undefined) cols.push(deco.collision);
     }
     group.updateMatrixWorld(true);

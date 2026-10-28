@@ -1,7 +1,8 @@
 // ── The Big Drop's systems: created on the way in, one line each ────────
 //
 // Add yours as one import + one entry (keep the list order: terrain-side
-// things first, then scenery, then riders and effects).
+// things first, then scenery, then riders and effects). The first three
+// start on the way in (peak.ts START_NOW), the rest one a frame after.
 
 import type { PeakSystemFactory } from './contract';
 
