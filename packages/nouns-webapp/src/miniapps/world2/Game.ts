@@ -54,6 +54,7 @@ import { CALLOUT_CODES, Net, type NetPose, type RemoteCallout } from './net/Net'
 import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { JerseyCrew } from './npc/JerseyCrew';
 import { ParkourSystem } from './parkour/ParkourSystem';
+import { perf, perfParam } from './perf/PerfProbe';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { PoolMode } from './pool/net/PoolMode';
@@ -411,6 +412,11 @@ export class Game {
       capUploads(this.gfx.renderer);
       this.gfx.sun.shadow.mapSize.set(512, 512);
       this.unwatchLoss = watchContextLoss(opts.canvas);
+    }
+    const perfOpts = perfParam();
+    if (perfOpts !== null) {
+      perf.enable(this.gfx.renderer, perfOpts);
+      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}`;
     }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
@@ -858,7 +864,9 @@ export class Game {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (dt <= 0) return;
+    perf.frameStart(now);
     this.step(dt, now);
+    perf.frameEnd();
   };
 
   /** Dev: Noun Breaks' battle view on its mock battle, in front of the skater (breakdance/view/dev.ts). */
@@ -988,6 +996,7 @@ export class Game {
     this.input.freeCursor = !driving && this.player.mode === 'foot' && input.mode !== 'gamepad';
     this.handleGlobalInput(input);
     this.handleSprayKeys(input);
+    perf.lap('input');
 
     // Physics in fixed-ish substeps for stability at low FPS — and short
     // enough at mountain speeds (≤ ~0.5 m per step) that nothing tunnels
@@ -1016,6 +1025,7 @@ export class Game {
       this.player.update(h, f, this.cam.controlYaw, now);
       this.handlePlayerEvents();
     }
+    perf.lap('physics');
 
     // In a vehicle my character isn't stepped: keep a parked pose fresh for the room
     if (driving) this.animTime += dt;
@@ -1027,6 +1037,7 @@ export class Game {
       this.updateMyCharacter(dt);
       this.parkour.frame(dt, input);
     }
+    perf.lap('character');
     this.updateAudio(dt);
     {
       const p = this.player;
@@ -1039,11 +1050,15 @@ export class Game {
       this.rider.tick(dt, p.speed, riding);
     }
     this.updateFm(dt);
+    perf.lap('audio');
     this.updateGraffiti(dt, input);
+    perf.lap('graffiti');
     this.updateNetwork(dt);
+    perf.lap('net');
     this.van2.update(dt);
     this.cars.update(dt);
     this.dragon.update(dt);
+    perf.lap('vehicles');
     // On the Big Drop the world you left waits: nothing down there streams
     // or triggers round a rider who's somewhere else entirely
     const away = this.missions.ud.active || this.interiors.inside;
@@ -1054,17 +1069,22 @@ export class Game {
     // A van ride can't touch a drop (its proof would be a 140 km/h walk)
     if (!driving && !away) this.drops?.update(dt, this.player);
     if (!away) this.crew?.update(dt, this.player.pos);
+    perf.lap('crew');
     this.missions.update(dt);
+    perf.lap('missions');
     this.interiors.update(dt);
+    perf.lap('interiors');
     if (!away) this.facades.update(dt);
     if (!away) {
       this.towns?.update(dt);
       this.landmarks?.update(dt);
     }
+    perf.lap('towns');
     this.particles.update(dt, p => {
       const hit = this.world.raycast(_v.set(p.x, p.y + 0.5, p.z), DOWN, 1);
       return hit ? hit.point.y : null;
     });
+    perf.lap('particles');
     this.gfx.followShadow(this.player.pos);
     if (this.mountain !== null && !away) {
       this.mountain.update(this.player.pos, this.player.vel);
@@ -1075,6 +1095,7 @@ export class Game {
       const out = edgeDistance(c.x, c.z) + Math.max(0, c.y - 30);
       setSkyGroundFog(THREE.MathUtils.smoothstep(out, 4, 90));
     }
+    perf.lap('mountain');
     if (this.wild !== null && !away) {
       // Local rider first (the creature name tag follows them), then remotes
       this.riders.length = 0;
@@ -1082,13 +1103,17 @@ export class Game {
       for (const r of this.remotes.values()) this.riders.push(r.character.root.position);
       this.wild.update(dt, this.gfx.camera, this.riders);
     }
+    perf.lap('wild');
     if (!away) {
       this.nature?.update(dt, this.player.pos);
       this.billboards.update(dt);
     }
     this.camHook?.(this.gfx.camera, dt);
+    perf.lap('nature');
     this.gfx.render(dt);
+    perf.lap('render');
     this.updateHud(dt, input);
+    perf.lap('hud');
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
     this.pool.idle(dt);
