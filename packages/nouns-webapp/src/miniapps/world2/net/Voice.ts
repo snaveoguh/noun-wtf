@@ -13,10 +13,14 @@
 // - ICE candidates that arrive before the remote description are queued.
 // - Connections are never torn down while still connecting; a dropped
 //   connection gets an ICE restart before it's rebuilt.
-// - Remote audio plays through plain <audio> elements, retried on the
-//   next user gesture if autoplay blocks them.
+// - Remote audio plays through plain <audio> elements. Ones the browser
+//   refuses to start (iOS Safari, outside a gesture) are retried on the next
+//   real gesture and when the mic starts; `blockedCount` drives the HUD's
+//   "tap to hear voices" hint (see voicePlayback.ts).
 
 import type PartySocket from 'partysocket';
+
+import { PlaybackGate, UNLOCK_EVENTS } from './voicePlayback';
 
 const ICE: RTCConfiguration = {
   iceServers: [
@@ -60,21 +64,28 @@ export class Voice {
   isSpeaking = false;
   /** Playback volume for everyone else's voice (the mixer's voice bus). */
   private outVolume = 1;
+  private gate = new PlaybackGate<HTMLAudioElement>();
   get micOn() {
     return this.track !== null;
   }
+  /** Remote voices the browser won't play until the next tap / key. */
+  get blockedCount() {
+    return this.gate.blockedCount;
+  }
 
   constructor() {
-    // Autoplay can block remote audio until the page has a gesture: retry
-    // any paused element on the next interaction.
-    const kick = () => {
-      for (const p of this.peers.values())
-        if (p.audio?.paused === true) void p.audio.play().catch(() => undefined);
-      if (this.ctx?.state === 'suspended') void this.ctx.resume();
-    };
-    window.addEventListener('pointerdown', kick);
-    window.addEventListener('keydown', kick);
+    // Capture phase, so game handlers that stop propagation can't eat it
+    for (const ev of UNLOCK_EVENTS)
+      window.addEventListener(ev, this.unlock, { capture: true, passive: true });
   }
+
+  /** Retry any remote voice that isn't playing; call from a user gesture. */
+  unlock = () => {
+    const els: HTMLAudioElement[] = [];
+    for (const p of this.peers.values()) if (p.audio) els.push(p.audio);
+    void this.gate.retry(els);
+    if (this.ctx?.state === 'suspended') void this.ctx.resume();
+  };
 
   bind(ws: PartySocket, myId: string) {
     this.ws = ws;
@@ -140,6 +151,7 @@ export class Voice {
     if (p.restartTimer !== null) window.clearTimeout(p.restartTimer);
     p.pc.close();
     if (p.audio) {
+      this.gate.forget(p.audio);
       p.audio.pause();
       p.audio.srcObject = null;
       p.audio.remove();
@@ -196,7 +208,7 @@ export class Voice {
       }
       peer.audio.volume = this.outVolume;
       peer.audio.srcObject = stream;
-      void peer.audio.play().catch(() => undefined);
+      void this.gate.play(peer.audio);
     };
 
     pc.onconnectionstatechange = () => {
@@ -319,6 +331,9 @@ export class Voice {
     src.connect(this.analyser);
     this.vadBuf = new Uint8Array(this.analyser.frequencyBinCount);
     for (const p of this.peers.values()) if (p.sender) void p.sender.replaceTrack(this.track);
+    // Capturing lets iOS autoplay MediaStream audio, and starting the mic can
+    // interrupt what was playing: (re)start every remote voice now
+    this.unlock();
     return 'on';
   }
 
@@ -348,12 +363,13 @@ export class Voice {
     ];
     for (const [id, p] of this.peers)
       lines.push(
-        `${id.slice(0, 6)} ${p.pc.connectionState}/${p.pc.iceConnectionState} ${p.audio?.paused === false ? 'playing' : 'silent'}`,
+        `${id.slice(0, 6)} ${p.pc.connectionState}/${p.pc.iceConnectionState} ${p.audio?.paused === false ? 'playing' : p.audio && this.gate.isBlocked(p.audio) ? 'blocked' : 'silent'}`,
       );
     return lines;
   }
 
   destroy() {
+    for (const ev of UNLOCK_EVENTS) window.removeEventListener(ev, this.unlock, { capture: true });
     for (const id of [...this.peers.keys()]) this.dropPeer(id);
     this.stream?.getTracks().forEach(t => t.stop());
     this.stream = null;

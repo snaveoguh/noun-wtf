@@ -186,6 +186,8 @@ export interface HudState {
   connected: boolean;
   mic: 'off' | 'on' | 'muted';
   speaking: boolean;
+  /** Remote voice chat is refused until the next tap (iOS autoplay). */
+  voiceBlocked: boolean;
   fps: number;
   manualBalance: number | null;
   inputMode: string;
@@ -433,6 +435,7 @@ export class Game {
       connected: false,
       mic: 'off',
       speaking: false,
+      voiceBlocked: false,
       fps: 0,
       manualBalance: null,
       inputMode: 'keyboard',
@@ -689,6 +692,7 @@ export class Game {
 
   /** Call from a user gesture (click/tap/key) to unlock audio. */
   unlockAudio() {
+    this.net.voip.unlock();
     this.audio.out ??= ctx => this.mixer.attach(ctx).bus('sfx');
     this.audio.start();
     const ctx = this.audio.ctx;
@@ -2240,6 +2244,7 @@ export class Game {
       players: this.net.players.size + 1,
       connected: this.net.connected,
       speaking: this.net.voip.isSpeaking,
+      voiceBlocked: this.net.voip.blockedCount > 0,
       fps,
       manualBalance: p.state === 'manual' ? p.manualBalance : null,
       inputMode: input.mode,

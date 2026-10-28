@@ -157,6 +157,17 @@ export function RingHud({
         </HudDrag>
       )}
       <RespectBanner respect={game.respect} sfx={game.sfx} />
+      {/* The browser won't play the others' voices until a tap (iOS) */}
+      {hud.voiceBlocked && (
+        <button
+          type="button"
+          data-w2hud="voice-blocked"
+          className="pointer-events-auto absolute left-1/2 top-12 -translate-x-1/2 rounded-full bg-black/75 px-4 py-2 text-sm tracking-wide text-white"
+          onClick={() => game.net.voip.unlock()}
+        >
+          🔊 TAP TO HEAR VOICES
+        </button>
+      )}
 
       {/* ── Top-centre: landmarks compass (desktop; no room on phones) ── */}
       {!touch && (
