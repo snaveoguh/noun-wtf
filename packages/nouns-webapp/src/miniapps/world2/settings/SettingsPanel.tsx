@@ -20,6 +20,7 @@ import VoiceBooth from '../booth/VoiceBooth';
 import { HudIcon } from '../hud/icons';
 import { installState, subscribeInstall } from '../pwa/install';
 import { InstallButton } from '../pwa/InstallButton';
+import { FRAME_CAPS } from '../render/framePacer';
 import { resetHudPositions } from '../ui/HudDrag';
 import { cleanName, NAME_MAX, renameRider } from '../ui/riderName';
 import { worldPause } from '../worldPause';
@@ -121,6 +122,9 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
   const close = useRef(onClose);
   close.current = onClose;
   const lastPreview = useRef(0);
+
+  // The game shows beside the panel: it runs at the covered rate meanwhile
+  useEffect(() => game.coverGame('settings'), [game]);
 
   // Keys belong to the panel: the game's input is off, Esc closes
   useEffect(() => {
@@ -323,6 +327,22 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
                 reload
               </button>
             </div>
+          )}
+          <Choice
+            name="Frame rate (fps)"
+            options={FRAME_CAPS}
+            value={s.frameCap}
+            onChange={c => settings.update({ frameCap: c })}
+          />
+          <p className="text-xs opacity-70">
+            60 keeps laptops cool on fast (120 / 144 Hz) screens. max follows your screen.
+          </p>
+          {game.gfx.quality !== 'low' && window.devicePixelRatio > 1.5 && (
+            <Toggle
+              name="Sharp (full Retina resolution, runs hotter)"
+              on={s.sharp}
+              onClick={() => settings.update({ sharp: !s.sharp })}
+            />
           )}
           <Choice
             name="Camera (C)"

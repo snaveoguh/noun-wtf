@@ -100,6 +100,10 @@ export interface LiteState {
   shadows: boolean;
   /** Ink outline + post (off = straight render, no composer). */
   post: boolean;
+  /** Desktop: the SMAA pass (absent = as built). */
+  aa?: boolean;
+  /** Desktop: the sun's shadow map size in texels (absent = as built). */
+  shadowMap?: number;
 }
 
 /** The next rung down, or null at the bottom. */

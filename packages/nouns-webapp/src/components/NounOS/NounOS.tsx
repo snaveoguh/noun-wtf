@@ -134,7 +134,12 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Pointer parallax: the whole desk leans toward the cursor
+  // Pointer parallax: the whole desk leans toward the cursor. Only while
+  // the desk or the home poster shows: in the game the custom properties
+  // (on the root, inherited by every HUD element) restyled the whole tree
+  // on every vsync the mouse moved. The loop sleeps once it settles.
+  const worldUp = useRef(false);
+  worldUp.current = mode === 'world' && gameMounted;
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage || isMobile()) return;
@@ -143,21 +148,23 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     let cx = 0;
     let cy = 0;
     let raf = 0;
-    const onMove = (e: PointerEvent) => {
-      tx = e.clientX / window.innerWidth - 0.5;
-      ty = e.clientY / window.innerHeight - 0.5;
-    };
     const loop = () => {
-      raf = requestAnimationFrame(loop);
+      raf = 0;
+      if (worldUp.current) return;
       cx += (tx - cx) * 0.06;
       cy += (ty - cy) * 0.06;
       // On the root so the desk AND the home poster both lean with the pointer
       const host = stage.parentElement ?? stage;
       host.style.setProperty('--rx', `${(-cy * 3.2).toFixed(3)}deg`);
       host.style.setProperty('--ry', `${(cx * 4.5).toFixed(3)}deg`);
+      if (Math.abs(tx - cx) + Math.abs(ty - cy) > 1e-4) raf = requestAnimationFrame(loop);
+    };
+    const onMove = (e: PointerEvent) => {
+      tx = e.clientX / window.innerWidth - 0.5;
+      ty = e.clientY / window.innerHeight - 0.5;
+      if (raf === 0 && !worldUp.current) raf = requestAnimationFrame(loop);
     };
     window.addEventListener('pointermove', onMove);
-    raf = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('pointermove', onMove);

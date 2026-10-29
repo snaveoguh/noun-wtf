@@ -116,6 +116,11 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
     return { y };
   });
   log('spawn', JSON.stringify(spot));
+  // SEED=1: the same rider in every run (head models range from ~1k to ~30k triangles)
+  if (process.env.SEED)
+    await p.evaluate(() =>
+      window.__w2.setSeed({ background: 0, body: 12, accessory: 40, head: 60, glasses: 3 }),
+    );
   await sleep(15000); // settle: lazy systems, first compiles
   if (P.throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: P.throttle });
 

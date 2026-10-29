@@ -30,6 +30,17 @@ export type Quality = 'low' | 'medium' | 'high';
 const SHADOW_EXTENT = { low: 18, medium: 24, high: 30 };
 const SHADOW_SIZE = { low: 1024, medium: 2048, high: 4096 };
 
+/**
+ * Pixel ratio a tier boots with. High draws at 1.5 on a Retina screen, not
+ * 2: 2 is 78% more pixels through every pass (scene, normals, ink, grade,
+ * 3 SMAA passes) for a difference hard to see under the outlines, and it
+ * was what kept laptops hot. `sharp` (Settings → Sharp) asks for the full 2.
+ */
+export function bootScale(quality: Quality, dpr: number, sharp = false): number {
+  const max = quality === 'low' ? 1 : quality === 'high' && sharp ? 2 : 1.5;
+  return Math.min(dpr || 1, max);
+}
+
 export class Graphics {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
@@ -46,6 +57,8 @@ export class Graphics {
    */
   lite: LiteState;
   gradePass: EffectPass | null = null;
+  /** SMAA (medium / high), last in the stack; the desktop ladder can turn it off. */
+  private aaPass: EffectPass | null = null;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   sky: Sky;
@@ -58,6 +71,9 @@ export class Graphics {
   private sunDir = new THREE.Vector3(-0.45, -0.75, 0.48).normalize();
   private envRT: THREE.WebGLRenderTarget | null = null;
   private pixelRatio = 1;
+  /** Ink thickness (buffer px) as designed, and the render scale it was designed at. */
+  private inkBase = 0;
+  private inkAtScale = 1;
 
   constructor(canvas: HTMLCanvasElement, quality: Quality) {
     this.quality = quality;
@@ -69,11 +85,17 @@ export class Graphics {
       powerPreference: 'high-performance',
       alpha: false,
     });
-    this.pixelRatio = Math.min(
-      window.devicePixelRatio || 1,
-      quality === 'high' ? 2 : quality === 'medium' ? 1.5 : 1,
-    );
-    this.lite = { scale: this.pixelRatio, shadows: true, post: true };
+    this.pixelRatio = bootScale(quality, window.devicePixelRatio);
+    this.lite =
+      quality === 'low'
+        ? { scale: this.pixelRatio, shadows: true, post: true }
+        : {
+            scale: this.pixelRatio,
+            shadows: true,
+            post: true,
+            aa: true,
+            shadowMap: SHADOW_SIZE[quality],
+          };
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
@@ -199,10 +221,14 @@ export class Graphics {
     });
     const sat = new HueSaturationEffect({ saturation: this.toon ? 0.28 : 0.12 });
     if (this.toon) {
+      this.inkBase = quality === 'high' ? 2.2 : 1.8;
       this.outline = new InkOutlineEffect({
         normalBuffer: normalPass?.texture ?? null,
-        thickness: quality === 'high' ? 2.2 : 1.8,
+        thickness: this.inkBase,
       });
+      // (the scale today's look was drawn at: the old caps; phones keep theirs as is)
+      this.inkAtScale = bootScale(quality, window.devicePixelRatio, true);
+      this.fitInk();
     }
     const vignette = new VignetteEffect({ offset: 0.3, darkness: 0.42 });
     // `?fx=bloom,tone,grade,sat,vig` limits the stack (debugging / perf triage).
@@ -237,10 +263,10 @@ export class Graphics {
       this.composer.addPass((this.gradePass = new EffectPass(this.camera, ...effects)));
     if (quality !== 'low') {
       this.composer.addPass(
-        new EffectPass(
+        (this.aaPass = new EffectPass(
           this.camera,
           new SMAAEffect({ preset: quality === 'high' ? SMAAPreset.HIGH : SMAAPreset.MEDIUM }),
-        ),
+        )),
       );
     }
   }
@@ -337,12 +363,36 @@ export class Graphics {
    * caller resizes), shadows off stops the sun casting (three recompiles the
    * lit materials once), post off renders straight to the screen.
    */
+  /**
+   * The ink is drawn in buffer pixels: keep its width on screen the same at
+   * any render scale (1.5 on a Retina screen draws the lines it drew at 2).
+   */
+  private fitInk() {
+    if (this.outline !== null && this.inkBase > 0 && this.quality !== 'low')
+      this.outline.thickness = (this.inkBase * this.pixelRatio) / this.inkAtScale;
+  }
+
   applyLite(s: LiteState) {
     if (s.scale !== this.lite.scale) {
       this.pixelRatio = s.scale;
       this.renderer.setPixelRatio(s.scale);
+      this.fitInk();
     }
     if (s.shadows !== this.lite.shadows) this.sun.castShadow = s.shadows;
+    // SMAA off: the pass before it draws to the screen instead (no relink)
+    const aa = this.aaPass;
+    if (aa !== null && s.aa !== undefined && aa.enabled !== s.aa) {
+      aa.enabled = s.aa;
+      const live = this.composer.passes.filter(p => p.enabled);
+      for (const p of this.composer.passes) p.renderToScreen = false;
+      if (live.length > 0) live[live.length - 1].renderToScreen = true;
+    }
+    // A new shadow map size reallocates the map; materials don't relink
+    if (s.shadowMap !== undefined && s.shadowMap !== this.sun.shadow.mapSize.x) {
+      this.sun.shadow.mapSize.set(s.shadowMap, s.shadowMap);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
     this.lite = { ...s };
   }
 
@@ -372,7 +422,11 @@ export class Graphics {
     }
   }
 
+  /** Draw nothing (an opaque menu covers the canvas: Game.coverGame). */
+  hold = false;
+
   render(dt: number) {
+    if (this.hold) return;
     if (this.rawRender || !this.lite.post) {
       this.renderer.render(this.scene, this.camera);
       return;
