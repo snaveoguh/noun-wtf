@@ -559,7 +559,7 @@ function seedToSvgDataUri(seed: NounSeed, isV2: boolean): string {
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
-// ─── Pill toggle (matches HeaderDaoToggle aesthetic) ───────────────────
+// ─── Pill toggle ───────────────────────────────────────────────────────
 interface PillProps<T extends string> {
   label: string;
   value: T;
@@ -624,6 +624,32 @@ function ViewModeToggle({ mode, setMode }: { mode: ViewMode; setMode: (m: ViewMo
           value={m.value}
           active={mode === m.value}
           onSelect={setMode}
+          accent="purple"
+        />
+      ))}
+    </div>
+  );
+}
+
+const DAOS: { value: ActiveDao; label: string }[] = [
+  { value: 'nouns', label: 'V1' },
+  { value: 'nounv2', label: 'V2' },
+];
+
+function DaoToggle({ dao, setDao }: { dao: ActiveDao; setDao: (d: ActiveDao) => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Select DAO"
+      className="inline-flex items-center gap-0.5 rounded-full border border-transparent bg-white/10 p-0.5 shadow-sm backdrop-blur-sm"
+    >
+      {DAOS.map(d => (
+        <Pill
+          key={d.value}
+          label={d.label}
+          value={d.value}
+          active={dao === d.value}
+          onSelect={setDao}
           accent="purple"
         />
       ))}
@@ -995,9 +1021,9 @@ export default function CrystalBallPage() {
     return 'ascii';
   });
   // DAO context comes from the URL: `/crystal-ball` is V1, `/v2/crystal-ball`
-  // is V2. The global header toggle (HeaderDaoToggle) flips between the two
-  // routes — same component, different prediction chain.
-  const { activeDao } = useActiveDao();
+  // is V2. The DAO toggle below flips between the two routes — same
+  // component, different prediction chain.
+  const { activeDao, setActiveDao } = useActiveDao();
 
   useEffect(() => {
     try {
@@ -1161,14 +1187,14 @@ export default function CrystalBallPage() {
         </a>
       )}
 
-      {/* View-mode toggle. The DAO toggle lives in the global header now
-          (HeaderDaoToggle) — flipping it navigates between /crystal-ball
-          and /v2/crystal-ball. */}
+      {/* DAO + view-mode toggles. The DAO toggle navigates between
+          /crystal-ball and /v2/crystal-ball. */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          flexWrap: 'wrap',
           gap: 10,
           paddingTop: 12,
         }}
@@ -1180,6 +1206,19 @@ export default function CrystalBallPage() {
             color: 'var(--theme-text-muted)',
             fontWeight: 700,
             minWidth: 36,
+          }}
+        >
+          DAO
+        </span>
+        <DaoToggle dao={activeDao} setDao={setActiveDao} />
+        <span
+          style={{
+            fontSize: 12,
+            letterSpacing: '0.2em',
+            color: 'var(--theme-text-muted)',
+            fontWeight: 700,
+            minWidth: 36,
+            marginLeft: 8,
           }}
         >
           VIEW
