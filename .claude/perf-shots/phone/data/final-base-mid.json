@@ -1,0 +1,904 @@
+{
+ "profile": "mid",
+ "boot": {
+  "quality": "low",
+  "lite": {
+   "scale": 1,
+   "shadows": true,
+   "post": true
+  },
+  "weak": false,
+  "pr": 1
+ },
+ "scenarios": {
+  "plaza-idle": {
+   "frame": {
+    "frames": 14,
+    "fps": 1.374840420308357,
+    "mean": 727.3571428571429,
+    "p50": 600,
+    "p95": 1416.7000000000116,
+    "p99": 1416.7000000000116,
+    "max": 1416.7000000000116,
+    "hitches": 14
+   },
+   "cpu": {
+    "frames": 15,
+    "fps": 3.514691410092046,
+    "mean": 284.52000000017387,
+    "p50": 234.20000000018626,
+    "p95": 541.5,
+    "p99": 541.5,
+    "max": 541.5,
+    "hitches": 15
+   },
+   "systems": [
+    {
+     "name": "render",
+     "mean": 203.75999999996276,
+     "p95": 373.1000000005588,
+     "max": 373.1000000005588
+    },
+    {
+     "name": "graffiti",
+     "mean": 32.63999999997517,
+     "p95": 184.20000000018626,
+     "max": 184.20000000018626
+    },
+    {
+     "name": "towns",
+     "mean": 19.553333333320914,
+     "p95": 67,
+     "max": 67
+    },
+    {
+     "name": "missions",
+     "mean": 6.739999999788901,
+     "p95": 32.09999999962747,
+     "max": 32.09999999962747
+    },
+    {
+     "name": "warm",
+     "mean": 6.273333333370586,
+     "p95": 34.5,
+     "max": 34.5
+    },
+    {
+     "name": "physics",
+     "mean": 2.4066666667660077,
+     "p95": 11.399999999441206,
+     "max": 11.399999999441206
+    },
+    {
+     "name": "net",
+     "mean": 1.7800000000124176,
+     "p95": 8.5,
+     "max": 8.5
+    },
+    {
+     "name": "character",
+     "mean": 1.7199999997392297,
+     "p95": 4.699999999254942,
+     "max": 4.699999999254942
+    },
+    {
+     "name": "audio",
+     "mean": 1.6133333334699274,
+     "p95": 4.7000000001862645,
+     "max": 4.7000000001862645
+    },
+    {
+     "name": "modes",
+     "mean": 1.5733333333705863,
+     "p95": 3,
+     "max": 3
+    },
+    {
+     "name": "mountain",
+     "mean": 1.4066666666418315,
+     "p95": 2.6000000005587935,
+     "max": 2.6000000005587935
+    },
+    {
+     "name": "vehicles",
+     "mean": 1.2800000000124176,
+     "p95": 6.2999999998137355,
+     "max": 6.2999999998137355
+    },
+    {
+     "name": "wild",
+     "mean": 1.2733333333705863,
+     "p95": 5.400000000372529,
+     "max": 5.400000000372529
+    },
+    {
+     "name": "input",
+     "mean": 0.8933333334202568,
+     "p95": 4.900000000372529,
+     "max": 4.900000000372529
+    },
+    {
+     "name": "hud",
+     "mean": 0.6466666666790843,
+     "p95": 3.2999999998137355,
+     "max": 3.2999999998137355
+    },
+    {
+     "name": "nature",
+     "mean": 0.3400000000372529,
+     "p95": 1.400000000372529,
+     "max": 1.400000000372529
+    },
+    {
+     "name": "interiors",
+     "mean": 0.2066666668901841,
+     "p95": 1.1000000005587935,
+     "max": 1.1000000005587935
+    },
+    {
+     "name": "decks",
+     "mean": 0.1466666666790843,
+     "p95": 2,
+     "max": 2
+    },
+    {
+     "name": "crew",
+     "mean": 0.12666666669150192,
+     "p95": 0.7000000001862645,
+     "max": 0.7000000001862645
+    },
+    {
+     "name": "other",
+     "mean": 0.0933333333581686,
+     "p95": 0.7000000001862645,
+     "max": 0.7000000001862645
+    },
+    {
+     "name": "particles",
+     "mean": 0.04666666661699613,
+     "p95": 0.5,
+     "max": 0.5
+    }
+   ],
+   "render": {
+    "calls": 852,
+    "triangles": 213507,
+    "points": 2,
+    "lines": 0,
+    "programs": 49,
+    "textures": 698,
+    "geometries": 738,
+    "pixelRatio": 1,
+    "width": 393,
+    "height": 852
+   },
+   "heapMB": 152.0626,
+   "allocMBps": 6.163028177481143,
+   "longTasks": {
+    "count": 15,
+    "totalMs": 4609,
+    "maxMs": 567
+   },
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   }
+  },
+  "skate-loop": {
+   "frame": {
+    "frames": 20,
+    "fps": 1.3575244184704776,
+    "mean": 736.6349999999999,
+    "p50": 650,
+    "p95": 1216.5999999999913,
+    "p99": 1333.300000000003,
+    "max": 1333.300000000003,
+    "hitches": 20
+   },
+   "cpu": {
+    "frames": 21,
+    "fps": 2.4246062901211483,
+    "mean": 412.43809523814843,
+    "p50": 268,
+    "p95": 1197,
+    "p99": 1302.4000000003725,
+    "max": 1302.4000000003725,
+    "hitches": 21
+   },
+   "systems": [
+    {
+     "name": "render",
+     "mean": 361.1904761904762,
+     "p95": 1183.6000000005588,
+     "max": 1289.199999999255
+    },
+    {
+     "name": "towns",
+     "mean": 15.999999999911303,
+     "p95": 41.89999999944121,
+     "max": 42.09999999962747
+    },
+    {
+     "name": "graffiti",
+     "mean": 13.742857142839403,
+     "p95": 75.29999999981374,
+     "max": 77.20000000018626
+    },
+    {
+     "name": "missions",
+     "mean": 6.042857142830534,
+     "p95": 14.900000000372529,
+     "max": 16
+    },
+    {
+     "name": "warm",
+     "mean": 3.6238095237917842,
+     "p95": 21,
+     "max": 26
+    },
+    {
+     "name": "character",
+     "mean": 1.8333333333333333,
+     "p95": 4.7000000001862645,
+     "max": 5
+    },
+    {
+     "name": "physics",
+     "mean": 1.828571428589168,
+     "p95": 3.599999999627471,
+     "max": 9.599999999627471
+    },
+    {
+     "name": "modes",
+     "mean": 1.3476190476988752,
+     "p95": 3.2999999998137355,
+     "max": 6.1000000005587935
+    },
+    {
+     "name": "input",
+     "mean": 1.2809523810144692,
+     "p95": 2.2999999998137355,
+     "max": 18.700000000186265
+    },
+    {
+     "name": "mountain",
+     "mean": 1.133333333280115,
+     "p95": 3.599999999627471,
+     "max": 5
+    },
+    {
+     "name": "audio",
+     "mean": 1.0285714285093404,
+     "p95": 2.8999999994412065,
+     "max": 3.7999999998137355
+    },
+    {
+     "name": "wild",
+     "mean": 1.0190476190210098,
+     "p95": 2.099999999627471,
+     "max": 8.099999999627471
+    },
+    {
+     "name": "vehicles",
+     "mean": 0.9285714286157772,
+     "p95": 3.7000000001862645,
+     "max": 3.8999999994412065
+    },
+    {
+     "name": "net",
+     "mean": 0.41428571429458405,
+     "p95": 1.099999999627471,
+     "max": 4.2999999998137355
+    },
+    {
+     "name": "nature",
+     "mean": 0.38571428569654626,
+     "p95": 0.900000000372529,
+     "max": 4.2999999998137355
+    },
+    {
+     "name": "hud",
+     "mean": 0.3428571428660126,
+     "p95": 1.6000000005587935,
+     "max": 1.699999999254942
+    },
+    {
+     "name": "interiors",
+     "mean": 0.1047619047707745,
+     "p95": 0.30000000074505806,
+     "max": 1.2000000001862645
+    },
+    {
+     "name": "particles",
+     "mean": 0.07142857156161751,
+     "p95": 0.30000000074505806,
+     "max": 0.900000000372529
+    },
+    {
+     "name": "decks",
+     "mean": 0.06666666659570876,
+     "p95": 0.09999999962747097,
+     "max": 1.099999999627471
+    },
+    {
+     "name": "other",
+     "mean": 0.042857142874882334,
+     "p95": 0,
+     "max": 0.900000000372529
+    },
+    {
+     "name": "crew",
+     "mean": 0.009523809577027956,
+     "p95": 0.10000000055879354,
+     "max": 0.10000000055879354
+    }
+   ],
+   "render": {
+    "calls": 683,
+    "triangles": 192657,
+    "points": 2,
+    "lines": 0,
+    "programs": 50,
+    "textures": 1489,
+    "geometries": 1601,
+    "pixelRatio": 1,
+    "width": 393,
+    "height": 852
+   },
+   "heapMB": 179.06277,
+   "allocMBps": 3.6154915402562184,
+   "longTasks": {
+    "count": 20,
+    "totalMs": 8828,
+    "maxMs": 1322
+   },
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   }
+  },
+  "remotes-16": {
+   "frame": {
+    "frames": 12,
+    "fps": 1.1520294919549932,
+    "mean": 868.0333333333341,
+    "p50": 716.8000000000029,
+    "p95": 1666.6000000000058,
+    "p99": 1666.6000000000058,
+    "max": 1666.6000000000058,
+    "hitches": 12
+   },
+   "cpu": {
+    "frames": 13,
+    "fps": 4.144615188422305,
+    "mean": 241.27692307682278,
+    "p50": 238.29999999981374,
+    "p95": 356.69999999925494,
+    "p99": 356.69999999925494,
+    "max": 356.69999999925494,
+    "hitches": 13
+   },
+   "systems": [
+    {
+     "name": "render",
+     "mean": 191.81538461528433,
+     "p95": 324.70000000018626,
+     "max": 324.70000000018626
+    },
+    {
+     "name": "graffiti",
+     "mean": 15.40769230774962,
+     "p95": 92.79999999981374,
+     "max": 92.79999999981374
+    },
+    {
+     "name": "modes",
+     "mean": 7.961538461610102,
+     "p95": 35.200000000186265,
+     "max": 35.200000000186265
+    },
+    {
+     "name": "net",
+     "mean": 7.853846153960778,
+     "p95": 24.100000000558794,
+     "max": 24.100000000558794
+    },
+    {
+     "name": "warm",
+     "mean": 5.753846153760185,
+     "p95": 29.09999999962747,
+     "max": 29.09999999962747
+    },
+    {
+     "name": "missions",
+     "mean": 2.8384615384185543,
+     "p95": 7.5,
+     "max": 7.5
+    },
+    {
+     "name": "physics",
+     "mean": 1.8846153846870248,
+     "p95": 6,
+     "max": 6
+    },
+    {
+     "name": "wild",
+     "mean": 1.776923076966061,
+     "p95": 9.700000000186265,
+     "max": 9.700000000186265
+    },
+    {
+     "name": "mountain",
+     "mean": 1.3999999999426878,
+     "p95": 6.7000000001862645,
+     "max": 6.7000000001862645
+    },
+    {
+     "name": "character",
+     "mean": 0.9384615384042263,
+     "p95": 2.599999999627471,
+     "max": 2.599999999627471
+    },
+    {
+     "name": "audio",
+     "mean": 0.7538461538318258,
+     "p95": 2.400000000372529,
+     "max": 2.400000000372529
+    },
+    {
+     "name": "vehicles",
+     "mean": 0.6769230768371087,
+     "p95": 2.599999999627471,
+     "max": 2.599999999627471
+    },
+    {
+     "name": "towns",
+     "mean": 0.6538461539894342,
+     "p95": 3.3999999994412065,
+     "max": 3.3999999994412065
+    },
+    {
+     "name": "input",
+     "mean": 0.4846153844577762,
+     "p95": 2.699999999254942,
+     "max": 2.699999999254942
+    },
+    {
+     "name": "interiors",
+     "mean": 0.3153846152843191,
+     "p95": 2.2999999998137355,
+     "max": 2.2999999998137355
+    },
+    {
+     "name": "decks",
+     "mean": 0.2615384616387578,
+     "p95": 2.300000000745058,
+     "max": 2.300000000745058
+    },
+    {
+     "name": "hud",
+     "mean": 0.21538461544192755,
+     "p95": 0.900000000372529,
+     "max": 0.900000000372529
+    },
+    {
+     "name": "nature",
+     "mean": 0.19999999997134393,
+     "p95": 0.7999999998137355,
+     "max": 0.7999999998137355
+    },
+    {
+     "name": "particles",
+     "mean": 0.07692307692307693,
+     "p95": 0.599999999627471,
+     "max": 0.599999999627471
+    },
+    {
+     "name": "crew",
+     "mean": 0.0076923076636516135,
+     "p95": 0.09999999962747097,
+     "max": 0.09999999962747097
+    }
+   ],
+   "render": {
+    "calls": 741,
+    "triangles": 328919,
+    "points": 8,
+    "lines": 0,
+    "programs": 54,
+    "textures": 1785,
+    "geometries": 1843,
+    "pixelRatio": 1,
+    "width": 393,
+    "height": 852
+   },
+   "heapMB": 250.485852,
+   "allocMBps": 0.9994188685363804,
+   "longTasks": {
+    "count": 14,
+    "totalMs": 3806,
+    "maxMs": 415
+   },
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   }
+  }
+ },
+ "breakdown": {
+  "plaza-idle": {
+   "frames": 2,
+   "perFrame": [
+    [
+     "graffiti",
+     525
+    ],
+    [
+     "Scene/NounRig",
+     66
+    ],
+    [
+     "SHADOW (unnamed Mesh)",
+     18
+    ],
+    [
+     "SHADOW Scene/Skateboard",
+     15
+    ],
+    [
+     "Scene/Buildings",
+     15
+    ],
+    [
+     "Scene/Skateboard",
+     15
+    ],
+    [
+     "IceCreamVan/IceCreamVan-static",
+     14
+    ],
+    [
+     "SHADOW Scene/NounRig",
+     13
+    ],
+    [
+     "Scene/Obstacles",
+     12
+    ],
+    [
+     "Scene/Backdrop",
+     11
+    ],
+    [
+     "Scene/Decals",
+     10
+    ],
+    [
+     "SHADOW IceCreamVan/IceCreamVan-static",
+     8
+    ],
+    [
+     "Mountain/mountain-props:0,0",
+     8
+    ],
+    [
+     "IceCreamVan",
+     8
+    ],
+    [
+     "Mountain/mountain-props:-1,0",
+     7
+    ],
+    [
+     "Scene/Ground",
+     7
+    ],
+    [
+     "Mountain/mountain-props:0,-1",
+     6
+    ],
+    [
+     "Mountain/mountain-props:0,1",
+     6
+    ],
+    [
+     "Mountain/mountain-props:-1,1",
+     6
+    ],
+    [
+     "Mountain/mountain-props:1,1",
+     5
+    ],
+    [
+     "Mountain/mountain-props:-2,1",
+     5
+    ],
+    [
+     "Scene/Props",
+     4
+    ],
+    [
+     "Mountain/mountain-props:-1,-1",
+     4
+    ],
+    [
+     "IceCreamVan/van-tyre",
+     4
+    ],
+    [
+     "IceCreamVan/van-hub",
+     4
+    ],
+    [
+     "Scene/Foliage",
+     3
+    ],
+    [
+     "Scene/Alleys",
+     3
+    ],
+    [
+     "(unnamed Mesh)",
+     3
+    ],
+    [
+     "SHADOW Scene/Skyline",
+     2
+    ],
+    [
+     "SHADOW IceCreamVan",
+     2
+    ]
+   ],
+   "trisPerFrame": [
+    [
+     "Scene/NounRig",
+     25988
+    ],
+    [
+     "Scene/Foliage",
+     19968
+    ],
+    [
+     "Mountain/mountain-props:0,1",
+     18732
+    ],
+    [
+     "Mountain/mountain-props:1,1",
+     17396
+    ],
+    [
+     "Mountain/mountain-props:-2,1",
+     15060
+    ],
+    [
+     "Mountain/mountain-props:0,0",
+     11794
+    ],
+    [
+     "Mountain/mountain-props:-1,1",
+     11452
+    ],
+    [
+     "Scene/Props",
+     10126
+    ],
+    [
+     "Mountain/mountain-props:0,-1",
+     9932
+    ],
+    [
+     "SHADOW Scene/NounRig",
+     9214
+    ],
+    [
+     "Mountain/mountain-props:-1,0",
+     8558
+    ],
+    [
+     "InteriorDoors/Interior:solid",
+     6000
+    ],
+    [
+     "Mountain/mountain-props:-1,-1",
+     5786
+    ],
+    [
+     "Scene/Ground",
+     4796
+    ],
+    [
+     "Scene/Buildings",
+     3020
+    ]
+   ]
+  },
+  "skate-loop": {
+   "frames": 2,
+   "perFrame": [
+    [
+     "graffiti",
+     327.5
+    ],
+    [
+     "Scene/NounRig",
+     58
+    ],
+    [
+     "(unnamed Mesh)",
+     38
+    ],
+    [
+     "SHADOW (unnamed Mesh)",
+     18
+    ],
+    [
+     "SHADOW Scene/Skateboard",
+     15
+    ],
+    [
+     "Scene/Buildings",
+     15
+    ],
+    [
+     "Scene/Decals",
+     15
+    ],
+    [
+     "Scene/Skateboard",
+     15
+    ],
+    [
+     "SHADOW Scene/NounRig",
+     13
+    ],
+    [
+     "Scene/Obstacles",
+     13
+    ],
+    [
+     "Scene/Backdrop",
+     11
+    ],
+    [
+     "Mountain/mountain-props:0,0",
+     8
+    ],
+    [
+     "Mountain/mountain-props:-1,0",
+     7
+    ],
+    [
+     "Mountain/mountain-props:-1,-2",
+     7
+    ],
+    [
+     "Scene/Ground",
+     7
+    ],
+    [
+     "Scene/Props",
+     6.5
+    ],
+    [
+     "Mountain/mountain-props:0,-1",
+     6
+    ],
+    [
+     "Mountain/mountain-props:-2,-2",
+     6
+    ],
+    [
+     "Mountain/mountain-props:-2,-1",
+     5
+    ],
+    [
+     "Mountain/mountain-props:-1,-1",
+     4
+    ],
+    [
+     "Scene/Foliage",
+     3
+    ],
+    [
+     "Mountain/mountain-props:0,-2",
+     3
+    ],
+    [
+     "SHADOW Scene/Skyline",
+     2
+    ],
+    [
+     "Scene/Skyline",
+     2
+    ],
+    [
+     "car-parked-cavallino",
+     2
+    ],
+    [
+     "car-parked-bruiser",
+     2
+    ],
+    [
+     "(unnamed Points)",
+     2
+    ],
+    [
+     "SHADOW Scene/RingInfill",
+     1
+    ],
+    [
+     "tod-sky",
+     1
+    ],
+    [
+     "Scene/Water",
+     1
+    ]
+   ],
+   "trisPerFrame": [
+    [
+     "Scene/NounRig",
+     25052
+    ],
+    [
+     "Scene/Buildings",
+     24680
+    ],
+    [
+     "Scene/Foliage",
+     19968
+    ],
+    [
+     "Mountain/mountain-props:-1,-2",
+     15682
+    ],
+    [
+     "Mountain/mountain-props:-2,-1",
+     15116
+    ],
+    [
+     "Mountain/mountain-props:0,0",
+     11794
+    ],
+    [
+     "Scene/Props",
+     10530
+    ],
+    [
+     "Mountain/mountain-props:0,-1",
+     9932
+    ],
+    [
+     "SHADOW Scene/NounRig",
+     9214
+    ],
+    [
+     "Mountain/mountain-props:-1,0",
+     8558
+    ],
+    [
+     "Mountain/mountain-props:-2,-2",
+     8444
+    ],
+    [
+     "Mountain/mountain-props:0,-2",
+     7315
+    ],
+    [
+     "InteriorDoors/Interior:solid",
+     6000
+    ],
+    [
+     "Mountain/mountain-props:-1,-1",
+     5786
+    ],
+    [
+     "Scene/Ground",
+     4796
+    ]
+   ]
+  }
+ }
+}
