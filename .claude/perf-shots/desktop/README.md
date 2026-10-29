@@ -91,9 +91,54 @@ Report: desktop machines ran hot (fans, heat, battery) and froze in `/world`.
 - `crop-1to1-before-after-sharp.jpg`: a native-resolution crop of the rider, left to right before (2), after (1.5), after + Sharp (2). Outline width matches.
 - The coloured facades in the before shot are facade streaming at that moment, not a render change. The Sharp shot (the after build) matches the after one.
 
-## Phones
+## Phones (no regression)
 
-See the table appended below (weak and mid profiles, `../harness/measure.cjs`, before vs after).
+`../harness/measure.cjs` with `SEED=1` (the same rider in every run: head models range from ~1k to ~30k triangles, which moved frame times more than any change did). `main` vs this branch, weak (6× CPU) and mid (4× CPU) profiles. Phones run `low` at 60 Hz, so the cap is a no-op there.
+
+The first branch run caught a regression from this branch. The minimap's new 30 fps gate let a phone at ~7 fps redraw it every frame instead of every other. A redraw is a whole Canvas 2D map, ~160 ms at 6× CPU: room frames were 88 ms without it and 250 ms with it. Touch screens now redraw at most 12 a second and never on consecutive frames (b6bb3bd). The table below is after that fix: frame p50s and frame counts match `main`, and CPU ms differ only by run-to-run noise. The skate p99 is that run's single worst frame (~45 frames a window), as in the phone pass.
+
+### weak  (boot base low @0.75, new low @0.75)
+
+| scenario | build | frame p50 / p95 / p99 ms | hitches >50ms | CPU p50 / p95 ms | render ms | draws | tris | programs | heap MB | long tasks (max ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plaza-idle | main | 150 / 167 / 283 | 82/82 | 54 / 84 | 46 | 327 | 232k | 53 | 100 | 72 (149) |
+| plaza-idle | branch | 150 / 217 / 300 | 72/72 | 62 / 106 | 55 | 328 | 232k | 53 | 100 | 70 (308) |
+| skate-loop | main | 217 / 400 / 550 | 65/65 | 60 / 251 | 79 | 319 | 198k | 53 | 104 | 62 (553) |
+| skate-loop | branch | 200 / 417 / 800 | 64/64 | 66 / 232 | 76 | 348 | 220k | 53 | 105 | 63 (788) |
+| remotes-16 | main | 200 / 333 / 333 | 49/49 | 87 / 150 | 72 | 408 | 289k | 53 | 162 | 48 (178) |
+| remotes-16 | branch | 233 / 367 / 400 | 47/47 | 98 / 153 | 82 | 471 | 306k | 53 | 149 | 47 (232) |
+| interior | main | 167 / 283 / 317 | 57/60 | 29 / 52 | 22 | 57 | 41k | 55 | 207 | 13 (84) |
+| interior | branch | 167 / 317 / 500 | 51/56 | 30 / 52 | 23 | 57 | 41k | 55 | 207 | 19 (86) |
+| big-drop | main | 117 / 200 / 217 | 122/125 | 53 / 86 | 41 | 326 | 98k | 75 | 239 | 104 (150) |
+| big-drop | branch | 117 / 183 / 217 | 123/126 | 47 / 84 | 36 | 314 | 93k | 75 | 226 | 95 (147) |
+
+enterInterior: before {"ms": 6755.299999999814, "maxFrame": 550, "longMax": 556, "hitches": 13} → after {"ms": 6858.700000000186, "maxFrame": 366.6999999999971, "longMax": 151, "hitches": 13}
+
+leaveInterior: before {"maxFrame": 433.3000000000029, "hitches": 12} → after {"maxFrame": 400, "hitches": 11}
+
+enterDrop: before {"maxFrame": 816.6999999999971, "hitches": 129, "longMax": 821} → after {"maxFrame": 933.3000000000029, "hitches": 119, "longMax": 934}
+
+### mid  (boot base low @1, new low @1)
+
+| scenario | build | frame p50 / p95 / p99 ms | hitches >50ms | CPU p50 / p95 ms | render ms | draws | tris | programs | heap MB | long tasks (max ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plaza-idle | main | 183 / 217 / 250 | 64/64 | 45 / 85 | 42 | 329 | 232k | 53 | 109 | 40 (147) |
+| plaza-idle | branch | 183 / 233 / 250 | 66/66 | 41 / 72 | 35 | 329 | 232k | 53 | 107 | 30 (87) |
+| skate-loop | main | 250 / 400 / 633 | 56/58 | 50 / 357 | 74 | 324 | 209k | 53 | 112 | 48 (680) |
+| skate-loop | branch | 217 / 467 / 783 | 55/57 | 52 / 454 | 70 | 355 | 208k | 53 | 112 | 45 (777) |
+| remotes-16 | main | 250 / 483 / 500 | 37/37 | 78 / 138 | 63 | 420 | 296k | 53 | 162 | 38 (230) |
+| remotes-16 | branch | 250 / 450 / 483 | 36/36 | 70 / 138 | 58 | 423 | 299k | 53 | 179 | 38 (236) |
+| interior | main | 150 / 300 / 433 | 52/55 | 20 / 38 | 16 | 57 | 41k | 55 | 165 | 4 (58) |
+| interior | branch | 183 / 350 / 417 | 53/54 | 20 / 35 | 17 | 57 | 41k | 55 | 137 | 2 (52) |
+| big-drop | main | 133 / 183 / 217 | 106/108 | 43 / 66 | 33 | 332 | 100k | 75 | 177 | 60 (118) |
+| big-drop | branch | 150 / 200 / 233 | 102/103 | 43 / 82 | 37 | 346 | 103k | 75 | 165 | 58 (127) |
+
+enterInterior: before {"ms": 5777.0999999996275, "maxFrame": 400, "longMax": 174, "hitches": 12} → after {"ms": 6341.89999999851, "maxFrame": 499.90000000000873, "longMax": 211, "hitches": 13}
+
+leaveInterior: before {"maxFrame": 400, "hitches": 11} → after {"maxFrame": 433.3000000000029, "hitches": 12}
+
+enterDrop: before {"maxFrame": 816.6000000000058, "hitches": 113, "longMax": 820} → after {"maxFrame": 916.5999999999913, "hitches": 102, "longMax": 885}
+
 
 ## Re-running
 
@@ -121,4 +166,5 @@ The perf builds use a vite config without `vite-plugin-checker` (it typechecks w
 - **A cap of 60 on a 144 Hz screen** alternates 14 and 21 ms frames, the usual 60-on-144 cadence. Players who prefer smoothness pick `max`.
 - **Heap creep** of ~0.6 MB/min after GC in both builds (20 min soak). It isn't a freeze cause at that rate; a heap snapshot diff over an hour would find it.
 - **Room entry** still builds the room in one long task; on desktop it is mostly CPU plus first-frame raster. Slicing it (as the phone pass did for the floor above) is the next step.
+- **The minimap** redraws a whole vector map each time (~160 ms on a weak phone at 6× CPU). Caching its static layers (contours, tracks, the city) in an offscreen canvas would make it nearly free.
 - **Video billboards** still decode while you're on the plaza (8% of a core). That's by design: they're on screen.
