@@ -7,6 +7,8 @@
 // Storage access is wrapped: private mode / blocked storage just means the
 // settings last for this page only.
 
+import { FRAME_CAPS, type FrameCapSetting } from '../render/framePacer';
+
 export const SETTINGS_KEY = 'noun-world-settings';
 export const SETTINGS_VERSION = 2;
 
@@ -58,6 +60,10 @@ export interface WorldSettings {
   hud: Record<HudItem, boolean>;
   hudScale: number;
   quality: QualitySetting;
+  /** Frame-rate cap: 30, 60 (default) or the display's own rate. */
+  frameCap: FrameCapSetting;
+  /** Desktop: draw at the screen's full pixel ratio (2 on Retina) instead of 1.5. */
+  sharp: boolean;
   camMode: CamModeSetting;
   /** Mouse-look multiplier. */
   lookSens: number;
@@ -101,6 +107,8 @@ export function defaultSettings(reduceMotion = prefersReducedMotion()): WorldSet
     hud,
     hudScale: 1,
     quality: 'auto',
+    frameCap: '60',
+    sharp: false,
     camMode: 'follow',
     lookSens: 1,
     invertY: false,
@@ -175,6 +183,8 @@ export function sanitize(raw: unknown, base: WorldSettings = defaultSettings()):
     hud,
     hudScale: clamp(o.hudScale, HUD_SCALE_MIN, HUD_SCALE_MAX, base.hudScale),
     quality: oneOf(o.quality, QUALITIES, base.quality),
+    frameCap: oneOf(o.frameCap, FRAME_CAPS, base.frameCap),
+    sharp: bool(o.sharp, base.sharp),
     camMode: oneOf(o.camMode, CAM_MODES, base.camMode),
     lookSens: clamp(o.lookSens, LOOK_SENS_MIN, LOOK_SENS_MAX, base.lookSens),
     invertY: bool(o.invertY, base.invertY),

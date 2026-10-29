@@ -47,6 +47,11 @@ function fit(canvas: HTMLCanvasElement) {
   return { w, h, dpr };
 }
 
+/** Minimap redraws a second (it moves with the rider, not the display). */
+const MINI_FPS = 30;
+/** The full map while it's open (dragging and zooming it). */
+const MAP_FPS = 60;
+
 export function WorldMap({
   game,
   touch,
@@ -95,16 +100,21 @@ export function WorldMap({
     if (game.mountain !== null) secretSpot();
   }, [open, game, touch]);
 
-  // Draw loop: the minimap always, the full map while open
+  // The full map hides the game completely: stop drawing the world behind it
+  useEffect(() => (open ? game.coverGame('map', true) : undefined), [open, game]);
+
+  // Draw loop: the minimap always, the full map while open. Paced (it was
+  // redrawn on every vsync, 144 a second on fast screens, and behind the desk)
   useEffect(() => {
     let raf = 0;
-    let frame = 0;
-    const tick = () => {
+    let last = -Infinity;
+    const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      frame++;
+      if (game.paused || now - last < 1000 / (open ? MAP_FPS : MINI_FPS) - 2) return;
+      last = now;
       const scene = sceneOf(game, way.current, open);
       const mini = miniRef.current;
-      if (!open && mini !== null && (!touch || frame % 2 === 0)) {
+      if (!open && mini !== null) {
         const ctx = mini.getContext('2d');
         if (ctx !== null) {
           const { w, h, dpr } = fit(mini);

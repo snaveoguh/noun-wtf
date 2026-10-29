@@ -6,6 +6,8 @@
 
 import type { Game } from '../Game';
 
+import { capFps } from '../render/framePacer';
+
 import { settings, type WorldSettings } from './store';
 
 export function applySettings(game: Game, s: WorldSettings) {
@@ -15,6 +17,8 @@ export function applySettings(game: Game, s: WorldSettings) {
   game.cam.shakeScale = s.reduceMotion ? 0 : 1;
   if (game.cam.mode !== s.camMode) game.cam.mode = s.camMode;
   game.voiceMode = s.voices;
+  game.frameCap = capFps(s.frameCap);
+  game.setSharp(s.sharp);
   game.rider.enabled = s.callouts;
   game.rider.brain.clean = s.cleanVoices;
 }

@@ -68,13 +68,15 @@ import {
 } from './radio/townTheme';
 import { localTransport, netTransport } from './radio/transport';
 import { autoQuality, isWeakDevice, readDevice, WEAK_BOOT_SCALE } from './render/deviceTier';
-import { Graphics, type Quality } from './render/Graphics';
+import { BLURRED_FPS, COVERED_FPS, effectiveFps, makePacer, pace } from './render/framePacer';
+import { bootScale, Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
 import {
   desktopRungs,
   DESKTOP_TUNING,
   frameWindow,
   makeController,
+  pacedTuning,
   phoneRungs,
   PHONE_TUNING,
   qualityTick,
@@ -727,6 +729,9 @@ export class Game {
       setTimeout(() => !this.disposed && checkTextureBudget(this.gfx.scene), 20_000);
     this.running = true;
     this.last = performance.now();
+    window.addEventListener('blur', this.onBlur);
+    window.addEventListener('focus', this.onFocus);
+    document.addEventListener('visibilitychange', this.onVisibility);
     this.raf = requestAnimationFrame(this.frame);
   }
 
@@ -888,11 +893,71 @@ export class Game {
     this.input.setEnabled(!p);
     this.fm.setHidden(p);
     this.beats.setHidden(p);
+    this.onVisibility();
     if (p) claimAudio('noun-world-radio', false);
   }
 
   /** Links streamed-in materials' programs ahead of their first draw (render/shaderWarm.ts). */
   private warmer: ShaderWarmer | null = null;
+
+  /**
+   * Frame-rate cap in fps (Settings → Frame rate; 0 = uncapped). Fast
+   * displays (120 / 144 Hz) otherwise ran the whole pipeline on every
+   * vsync (render/framePacer.ts).
+   */
+  frameCap = 60;
+  private pacer = makePacer();
+  /** The window lost focus: the game still shows, at BLURRED_FPS. */
+  private blurred = typeof document !== 'undefined' && !document.hasFocus();
+  // (focus moving into an iframe on the page blurs the window but not the document)
+  private onBlur = () => setTimeout(() => (this.blurred = !document.hasFocus()), 0);
+  private onFocus = () => (this.blurred = false);
+  /** A hidden tab draws nothing: its videos needn't decode either. */
+  private onVisibility = () =>
+    this.billboards.setActive(!this.paused && document.visibilityState !== 'hidden');
+  /** Menus over the game (coverGame): reason → hides it completely. */
+  private covers = new Map<string, boolean>();
+
+  /**
+   * A menu is over the game: what shows behind it runs at COVERED_FPS, and
+   * an opaque one (the full map) stops drawing it at all; the sim, network
+   * and audio carry on. Returns the release.
+   */
+  coverGame(reason: string, opaque = false): () => void {
+    this.covers.set(reason, opaque);
+    this.gfx.hold = [...this.covers.values()].some(Boolean);
+    return () => {
+      this.covers.delete(reason);
+      this.gfx.hold = [...this.covers.values()].some(Boolean);
+    };
+  }
+
+  /**
+   * Settings → Sharp: medium / high draw at the screen's full pixel ratio
+   * (up to 2) instead of 1.5. Rebuilds the desktop ladder from the new top.
+   */
+  setSharp(on: boolean) {
+    const q = this.gfx.quality;
+    if (q === 'low' || this.adaptive === null) return;
+    const dpr = window.devicePixelRatio || 1;
+    const top = bootScale(q, dpr, on);
+    if (top === this.adaptive.rungs[0].scale) return;
+    const frozen = this.adaptive.frozen;
+    const rungs = desktopRungs({ ...this.adaptive.rungs[0], scale: top }, dpr);
+    this.adaptive = makeController(rungs, DESKTOP_TUNING);
+    this.adaptive.frozen = frozen;
+    this.gfx.applyLite(rungs[0]);
+    this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
+  }
+
+  /** The cap in force right now (fps, 0 = none). */
+  get fpsCap(): number {
+    return effectiveFps(
+      this.frameCap,
+      this.blurred ? BLURRED_FPS : 0,
+      this.covers.size > 0 ? COVERED_FPS : 0,
+    );
+  }
 
   private frame = (now: number) => {
     if (!this.running) return;
@@ -901,6 +966,8 @@ export class Game {
       this.last = now;
       return;
     }
+    // Too soon under the cap: skip this vsync (the sim sees the whole gap next frame)
+    if (!pace(this.pacer, now, this.fpsCap)) return;
     const raw = now - this.last;
     const dt = Math.min(0.05, raw / 1000);
     this.last = now;
@@ -1025,7 +1092,7 @@ export class Game {
         this.towns?.update(dt);
         this.mountain?.update(this.player.pos, this.player.vel);
         this.nature?.update(dt, this.player.pos);
-        this.billboards.update(dt);
+        this.billboards.update(dt, this.gfx.camera.position);
         this.gfx.followShadow(this.player.pos);
         this.gfx.render(dt);
         this.updateHud(dt, fin);
@@ -1152,7 +1219,7 @@ export class Game {
     perf.lap('wild');
     if (!away) {
       this.nature?.update(dt, this.player.pos);
-      this.billboards.update(dt);
+      this.billboards.update(dt, this.gfx.camera.position);
     }
     this.camHook?.(this.gfx.camera, dt);
     perf.lap('nature');
@@ -1191,7 +1258,7 @@ export class Game {
     if (!away) {
       this.mountain?.update(this.player.pos, this.player.vel);
       this.nature?.update(wdt, this.player.pos);
-      this.billboards.update(wdt);
+      this.billboards.update(wdt, this.gfx.camera.position);
     }
     this.gfx.render(dt);
     // Stats see the scene like the Upside Down: suspended (only time played counts)
@@ -2270,7 +2337,12 @@ export class Game {
       this.fpsAcc = 0;
       this.fpsFrames = 0;
       // Adaptive quality: step down on slow / stuttering frames, back up on headroom
-      if (this.adaptive !== null && this.frameMs.length > 0) {
+      // (judged at the player's own cap only: a blurred window or a menu runs slower on purpose)
+      if (this.adaptive !== null && this.frameMs.length > 0 && this.fpsCap === this.frameCap) {
+        this.adaptive.tuning = pacedTuning(
+          this.gfx.quality === 'low' ? PHONE_TUNING : DESKTOP_TUNING,
+          this.frameCap,
+        );
         const next = qualityTick(this.adaptive, frameWindow(this.frameMs), window_);
         if (next !== null) {
           this.gfx.applyLite(next);
@@ -2437,6 +2509,9 @@ export class Game {
     this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.raf);
+    window.removeEventListener('blur', this.onBlur);
+    window.removeEventListener('focus', this.onFocus);
+    document.removeEventListener('visibilitychange', this.onVisibility);
     this.input.dispose();
     this.audio.dispose();
     this.graffiti?.dispose();

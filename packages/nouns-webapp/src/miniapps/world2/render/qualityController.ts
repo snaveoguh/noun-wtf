@@ -4,8 +4,10 @@
 // rung it picks through Graphics.applyLite):
 //   - phones ('low' on auto): render scale down to MIN_SCALE, then shadows
 //     off, then the ink pass off (deviceTier.stepDown's ladder);
-//   - desktop (medium / high): render scale only, in 0.25 steps down to a
-//     floor (1.25 on a Retina screen: lower read as blurry), no look change.
+//   - desktop (medium / high): render scale in 0.25 steps down to a floor
+//     (1.25 on a Retina screen: lower read as blurry), then SMAA off, then
+//     a half-size shadow map. None of those relinks a material, so the
+//     controller can step back up through all of them.
 // It reads frame-time percentiles, not an average: the median catches a
 // device that is simply too slow, the p95 one that keeps stuttering, and a
 // lone hitch (a shader link, a GC) moves neither for long enough to count.
@@ -73,7 +75,11 @@ export function phoneRungs(boot: LiteState): LiteState[] {
   return out;
 }
 
-/** Desktop: render scale in 0.25 steps down to the floor; shadows and post untouched. */
+/**
+ * Desktop: render scale in 0.25 steps down to the floor, then SMAA off,
+ * then the shadow map at half size (not under 2048). Shadows and the ink
+ * pass stay.
+ */
 export function desktopRungs(boot: LiteState, dpr: number): LiteState[] {
   const floor = dpr >= 2 ? 1.25 : 1;
   const out = [boot];
@@ -82,7 +88,27 @@ export function desktopRungs(boot: LiteState, dpr: number): LiteState[] {
     s = +(s - 0.25).toFixed(2);
     out.push({ ...boot, scale: s });
   }
+  let last = out[out.length - 1];
+  if (boot.aa === true) out.push((last = { ...last, aa: false }));
+  if (boot.shadowMap !== undefined && boot.shadowMap > 2048)
+    out.push({ ...last, shadowMap: boot.shadowMap / 2 });
   return out;
+}
+
+/**
+ * The tuning under a frame cap of `capFps` (0 = none). Frames come no
+ * faster than the cap, so headroom means holding it (a 144 Hz display
+ * alternates 2 and 3 vsyncs a frame at 60: up to ~21 ms), and a 30 fps cap
+ * is no reason to step down.
+ */
+export function pacedTuning(t: QualityTuning, capFps: number): QualityTuning {
+  if (!(capFps > 0)) return t;
+  const iv = 1000 / capFps;
+  return {
+    slowMs: Math.max(t.slowMs, iv * 1.25),
+    stutterMs: Math.max(t.stutterMs, iv * 2),
+    roomMs: Math.max(t.roomMs, iv * 1.3),
+  };
 }
 
 export function makeController(rungs: LiteState[], tuning: QualityTuning): QualityController {
@@ -111,8 +137,8 @@ export function frameWindow(ms: readonly number[]): FrameWindow {
   return { p50: percentile(s, 50), p95: percentile(s, 95) };
 }
 
-/** Only the scale differs between rungs a and b (cheap to switch: no relink). */
-function scaleOnly(a: LiteState, b: LiteState): boolean {
+/** Rungs a and b differ only in what switches without relinking a material. */
+function cheapSwitch(a: LiteState, b: LiteState): boolean {
   return a.shadows === b.shadows && a.post === b.post;
 }
 
@@ -135,7 +161,7 @@ export function qualityTick(c: QualityController, w: FrameWindow, dt: number): L
     if (c.age - c.lastUp < FLIP_WINDOW && ++c.flips >= MAX_FLIPS) c.noUp = true;
     return c.rungs[c.at];
   }
-  if (!c.noUp && c.at > 0 && c.good >= UP_AFTER && scaleOnly(c.rungs[c.at], c.rungs[c.at - 1])) {
+  if (!c.noUp && c.at > 0 && c.good >= UP_AFTER && cheapSwitch(c.rungs[c.at], c.rungs[c.at - 1])) {
     c.at--;
     c.good = 0;
     c.bad = 0;

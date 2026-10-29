@@ -6,6 +6,7 @@ import {
   DESKTOP_TUNING,
   frameWindow,
   makeController,
+  pacedTuning,
   phoneRungs,
   PHONE_TUNING,
   qualityTick,
@@ -122,5 +123,68 @@ describe('qualityTick', () => {
     );
     expect(feed(c, { p50: 30, p95: 35 }, 100)).toEqual([1, 2, 3]);
     expect(c.rungs[c.at]!.scale).toBe(1.25);
+  });
+
+  it('desktop at a 60 cap: holding 60 is headroom, 35 fps steps down', () => {
+    const boot = { scale: 1.5, shadows: true, post: true, aa: true, shadowMap: 4096 };
+    const c = makeController(desktopRungs(boot, 2), pacedTuning(DESKTOP_TUNING, 60));
+    // a 144 Hz display at a 60 cap: frames 2 or 3 vsyncs apart
+    const capped = { p50: 13.9, p95: 20.8 };
+    expect(feed(c, capped, 100)).toEqual([]);
+    expect(feed(c, { p50: 28, p95: 33 }, 9)).toEqual([1]);
+    c.age = 100;
+    expect(feed(c, capped, UP_AFTER * 2)).toEqual([0]);
+  });
+
+  it('desktop steps back up through SMAA and the shadow map (no relink)', () => {
+    const boot = { scale: 1, shadows: true, post: true, aa: true, shadowMap: 4096 };
+    const c = makeController(desktopRungs(boot, 1), DESKTOP_TUNING);
+    expect(feed(c, { p50: 30, p95: 35 }, 100)).toEqual([1, 2]);
+    expect(c.rungs[c.at]).toEqual({ ...boot, aa: false, shadowMap: 2048 });
+    c.age = 200;
+    expect(feed(c, ROOMY_DESK, UP_AFTER * 4)).toEqual([1, 0]);
+  });
+});
+
+const ROOMY_DESK = { p50: 9, p95: 11 };
+
+describe('desktop rungs', () => {
+  it('scale to the floor, then SMAA off, then a half-size shadow map', () => {
+    const boot = { scale: 1.5, shadows: true, post: true, aa: true, shadowMap: 4096 };
+    const r = desktopRungs(boot, 2);
+    expect(r.map(x => [x.scale, x.aa, x.shadowMap])).toEqual([
+      [1.5, true, 4096],
+      [1.25, true, 4096],
+      [1.25, false, 4096],
+      [1.25, false, 2048],
+    ]);
+    for (const x of r) expect(x.shadows && x.post).toBe(true);
+  });
+
+  it('a 1x monitor still has rungs; medium (2048 shadows) has no shadow rung', () => {
+    expect(
+      desktopRungs({ scale: 1, shadows: true, post: true, aa: true, shadowMap: 4096 }, 1),
+    ).toHaveLength(3);
+    expect(
+      desktopRungs({ scale: 1, shadows: true, post: true, aa: true, shadowMap: 2048 }, 1),
+    ).toHaveLength(2);
+  });
+});
+
+describe('pacedTuning', () => {
+  it('uncapped leaves the tuning alone', () => {
+    expect(pacedTuning(DESKTOP_TUNING, 0)).toEqual(DESKTOP_TUNING);
+  });
+
+  it('a 60 cap counts 2-3 vsyncs a frame as headroom; phones keep theirs', () => {
+    expect(pacedTuning(DESKTOP_TUNING, 60).roomMs).toBeGreaterThan(20.8);
+    expect(pacedTuning(DESKTOP_TUNING, 60).slowMs).toBe(DESKTOP_TUNING.slowMs);
+    expect(pacedTuning(PHONE_TUNING, 60)).toEqual(PHONE_TUNING);
+  });
+
+  it('a 30 cap is never "slow" for being 30', () => {
+    const t = pacedTuning(DESKTOP_TUNING, 30);
+    expect(t.slowMs).toBeGreaterThan(34);
+    expect(t.stutterMs).toBeGreaterThan(50);
   });
 });

@@ -17,6 +17,12 @@ const mp4Url = (id: string) => `https://media.giphy.com/media/${id}/giphy.mp4`;
 /** Decal materials in plaza.glb that become screens (mural first = hero). */
 const SCREEN_MATERIAL = /^(mural|poster_\d+)__/i;
 const CYCLE_SECONDS = 9;
+/**
+ * Past this (m) from every mesh a screen is on, its video pauses: each live
+ * video is a decoder running all the time (~8% of a core for the plaza's
+ * set), seen or not. Indoors (rooms are 4 km up) they all pause.
+ */
+const PLAY_WITHIN = 160;
 
 async function fetchGifIds(): Promise<string[]> {
   const ids: string[] = [];
@@ -41,6 +47,8 @@ interface Screen {
   video: HTMLVideoElement;
   texture: THREE.VideoTexture;
   next: number;
+  /** World centres of the meshes showing it. */
+  at: THREE.Vector3[];
 }
 
 export class PipBillboards {
@@ -49,6 +57,8 @@ export class PipBillboards {
   private cursor = 0;
   private elapsed = 0;
   private disposed = false;
+  /** Off: every video paused (the game is backgrounded). */
+  private active = true;
 
   /** Find screen materials under the level root and start the feed. */
   async attach(levelRoot: THREE.Object3D) {
@@ -87,8 +97,17 @@ export class PipBillboards {
       if (Array.isArray(t.mesh.material)) t.mesh.material[t.index] = m;
       else t.mesh.material = m;
     }
+    const centres = new Map<string, THREE.Vector3[]>();
+    const box = new THREE.Box3();
+    for (const t of targets) {
+      t.mesh.updateWorldMatrix(true, false);
+      const c = box.setFromObject(t.mesh).getCenter(new THREE.Vector3());
+      const list = centres.get(t.key) ?? [];
+      list.push(c);
+      centres.set(t.key, list);
+    }
     let k = 0;
-    for (const material of mats.values()) {
+    for (const [key, material] of mats) {
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
       video.muted = true;
@@ -103,7 +122,13 @@ export class PipBillboards {
       texture.generateMipmaps = false;
       material.map = texture;
       material.needsUpdate = true;
-      const screen: Screen = { material, video, texture, next: (k * 3) % CYCLE_SECONDS };
+      const screen: Screen = {
+        material,
+        video,
+        texture,
+        next: (k * 3) % CYCLE_SECONDS,
+        at: centres.get(key) ?? [],
+      };
       this.screens.push(screen);
       this.load(screen);
       k++;
@@ -120,10 +145,25 @@ export class PipBillboards {
     });
   }
 
-  update(dt: number) {
-    if (this.screens.length === 0) return;
+  /** Pause every video (false) or let them play where they're seen (true). */
+  setActive(on: boolean) {
+    this.active = on;
+    if (!on) for (const s of this.screens) if (!s.video.paused) s.video.pause();
+  }
+
+  /** `eye`: the camera; a screen far from it pauses until it's near again. */
+  update(dt: number, eye?: THREE.Vector3) {
+    if (this.screens.length === 0 || !this.active) return;
     this.elapsed += dt;
     for (const s of this.screens) {
+      if (
+        eye !== undefined &&
+        s.at.length > 0 &&
+        !s.at.some(c => c.distanceTo(eye) < PLAY_WITHIN)
+      ) {
+        if (!s.video.paused) s.video.pause();
+        continue;
+      }
       s.next -= dt;
       if (s.next <= 0) {
         s.next = CYCLE_SECONDS + Math.random() * 3;
