@@ -47,8 +47,13 @@ function fit(canvas: HTMLCanvasElement) {
   return { w, h, dpr };
 }
 
-/** Minimap redraws a second (it moves with the rider, not the display). */
+/**
+ * Minimap redraws a second (it moves with the rider, not the display). A
+ * redraw is a whole Canvas 2D map: ~160 ms on a weak phone at 6x CPU, so
+ * touch screens also keep to every other frame, as before.
+ */
 const MINI_FPS = 30;
+const MINI_FPS_TOUCH = 12;
 /** The full map while it's open (dragging and zooming it). */
 const MAP_FPS = 60;
 
@@ -108,9 +113,12 @@ export function WorldMap({
   useEffect(() => {
     let raf = 0;
     let last = -Infinity;
+    let frame = 0;
+    const fps = open ? MAP_FPS : touch ? MINI_FPS_TOUCH : MINI_FPS;
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      if (game.paused || now - last < 1000 / (open ? MAP_FPS : MINI_FPS) - 2) return;
+      if (game.paused || (!open && touch && ++frame % 2 === 1)) return;
+      if (now - last < 1000 / fps - 2) return;
       last = now;
       const scene = sceneOf(game, way.current, open);
       const mini = miniRef.current;

@@ -33,6 +33,19 @@ const PROFILES = {
     cores: 8,
     memory: 8,
   },
+  weak: {
+    ctx: {
+      viewport: { width: 412, height: 915 },
+      deviceScaleFactor: 2.6,
+      isMobile: true,
+      hasTouch: true,
+      userAgent:
+        'Mozilla/5.0 (Linux; Android 12; moto g06) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+    },
+    gpu: 'Mali-G52 MC2',
+    cores: 8,
+    memory: 4,
+  },
   hd: {
     ctx: { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 },
     gpu: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0)',
