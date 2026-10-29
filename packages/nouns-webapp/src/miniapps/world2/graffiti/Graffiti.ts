@@ -21,13 +21,15 @@
 // wide when they hold fine-tip strokes, with a cap on how many big canvases
 // exist at once so memory stays bounded.
 
+import type { Slot } from './atlas';
 import type { CollisionWorld } from '../physics/Collision';
 
 import * as THREE from 'three';
 
+import { FarBatch } from './farBatch';
 import { type DrawItem, SprayHistory, WallLog, type Outgoing } from './history';
 import { inParallel, nearestFirst, retry } from './loadOrder';
-import { FAR_W, type LodCell, lodChanges } from './lod';
+import { FAR_W, LOD_DEFAULT, type LodCell, lodChanges, type LodTuning, lodTuning } from './lod';
 import { postTag, type QueuedTag, StoreQueue } from './storeQueue';
 import {
   CELL_H_MM,
@@ -92,6 +94,8 @@ export const NOZZLES = [
 
 const CELL_W = CELL_W_MM / 1000;
 const CELL_H = CELL_H_MM / 1000;
+/** Paint sits this far off its wall (m). */
+const LIFT = 0.012;
 const TIER_W = [512, 1024, 2048];
 const INDEX_BUCKETS = 8;
 const RANGE = 7;
@@ -151,6 +155,24 @@ interface Cell {
   n: THREE.Vector3;
   dirty: boolean;
   log: WallLog;
+  /** Phones: its tile in the far atlas (FarBatch), drawn there while far. */
+  tile: { n: number; slot: Slot } | null;
+}
+
+/**
+ * Phones ('low'): far cells as atlas tiles (a few draws instead of one per
+ * cell), sharp only close up and only so many, smaller canvases. Absent
+ * (desktop, medium / high) everything is as it always was.
+ */
+export interface GraffitiOptions {
+  batch?: { renderer: THREE.WebGLRenderer; tileW: number; pageW: number };
+  lod?: LodTuning;
+  /** Canvas width of a sharp cell (512 as built). */
+  nearW?: number;
+  /** How many 1024- and 2048-wide canvases may exist at once. */
+  tierCaps?: [number, number];
+  /** Cells that change size per LOD look. */
+  lodBudget?: number;
 }
 
 export interface GraffitiNet {
@@ -349,6 +371,36 @@ function drawItem(ctx: CanvasRenderingContext2D, W: number, H: number, it: DrawI
 
 const _p = new THREE.Vector3();
 
+/** What a tier draws paint with: phones ('low') batch and shrink, the rest as built. */
+export function graffitiOptions(
+  quality: 'low' | 'medium' | 'high',
+  weak: boolean,
+  renderer: THREE.WebGLRenderer,
+): GraffitiOptions {
+  if (quality !== 'low') return {};
+  return {
+    // 64×32 tiles on a weak phone: ~2,500 cells fit 5 pages of 4 MB
+    batch: { renderer, tileW: weak ? 64 : FAR_W, pageW: weak ? 1024 : 2048 },
+    lod: lodTuning(quality, weak),
+    nearW: weak ? 256 : 512,
+    tierCaps: weak ? [0, 0] : [6, 1],
+    lodBudget: weak ? 3 : 6,
+  };
+}
+
+/** A cell's (or an atlas page's) paint material. */
+function cellMaterial() {
+  return new THREE.MeshStandardMaterial({
+    transparent: true,
+    depthWrite: false,
+    roughness: 0.75,
+    metalness: 0,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+  });
+}
+
 export class Graffiti {
   group = new THREE.Group();
   cells = new Map<string, Cell>();
@@ -387,6 +439,11 @@ export class Graffiti {
   private readonly startedAt = Date.now();
   private hiss: { gain: GainNode } | null = null;
   private tierCaps: number[];
+  private tierW: number[];
+  private farW: number;
+  private lod: LodTuning;
+  private lodBudget: number;
+  private batch: FarBatch | null = null;
   private cursor: THREE.Group;
   private cursorDisc: THREE.Mesh;
   private cursorRing: THREE.LineLoop;
@@ -400,11 +457,22 @@ export class Graffiti {
     private world: CollisionWorld,
     private levelKey: string,
     private net: GraffitiNet | null,
+    opts: GraffitiOptions = {},
   ) {
     this.group.name = 'graffiti';
     const touch = isTouchDevice();
     // How many 1024- and 2048-wide canvases may exist at once
-    this.tierCaps = [Infinity, touch ? 12 : 32, touch ? 3 : 8];
+    this.tierCaps = [Infinity, ...(opts.tierCaps ?? [touch ? 12 : 32, touch ? 3 : 8])];
+    this.tierW = [opts.nearW ?? TIER_W[0], TIER_W[1], TIER_W[2]];
+    this.lod = opts.lod ?? LOD_DEFAULT;
+    this.lodBudget = opts.lodBudget ?? LOD_BUDGET;
+    this.farW = FAR_W;
+    if (opts.batch !== undefined) {
+      const b = opts.batch;
+      this.farW = b.tileW;
+      this.batch = new FarBatch(b.renderer, { tileW: b.tileW, pageW: b.pageW }, cellMaterial);
+      this.group.add(this.batch.group);
+    }
     this.toolState = this.loadPrefs();
 
     // Aim cursor: a disc of the current colour at the real nozzle size,
@@ -512,6 +580,18 @@ export class Graffiti {
     }
     base.hex = intToHex(base.color);
     return base;
+  }
+
+  /** ?perf=1: how much paint is drawn and how. */
+  perfLine(): string {
+    let sharp = 0;
+    for (const c of this.cells.values()) if (c.near) sharp++;
+    const b = this.batch;
+    const far =
+      b === null
+        ? 'own meshes'
+        : `${b.pageCount} pages, ${b.pending} queued, ${b.stats.blits} copies ${b.stats.ms.toFixed(0)} ms`;
+    return `${this.cells.size} cells, ${sharp} sharp, far: ${far}`;
   }
 
   /** Current colour as #rrggbb. */
@@ -862,20 +942,12 @@ export class Graffiti {
     const hit = this.cells.get(id);
     if (hit !== undefined) return hit;
     const canvas = document.createElement('canvas');
-    canvas.width = FAR_W;
-    canvas.height = FAR_W / 2;
+    canvas.width = this.farW;
+    canvas.height = this.farW / 2;
     const ctx = canvas.getContext('2d')!;
     const texture = this.makeTexture(canvas);
-    const mat = new THREE.MeshStandardMaterial({
-      map: texture,
-      transparent: true,
-      depthWrite: false,
-      roughness: 0.75,
-      metalness: 0,
-      polygonOffset: true,
-      polygonOffsetFactor: -4,
-      polygonOffsetUnits: -4,
-    });
+    const mat = cellMaterial();
+    mat.map = texture;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(CELL_W, CELL_H), mat);
     const origin = n
       .clone()
@@ -888,10 +960,19 @@ export class Graffiti {
       .copy(origin)
       .addScaledVector(u, CELL_W / 2)
       .addScaledVector(v, CELL_H / 2)
-      .addScaledVector(n, 0.012);
+      .addScaledVector(n, LIFT);
     mesh.receiveShadow = true;
     mesh.renderOrder = 2;
-    this.group.add(mesh);
+    // Walls never move: no matrix rebuilt every frame for each of ~2,500
+    mesh.matrixAutoUpdate = false;
+    mesh.updateMatrix();
+    let tile: Cell['tile'] = null;
+    if (this.batch !== null) {
+      // Far: a tile in the atlas; the mesh joins the scene only while sharp
+      tile = this.batch.alloc();
+      this.batch.place(tile.slot, origin, u, v, n, CELL_W, CELL_H, LIFT);
+      this.batch.setNormal(tile.slot, n);
+    } else this.group.add(mesh);
     const cell: Cell = {
       id,
       plane: id.split('|').slice(0, 3).join('|'),
@@ -908,6 +989,7 @@ export class Graffiti {
       n,
       dirty: false,
       log: new WallLog(),
+      tile,
     };
     this.cells.set(id, cell);
     return cell;
@@ -934,7 +1016,7 @@ export class Graffiti {
     }
     if (tier === cell.tier) return false;
     cell.tier = tier;
-    this.resize(cell, TIER_W[tier]);
+    this.resize(cell, this.tierW[tier]);
     return true;
   }
 
@@ -955,8 +1037,19 @@ export class Graffiti {
     if (cell.near === near) return;
     cell.near = near;
     cell.tier = 0;
-    if (!near) this.resize(cell, FAR_W);
-    else if (!this.retier(cell, cell.want)) this.resize(cell, TIER_W[0]);
+    if (!near) this.resize(cell, this.farW);
+    else if (!this.retier(cell, cell.want)) this.resize(cell, this.tierW[0]);
+    const b = this.batch;
+    if (b !== null && cell.tile !== null) {
+      // Sharp: its own mesh, its tile hidden. Far again: back to the tile
+      if (near) {
+        this.group.add(cell.mesh);
+        b.hide(cell.tile.slot, cell.mesh.position);
+      } else {
+        this.group.remove(cell.mesh);
+        b.place(cell.tile.slot, cell.origin, cell.u, cell.v, cell.n, CELL_W, CELL_H, LIFT);
+      }
+    }
     this.redraw(cell);
   }
 
@@ -971,7 +1064,7 @@ export class Graffiti {
         dist: c.mesh.position.distanceTo(at),
         pinned: c === live,
       });
-    const { promote, demote } = lodChanges(list, LOD_BUDGET);
+    const { promote, demote } = lodChanges(list, this.lodBudget, this.lod);
     // Down first, so the big-canvas caps have room for the ones going up
     for (const id of demote) this.setNear(this.cells.get(id)!, false);
     for (const id of promote) this.setNear(this.cells.get(id)!, true);
@@ -1187,12 +1280,16 @@ export class Graffiti {
       this.updateLod(playerPos);
     }
     this.updateCursor(opts.cursor !== false);
+    const b = this.batch;
     for (const c of this.cells.values()) {
       if (c.dirty) {
-        c.texture.needsUpdate = true;
+        // (a far cell on a phone is a tile: its own texture is never drawn)
+        if (b !== null && c.tile !== null && !c.near) b.blit(c.tile.n, c.tile.slot, c.canvas);
+        else c.texture.needsUpdate = true;
         c.dirty = false;
       }
     }
+    b?.flush();
     return landed;
   }
 
@@ -1279,6 +1376,7 @@ export class Graffiti {
       (c.mesh.material as THREE.Material).dispose();
     }
     this.cells.clear();
+    this.batch?.dispose();
     this.cursor.traverse(o => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Line) {
         o.geometry.dispose();

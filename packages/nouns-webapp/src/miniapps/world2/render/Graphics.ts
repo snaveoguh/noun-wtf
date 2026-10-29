@@ -111,6 +111,16 @@ export class Graphics {
       new URLSearchParams(window.location.search).get('shadows') === 'pcf'
         ? THREE.PCFShadowMap
         : THREE.BasicShadowMap;
+    // shadowRoot: the frame's shadow pass walks that subtree instead of the
+    // scene (inside render(), where matrices and skeletons are already fresh)
+    const sm = this.renderer.shadowMap;
+    const drawShadows = sm.render.bind(sm);
+    sm.render = (lights, scene, camera) =>
+      drawShadows(
+        lights,
+        scene === this.scene && this.shadowRoot !== null ? (this.shadowRoot as THREE.Scene) : scene,
+        camera,
+      );
 
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.15, 3000);
 
@@ -424,6 +434,15 @@ export class Graphics {
 
   /** Draw nothing (an opaque menu covers the canvas: Game.coverGame). */
   hold = false;
+
+  /**
+   * Weak phones: only this subtree (the rider) casts into the shadow map.
+   * Low already meant "only the rider casts", but the van, cars, props and
+   * NPC heads that load late set their own castShadow (~40 shadow draws at
+   * the plaza), and the shadow pass walked the whole scene every frame to
+   * find them. Null: everything that casts, as built.
+   */
+  shadowRoot: THREE.Object3D | null = null;
 
   render(dt: number) {
     if (this.hold) return;

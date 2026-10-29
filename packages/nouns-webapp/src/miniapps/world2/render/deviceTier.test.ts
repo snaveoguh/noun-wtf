@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   autoQuality,
+  bootPlan,
+  deviceLine,
   isMobile,
   isWeakDevice,
   MIN_SCALE,
@@ -45,5 +47,27 @@ describe('device tier', () => {
     expect(seen.map(x => x.scale)).toEqual([1, 0.85, 0.7, 0.6, 0.6, 0.6]);
     expect(seen.at(-2)).toEqual({ scale: MIN_SCALE, shadows: false, post: true });
     expect(seen.at(-1)).toEqual({ scale: MIN_SCALE, shadows: false, post: false });
+  });
+
+  it("an explicit Low on a phone keeps every phone protection (the owner's Moto G06)", () => {
+    // auto on a phone boots low with the weak check and the full ladder
+    expect(bootPlan('low', false, true)).toEqual({ phone: true, ladder: 'phone' });
+    // Settings → Low (or ?q=low) on a phone: the same, never less
+    expect(bootPlan('low', true, true)).toEqual({ phone: true, ladder: 'phone' });
+    // ?q=low on a desktop stays as chosen (scripts, comparisons)
+    expect(bootPlan('low', true, false)).toEqual({ phone: false, ladder: null });
+    // medium / high (auto or picked) keep the desktop ladder
+    expect(bootPlan('high', false, false)).toEqual({ phone: false, ladder: 'desktop' });
+    expect(bootPlan('medium', true, true)).toEqual({ phone: false, ladder: 'desktop' });
+  });
+
+  it('the perf device line names the verdict and the GPU', () => {
+    const g06 = { ua: ANDROID, gpu: 'Mali-G52 MC2', memory: 4, cores: 8 };
+    expect(deviceLine(g06, true, isWeakDevice(g06))).toBe(
+      'WEAK · Mali-G52 MC2 · 4 GB · 8 cores · mobile',
+    );
+    expect(deviceLine({ ua: MAC, cores: 10 }, false, false)).toBe(
+      'not checked · gpu hidden · ? GB · 10 cores',
+    );
   });
 });

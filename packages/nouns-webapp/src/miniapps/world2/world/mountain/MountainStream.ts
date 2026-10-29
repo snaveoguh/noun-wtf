@@ -22,6 +22,7 @@ import type { Quality } from '../../render/Graphics';
 
 import * as THREE from 'three';
 
+import { textureDiet } from '../../render/textureDiet';
 import { toonify } from '../../render/Toon';
 
 import {
@@ -55,6 +56,8 @@ const URGENT_PROPS = CHUNK * 1.2;
  * weak phone's frame (?perf=1, 2026-10-28) for trees the fog half hides.
  */
 const LOW_DRESSING_VIEW = 300;
+/** A weak phone (on the texture diet): nearer still (~70 → ~35 draws from the plaza). */
+const WEAK_DRESSING_VIEW = 180;
 
 export interface ChunkContext {
   ix: number;
@@ -222,7 +225,7 @@ export class MountainStream {
       c.ahead = speed > 15 ? distTo(c, lx, lz) : Infinity;
       if (c.dist > VIEW + CHUNK && c.ahead > aheadR + CHUNK) this.disposeChunk(c);
       else if (low && c.props !== null) {
-        const near = c.dist < LOW_DRESSING_VIEW;
+        const near = c.dist < (textureDiet.on ? WEAK_DRESSING_VIEW : LOW_DRESSING_VIEW);
         for (const o of c.props.group.children)
           if (o.userData.farCull === true && o.visible !== near) o.visible = near;
       }

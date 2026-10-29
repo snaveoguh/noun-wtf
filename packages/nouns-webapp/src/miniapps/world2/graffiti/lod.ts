@@ -15,6 +15,26 @@ export const NEAR_M = 35;
 /** ...and keeps it until it's this far away. */
 export const FAR_M = 50;
 
+export interface LodTuning {
+  nearM: number;
+  farM: number;
+  /** At most this many cells sharp at once (the nearest; pinned ones always). */
+  maxNear: number;
+}
+
+/** Desktop (and medium / high anywhere): as it always was. */
+export const LOD_DEFAULT: LodTuning = { nearM: NEAR_M, farM: FAR_M, maxNear: Infinity };
+
+/**
+ * Phones: ~340 painted cells sit within 35 m of the plaza's centre, each a
+ * 512×256 canvas sharp (~180 MB of canvases plus their mipmapped textures on
+ * a 4 GB phone). A phone draws a sharp cell only close up, and only so many.
+ */
+export function lodTuning(quality: 'low' | 'medium' | 'high', weak: boolean): LodTuning {
+  if (quality !== 'low') return LOD_DEFAULT;
+  return weak ? { nearM: 12, farM: 18, maxNear: 16 } : { nearM: 20, farM: 28, maxNear: 40 };
+}
+
 export interface LodCell {
   id: string;
   near: boolean;
@@ -32,14 +52,26 @@ export interface LodCell {
 export function lodChanges(
   cells: Iterable<LodCell>,
   budget: number,
+  t: LodTuning = LOD_DEFAULT,
 ): { promote: string[]; demote: string[] } {
   const up: LodCell[] = [];
   const down: LodCell[] = [];
+  const want: LodCell[] = [];
   for (const c of cells) {
-    const sharp = c.pinned || c.dist < NEAR_M || (c.near && c.dist < FAR_M);
-    if (sharp && !c.near) up.push(c);
-    else if (!sharp && c.near) down.push(c);
+    const sharp = c.pinned || c.dist < t.nearM || (c.near && c.dist < t.farM);
+    if (sharp) want.push(c);
+    else if (c.near) down.push(c);
   }
+  // Over the cap: the furthest of the wanted ones stay (or go back to) small.
+  // A sharp one counts as a little nearer, so two at the edge don't swap.
+  if (want.length > t.maxNear) {
+    const slack = (t.farM - t.nearM) / 2;
+    const key = (c: LodCell) => c.dist - (c.near ? slack : 0);
+    want.sort((a, b) => Number(b.pinned) - Number(a.pinned) || key(a) - key(b));
+    for (const c of want.splice(Math.max(t.maxNear, want.filter(w => w.pinned).length)))
+      if (c.near) down.push(c);
+  }
+  for (const c of want) if (!c.near) up.push(c);
   up.sort((a, b) => a.dist - b.dist);
   down.sort((a, b) => b.dist - a.dist);
   return {

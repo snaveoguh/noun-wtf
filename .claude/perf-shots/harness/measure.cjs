@@ -74,6 +74,19 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
     },
     { gpu: P.gpu, cores: P.cores, memory: P.memory },
   );
+  // Q=low: a saved Low in Settings (what the owner's phone had); GRAFFITI=<store.json>:
+  // the live wall store (?level=plaza, fetched read-only) painted as offline tags
+  const store = process.env.GRAFFITI ? fs.readFileSync(process.env.GRAFFITI, 'utf8') : null;
+  if (process.env.Q || store)
+    await ctx.addInitScript(
+      ({ q, store }) => {
+        try {
+          if (q) localStorage.setItem('noun-world-settings', JSON.stringify({ v: 2, quality: q }));
+          if (store) localStorage.setItem('w2-graffiti-offline:plaza', store);
+        } catch {}
+      },
+      { q: process.env.Q || null, store },
+    );
   const p = await ctx.newPage();
   p.on('pageerror', e => log('pageerror', String(e).slice(0, 200)));
   const cdp = await ctx.newCDPSession(p);
@@ -147,6 +160,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
       `draws ${s.render?.calls} tris ${s.render?.triangles} progs ${s.render?.programs}`,
       `heap ${s.heapMB?.toFixed(0)} alloc ${s.allocMBps?.toFixed(1)} lt ${s.longTasks.count}/${s.longTasks.maxMs.toFixed(0)}`,
     );
+    log('    extra', JSON.stringify(s.extra));
     log('   ', s.systems.slice(0, 8).map(x => `${x.name}:${x.mean.toFixed(2)}/${x.p95.toFixed(1)}`).join(' '));
     fs.writeFileSync(out, JSON.stringify(results, null, 1));
   };
@@ -159,11 +173,72 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
       [on, k],
     );
 
-  if (SCEN.includes('idle')) await measure('plaza-idle', 12000);
+  // BREAKDOWN=1: one frame's draw calls by top-level scene branch (shadow pass apart)
+  const breakdown = async name => {
+    if (!process.env.BREAKDOWN) return;
+    const r = await p.evaluate(
+      () =>
+        new Promise(res => {
+          const g = window.__w2;
+          const rd = g.gfx.renderer;
+          const orig = rd.renderBufferDirect;
+          const by = {};
+          const tby = {};
+          let frames = 0;
+          const origRender = rd.render;
+          rd.render = function (scene, cam) {
+            if (scene === g.gfx.scene && !cam.isOrthographicCamera) frames++;
+            return origRender.apply(this, arguments);
+          };
+          const label = o => {
+            const path = [];
+            // the first two named ancestors (most groups are unnamed)
+            for (let x = o; x && x.parent; x = x.parent) path.unshift(x.name || '');
+            const named = path.filter(Boolean);
+            return named.length > 0 ? named.slice(0, 2).join('/') : `(unnamed ${o.type})`;
+          };
+          rd.renderBufferDirect = function (cam, scene, geo, mat, obj, grp) {
+            const k = (cam.isOrthographicCamera ? 'SHADOW ' : '') + label(obj);
+            by[k] = (by[k] || 0) + 1;
+            const n = geo.index ? geo.index.count : geo.attributes.position ? geo.attributes.position.count : 0;
+            const tris = (Math.min(n, geo.drawRange.count) / 3) * (obj.isInstancedMesh ? obj.count : 1);
+            tby[k] = (tby[k] || 0) + tris;
+            return orig.apply(this, arguments);
+          };
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              rd.renderBufferDirect = orig;
+              rd.render = origRender;
+              const f = Math.max(1, frames);
+              res({
+                frames: f,
+                perFrame: Object.entries(by)
+                  .map(([k, v]) => [k, +(v / f).toFixed(1)])
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 30),
+                trisPerFrame: Object.entries(tby)
+                  .map(([k, v]) => [k, Math.round(v / f)])
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 15),
+              });
+            }),
+          );
+        }),
+    );
+    results.breakdown = results.breakdown || {};
+    results.breakdown[name] = r;
+    log('draws by branch', name, JSON.stringify(r));
+  };
+
+  if (SCEN.includes('idle')) {
+    await measure('plaza-idle', 12000);
+    await breakdown('plaza-idle');
+  }
   if (SCEN.includes('skate')) {
     await keys(true, 'KeyW', 'KeyD');
     await sleep(1500);
     await measure('skate-loop', 15000);
+    await breakdown('skate-loop');
     await keys(false, 'KeyW', 'KeyD');
     await sleep(1000);
   }

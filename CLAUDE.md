@@ -197,6 +197,13 @@ The baked plaza left a 4.5 m dead-end slot between neighbouring blocks on each s
 
 A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Android) goes on the texture diet (`render/textureDiet.ts`, `textureDiet.on`): every upload is capped at 512 px, static textures are shrunk to 256 px on the CPU before upload (`shrinkTexture`: the plaza GLB's materials, nature, skyline; shirts and heads paint smaller), the env map bakes at 64 px, the shadow map is 512, only the mural plays a Giphy video, and a lost WebGL context reloads once. New features that add textures should shrink them under `textureDiet.on` too; dev builds warn when the weak-device estimate passes 50 MB (`checkTextureBudget`). Desktop and normal phones never diet. Measured 2026-10-27 (emulated Moto G06, production build): GL textures ~130 → ~36 MB.
 
+**Phone pass 2 (2026-10-29, `.claude/perf-shots/phone/README.md`):**
+- **Low never costs a phone its protections** (`bootPlan` in `render/deviceTier.ts`): the weak check, boot scale, texture diet and the full phone ladder run on a picked Low (Settings / `?q=low`) exactly as on auto. The owner's Moto G06 had Low saved and ran at 1.00 scale with no diet and no ladder. Only `?q=low` on a desktop stays as chosen.
+- **Graffiti on phones** (`graffitiOptions` in `graffiti/Graffiti.ts`): the live store is ~2,500 painted cells, which was ~500 draws, ~1,300 textures and ~340 sharp 512 px canvases at the plaza. On `low`, far cells are tiles in a few atlas pages (`graffiti/atlas.ts` pure layout, `graffiti/farBatch.ts` sub-uploads with `texSubImage2D`, one mip build per page a frame): 5 draws. Sharp cells are close and capped (`lodTuning`: weak 12 m / 16 cells / 256 px). Cell meshes never rebuild their matrices. Desktop is unchanged.
+- **Weak phones only:** the shadow map is drawn from the rider alone (`gfx.shadowRoot`, a wrapper on `shadowMap.render`), board trucks and wheels don't cast, dressing is drawn within 180 m, and the ladder ends on a 0.5 scale rung (`WEAK_LAST_SCALE`).
+- **Static NPC props** (Keymaker, Oracle…) are merged per material on `low` (`render/mergeStatic.ts`).
+- `?perf=1` shows the device verdict + GPU string, quality (picked / auto), render scale / ink / post / shadows, the adaptive rung and a graffiti line; the harness takes `Q=low` (a saved Low) and `GRAFFITI=<store.json>` (the live wall store as offline paint).
+
 ### Noun World performance (?perf=1, shader warm-up, adaptive quality)
 
 - **Measure first:** `?perf=1` (overlay) or `?perf=quiet` (scripts) turns on `world2/perf/PerfProbe.ts`. Game brackets each frame and laps each system (`perf.lap('name')`); you get frame p50/p95/p99, hitches over 50 ms, ms per system, draw calls / triangles / programs and heap, and `window.__w2perf.snapshot()` returns the same. The headless before/after harness and the 2026-10-28 numbers are in `.claude/perf-shots/README.md`. Headless WebGL is SwiftShader: its frame intervals are GPU-bound, so compare CPU ms, draws, programs and hitches, not fps.
@@ -207,7 +214,7 @@ A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Andro
 - **Adaptive quality:** `render/qualityController.ts` (pure, tested) steps on median / p95 frame times.
   - Phones: render scale → shadows → ink pass.
   - Desktop: render scale only, never under 1.25 on Retina.
-  - It steps back up only across scale rungs; dropping shadows or post relinks every lit material, one long hitch. An explicit Low (Settings / `?q=low`) stays as chosen.
+  - It steps back up only across scale rungs; dropping shadows or post relinks every lit material, one long hitch. An explicit Low on a phone runs the same ladder (`bootPlan`); only `?q=low` on a desktop stays as chosen.
 - **Desktop heat (2026-10-28, `.claude/perf-shots/desktop/README.md`):**
   - `render/framePacer.ts` caps `Game.frame` at 60 fps by default (Settings → Frame rate 30 / 60 / max). It drops to 30 while the window is blurred or a menu covers the game (`game.coverGame(reason, opaque)`; an opaque one sets `gfx.hold`). The sim still steps on the interval since the last run frame: a capped 144 Hz screen plays like a 60 Hz one.
   - High draws at 1.5 on Retina (`bootScale`). Settings → Sharp restores 2. The ink thickness follows the render scale.

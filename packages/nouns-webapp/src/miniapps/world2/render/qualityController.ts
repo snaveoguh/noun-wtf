@@ -68,10 +68,15 @@ export interface QualityController {
   frozen: boolean;
 }
 
-/** The phone ladder from `boot` (deviceTier.stepDown, rung by rung). */
-export function phoneRungs(boot: LiteState): LiteState[] {
+/**
+ * The phone ladder from `boot` (deviceTier.stepDown, rung by rung). A weak
+ * phone (`lastScale`) gets one more rung at the bottom: that render scale.
+ */
+export function phoneRungs(boot: LiteState, lastScale?: number): LiteState[] {
   const out = [boot];
   for (let s = stepDown(boot); s !== null; s = stepDown(s)) out.push(s);
+  const end = out[out.length - 1];
+  if (lastScale !== undefined && lastScale < end.scale) out.push({ ...end, scale: lastScale });
   return out;
 }
 

@@ -64,6 +64,36 @@ export function autoQuality(d: DeviceInfo): Quality {
   return cores >= 8 ? 'high' : 'medium';
 }
 
+export interface BootPlan {
+  /** Phone protections: the weak check (boot scale, texture diet) on 'low'. */
+  phone: boolean;
+  /** Which adaptive ladder runs (null: none, quality stays as chosen). */
+  ladder: 'phone' | 'desktop' | null;
+}
+
+/**
+ * What a booted quality turns on. `explicit`: the player picked it (Settings
+ * or ?q=), not auto. A phone is never worse off for picking Low: the weak
+ * check, the texture diet and the full phone ladder all run on an explicit
+ * Low exactly as on auto (which boots phones on Low anyway). A player who
+ * picks Low is asking for speed, and every rung of the ladder is lighter
+ * than Low, so it never undoes the choice. An explicit Low off a phone
+ * (a desktop's ?q=low, scripts) stays as chosen, as before.
+ */
+export function bootPlan(quality: Quality, explicit: boolean, mobile: boolean): BootPlan {
+  if (quality !== 'low') return { phone: false, ladder: 'desktop' };
+  if (!explicit || mobile) return { phone: true, ladder: 'phone' };
+  return { phone: false, ladder: null };
+}
+
+/** ?perf=1's device line: the weak verdict and what it was judged on. */
+export function deviceLine(d: DeviceInfo, phone: boolean, weak: boolean): string {
+  const verdict = weak ? 'WEAK' : phone ? 'not weak' : 'not checked';
+  const gpu = d.gpu !== undefined && d.gpu !== '' ? d.gpu : 'gpu hidden';
+  const mem = d.memory !== undefined ? `${d.memory} GB` : '? GB';
+  return `${verdict} · ${gpu} · ${mem} · ${d.cores ?? '?'} cores${isMobile(d) ? ' · mobile' : ''}`;
+}
+
 /** Read the device from the browser (GPU string best effort). */
 export function readDevice(gl?: WebGLRenderingContext | WebGL2RenderingContext | null): DeviceInfo {
   const nav = navigator as Navigator & { deviceMemory?: number };
@@ -91,6 +121,12 @@ export function readDevice(gl?: WebGLRenderingContext | WebGL2RenderingContext |
 export const WEAK_BOOT_SCALE = 0.75;
 /** Lowest render scale the ladder goes to before dropping features. */
 export const MIN_SCALE = 0.6;
+/**
+ * A weak phone's last resort, after shadows and the ink pass are gone. Not
+ * before them: 0.5 on a ~410 px wide phone is a ~205 px picture, and the
+ * features cost more per pixel than the last 0.1 of scale saves.
+ */
+export const WEAK_LAST_SCALE = 0.5;
 /** Each rung of render scale. */
 export const SCALE_STEP = 0.15;
 

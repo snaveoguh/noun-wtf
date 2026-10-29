@@ -15,6 +15,7 @@ import * as THREE from 'three';
 
 import { type NounSeed } from '../character/NounAppearance';
 import { NounCharacter, type CharacterAssets } from '../character/NounCharacter';
+import { mergeStatic } from '../render/mergeStatic';
 import { inkExcluded, toonify } from '../render/Toon';
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -37,6 +38,8 @@ export interface NpcHost {
   camera: THREE.PerspectiveCamera;
   canvas: HTMLCanvasElement;
   toon: boolean;
+  /** Phones: an NPC's static props are merged per material (render/mergeStatic.ts). */
+  mergeProps?: boolean;
 }
 
 /** Talk range (m). */
@@ -92,6 +95,7 @@ export class StandingNpc {
     });
     if (opts.props) {
       if (host.toon) toonify(opts.props);
+      if (host.mergeProps === true) mergeStatic(opts.props, inkExcluded);
       if (opts.fixedProps === true) {
         this.fixedProps = opts.props;
         host.scene.add(opts.props);

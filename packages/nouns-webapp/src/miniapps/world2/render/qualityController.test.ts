@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MIN_SCALE } from './deviceTier';
+import { MIN_SCALE, WEAK_BOOT_SCALE, WEAK_LAST_SCALE } from './deviceTier';
 import {
   desktopRungs,
   DESKTOP_TUNING,
@@ -34,6 +34,19 @@ describe('rungs', () => {
     expect(r.map(x => x.scale)).toEqual([1, 0.85, 0.7, 0.6, 0.6, 0.6]);
     expect(r.at(-2)).toEqual({ scale: MIN_SCALE, shadows: false, post: true });
     expect(r.at(-1)).toEqual({ scale: MIN_SCALE, shadows: false, post: false });
+  });
+
+  it('a weak phone: 0.75 boot, down to the floor, features off, then 0.5 as the last resort', () => {
+    const r = phoneRungs({ scale: WEAK_BOOT_SCALE, shadows: true, post: true }, WEAK_LAST_SCALE);
+    expect(r).toEqual([
+      { scale: 0.75, shadows: true, post: true },
+      { scale: 0.6, shadows: true, post: true },
+      { scale: 0.6, shadows: false, post: true },
+      { scale: 0.6, shadows: false, post: false },
+      { scale: 0.5, shadows: false, post: false },
+    ]);
+    // (no extra rung when the floor is already that low)
+    expect(phoneRungs({ scale: 0.5, shadows: false, post: false }, 0.5)).toHaveLength(1);
   });
 
   it('desktop: render scale only, never under 1.25 on a Retina screen', () => {

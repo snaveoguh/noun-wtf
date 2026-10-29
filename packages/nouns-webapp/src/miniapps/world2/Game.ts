@@ -41,7 +41,7 @@ import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
-import { Graffiti } from './graffiti/Graffiti';
+import { Graffiti, graffitiOptions } from './graffiti/Graffiti';
 import { HideSeekMode } from './hideseek/net/HideSeekMode';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
@@ -67,7 +67,16 @@ import {
   type TownThemeState,
 } from './radio/townTheme';
 import { localTransport, netTransport } from './radio/transport';
-import { autoQuality, isWeakDevice, readDevice, WEAK_BOOT_SCALE } from './render/deviceTier';
+import {
+  autoQuality,
+  bootPlan,
+  deviceLine,
+  isMobile,
+  isWeakDevice,
+  readDevice,
+  WEAK_BOOT_SCALE,
+  WEAK_LAST_SCALE,
+} from './render/deviceTier';
 import { BLURRED_FPS, COVERED_FPS, effectiveFps, makePacer, pace } from './render/framePacer';
 import { bootScale, Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
@@ -400,7 +409,7 @@ export class Game {
   /**
    * Adaptive quality (render/qualityController.ts): auto 'low' steps render
    * scale → shadows → ink; medium / high step render scale only. Null on
-   * an explicit Low (Settings / ?q=low stays as chosen).
+   * an explicit Low off a phone (?q=low on a desktop stays as chosen).
    */
   adaptive: QualityController | null = null;
   /** Raw rAF intervals (ms) since the last quality window. */
@@ -425,17 +434,23 @@ export class Game {
     this.gfx = new Graphics(opts.canvas, quality);
     // Low: only the rider's own Noun casts a shadow (NPCs, customers, remotes don't)
     NounCharacter.castShadows = quality !== 'low';
-    // 'low' picked automatically: a weak phone boots lighter and the ladder
-    // may keep stepping down (an explicit Low / ?q=low stays as chosen)
-    if (quality === 'low' && opts.quality === undefined) {
-      this.weakDevice = isWeakDevice(readDevice(this.gfx.renderer.getContext()));
+    // 'low' on a phone (auto, or picked: Low must never cost a phone its
+    // protections, bootPlan): a weak phone boots lighter and the ladder may
+    // keep stepping down. An explicit Low on a desktop stays as chosen.
+    const device = readDevice(this.gfx.renderer.getContext());
+    const plan = bootPlan(quality, opts.quality !== undefined, isMobile(device));
+    if (plan.phone) {
+      this.weakDevice = isWeakDevice(device);
       if (this.weakDevice)
         this.gfx.applyLite({
           ...this.gfx.lite,
           scale: Math.min(this.gfx.lite.scale, WEAK_BOOT_SCALE),
         });
-      this.adaptive = makeController(phoneRungs(this.gfx.lite), PHONE_TUNING);
-    } else if (quality !== 'low') {
+      this.adaptive = makeController(
+        phoneRungs(this.gfx.lite, this.weakDevice ? WEAK_LAST_SCALE : undefined),
+        PHONE_TUNING,
+      );
+    } else if (plan.ladder === 'desktop') {
       this.adaptive = makeController(
         desktopRungs(this.gfx.lite, window.devicePixelRatio || 1),
         DESKTOP_TUNING,
@@ -451,7 +466,9 @@ export class Game {
     const perfOpts = perfParam();
     if (perfOpts !== null) {
       perf.enable(this.gfx.renderer, perfOpts);
-      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}`;
+      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}${opts.quality !== undefined ? ' picked' : ' auto'}`;
+      perf.extra.device = deviceLine(device, plan.phone, this.weakDevice);
+      this.perfLite();
     }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
@@ -574,6 +591,7 @@ export class Game {
             save: (id, data) => this.net.graffitiSave(id, data),
             load: id => this.net.graffitiLoad(id),
           },
+      graffitiOptions(this.gfx.quality, this.weakDevice, this.gfx.renderer),
     );
     this.gfx.scene.add(this.graffiti.group);
     this.graffiti.near = () => this.player.pos;
@@ -649,6 +667,7 @@ export class Game {
     if (this.gfx.toon) toonify(this.me.root);
     this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
+    this.riderShadow();
     this.missions.start();
     const spawn = level.spawns[Math.floor(Math.random() * level.spawns.length)] ?? {
       position: new THREE.Vector3(),
@@ -948,6 +967,40 @@ export class Game {
     this.adaptive.frozen = frozen;
     this.gfx.applyLite(rungs[0]);
     this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
+  }
+
+  /**
+   * Weak phones: the shadow map is drawn from the rider alone (Graphics
+   * shadowRoot), and the board casts by its deck only (trucks and wheels
+   * are 12 draws for a few shadow texels).
+   */
+  private riderShadow() {
+    if (!this.weakDevice || this.me === null) return;
+    this.gfx.shadowRoot = this.me.root;
+    this.me.root.traverse(o => {
+      if (!(o as THREE.Mesh).isMesh) return;
+      for (let x: THREE.Object3D | null = o; x !== null; x = x.parent)
+        if (/^(truck|wheel)/i.test(x.name)) {
+          o.castShadow = false;
+          return;
+        }
+    });
+  }
+
+  /** ?perf=1: what the renderer draws with right now (one screenshot settles it). */
+  private perfLite() {
+    if (!perf.on) return;
+    const l = this.gfx.lite;
+    const a = this.adaptive;
+    const shadows = l.shadows && this.gfx.sun.castShadow;
+    perf.extra.render =
+      `scale ${l.scale.toFixed(2)}  ink ${l.post && this.gfx.inkPass !== null ? 'on' : 'off'}` +
+      `  post ${l.post ? 'on' : 'off'}  shadows ${shadows ? this.gfx.sun.shadow.mapSize.x : 'off'}`;
+    perf.extra.adaptive =
+      a === null
+        ? 'off (as chosen)'
+        : `rung ${a.at}/${a.rungs.length - 1}${a.frozen ? ' frozen' : ''}`;
+    if (this.graffiti !== null) perf.extra.graffiti = this.graffiti.perfLine();
   }
 
   /** The cap in force right now (fps, 0 = none). */
@@ -2275,6 +2328,7 @@ export class Game {
     if (this.gfx.toon) toonify(this.me.root);
     this.me.setWeight(this.weight);
     this.gfx.scene.add(this.me.root);
+    this.riderShadow();
   }
 
   /** Records, lifetime totals and play counts (world-stats board). */
@@ -2349,8 +2403,7 @@ export class Game {
           this.resize(this.opts.canvas.clientWidth, this.opts.canvas.clientHeight);
           if (import.meta.env.DEV) console.info('[perf] quality', next, `${fps} fps`);
         }
-        if (perf.on)
-          perf.extra.adaptive = `rung ${this.adaptive.at}/${this.adaptive.rungs.length - 1} ${JSON.stringify(this.gfx.lite)}`;
+        this.perfLite();
       }
       this.frameMs.length = 0;
     }

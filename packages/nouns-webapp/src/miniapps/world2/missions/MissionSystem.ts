@@ -199,6 +199,7 @@ export class MissionSystem {
       camera: g.gfx.camera,
       canvas: g.gfx.renderer.domElement,
       toon: g.gfx.toon,
+      mergeProps: g.gfx.quality === 'low',
     };
     // Server sync rides on the stats posts
     g.stats.extras = () => ({ missions: postable(this.state), title: this.state.title });
