@@ -1,0 +1,680 @@
+{
+ "profile": "retina",
+ "url": "http://127.0.0.1:5301/world?offline=1&skip=1&bday=0&perf=quiet&debug=1",
+ "scenarios": {
+  "soak": [
+   {
+    "heapMB": 120.26016139984131,
+    "geometries": 434,
+    "textures": 229,
+    "programs": 71,
+    "fps": 1.0070119013314247,
+    "longMax": 20962,
+    "longCount": 18,
+    "frameMax": 21065.799999999996,
+    "pos": [
+     6,
+     14
+    ],
+    "dom": 511,
+    "min": 0.5
+   },
+   {
+    "heapMB": 120.76042461395264,
+    "geometries": 453,
+    "textures": 229,
+    "programs": 72,
+    "fps": 2.056054910373139,
+    "longMax": 1194,
+    "longCount": 1,
+    "frameMax": 2916.699999999997,
+    "pos": [
+     6,
+     12
+    ],
+    "dom": 508,
+    "min": 1
+   },
+   {
+    "heapMB": 121.32519912719727,
+    "geometries": 501,
+    "textures": 235,
+    "programs": 72,
+    "fps": 2.064229010464591,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2899.800000000003,
+    "pos": [
+     5,
+     10
+    ],
+    "dom": 500,
+    "min": 1.5
+   },
+   {
+    "heapMB": 121.55659103393555,
+    "geometries": 501,
+    "textures": 235,
+    "programs": 72,
+    "fps": 2.0396356839825573,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2799.7999999999884,
+    "pos": [
+     1,
+     9
+    ],
+    "dom": 514,
+    "min": 2
+   },
+   {
+    "heapMB": 124.15578651428223,
+    "geometries": 514,
+    "textures": 240,
+    "programs": 72,
+    "fps": 2.699765795317258,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3133.2000000000116,
+    "pos": [
+     106,
+     56
+    ],
+    "dom": 516,
+    "min": 2.5
+   },
+   {
+    "heapMB": 123.06251430511475,
+    "geometries": 517,
+    "textures": 240,
+    "programs": 72,
+    "fps": 2.8973593601552463,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2899.899999999994,
+    "pos": [
+     106,
+     52
+    ],
+    "dom": 518,
+    "min": 3
+   },
+   {
+    "heapMB": 123.95508098602295,
+    "geometries": 519,
+    "textures": 240,
+    "programs": 72,
+    "fps": 2.8126098675729523,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2866.500000000029,
+    "pos": [
+     106,
+     48
+    ],
+    "dom": 523,
+    "min": 3.5
+   },
+   {
+    "heapMB": 124.50165176391602,
+    "geometries": 522,
+    "textures": 240,
+    "programs": 72,
+    "fps": 2.968592293534407,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3166.5,
+    "pos": [
+     103,
+     45
+    ],
+    "dom": 534,
+    "min": 4
+   },
+   {
+    "heapMB": 124.71862888336182,
+    "geometries": 522,
+    "textures": 244,
+    "programs": 72,
+    "fps": 3.177385045553669,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3016.5,
+    "pos": [
+     64,
+     105
+    ],
+    "dom": 521,
+    "min": 4.5
+   },
+   {
+    "heapMB": 124.77942180633545,
+    "geometries": 524,
+    "textures": 244,
+    "programs": 72,
+    "fps": 3.652918614326203,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2983.0999999999767,
+    "pos": [
+     68,
+     102
+    ],
+    "dom": 513,
+    "min": 5
+   },
+   {
+    "heapMB": 124.68040180206299,
+    "geometries": 524,
+    "textures": 244,
+    "programs": 72,
+    "fps": 3.2868397036249686,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3066.5,
+    "pos": [
+     75,
+     104
+    ],
+    "dom": 516,
+    "min": 5.5
+   },
+   {
+    "heapMB": 124.92517757415771,
+    "geometries": 524,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.595904898891618,
+    "longMax": 504,
+    "longCount": 1,
+    "frameMax": 2933.100000000035,
+    "pos": [
+     79,
+     104
+    ],
+    "dom": 516,
+    "min": 6
+   },
+   {
+    "heapMB": 126.21604251861572,
+    "geometries": 520,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.5887494382097884,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3066.5,
+    "pos": [
+     -2,
+     117
+    ],
+    "dom": 543,
+    "min": 6.5
+   },
+   {
+    "heapMB": 125.67660903930664,
+    "geometries": 523,
+    "textures": 244,
+    "programs": 73,
+    "fps": 4.00922801974715,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2766.5,
+    "pos": [
+     -1,
+     124
+    ],
+    "dom": 513,
+    "min": 7
+   },
+   {
+    "heapMB": 125.63576698303223,
+    "geometries": 522,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.4851718513089143,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3349.9000000000233,
+    "pos": [
+     2,
+     116
+    ],
+    "dom": 510,
+    "min": 7.5
+   },
+   {
+    "heapMB": 125.65221881866455,
+    "geometries": 522,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.8365558097897905,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2983.2999999999884,
+    "pos": [
+     -6,
+     122
+    ],
+    "dom": 525,
+    "min": 8
+   },
+   {
+    "heapMB": 127.7701416015625,
+    "geometries": 523,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.224766204450175,
+    "longMax": 51,
+    "longCount": 1,
+    "frameMax": 3416.5,
+    "pos": [
+     -53,
+     110
+    ],
+    "dom": 528,
+    "min": 8.5
+   },
+   {
+    "heapMB": 127.11176681518555,
+    "geometries": 524,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.9340079034573194,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3049.9000000000233,
+    "pos": [
+     -52,
+     116
+    ],
+    "dom": 528,
+    "min": 9
+   },
+   {
+    "heapMB": 127.1299934387207,
+    "geometries": 524,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.608915031974321,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3166.5,
+    "pos": [
+     -51,
+     122
+    ],
+    "dom": 516,
+    "min": 9.5
+   },
+   {
+    "heapMB": 128.10004329681396,
+    "geometries": 525,
+    "textures": 244,
+    "programs": 73,
+    "fps": 3.614203821016584,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3083.1999999999534,
+    "pos": [
+     -62,
+     125
+    ],
+    "dom": 512,
+    "min": 10
+   },
+   {
+    "heapMB": 128.84422492980957,
+    "geometries": 520,
+    "textures": 248,
+    "programs": 73,
+    "fps": 2.159656182735712,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3066.5,
+    "pos": [
+     -104,
+     59
+    ],
+    "dom": 517,
+    "min": 10.5
+   },
+   {
+    "heapMB": 128.27922821044922,
+    "geometries": 524,
+    "textures": 248,
+    "programs": 73,
+    "fps": 2.1563969687219737,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3283.1999999999534,
+    "pos": [
+     -104,
+     59
+    ],
+    "dom": 528,
+    "min": 11
+   },
+   {
+    "heapMB": 128.3054428100586,
+    "geometries": 529,
+    "textures": 248,
+    "programs": 73,
+    "fps": 2.1537581396914067,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2399.9000000000233,
+    "pos": [
+     -104,
+     59
+    ],
+    "dom": 531,
+    "min": 11.5
+   },
+   {
+    "heapMB": 128.31893634796143,
+    "geometries": 529,
+    "textures": 248,
+    "programs": 73,
+    "fps": 2.228660574994428,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2983.3000000000466,
+    "pos": [
+     -104,
+     59
+    ],
+    "dom": 527,
+    "min": 12
+   },
+   {
+    "heapMB": 130.2251205444336,
+    "geometries": 526,
+    "textures": 250,
+    "programs": 73,
+    "fps": 2.4819305394844964,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2899.9000000000233,
+    "pos": [
+     -117,
+     1
+    ],
+    "dom": 522,
+    "min": 12.5
+   },
+   {
+    "heapMB": 129.4426441192627,
+    "geometries": 526,
+    "textures": 250,
+    "programs": 73,
+    "fps": 2.280904415389477,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2833.1999999999534,
+    "pos": [
+     -118,
+     0
+    ],
+    "dom": 520,
+    "min": 13
+   },
+   {
+    "heapMB": 129.45445442199707,
+    "geometries": 527,
+    "textures": 250,
+    "programs": 73,
+    "fps": 2.2751351498193437,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2849.9000000000233,
+    "pos": [
+     -118,
+     1
+    ],
+    "dom": 518,
+    "min": 13.5
+   },
+   {
+    "heapMB": 129.4613161087036,
+    "geometries": 527,
+    "textures": 250,
+    "programs": 73,
+    "fps": 2.275602197964009,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2783.29999999993,
+    "pos": [
+     -118,
+     2
+    ],
+    "dom": 532,
+    "min": 14
+   },
+   {
+    "heapMB": 131.10916137695312,
+    "geometries": 530,
+    "textures": 250,
+    "programs": 73,
+    "fps": 2.6431324895905224,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2833.29999999993,
+    "pos": [
+     -106,
+     -59
+    ],
+    "dom": 524,
+    "min": 14.5
+   },
+   {
+    "heapMB": 130.18908309936523,
+    "geometries": 529,
+    "textures": 250,
+    "programs": 73,
+    "fps": 2.828992634141403,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3033.0999999999767,
+    "pos": [
+     -96,
+     -45
+    ],
+    "dom": 543,
+    "min": 15
+   },
+   {
+    "heapMB": 130.21510982513428,
+    "geometries": 529,
+    "textures": 250,
+    "programs": 73,
+    "fps": 3.0450986023689457,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2549.9000000000233,
+    "pos": [
+     -97,
+     -47
+    ],
+    "dom": 506,
+    "min": 15.5
+   },
+   {
+    "heapMB": 130.44879150390625,
+    "geometries": 529,
+    "textures": 250,
+    "programs": 73,
+    "fps": 2.844512266540841,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2733.3000000000466,
+    "pos": [
+     -96,
+     -58
+    ],
+    "dom": 523,
+    "min": 16.1
+   },
+   {
+    "heapMB": 131.49849891662598,
+    "geometries": 526,
+    "textures": 254,
+    "programs": 73,
+    "fps": 2.801016465252201,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2866.5999999999767,
+    "pos": [
+     -65,
+     -105
+    ],
+    "dom": 518,
+    "min": 16.6
+   },
+   {
+    "heapMB": 131.11121654510498,
+    "geometries": 532,
+    "textures": 254,
+    "programs": 73,
+    "fps": 2.5647861609538225,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3250,
+    "pos": [
+     -61,
+     -101
+    ],
+    "dom": 522,
+    "min": 17.1
+   },
+   {
+    "heapMB": 131.13537979125977,
+    "geometries": 535,
+    "textures": 254,
+    "programs": 73,
+    "fps": 2.936441952203216,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2750,
+    "pos": [
+     -66,
+     -96
+    ],
+    "dom": 519,
+    "min": 17.6
+   },
+   {
+    "heapMB": 131.21346855163574,
+    "geometries": 535,
+    "textures": 254,
+    "programs": 73,
+    "fps": 3.0886047835200277,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 2849.899999999907,
+    "pos": [
+     -68,
+     -104
+    ],
+    "dom": 522,
+    "min": 18.1
+   },
+   {
+    "heapMB": 133.6611614227295,
+    "geometries": 534,
+    "textures": 256,
+    "programs": 73,
+    "fps": 2.6910167315783404,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3483.1999999999534,
+    "pos": [
+     -11,
+     -123
+    ],
+    "dom": 507,
+    "min": 18.6
+   },
+   {
+    "heapMB": 133.1877851486206,
+    "geometries": 534,
+    "textures": 256,
+    "programs": 73,
+    "fps": 2.2037610855860637,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3349.899999999907,
+    "pos": [
+     -10,
+     -123
+    ],
+    "dom": 516,
+    "min": 19.1
+   },
+   {
+    "heapMB": 133.08217811584473,
+    "geometries": 535,
+    "textures": 256,
+    "programs": 73,
+    "fps": 2.1539418845965668,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 3333.3000000000466,
+    "pos": [
+     -11,
+     -123
+    ],
+    "dom": 517,
+    "min": 19.6
+   },
+   {
+    "heapMB": 133.12140274047852,
+    "geometries": 535,
+    "textures": 256,
+    "programs": 73,
+    "fps": 2.056267570974947,
+    "longMax": 0,
+    "longCount": 0,
+    "frameMax": 4249.800000000047,
+    "pos": [
+     -12,
+     -122
+    ],
+    "dom": 504,
+    "min": 20.1
+   }
+  ]
+ },
+ "boot": {
+  "quality": "high",
+  "lite": {
+   "scale": 2,
+   "shadows": true,
+   "post": true
+  },
+  "pixelRatio": 2,
+  "css": [
+   1440,
+   900
+  ],
+  "buffer": [
+   2880,
+   1800
+  ],
+  "shadowMap": 4096,
+  "passes": [
+   "RenderPass",
+   "NormalPass",
+   "EffectPass",
+   "EffectPass",
+   "EffectPass"
+  ],
+  "frameCap": null,
+  "adaptive": [
+   "{\"scale\":2,\"shadows\":true,\"post\":true}",
+   "{\"scale\":1.75,\"shadows\":true,\"post\":true}",
+   "{\"scale\":1.5,\"shadows\":true,\"post\":true}",
+   "{\"scale\":1.25,\"shadows\":true,\"post\":true}"
+  ]
+ }
+}

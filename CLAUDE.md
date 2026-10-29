@@ -208,6 +208,12 @@ A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Andro
   - Phones: render scale → shadows → ink pass.
   - Desktop: render scale only, never under 1.25 on Retina.
   - It steps back up only across scale rungs; dropping shadows or post relinks every lit material, one long hitch. An explicit Low (Settings / `?q=low`) stays as chosen.
+- **Desktop heat (2026-10-28, `.claude/perf-shots/desktop/README.md`):**
+  - `render/framePacer.ts` caps `Game.frame` at 60 fps by default (Settings → Frame rate 30 / 60 / max). It drops to 30 while the window is blurred or a menu covers the game (`game.coverGame(reason, opaque)`; an opaque one sets `gfx.hold`). The sim still steps on the interval since the last run frame: a capped 144 Hz screen plays like a 60 Hz one.
+  - High draws at 1.5 on Retina (`bootScale`). Settings → Sharp restores 2. The ink thickness follows the render scale.
+  - Desktop rungs: scale → SMAA off → 2048 shadow map, judged against the cap (`pacedTuning`).
+  - Billboard videos pause when far, paused or hidden. The minimap redraws at 30 fps. The NounOS parallax sleeps while the game is up.
+  - Anything new with its own rAF loop should pace itself and stop while `game.paused`.
 - **Phones (low):**
   - mountain dressing is drawn within 300 m (`LOW_DRESSING_VIEW`);
   - dressing and the nature showcase don't cast shadows;

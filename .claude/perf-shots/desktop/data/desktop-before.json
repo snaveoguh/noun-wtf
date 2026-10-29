@@ -1,0 +1,665 @@
+{
+ "scenarios": {
+  "passes": {
+   "mpx": 47.881216,
+   "draws": 971,
+   "scale": 2,
+   "shadow": 4096,
+   "base": 2300,
+   "shadow2048": 2343,
+   "noSMAA": 2003,
+   "scale1.5": 1507,
+   "scale1": 1027,
+   "baseAgain": 2452
+  },
+  "rooms": [
+   {
+    "i": 0,
+    "heapMB": 119.76830768585205,
+    "geometries": 395,
+    "textures": 222,
+    "programs": 74,
+    "sceneObjects": 2075,
+    "dom": 515
+   },
+   {
+    "i": 1,
+    "ok": true,
+    "enterLongMs": 8327,
+    "leaveLongMs": 0,
+    "heapMB": 126.56628131866455,
+    "geometries": 476,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2079,
+    "dom": 525
+   },
+   {
+    "i": 2,
+    "ok": true,
+    "enterLongMs": 7945,
+    "leaveLongMs": 54,
+    "heapMB": 125.02871227264404,
+    "geometries": 480,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2079,
+    "dom": 516
+   },
+   {
+    "i": 3,
+    "ok": true,
+    "enterLongMs": 7010,
+    "leaveLongMs": 0,
+    "heapMB": 122.0434627532959,
+    "geometries": 480,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2079,
+    "dom": 527
+   },
+   {
+    "i": 4,
+    "ok": true,
+    "enterLongMs": 6726,
+    "leaveLongMs": 50,
+    "heapMB": 121.85341262817383,
+    "geometries": 480,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2079,
+    "dom": 531
+   },
+   {
+    "i": 5,
+    "ok": true,
+    "enterLongMs": 7495,
+    "leaveLongMs": 0,
+    "heapMB": 124.47161674499512,
+    "geometries": 480,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2088,
+    "dom": 519
+   },
+   {
+    "i": 6,
+    "ok": true,
+    "enterLongMs": 7196,
+    "leaveLongMs": 61,
+    "heapMB": 122.60993671417236,
+    "geometries": 484,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2119,
+    "dom": 528
+   },
+   {
+    "i": 7,
+    "ok": true,
+    "enterLongMs": 10063,
+    "leaveLongMs": 52,
+    "heapMB": 125.37913799285889,
+    "geometries": 485,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2119,
+    "dom": 527
+   },
+   {
+    "i": 8,
+    "ok": true,
+    "enterLongMs": 8770,
+    "leaveLongMs": 0,
+    "heapMB": 125.54858303070068,
+    "geometries": 485,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2130,
+    "dom": 520
+   },
+   {
+    "i": 9,
+    "ok": true,
+    "enterLongMs": 10802,
+    "leaveLongMs": 55,
+    "heapMB": 125.57588195800781,
+    "geometries": 485,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2130,
+    "dom": 530
+   },
+   {
+    "i": 10,
+    "ok": true,
+    "enterLongMs": 7656,
+    "leaveLongMs": 0,
+    "heapMB": 123.50215911865234,
+    "geometries": 485,
+    "textures": 238,
+    "programs": 75,
+    "sceneObjects": 2130,
+    "dom": 525
+   }
+  ],
+  "pacing-60": {
+   "hz": 60,
+   "state": "",
+   "stepsPerSec": 60,
+   "rendersPerSec": 60,
+   "simSecondsPerSecond": 0.9999999999998508,
+   "cpuMsPerFrameCall": 3.078333333333851,
+   "cpuMsPerStep": 3.078333333333851,
+   "maxDt": 0.01666666666666424
+  },
+  "pacing-120": {
+   "hz": 120,
+   "state": "",
+   "stepsPerSec": 120,
+   "rendersPerSec": 120,
+   "simSecondsPerSecond": 1.006944444444733,
+   "cpuMsPerFrameCall": 2.177361111113957,
+   "cpuMsPerStep": 2.177361111113957,
+   "maxDt": 0.05
+  },
+  "pacing-144": {
+   "hz": 144,
+   "state": "",
+   "stepsPerSec": 144,
+   "rendersPerSec": 144,
+   "simSecondsPerSecond": 0.99999999999986,
+   "cpuMsPerFrameCall": 1.8170138888893201,
+   "cpuMsPerStep": 1.8170138888893201,
+   "maxDt": 0.006944444444445253
+  },
+  "pacing-144-blurred": {
+   "hz": 144,
+   "state": "blurred",
+   "stepsPerSec": 144,
+   "rendersPerSec": 144,
+   "simSecondsPerSecond": 1.0071759259249744,
+   "cpuMsPerFrameCall": 2.0675925925962577,
+   "cpuMsPerStep": 2.0675925925962577,
+   "maxDt": 0.05
+  },
+  "pacing-144-menu": {
+   "hz": 144,
+   "state": "menu",
+   "stepsPerSec": 144,
+   "rendersPerSec": 144,
+   "simSecondsPerSecond": 0.9999999999990479,
+   "cpuMsPerFrameCall": 1.4401620370352046,
+   "cpuMsPerStep": 1.4401620370352046,
+   "maxDt": 0.006944444444437977
+  },
+  "pacing-240": {
+   "hz": 240,
+   "state": "",
+   "stepsPerSec": 240,
+   "rendersPerSec": 240,
+   "simSecondsPerSecond": 1.0076388888900567,
+   "cpuMsPerFrameCall": 1.6610416666656318,
+   "cpuMsPerStep": 1.6610416666656318,
+   "maxDt": 0.05
+  },
+  "threads-playing": {
+   "totalPct": 365.5,
+   "rows": [
+    [
+     "gpu-process/Thread<01>",
+     84
+    ],
+    [
+     "gpu-process/Thread<00>",
+     82.7
+    ],
+    [
+     "gpu-process/Thread<02>",
+     81.3
+    ],
+    [
+     "gpu-process/Thread<03>",
+     80.6
+    ],
+    [
+     "gpu-process/chrome",
+     15
+    ],
+    [
+     "renderer/Media",
+     9.7
+    ],
+    [
+     "renderer/chrome",
+     2.6
+    ],
+    [
+     "renderer/ThreadPoolForeg",
+     2.6
+    ],
+    [
+     "renderer/Realtime AudioW",
+     2.6
+    ],
+    [
+     "renderer/ThreadPoolSingl",
+     1
+    ],
+    [
+     "renderer/ThreadPoolServi",
+     0.8
+    ],
+    [
+     "browser/Gamepad polling",
+     0.7
+    ]
+   ],
+   "snap": {
+    "fps": 0.44314848133015416,
+    "frames": null,
+    "cpuP50": 20
+   },
+   "main": {
+    "TaskMsPerSec": 38.1,
+    "ScriptMsPerSec": 16.4,
+    "RecalcStyleMsPerSec": 0.3,
+    "LayoutMsPerSec": 0,
+    "styleRecalcsPerSec": 0.7
+   }
+  },
+  "threads-paused": {
+   "totalPct": 168.4,
+   "rows": [
+    [
+     "gpu-process/Thread<00>",
+     34.4
+    ],
+    [
+     "gpu-process/Thread<03>",
+     33.1
+    ],
+    [
+     "gpu-process/Thread<01>",
+     32.6
+    ],
+    [
+     "gpu-process/Thread<02>",
+     32.6
+    ],
+    [
+     "renderer/Media",
+     10.7
+    ],
+    [
+     "gpu-process/chrome",
+     8.4
+    ],
+    [
+     "renderer/chrome",
+     3
+    ],
+    [
+     "renderer/Realtime AudioW",
+     2.7
+    ],
+    [
+     "gpu-process/VizCompositorTh",
+     2.2
+    ],
+    [
+     "renderer/Compositor",
+     1.5
+    ],
+    [
+     "renderer/ThreadPoolSingl",
+     1.2
+    ],
+    [
+     "browser/Gamepad polling",
+     1.1
+    ],
+    [
+     "renderer/ThreadPoolServi",
+     1.1
+    ],
+    [
+     "renderer/VideoFrameCompo",
+     1.1
+    ],
+    [
+     "renderer/ThreadPoolForeg",
+     0.9
+    ],
+    [
+     "gpu-process/Chrome_ChildIOT",
+     0.6
+    ]
+   ],
+   "snap": {
+    "fps": 0,
+    "frames": null,
+    "cpuP50": 0
+   },
+   "main": {
+    "TaskMsPerSec": 29.4,
+    "ScriptMsPerSec": 6,
+    "RecalcStyleMsPerSec": 3.2,
+    "LayoutMsPerSec": 0,
+    "styleRecalcsPerSec": 42
+   }
+  },
+  "threads-blurred": {
+   "totalPct": 362,
+   "rows": [
+    [
+     "gpu-process/Thread<02>",
+     83.2
+    ],
+    [
+     "gpu-process/Thread<01>",
+     82.6
+    ],
+    [
+     "gpu-process/Thread<03>",
+     82.1
+    ],
+    [
+     "gpu-process/Thread<00>",
+     80.9
+    ],
+    [
+     "gpu-process/chrome",
+     15.4
+    ],
+    [
+     "renderer/Media",
+     9.1
+    ],
+    [
+     "renderer/Realtime AudioW",
+     2.3
+    ],
+    [
+     "renderer/chrome",
+     1.6
+    ],
+    [
+     "renderer/ThreadPoolSingl",
+     1
+    ],
+    [
+     "renderer/ThreadPoolServi",
+     0.9
+    ],
+    [
+     "browser/Gamepad polling",
+     0.7
+    ],
+    [
+     "renderer/ThreadPoolForeg",
+     0.7
+    ]
+   ],
+   "snap": {
+    "fps": 0.373266643026446,
+    "frames": null,
+    "cpuP50": 21.700000000186265
+   },
+   "main": {
+    "TaskMsPerSec": 20.4,
+    "ScriptMsPerSec": 12.3,
+    "RecalcStyleMsPerSec": 0.3,
+    "LayoutMsPerSec": 0,
+    "styleRecalcsPerSec": 0.7
+   }
+  },
+  "threads-hidden": {
+   "totalPct": 258.3,
+   "rows": [
+    [
+     "gpu-process/Thread<02>",
+     57.2
+    ],
+    [
+     "gpu-process/Thread<03>",
+     56.4
+    ],
+    [
+     "gpu-process/Thread<01>",
+     56.3
+    ],
+    [
+     "gpu-process/Thread<00>",
+     55.4
+    ],
+    [
+     "gpu-process/chrome",
+     10.5
+    ],
+    [
+     "renderer/Media",
+     10
+    ],
+    [
+     "renderer/Realtime AudioW",
+     2.5
+    ],
+    [
+     "renderer/chrome",
+     1.9
+    ],
+    [
+     "gpu-process/VizCompositorTh",
+     1.2
+    ],
+    [
+     "renderer/ThreadPoolSingl",
+     1.2
+    ],
+    [
+     "renderer/ThreadPoolServi",
+     1
+    ],
+    [
+     "renderer/ThreadPoolForeg",
+     1
+    ],
+    [
+     "browser/Gamepad polling",
+     0.9
+    ],
+    [
+     "renderer/Compositor",
+     0.7
+    ],
+    [
+     "renderer/VideoFrameCompo",
+     0.7
+    ]
+   ],
+   "snap": {
+    "fps": 0,
+    "frames": null,
+    "cpuP50": 0
+   },
+   "main": {
+    "TaskMsPerSec": 19,
+    "ScriptMsPerSec": 3.7,
+    "RecalcStyleMsPerSec": 1.4,
+    "LayoutMsPerSec": 0,
+    "styleRecalcsPerSec": 16.8
+   }
+  },
+  "threads-settings": {
+   "totalPct": 365.7,
+   "rows": [
+    [
+     "gpu-process/Thread<03>",
+     84.7
+    ],
+    [
+     "gpu-process/Thread<00>",
+     83.2
+    ],
+    [
+     "gpu-process/Thread<01>",
+     82.9
+    ],
+    [
+     "gpu-process/Thread<02>",
+     81.1
+    ],
+    [
+     "gpu-process/chrome",
+     14.4
+    ],
+    [
+     "renderer/Media",
+     9.2
+    ],
+    [
+     "renderer/Realtime AudioW",
+     2.7
+    ],
+    [
+     "renderer/chrome",
+     1.7
+    ],
+    [
+     "renderer/AudioOutputDevi",
+     1.1
+    ],
+    [
+     "browser/Gamepad polling",
+     0.8
+    ],
+    [
+     "renderer/ThreadPoolForeg",
+     0.8
+    ],
+    [
+     "utility:mojom.AudioService/AudioWorkerThre",
+     0.7
+    ]
+   ],
+   "snap": {
+    "fps": 0.36981222784131396,
+    "frames": null,
+    "cpuP50": 22.399999999906868
+   },
+   "main": {
+    "TaskMsPerSec": 22.2,
+    "ScriptMsPerSec": 13.8,
+    "RecalcStyleMsPerSec": 0.3,
+    "LayoutMsPerSec": 0,
+    "styleRecalcsPerSec": 0.6
+   }
+  },
+  "threads-map": {
+   "totalPct": 361.8,
+   "rows": [
+    [
+     "gpu-process/Thread<02>",
+     78.7
+    ],
+    [
+     "gpu-process/Thread<01>",
+     77.7
+    ],
+    [
+     "gpu-process/Thread<00>",
+     77.6
+    ],
+    [
+     "gpu-process/Thread<03>",
+     76.8
+    ],
+    [
+     "gpu-process/chrome",
+     23.9
+    ],
+    [
+     "renderer/Media",
+     8.8
+    ],
+    [
+     "renderer/ThreadPoolForeg",
+     5.4
+    ],
+    [
+     "renderer/chrome",
+     4.7
+    ],
+    [
+     "renderer/Realtime AudioW",
+     2.6
+    ],
+    [
+     "renderer/AudioOutputDevi",
+     1
+    ],
+    [
+     "browser/Gamepad polling",
+     0.8
+    ],
+    [
+     "renderer/DedicatedWorker",
+     0.8
+    ],
+    [
+     "utility:mojom.AudioService/AudioWorkerThre",
+     0.7
+    ],
+    [
+     "renderer/ThreadPoolServi",
+     0.6
+    ]
+   ],
+   "snap": {
+    "fps": 0.3214400514304082,
+    "frames": null,
+    "cpuP50": 20.899999999906868
+   },
+   "main": {
+    "TaskMsPerSec": 73.8,
+    "ScriptMsPerSec": 37.1,
+    "RecalcStyleMsPerSec": 0.3,
+    "LayoutMsPerSec": 0,
+    "styleRecalcsPerSec": 0.7
+   }
+  }
+ },
+ "boot": {
+  "quality": "high",
+  "lite": {
+   "scale": 2,
+   "shadows": true,
+   "post": true
+  },
+  "pixelRatio": 2,
+  "css": [
+   1440,
+   900
+  ],
+  "buffer": [
+   2880,
+   1800
+  ],
+  "shadowMap": 4096,
+  "passes": [
+   "RenderPass",
+   "NormalPass",
+   "EffectPass",
+   "EffectPass",
+   "EffectPass"
+  ],
+  "frameCap": null,
+  "adaptive": [
+   "{\"scale\":2,\"shadows\":true,\"post\":true}",
+   "{\"scale\":1.75,\"shadows\":true,\"post\":true}",
+   "{\"scale\":1.5,\"shadows\":true,\"post\":true}",
+   "{\"scale\":1.25,\"shadows\":true,\"post\":true}"
+  ]
+ }
+}
