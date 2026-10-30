@@ -117,6 +117,12 @@ const _m = new THREE.Matrix4();
 
 const BODY_RADIUS = 0.32;
 /**
+ * Behind the ring, below this height the soft clamp always sends you out
+ * onto the slope (the city wall top is 0, a parkour flip off it peaks near
+ * 3; the lowest roof is 6.8).
+ */
+const CLAMP_ROOF_Y = 4.5;
+/**
  * Speed into a wall (m/s) that bails you. On the mountain it grows with
  * speed (`WALL_BAIL_GLANCE` of it), so a glancing scrape along a rock at
  * 80 m/s deflects you while a tree hit head on still takes you out.
@@ -711,15 +717,19 @@ export class Player {
       if (Math.max(Math.abs(p.x), Math.abs(p.z)) >= m.minZ) return;
       // Through an alley corridor (its walls are real geometry)
       if (m.inCorridor(p.x, p.z)) return;
-      // Between the ring and the slope, outside a corridor: back to the
-      // nearer side (the plaza, or down onto the mountain)
+      // Between the ring and the slope, outside a corridor. Up at roof
+      // height: back to the nearer side (a roof edge, or off the back).
+      // Down at street / wall-top height always out onto the mountain: the
+      // ring's blocks reach back to 94 m in places, so `b` is inside them
+      // there (a pull-up onto the city wall snapped riders into a building).
+      const out = p.y < CLAMP_ROOF_Y;
       const mid = (b + m.minZ) / 2;
       if (Math.abs(p.x) > b) {
-        p.x = Math.sign(p.x) * (Math.abs(p.x) > mid ? m.minZ : b);
+        p.x = Math.sign(p.x) * (out || Math.abs(p.x) > mid ? m.minZ : b);
         this.vel.x = 0;
       }
       if (Math.abs(p.z) > b) {
-        p.z = Math.sign(p.z) * (Math.abs(p.z) > mid ? m.minZ : b);
+        p.z = Math.sign(p.z) * (out || Math.abs(p.z) > mid ? m.minZ : b);
         this.vel.z = 0;
       }
       return;

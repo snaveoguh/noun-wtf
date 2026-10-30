@@ -72,15 +72,17 @@ export function alleyCutBoxes(): THREE.Box3[] {
 
 /**
  * World boxes covering band [o0, o1] of every side of the ring, leaving the
- * alley corridors open (catch floor, retaining wall).
+ * alley corridors open (retaining wall), or with `wholeCut` the corridor and
+ * its two blocks (catch floor: a floor inside the hollow alley blocks read as
+ * a ledge to vault onto from the corridor, and put riders inside them).
  */
-export function ringBands(o0: number, o1: number, aMax: number): THREE.Box3[] {
+export function ringBands(o0: number, o1: number, aMax: number, wholeCut = false): THREE.Box3[] {
   const out: THREE.Box3[] = [];
   for (const ang of SIDES) {
     const gaps = ALLEYS.filter(
       a => Math.abs(Math.atan2(Math.sin(a.angle - ang), Math.cos(a.angle - ang))) < 0.01,
     )
-      .map(a => [a.a - a.width / 2, a.a + a.width / 2] as const)
+      .map(a => (wholeCut ? a.cut : ([a.a - a.width / 2, a.a + a.width / 2] as const)))
       .sort((p, q) => p[0] - q[0]);
     let from = -aMax;
     for (const [g0, g1] of gaps) {
