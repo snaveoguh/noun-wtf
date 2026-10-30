@@ -15,6 +15,13 @@ import { ALLEYS, ALLEY_O0, MOUNTAIN, alleyToWorld, type AlleyDef } from './confi
 import { inAlley, sampleTerrain, type TerrainSample } from './terrain';
 
 const WALL_BOTTOM = -9;
+/**
+ * Back face of the ring's blocks (local o), flush with the inner face of the
+ * retaining wall. The alley blocks stop here too: past it the player's soft
+ * clamp (93.6) snaps riders back onto the wall top, and a block reaching
+ * out to the wall's outer edge swallowed them (they walked round inside it).
+ */
+export const RING_BACK = MOUNTAIN.wallZ - 2;
 /** The four sides of the ring as alley-frame angles. */
 const SIDES = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
 
@@ -325,7 +332,7 @@ export function buildAlleys(): AlleyBuild {
   const collision: THREE.Mesh[] = [];
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
   const z0 = ALLEY_O0;
-  const z1 = MOUNTAIN.wallZ;
+  const z1 = RING_BACK;
   const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
   const roofCol = new THREE.Color(0x6b6578);
   const windowCol = new THREE.Color(0x35507f);
@@ -440,7 +447,8 @@ export function buildAlleys(): AlleyBuild {
   const wallB = new Builder();
   const stone = new THREE.Color(0xc9bea8);
   const cap = new THREE.Color(0x8f8576);
-  for (const b of ringBands(z1 - 2, z1 + 1, z1 + 1)) {
+  const w = MOUNTAIN.wallZ;
+  for (const b of ringBands(RING_BACK, w + 1, w + 1)) {
     const min = V(b.min.x, WALL_BOTTOM, b.min.z);
     const max = V(b.max.x, 0, b.max.z);
     wallB.box(min, max, stone, cap);
