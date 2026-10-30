@@ -1,8 +1,8 @@
 // Facades: style assignment, wall layout, and the whole plaza's plan and
 // geometry (built from the real plaza.glb / collision.glb).
 
-import type { Footprint } from '../../interiors/doors';
 import type { SourceTri } from './faces';
+import type { Footprint } from '../../interiors/doors';
 
 import { describe, expect, it } from 'vitest';
 
@@ -100,11 +100,12 @@ describe('wall layout', () => {
   it('cuts a terrace wall per building and hides what a neighbour stands against', () => {
     const a = fp('a', 0, 10, 0, 10, 13.6);
     const b = fp('b', 10, 20, 0, 10, 6.8);
-    // a's east wall: x = 10, facing +x — b stands against it up to its parapet
+    // a's east wall: x = 10, facing +x — b stands against it up to its roof
+    // floor (no parapet along a party wall, so nothing hides the next 0.9 m)
     const segs = segmentFace({ nx: 1, nz: 0, at: 10, s0: 0, s1: 10, y0: 0, y1: 14.5 }, [a, b]);
     expect(segs).toHaveLength(1);
     expect(segs[0]!.fp).toBe(a);
-    expect(segs[0]!.cover).toBeCloseTo(7.7);
+    expect(segs[0]!.cover).toBeCloseTo(6.8);
     // A front spanning both is cut at their boundary
     const front = segmentFace({ nx: 0, nz: -1, at: 0, s0: 0, s1: 20, y0: 0, y1: 14.5 }, [a, b]);
     expect(front.map(s => s.fp?.key)).toEqual(['a', 'b']);
