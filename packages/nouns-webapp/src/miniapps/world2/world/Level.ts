@@ -273,8 +273,8 @@ export async function loadLevel(
         scene.add(alleys.group);
         collisionMeshes.push(...alleys.collision);
         // Catch floor behind the buildings, stopping at the outer wall and
-        // open along the corridors
-        for (const b of ringBands(85, MOUNTAIN.wallZ, 96)) {
+        // open along the corridors and under their blocks
+        for (const b of ringBands(85, MOUNTAIN.wallZ, 96, true)) {
           const m = new THREE.Mesh(
             new THREE.BoxGeometry(b.max.x - b.min.x, 0.2, b.max.z - b.min.z),
           );
