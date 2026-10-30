@@ -10,8 +10,8 @@
 // `at`, and `s` running along it (world x for ±Z faces, world z for ±X).
 // `d` is the distance out from the face.
 
-import type { Footprint, Rect } from '../../interiors/doors';
 import type { FacadeStyle } from './styles';
+import type { Footprint, Rect } from '../../interiors/doors';
 
 import { STOREY } from './styles';
 
@@ -112,7 +112,10 @@ export function segmentFace(
       styleOf,
       s0,
       s1,
-      cover: nb !== null ? nb.ground + nb.height + PARAPET : face.y0,
+      // Down to the neighbour's roof floor, not its parapet top: a block has
+      // no parapet along a party wall, so the bottom 0.9 m showed the city
+      // straight through from that roof
+      cover: nb !== null ? nb.ground + nb.height : face.y0,
       kind: wallKind(face.nx, face.nz, mid.x, mid.z),
     });
   }
