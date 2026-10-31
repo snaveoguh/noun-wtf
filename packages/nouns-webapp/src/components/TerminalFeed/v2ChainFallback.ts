@@ -7,7 +7,7 @@ import {
   nounV2AuctionHouseAbi,
 } from '@/contracts/nounv2-auction-house';
 import { NOUNV2_TREASURY_ADDRESS, nounV2TreasuryAbi } from '@/contracts/nounv2-treasury';
-import { config as wagmiConfig } from '@/wagmi';
+import { config as wagmiConfig, defaultChain } from '@/wagmi';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const V2_DEPLOY_BLOCK = 24951808n;
@@ -27,7 +27,7 @@ const LOOKBACK_BLOCKS = 9_000n;
  */
 export async function fetchV2ChainEvents(): Promise<ActivityEvent[]> {
   if (NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS) return [];
-  const client = getPublicClient(wagmiConfig);
+  const client = getPublicClient(wagmiConfig, { chainId: defaultChain.id });
   if (client == null) return [];
 
   // Pull head once (number + timestamp). Lower bound = max(deploy_block,
