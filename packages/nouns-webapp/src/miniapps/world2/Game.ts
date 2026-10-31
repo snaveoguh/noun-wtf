@@ -156,6 +156,14 @@ const AXIS_X = new THREE.Vector3(1, 0, 0);
 const AXIS_Y = new THREE.Vector3(0, 1, 0);
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
 const DOWN = new THREE.Vector3(0, -1, 0);
+/** On `low`, the ice cream van's NOUN FM details are drawn within this (m). */
+const VAN_DETAIL_M = 30;
+/**
+ * On `low`, [near, far] m: past near a Noun's board loses its wheels and
+ * trucks, past far it isn't drawn (its name tag stays). Tighter on weak phones.
+ */
+const NOUN_LOD_LOW: [number, number] = [22, 60];
+const NOUN_LOD_WEAK: [number, number] = [15, 45];
 const _v = new THREE.Vector3();
 /** Name-tag projection scratch (updateNetwork). */
 const _tagV = new THREE.Vector3();
@@ -648,6 +656,17 @@ export class Game {
     this.towns?.on('enter', t => this.sfx.setBed(t === 'cowboy' || t === 'beach' ? t : null));
     this.towns?.on('leave', () => this.sfx.setBed(null));
     this.me = new NounCharacter(this.seed, assets);
+    this.me.noLod = true;
+    // Phones: far Nouns lose their board's small parts, then aren't drawn
+    this.gfx.beforeRender = () => {
+      const low = this.gfx.quality === 'low';
+      const [near, far] = this.weakDevice ? NOUN_LOD_WEAK : NOUN_LOD_LOW;
+      NounCharacter.updateLod(
+        this.gfx.camera.position,
+        low ? near : Infinity,
+        low ? far : Infinity,
+      );
+    };
     if (this.outfit !== null) this.me.setOutfit(this.outfit);
     this.me.setBoardType(this.boardType);
     this.me.setCastShadows(true);
@@ -852,6 +871,11 @@ export class Game {
     claimAudio(
       'noun-world-radio',
       !this.paused && (this.radio.mode !== 'off' || (this.fm.view.near && this.fm.live)),
+    );
+    // Phones: the station's little lights and decks only up close
+    this.van?.detail(
+      this.gfx.camera.position,
+      this.gfx.quality === 'low' ? VAN_DETAIL_M : Infinity,
     );
     this.van?.animate(dt, this.fm.level, this.fm.live);
     const decks =
@@ -1357,6 +1381,8 @@ export class Game {
       this.wild = wild;
       this.gfx.scene.add(m.group);
       this.mountain = m;
+      // Chunks the plaza's ring of buildings hides from the camera aren't drawn
+      m.viewer = this.gfx.camera.position;
       this.player.mountain = level.mountain ?? null;
       this.player.terrain = {
         height: terrainHeight,
@@ -2279,6 +2305,7 @@ export class Game {
       this.me.dispose();
     }
     this.me = new NounCharacter(seed, this.assets);
+    this.me.noLod = true;
     if (this.outfit !== null) this.me.setOutfit(this.outfit);
     this.me.setBoardType(this.boardType);
     this.me.setCastShadows(true);

@@ -218,6 +218,11 @@ A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Andro
   - mountain dressing is drawn within 300 m (`LOW_DRESSING_VIEW`);
   - dressing and the nature showcase don't cast shadows;
   - remote riders' name tags only touch the DOM when they change.
+- **Draw calls (2026-10-31):** a draw costs ~0.23 ms at the harness's 6× throttle; the plaza was ~275 draws alone, ~415 with 16 riders about, a room ~65. Now:
+  - mountain chunks the plaza's ring of buildings hides from the camera aren't drawn (`world/mountain/ringOcclusion.ts`, pure, checked against the real plaza with rays; per mesh by layer mask in `MountainStream.cullByRing`, rerun when the camera moves 0.3 m);
+  - Noun bodies frustum-cull (they were `frustumCulled = false`: every Noun in the world drew every frame) against their rest sphere tripled;
+  - on `low`, Nouns lose their board's wheels and trucks past 22 m and aren't drawn past 60 m (15 / 45 on weak phones; `NounCharacter.updateLod` from `gfx.beforeRender`, name tags stay, hidden ones don't animate);
+  - on `low`, the ice cream van's NOUN FM details only within 30 m (`VanStation.detail`).
 - **Rooms:** the z-fight pass (`interiors/zfight.ts`) keys by number, not string (same output, ~2× faster), and the floor above is built in `goIn` behind the fade, not 0.4 s after it.
 - **Big Drop:** `peak.enter()` starts three systems; the rest start one a frame (`START_NOW`).
 - **Site tray:** on touch screens (and anything ≤ 760 px wide) it sits bottom-left in the game, as brand + DESK chips (`NounOS/styles.ts`), clear of the touch buttons.

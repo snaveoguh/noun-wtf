@@ -35,7 +35,8 @@ import { playTada, startSlowJam } from '@/lib/chiptune';
 
 const MIN_CELL = 72;
 const GAP = 6;
-const CELL_BG = '#f4f4f5';
+/** Behind each Borg: 70% black, so the page shows through a little. */
+const CELL_BG = 'rgba(0, 0, 0, 0.7)';
 
 type SortOption = 'id-desc' | 'id-asc' | 'rarest' | 'common';
 type StatusFilter = 'alive' | 'burned' | 'all';
@@ -59,14 +60,16 @@ const BORG_KEYFRAMES = `
 `;
 
 const rarityCache = new Map<number, number>();
+/** Snapshots whose live top-up already ran (once per page load, not per mount). */
+const topUpStarted = new WeakSet<BorgsData>();
 
 /** Mean on-chain usage count of a borg's non-blank attributes (lower = rarer). */
 function rarityScore(borg: Borg, attributes: BorgAttribute[]): number {
   const cached = rarityCache.get(borg.id);
   if (cached !== undefined) return cached;
   const used = borg.attrs
-    .map(i => attributes[i])
-    .filter(a => a && !isBlankAttribute(a.n))
+    .map(i => attributes[i] as BorgAttribute | undefined)
+    .filter((a): a is BorgAttribute => a !== undefined && !isBlankAttribute(a.n))
     .map(a => a.u);
   const score = used.length
     ? used.reduce((s, u) => s + u, 0) / used.length
@@ -109,7 +112,17 @@ const BorgsTab: FC = () => {
 
   useEffect(() => {
     loadBorgsData()
-      .then(d => setData(d))
+      .then(d => {
+        // The snapshot shows at once; anything newer pops in as it's read
+        setData(d);
+        if (!topUpStarted.has(d)) {
+          topUpStarted.add(d);
+          void fetchNewBorgs(d, () => {
+            rarityCache.clear();
+            setVersion(v => v + 1);
+          }).catch(() => undefined);
+        }
+      })
       .catch(err => {
         console.error('Failed to load borgs:', err);
         setLoadError(true);
@@ -604,7 +617,7 @@ function BorgOwnerDropdown({
     const q = query.toLowerCase();
     return entries
       .filter(
-        e => e.address.toLowerCase().includes(q) || (e.ens && e.ens.toLowerCase().includes(q)),
+        e => e.address.toLowerCase().includes(q) || (e.ens?.toLowerCase().includes(q) ?? false),
       )
       .slice(0, 50);
   }, [entries, query]);
@@ -805,7 +818,7 @@ function MintBorgDialog({
 
   // Extract minted borg id once the receipt lands
   useEffect(() => {
-    if (!tx.receipt.isSuccess || !tx.receipt.data) return;
+    if (!tx.receipt.isSuccess || tx.receipt.data === undefined) return;
     for (const log of tx.receipt.data.logs) {
       if (log.address.toLowerCase() !== BORGS_ADDRESS.toLowerCase()) continue;
       try {
@@ -998,7 +1011,7 @@ function BreedBorgsDialog({
 
   // Extract child id from receipt
   useEffect(() => {
-    if (!tx.receipt.isSuccess || !tx.receipt.data) return;
+    if (!tx.receipt.isSuccess || tx.receipt.data === undefined) return;
     for (const log of tx.receipt.data.logs) {
       if (log.address.toLowerCase() !== BORGS_ADDRESS.toLowerCase()) continue;
       try {
