@@ -42,7 +42,7 @@ const WARM_GROUND = new THREE.Color(0x8a7058);
 /** The game camera's field of view on foot (SkateCamera). */
 const FOOT_FOV = 62;
 /** First person, on the book in your hands. */
-const READ_FOV = 52;
+const READ_FOV = 38;
 
 /** Book / table reach (m, flat distance). */
 const NEAR_BOOK = 1.5;
@@ -399,7 +399,10 @@ export class CampSystem {
         const u = Math.min(1, (t - P.pullAt) / (P.pullEnd - P.pullAt));
         const e = u * u * (3 - 2 * u);
         r.pos.copy(I.eyes.pos).lerp(I.play.pos, e);
-        r.look.copy(I.eyes.look).lerp(I.play.look, e);
+        // (eyes on the book till the camera's out of the head: looking down
+        // from inside it showed the neck)
+        const el = u < 0.3 ? 0 : ((u - 0.3) / 0.7) ** 2 * (3 - (2 * (u - 0.3)) / 0.7);
+        r.look.copy(I.eyes.look).lerp(I.play.look, el);
         r.fov = READ_FOV + (FOOT_FOV - READ_FOV) * e;
       }
     }
@@ -417,25 +420,36 @@ export class CampSystem {
   }
 
   private readonly headBox = new THREE.Box3();
-  private headHidden: THREE.Object3D | null = null;
+  private firstPerson: { head: THREE.Object3D; hands: THREE.Object3D[] } | null = null;
   /**
-   * First person: the whole rider is hidden only while the camera's inside
-   * their head. Going in, the face (or the side of the head) fills the
-   * frame as the camera reaches it, and from inside a head draws nothing
-   * (its faces point out), so there's no pop either way.
+   * First person, only while the camera's inside the rider's head: the
+   * head goes (from inside it would draw nothing anyway, but its glasses
+   * and bits would), and so do the hands (the hand bones shrink to nothing,
+   * the body being one skinned mesh), so you see their arms reaching to the
+   * book and the pages, no fingers through them. Going in, the face fills
+   * the frame first, so there's no pop.
    */
   private hideHead(cam: THREE.Vector3 | null) {
     const me = this.game.me;
     const h = me?.head ?? null;
-    const root = me?.root ?? null;
     const hide = cam !== null && h !== null && this.headBox.setFromObject(h).containsPoint(cam);
-    if (this.headHidden !== null && (this.headHidden !== root || !hide)) {
-      this.headHidden.visible = true;
-      this.headHidden = null;
+    const fp = this.firstPerson;
+    if (fp !== null && (fp.head !== h || !hide)) {
+      fp.head.visible = true;
+      for (const b of fp.hands) b.scale.setScalar(1);
+      this.firstPerson = null;
     }
-    if (hide && root !== null) {
-      root.visible = false;
-      this.headHidden = root;
+    if (hide && me !== null && h !== null) {
+      if (this.firstPerson === null) {
+        const hands: THREE.Object3D[] = [];
+        me.root.traverse(o => {
+          const n = o.name.replace(/[.:_]/g, '').toLowerCase();
+          if (n === 'handl' || n === 'handr') hands.push(o);
+        });
+        this.firstPerson = { head: h, hands };
+      }
+      h.visible = false;
+      for (const b of this.firstPerson.hands) b.scale.setScalar(0.001);
     }
   }
 

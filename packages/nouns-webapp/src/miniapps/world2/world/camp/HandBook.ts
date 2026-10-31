@@ -23,19 +23,27 @@ const PAGE = 0.25;
 const LEAF_Y = 0.012;
 const PAGE_URL = (n: number) => `/books/meme-value/sm/p${String(n).padStart(3, '0')}.webp`;
 
-/** Reading: hands either side of the book at `at` (rider frame), head kept upright. */
+/** Reading: hands on the back of the book at `at` (rider frame), head kept upright. */
 function readingPose(at: V3): PoseSpec {
   const s = stand();
   const [bx, by, bz] = at;
+  // On the back of the book by its side edges (the side away from the
+  // eyes): from the eyes the book is in front of the arms, never crossed by them
+  const ny = Math.cos(BOOK_TILT);
+  const nz = -Math.sin(BOOK_TILT);
+  // (up the page, toward its top edge)
+  const vy = Math.sin(BOOK_TILT);
+  const vz = Math.cos(BOOK_TILT);
+  // At the bottom corners, behind: the arms come up from under the book
+  const behind = (side: number) =>
+    new THREE.Vector3(
+      bx + side * (PAGE - 0.05),
+      by - ny * 0.05 - vy * 0.11,
+      bz - nz * 0.05 - vz * 0.11,
+    );
   s.arms = [
-    {
-      at: new THREE.Vector3(bx + 0.17, by - 0.03, bz - 0.02),
-      pole: new THREE.Vector3(1, -0.7, -0.3),
-    },
-    {
-      at: new THREE.Vector3(bx - 0.17, by - 0.03, bz - 0.02),
-      pole: new THREE.Vector3(-1, -0.7, -0.3),
-    },
+    { at: behind(1), pole: new THREE.Vector3(1, -0.7, -0.3) },
+    { at: behind(-1), pole: new THREE.Vector3(-1, -0.7, -0.3) },
   ];
   // Upright: a Noun's head is up to ~1.8 m tall, so tipping it onto the
   // book swings its front edge a metre forward, straight into the shot

@@ -37,16 +37,16 @@ describe('the rider reading MEME VALUE', () => {
     const s = readingShot([0, 0, 0], 0);
     expect(s.book).toEqual(BOOK_AT);
     // looking down and forward at the book from above it
-    expect(s.cam[1] - s.look[1]).toBeGreaterThan(0.35);
+    expect(s.cam[1] - s.look[1]).toBeGreaterThan(0.15);
     expect(s.look[2]).toBeGreaterThan(s.cam[2]);
     expect(Math.abs(s.cam[0])).toBeLessThan(0.01);
     // within ~0.7 m: the spread (0.5 m wide) fills the middle of the frame
     expect(Math.hypot(s.look[1] - s.cam[1], s.look[2] - s.cam[2])).toBeLessThan(0.7);
-    // the page normal (tilted back toward the rider) points at the eyes, within ~25°
+    // the page normal (tilted back toward the rider) points at the eyes, within ~10°
     const n = [0, Math.cos(BOOK_TILT), -Math.sin(BOOK_TILT)];
     const d = [s.cam[0] - BOOK_AT[0], s.cam[1] - BOOK_AT[1], s.cam[2] - BOOK_AT[2]];
     const cos = (n[0]! * d[0]! + n[1]! * d[1]! + n[2]! * d[2]!) / Math.hypot(...d);
-    expect(cos).toBeGreaterThan(Math.cos((25 * Math.PI) / 180));
+    expect(cos).toBeGreaterThan(Math.cos((10 * Math.PI) / 180));
   });
 
   it('turns with the rider (any facing)', () => {

@@ -66,10 +66,14 @@ export function riderToWorld(pos: V3, yaw: number, x: number, y: number, z: numb
   return [pos[0] + x * c + z * s, pos[1] + y, pos[2] - x * s + z * c];
 }
 
-/** Where the open book is held (rider frame): in both hands, chest height. */
-export const BOOK_AT: V3 = [0, 0.86, 0.4];
-/** Its tilt back toward the reader's eyes (rad about the rider's x). */
-export const BOOK_TILT = 0.55;
+/**
+ * Where the open book is held (rider frame): held up in front of the face
+ * in both hands, so from the eyes the book is in front of the arms (held
+ * low, every arm reaching it crossed the pages).
+ */
+export const BOOK_AT: V3 = [0, 1.12, 0.5];
+/** Its tilt back toward the reader's eyes (rad about the rider's x): the pages face the eyes. */
+export const BOOK_TILT = 1.07;
 /** First person: where the eyes are (rider frame), looking down at the pages. */
 export const EYES: V3 = [0, 1.38, 0.02];
 
