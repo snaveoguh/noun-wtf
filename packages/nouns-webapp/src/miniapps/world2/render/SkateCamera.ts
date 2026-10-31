@@ -241,9 +241,12 @@ export class SkateCamera {
       const dir = _dir.copy(desired).sub(target).normalize();
       desired.copy(target).addScaledVector(dir, Math.max(0.6, blocked - 0.25));
     }
-    // Keep above the ground under the camera
+    // Keep above the ground under the camera (ground: not a ceiling over
+    // the rider, e.g. a room built into the world like NOUNS CAMP, whose
+    // roof is 2 m over a camera under its ceiling)
     const g = this.world.raycast(_probe.copy(desired).addScaledVector(UP, 2), DOWN, 4);
-    if (g && desired.y < g.point.y + 0.25) desired.y = g.point.y + 0.25;
+    if (g && g.point.y < target.y + 1.5 && desired.y < g.point.y + 0.25)
+      desired.y = g.point.y + 0.25;
 
     // Feed-forward: carry the camera along with the rider at mountain speeds
     // so the spring doesn't trail metres behind (a critically damped spring

@@ -67,22 +67,28 @@ const RING_KMH = 60;
 const HELP_KEY = 'noun-world-help-seen';
 
 /**
- * The controls card starts open once per browser (first visit, keyboard),
- * then folded behind its icon. Phones never start with it.
+ * The controls card never starts open (it covered the first view). Until a
+ * player has opened it once, its icon pulses with an H on it (`helpHint`).
  */
 export function initialHelp(): boolean {
-  if (window.matchMedia?.('(pointer: coarse)').matches === true) return false;
-  // Launched straight into a game (a homepage tile: ?play=parkour, ?drop=1…):
-  // its menu comes first, and the card waits for a free-roam visit
-  const q = new URLSearchParams(window.location.search);
-  if (q.has('play') || q.has('drop')) return false;
+  return false;
+}
+
+/** Has this browser ever opened the controls card? */
+function helpSeen(): boolean {
   try {
-    if (localStorage.getItem(HELP_KEY) !== null) return false;
+    return localStorage.getItem(HELP_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function markHelpSeen() {
+  try {
     localStorage.setItem(HELP_KEY, '1');
   } catch {
-    // no storage: show it, it folds with H
+    // no storage: it just keeps pulsing this visit
   }
-  return true;
 }
 
 function useHud(game: Game): HudState {
@@ -118,6 +124,13 @@ export function RingHud({
   onFm: () => void;
   onChat: () => void;
 }) {
+  // The controls icon pulses until the card has been opened once
+  const [helpHint, setHelpHint] = useState(() => !helpSeen());
+  useEffect(() => {
+    if (!showHelp || !helpHint) return;
+    markHelpSeen();
+    setHelpHint(false);
+  }, [showHelp, helpHint]);
   const hud = useHud(game);
   const now = performance.now();
   const banked = hud.banked && now - hud.banked.at < 2600 ? hud.banked : null;
@@ -185,6 +198,7 @@ export function RingHud({
         L={L}
         touch={touch}
         showHelp={showHelp}
+        helpHint={helpHint}
         onHelp={onHelp}
         onChat={onChat}
         statsOpen={statsOpen}
@@ -379,6 +393,7 @@ function Ring({
   L,
   touch,
   showHelp,
+  helpHint,
   onHelp,
   onChat,
   statsOpen,
@@ -389,6 +404,7 @@ function Ring({
   L: HudLayout;
   touch: boolean;
   showHelp: boolean;
+  helpHint: boolean;
   onHelp: () => void;
   onChat: () => void;
   statsOpen: boolean;
@@ -509,6 +525,8 @@ function Ring({
         <IconButton
           icon="help"
           on={showHelp}
+          live={helpHint}
+          badge={helpHint ? 'H' : undefined}
           label={showHelp ? 'Hide controls (H)' : 'Controls (H)'}
           onClick={onHelp}
         />

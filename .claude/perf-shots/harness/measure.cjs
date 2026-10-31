@@ -77,7 +77,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
   const p = await ctx.newPage();
   p.on('pageerror', e => log('pageerror', String(e).slice(0, 200)));
   const cdp = await ctx.newCDPSession(p);
-  const url = `${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1`;
+  const url = `${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1&spawn=plaza`;
   log('goto', url);
   await p.goto(url, { timeout: 600000 });
   await p.getByText('PRESS START').first().click({ force: true, timeout: 600000 }).catch(e => log('no start', e.message));
@@ -207,6 +207,24 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
       }
     });
     await sleep(2000);
+  }
+  // NOUNS CAMP: wake up in it as a first spawn does, look round, then out of the window
+  if (SCEN.includes('camp')) {
+    const ok = await p.evaluate(() => window.__w2.camp.spawnInside());
+    log('camp', ok);
+    await sleep(4000);
+    await measure('camp-spawn', 12000);
+    // Stood at the window looking out over the plaza (the most world it shows)
+    await p.evaluate(() => {
+      const g = window.__w2;
+      const s = g.camp.site;
+      const V = g.player.pos.constructor;
+      g.player.spawn(new V(s.origin.x - 0.5, s.floorY + 0.05, s.origin.z + 0.6), Math.PI);
+      g.cam.snap(g.player);
+    });
+    await sleep(3000);
+    await measure('camp-window', 12000);
+    await sleep(1000);
   }
   if (SCEN.includes('interior')) {
     const ok = await p.evaluate(() => {
