@@ -77,7 +77,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
   const p = await ctx.newPage();
   p.on('pageerror', e => log('pageerror', String(e).slice(0, 200)));
   const cdp = await ctx.newCDPSession(p);
-  const url = `${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1&spawn=plaza`;
+  const url = `${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1&spawn=plaza&camintro=0`;
   log('goto', url);
   await p.goto(url, { timeout: 600000 });
   await p.getByText('PRESS START').first().click({ force: true, timeout: 600000 }).catch(e => log('no start', e.message));

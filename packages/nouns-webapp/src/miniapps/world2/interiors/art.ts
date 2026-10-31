@@ -385,7 +385,13 @@ function paintPlinthLabel(
  * The ESPORTS rug, Off-White style: off-white pile, black condensed
  * capitals in quotation marks, a small label in the corner.
  */
-function paintEsportsRug(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+export function paintEsportsRug(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
   g.save();
   g.beginPath();
   g.rect(x, y, w, h);

@@ -1056,6 +1056,17 @@ export class Player {
     const dx = input.moveX * CLIMB_SIDE * dt;
     const start = this.pos.clone();
     const next = this.pos.clone().addScaledVector(UP, dy).addScaledVector(right, dx);
+    // A ceiling over the head stops the climb (a room's wall isn't a way
+    // through its roof): the hands go no higher than just under it
+    if (dy > 0) {
+      const ceil = this.world.raycast(
+        _v.copy(start).addScaledVector(UP, 1.0),
+        UP,
+        CLIMB_HANDS + 0.4,
+      );
+      if (ceil !== null && ceil.normal.y < -0.5)
+        next.y = Math.min(next.y, Math.max(start.y, ceil.point.y - CLIMB_HANDS - 0.25));
+    }
 
     // Bottom: climbing down onto the ground hops you off
     if (dy < 0) {
@@ -1116,7 +1127,16 @@ export class Player {
         .addScaledVector(n, -(CLIMB_DIST + 0.65))
         .addScaledVector(UP, CLIMB_HANDS + 1.2);
       const roof = this.world.raycast(inside, _v2.set(0, -1, 0), CLIMB_HANDS + 1.6);
-      if (roof !== null && roof.normal.y > 0.7 && roof.point.y > next.y + 0.3) {
+      // …and nothing between the hands and that top (a ceiling under it)
+      const through =
+        roof === null
+          ? null
+          : this.world.raycast(
+              _v3.copy(next).addScaledVector(UP, 1.0),
+              UP,
+              Math.max(0.1, roof.point.y - next.y - 0.9),
+            );
+      if (roof !== null && through === null && roof.normal.y > 0.7 && roof.point.y > next.y + 0.3) {
         const to = roof.point.clone();
         // Headroom on top?
         const clear = this.world.raycast(_v.copy(to).addScaledVector(UP, 0.1), UP, 1.6);

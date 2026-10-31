@@ -329,11 +329,26 @@ export function buildSkyline(roofs: THREE.Object3D | null): Skyline {
         box(facade, trim, min, max, tint, roofCol, uvo);
         addCollider(min, max);
       }
-      // Chunky trim band at the setback (flush with the roof, sticks out a bit)
-      const bMin = V(min.x - 0.3, yTop - 0.8, nearZ(tier.inset, 0.3));
-      const bMax = V(max.x + 0.3, yTop + 0.05, max.z + 0.3);
-      box(trim, trim, bMin, bMax, band, roofCol, null);
-      addCollider(bMin, bMax);
+      // Chunky trim band at the setback (flush with the roof, sticks out a bit).
+      // Round CAMP it's a ring outside the walls: a solid band would cut
+      // through the room under its ceiling (and catch climbers and paint)
+      const bands =
+        t.camp === true && k === tiers.length - 1
+          ? [
+              [V(min.x - 0.3, yTop - 0.8, min.z + 0.02), V(min.x, yTop + 0.05, max.z + 0.3)],
+              [V(max.x, yTop - 0.8, min.z + 0.02), V(max.x + 0.3, yTop + 0.05, max.z + 0.3)],
+              [V(min.x, yTop - 0.8, max.z), V(max.x, yTop + 0.05, max.z + 0.3)],
+            ]
+          : [
+              [
+                V(min.x - 0.3, yTop - 0.8, nearZ(tier.inset, 0.3)),
+                V(max.x + 0.3, yTop + 0.05, max.z + 0.3),
+              ],
+            ];
+      for (const [bMin, bMax] of bands) {
+        box(trim, trim, bMin!, bMax!, band, roofCol, null);
+        addCollider(bMin!, bMax!);
+      }
       // Thin white floor-line bands every ~4 storeys on the main shaft
       for (let ly = y + FLOOR_H * 4; ly < yTop - 3; ly += FLOOR_H * 4) {
         box(
