@@ -1,6 +1,6 @@
 import { getPublicClient } from '@wagmi/core';
 
-import { config as wagmiConfig } from '@/wagmi';
+import { config as wagmiConfig, defaultChain } from '@/wagmi';
 
 // The Ponder indexer can stop syncing while its HTTP server keeps answering
 // (2026-10-20 05:31Z: sync froze for 2+ days, /api/activity kept serving the
@@ -9,6 +9,11 @@ import { config as wagmiConfig } from '@/wagmi';
 // chain fallbacks only ran when the API returned NOTHING, so stale-but-
 // non-empty data looked healthy. Compare Ponder's own `/status` head against
 // the chain head instead.
+//
+// The chain head is always the Nouns chain's (`defaultChain`), never the
+// wallet's current one: wagmi's config also carries Polygon, and with a
+// wallet on Polygon the feed read Polygon's head (~96M) against mainnet's
+// ~26M and cried "70,203,480 blocks behind" (2026-10-31).
 
 /** ~30 min of blocks. Ponder normally trails head by 0-2 blocks. */
 export const STALE_LAG_BLOCKS = 150;
@@ -25,7 +30,7 @@ let cache: { at: number; value: IndexerHealth | null } | null = null;
 let inflight: Promise<IndexerHealth | null> | null = null;
 
 async function load(apiBase: string): Promise<IndexerHealth | null> {
-  const client = getPublicClient(wagmiConfig);
+  const client = getPublicClient(wagmiConfig, { chainId: defaultChain.id });
   if (client == null) return null;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 6_000);

@@ -63,7 +63,7 @@ export async function fetchV1ChainEvents(): Promise<ActivityEvent[]> {
   // exists for the case where defaultChain.id drifts to an unsupported id.
   if (address == null) return [];
 
-  const client = getPublicClient(wagmiConfig);
+  const client = getPublicClient(wagmiConfig, { chainId: defaultChain.id });
   if (client == null) return [];
 
   // Pull head info once. We derive each event's timestamp from the head

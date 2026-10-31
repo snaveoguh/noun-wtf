@@ -4,7 +4,7 @@ import {
   smallGrantsTreasuryAbi,
   SMALL_GRANTS_TREASURY_ADDRESS,
 } from '@/contracts/small-grants-treasury';
-import { config as wagmiConfig } from '@/wagmi';
+import { config as wagmiConfig, defaultChain } from '@/wagmi';
 
 // Mirrors enum SmallGrantsTreasury.ProposalState in the contract source.
 const STATE_LABELS = [
@@ -48,7 +48,7 @@ export interface ChainGrant {
  * "Untitled". Acceptable trade-off vs. scanning the full event history.
  */
 export async function fetchGrantsFromChain(): Promise<ChainGrant[]> {
-  const client = getPublicClient(wagmiConfig);
+  const client = getPublicClient(wagmiConfig, { chainId: defaultChain.id });
   if (client == null) return [];
 
   const proposalCount = (await client.readContract({
@@ -101,16 +101,11 @@ export async function fetchGrantsFromChain(): Promise<ChainGrant[]> {
     descMap = new Map(
       created
         .filter(ev => ev.args.id != null)
-        .map(ev => [
-          ev.args.id as bigint,
-          (ev.args.description as string | undefined) ?? '',
-        ]),
+        .map(ev => [ev.args.id as bigint, (ev.args.description as string | undefined) ?? '']),
     );
     // Capture the block for createdAt so the UI can sort sensibly.
     createdAtMap = new Map(
-      created
-        .filter(ev => ev.args.id != null)
-        .map(ev => [ev.args.id as bigint, ev.blockNumber]),
+      created.filter(ev => ev.args.id != null).map(ev => [ev.args.id as bigint, ev.blockNumber]),
     );
   } catch {
     /* event scan failed — descriptions stay empty, IDs still surface */
