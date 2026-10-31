@@ -103,6 +103,15 @@ describe('the CAMP layout', () => {
     }
   });
 
+  it('wall prints hang in front of the dado rail, never behind it', () => {
+    // The rail's face: the wall lining (0.03 in) plus 0.02 proud
+    const railFace = 0.05;
+    for (const q of L.pieces.filter(p => p.type === 'print' || p.type === 'poster')) {
+      const gap = Math.min(q.z, L.d - q.z, q.x + L.w / 2, L.w / 2 - q.x);
+      expect(gap, `${q.type} ${q.v}`).toBeGreaterThan(railFace + 0.01);
+    }
+  });
+
   it('solid furniture never overlaps', () => {
     for (let i = 0; i < solids.length; i++)
       for (let j = i + 1; j < solids.length; j++) {

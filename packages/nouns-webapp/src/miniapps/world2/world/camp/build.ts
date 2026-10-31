@@ -721,8 +721,16 @@ function piece(kit: Kit, q: Piece, art: CampArt, at: At) {
       break;
     }
     case 'tag': {
+      // Nouns Camp's closure notice, framed in black (the print just inside the moulding)
       at(q.x, q.y, q.z, q.yaw);
-      kit.addArt(panel(q.w, q.h, 0, q.h / 2, 0.003), art.slot.tag);
+      kit.addArt(panel(q.w, q.h, 0, q.h / 2, 0.012), art.slot.tag);
+      const f = 0.07;
+      const black = 0x141414;
+      kit.add(boxAt(-q.w / 2 - f, q.w / 2 + f, q.h, q.h + f, 0, 0.045), black);
+      kit.add(boxAt(-q.w / 2 - f, q.w / 2 + f, -f, 0, 0, 0.045), black);
+      kit.add(boxAt(-q.w / 2 - f, -q.w / 2, 0, q.h, 0, 0.045), black);
+      kit.add(boxAt(q.w / 2, q.w / 2 + f, 0, q.h, 0, 0.045), black);
+      kit.add(boxAt(-q.w / 2, q.w / 2, 0, q.h, 0, 0.008), black);
       break;
     }
     case 'boarded_door': {
