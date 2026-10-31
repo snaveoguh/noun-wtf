@@ -10,11 +10,13 @@
 
 import type { Game } from '../../Game';
 import type { LevelData } from '../Level';
+import type { Aabb } from '../mountain/ringOcclusion';
 
 import * as THREE from 'three';
 
 import { buildCamp, type CampBuild, type CampWorld } from './build';
 import { pickSpawn } from './firstSpawn';
+import { portalPlanes, seenFromRoom } from './portal';
 import { CAMP_TOWER, inCamp, toWorld, type CampSite } from './site';
 
 export interface CampPrompt {
@@ -32,6 +34,20 @@ const NEAR_BOOK = 1.5;
 const NEAR_POOL = 1.8;
 /** A fall this big off the tower gets called out on landing. */
 const BIG_DROP = 25;
+/** Rerun the portal cull when the camera has moved this far (or every CULL_EVERY s). */
+const CULL_MOVE = 0.25;
+const CULL_EVERY = 1;
+/** Look for new meshes (streamed chunks, riders) this often while culling. */
+const GATHER_EVERY = 2;
+
+interface CullItem {
+  o: THREE.Object3D;
+  box: Aabb;
+  /** matrixWorld translation + x scale when the box was taken. */
+  key: [number, number, number, number];
+  local: THREE.Box3;
+}
+
 /** Animate the bulb only this close (it's a glow material; nobody far sees it). */
 const NEAR_CAMP = 80;
 
@@ -47,6 +63,17 @@ export class CampSystem {
   private fallTop: number | null = null;
   private keyBound = false;
   private lit = false;
+  /** The window portal cull (portal.ts): on while the camera is inside. */
+  private cull = {
+    on: false,
+    from: new THREE.Vector3(Infinity, 0, 0),
+    at: -Infinity,
+    gatheredAt: -Infinity,
+    items: [] as CullItem[],
+    hidden: new Set<THREE.Object3D>(),
+  };
+  /** How many meshes the portal cull is hiding (perf probes). */
+  culled = 0;
 
   constructor(private readonly game: Game) {}
 
@@ -140,6 +167,114 @@ export class CampSystem {
       for (const l of this.listeners) l();
     }
     this.trackDrop();
+    this.portalCull();
+  }
+
+  /**
+   * From inside CAMP only the room and what the window frames can be seen:
+   * hide everything else (portal.ts). By layer bit 0, restored on the way
+   * out, and only bits this took away (it never fights MountainStream's
+   * ring cull, which sets whole masks).
+   */
+  private portalCull() {
+    const s = this.site!;
+    const g = this.game;
+    const C = this.cull;
+    const cam = g.gfx.camera.position;
+    const r = s.room;
+    const inside =
+      cam.x > r.minX &&
+      cam.x < r.maxX &&
+      cam.z > r.minZ &&
+      cam.z < r.maxZ &&
+      cam.y > s.floorY &&
+      cam.y < s.ceilY;
+    if (!inside) {
+      if (C.on) this.releaseCull();
+      return;
+    }
+    if (!C.on || this.t - C.gatheredAt > GATHER_EVERY) this.gatherCull();
+    C.on = true;
+    if (cam.distanceToSquared(C.from) < CULL_MOVE * CULL_MOVE && this.t - C.at < CULL_EVERY) return;
+    C.from.copy(cam);
+    C.at = this.t;
+    const w = s.window;
+    const planes = portalPlanes(
+      cam.x,
+      cam.y,
+      cam.z,
+      { x0: w.x0, x1: w.x1, y0: w.y0, y1: w.y1, z: s.faceZ },
+      0.3,
+    );
+    const room: Aabb = {
+      minX: s.tier.minX,
+      maxX: s.tier.maxX,
+      minY: s.floorY - 0.3,
+      maxY: s.ceilY + 0.3,
+      minZ: s.faceZ - 0.05,
+      maxZ: s.tier.maxZ,
+    };
+    for (const it of C.items) {
+      const show = seenFromRoom(planes, room, boxOf(it));
+      const o = it.o;
+      if (!show) {
+        if ((o.layers.mask & 1) !== 0) {
+          o.layers.mask &= ~1;
+          C.hidden.add(o);
+        }
+      } else if (C.hidden.has(o)) {
+        o.layers.mask |= 1;
+        C.hidden.delete(o);
+      }
+    }
+    this.culled = C.hidden.size;
+  }
+
+  /** Every drawable in the scene but the room itself, the rider and the sky. */
+  private gatherCull() {
+    const g = this.game;
+    const C = this.cull;
+    C.gatheredAt = this.t;
+    const skip = new Set<THREE.Object3D>([g.gfx.sky]);
+    if (g.me !== null) skip.add(g.me.root);
+    for (const c of this.built!.group.children) if (c.name.startsWith('Interior:')) skip.add(c);
+    const known = new Set(C.items.map(i => i.o));
+    const items: CullItem[] = C.items.filter(i => i.o.parent !== null);
+    const walk = (o: THREE.Object3D) => {
+      if (skip.has(o)) return;
+      const m = o as THREE.Mesh & { isInstancedMesh?: boolean; boundingBox?: THREE.Box3 | null };
+      if ((m.isMesh === true || (o as THREE.Points).isPoints === true) && !known.has(o)) {
+        let local: THREE.Box3 | null = null;
+        if (m.isInstancedMesh === true) {
+          const im = m as unknown as THREE.InstancedMesh;
+          if (im.boundingBox === null) im.computeBoundingBox();
+          local = im.boundingBox;
+        } else if (m.geometry !== undefined) {
+          if (m.geometry.boundingBox === null) m.geometry.computeBoundingBox();
+          local = m.geometry.boundingBox;
+        }
+        // Sky domes, terrain grids: too big to ever be behind the walls
+        if (
+          local !== null &&
+          local.min.distanceTo(local.max) * o.matrixWorld.getMaxScaleOnAxis() < 4000
+        )
+          items.push({ o, local: local.clone(), key: [NaN, 0, 0, 0], box: emptyBox() });
+      }
+      for (const c of o.children) walk(c);
+    };
+    walk(g.gfx.scene);
+    C.items = items;
+  }
+
+  private releaseCull() {
+    const C = this.cull;
+    for (const o of C.hidden) o.layers.mask |= 1;
+    C.hidden.clear();
+    C.items = [];
+    C.on = false;
+    C.from.set(Infinity, 0, 0);
+    C.gatheredAt = -Infinity;
+    this.culled = 0;
   }
 
   act(kind: CampPrompt['kind']) {
@@ -226,6 +361,7 @@ export class CampSystem {
   };
 
   dispose() {
+    this.releaseCull();
     if (this.keyBound) document.removeEventListener('keydown', this.onKey, true);
     this.keyBound = false;
     this.built?.dispose();
@@ -262,4 +398,28 @@ function probeWorld(meshes: THREE.Mesh[], site: CampSite): CampWorld {
   }
   if (parapet <= roof + 0.2) parapet = roof + 0.9;
   return { roof, parapet, parapetDepth: depth, towerMaxX };
+}
+
+const emptyBox = (): Aabb => ({ minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 });
+const _b = new THREE.Box3();
+
+/** A cull item's world box, retaken only when it has moved. */
+function boxOf(it: CullItem): Aabb {
+  const e = it.o.matrixWorld.elements;
+  const k = it.key;
+  if (k[0] !== e[12] || k[1] !== e[13] || k[2] !== e[14] || k[3] !== e[0]) {
+    k[0] = e[12]!;
+    k[1] = e[13]!;
+    k[2] = e[14]!;
+    k[3] = e[0]!;
+    _b.copy(it.local).applyMatrix4(it.o.matrixWorld);
+    const b = it.box;
+    b.minX = _b.min.x;
+    b.minY = _b.min.y;
+    b.minZ = _b.min.z;
+    b.maxX = _b.max.x;
+    b.maxY = _b.max.y;
+    b.maxZ = _b.max.z;
+  }
+  return it.box;
 }
