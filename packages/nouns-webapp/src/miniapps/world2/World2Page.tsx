@@ -43,6 +43,8 @@ import { DropClaim } from './ui/DropClaim';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
+import { CampUi } from './world/camp/CampUi';
+import { firstSpawnInCamp } from './world/camp/firstSpawn';
 import { worldPause } from './worldPause';
 
 /** The Grand Exchange, hidden under the Noggles Fountain (a lazy chunk). */
@@ -187,6 +189,32 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     game.spots.introPlayed = true;
     if (ok) void game.spots.intro();
   }, [game, phase, searchParams]);
+  // A plain /world load (no deep link, no `?spawn=plaza`): everyone wakes
+  // up in NOUNS CAMP, the condemned penthouse (world/camp). Once per page
+  // load; if CAMP isn't there the plaza spawn stands.
+  const wokeUp = useRef(false);
+  useEffect(() => {
+    if (!game || !started || wokeUp.current) return;
+    if (!firstSpawnInCamp(`?${searchParams.toString()}`)) return;
+    const tryWake = () => {
+      if (game.me === null || game.hud.loading !== null) return false;
+      wokeUp.current = true;
+      game.camp.spawnInside();
+      return true;
+    };
+    if (tryWake()) return;
+    const t = window.setInterval(() => tryWake() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+  // The book on CAMP's coffee table opens the real one
+  useEffect(() => {
+    if (!game) return;
+    game.camp.onRead = () => navigate('/books/meme-value');
+    return () => {
+      game.camp.onRead = null;
+    };
+  }, [game, navigate]);
+
   // `?drop=1` (the homepage's THE BIG DROP card): once the rider is in,
   // straight onto the mountain if the deepest door is open to them
   const dropLaunched = useRef(false);
@@ -412,6 +440,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         </Suspense>
       )}
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <CampUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}

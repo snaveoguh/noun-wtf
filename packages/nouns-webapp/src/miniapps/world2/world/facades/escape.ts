@@ -253,3 +253,231 @@ export function checkEscape(plan: EscapePlan, spec: EscapeSpec): string[] {
   if (Math.abs(plan.ladder.top - plan.levels[0]!) > 1e-6) errs.push('ladder misses the first pad');
   return errs;
 }
+
+// ── Tower escapes: a scissor stair down a skyscraper (pure, tested) ──────
+//
+// The zig-zag above walks back along a platform every storey, which is
+// fine for 4 floors and a slog for 35. A tower escape is a scissor stair:
+// two lanes, flights alternating direction, so you never walk back.
+//
+//   top:        a walkway along the inner lane at `top` (the window opens
+//               onto it), and the head pad at B;
+//   flight k:   even k in the outer lane, B → A; odd k in the inner lane,
+//               A → B; each falls one `rise`;
+//   landing k:  both lanes, at the end flight k arrives at;
+//   bottom:     the last landing at `bottom`, and an exit deck that runs on
+//               past that end (onto the roof next door).
+//
+// Stacked flights in one lane are two rises apart (headroom 2 × rise).
+// Same wall frame and parts as planEscape, so buildEscape draws and
+// collides it.
+
+export interface TowerEscapeSpec {
+  /** Length along the wall (m). */
+  length: number;
+  /** The walkway's height (the room's floor). */
+  top: number;
+  /** Where the stair ends (the roof next door's height). */
+  bottom: number;
+  /** Rise per flight to aim for (a storey of the tower). */
+  storey?: number;
+  /** Width of each lane. */
+  lane?: number;
+  /** How far the exit deck runs on past the last landing's end. */
+  exit?: number;
+  /** Where the lanes start out from the wall (clear of its trim). */
+  inset?: number;
+  /** Which end the last flight should arrive at (picks the flight count's parity). */
+  exitEnd?: 'A' | 'B';
+  /**
+   * Off the exit deck over the parapet onto a roof behind the wall: a deck
+   * in across [u0, u1] over the parapet (`depth` thick), then a ramp down
+   * onto `roof`. `bottom` should clear the parapet.
+   */
+  land?: { u0: number; u1: number; roof: number; depth: number };
+}
+
+export interface TowerEscapePlan extends EscapePlan {
+  rise: number;
+  flights: number;
+  lane: number;
+  inset: number;
+  /** End the last flight arrives at ('A' = u 0, 'B' = u length). */
+  exitEnd: 'A' | 'B';
+  /** The exit deck's span along u (past the wall's end). */
+  exitSpan: [number, number];
+}
+
+/** Plan a scissor stair (wall frame). Null when the wall is too short for a walkable flight. */
+export function planTowerEscape(spec: TowerEscapeSpec): TowerEscapePlan | null {
+  const L = spec.length;
+  const lane = spec.lane ?? 1.2;
+  const inset = spec.inset ?? 0.12;
+  const exit = spec.exit ?? 3;
+  const drop = spec.top - spec.bottom;
+  const run = L - 2 * PAD;
+  if (drop <= 0.5 || run <= 0) return null;
+  let n = Math.max(1, Math.round(drop / (spec.storey ?? 3.6)));
+  // n flights end at A when n is odd (flight 0 falls toward A)
+  if (spec.exitEnd !== undefined && (n % 2 === 1) !== (spec.exitEnd === 'A')) {
+    const up = n + 1;
+    const down = n - 1;
+    n =
+      down >= 1 &&
+      Math.abs(drop / down - (spec.storey ?? 3.6)) < Math.abs(drop / up - (spec.storey ?? 3.6))
+        ? down
+        : up;
+  }
+  const rise = drop / n;
+  if (slopeNormalY(rise, run) < MIN_NORMAL_Y) return null;
+  const d0 = inset;
+  const d1 = inset + lane;
+  const d2 = inset + 2 * lane;
+  const parts: EscapePart[] = [];
+  const box = (
+    role: EscapeBox['role'],
+    u0: number,
+    u1: number,
+    a: number,
+    b: number,
+    y0: number,
+    y1: number,
+    solid = true,
+  ) => parts.push({ kind: 'box', role, u0, u1, d0: a, d1: b, y0, y1, solid });
+  const rail = (u0: number, u1: number, a: number, b: number, y: number) =>
+    box('rail', u0, u1, a, b, y, y + RAIL_H);
+  const levels: number[] = [];
+  const top = spec.top;
+  // The walkway and the head pad
+  box('platform', 0, L, d0, d1, top - PLATE, top);
+  box('pad', L - PAD, L, d1, d2, top - PLATE, top);
+  rail(L - RAIL_T, L, d0, d2, top);
+  rail(L - PAD, L, d2 - RAIL_T, d2, top);
+  rail(0, RAIL_T, d0, d1, top);
+  levels.push(top);
+  for (let k = 0; k < n; k++) {
+    const yHi = top - k * rise;
+    const yLo = top - (k + 1) * rise;
+    const outer = k % 2 === 0;
+    const [a, b] = outer ? [d1, d2] : [d0, d1];
+    // u runs A → B: outer flights are low at A, inner flights low at B
+    const yA = outer ? yLo : yHi;
+    const yB = outer ? yHi : yLo;
+    parts.push({
+      kind: 'ramp',
+      role: 'flight',
+      axis: 'u',
+      u0: PAD,
+      u1: L - PAD,
+      d0: a + 0.02,
+      d1: b - 0.02,
+      y0: yA,
+      y1: yB,
+      thick: 0.16,
+      steps: Math.max(2, Math.round(rise / STEP_RISE)),
+      solid: true,
+    });
+    if (outer)
+      parts.push({
+        kind: 'ramp',
+        role: 'rail',
+        axis: 'u',
+        u0: PAD,
+        u1: L - PAD,
+        d0: d2 - RAIL_T,
+        d1: d2,
+        y0: yA + RAIL_H,
+        y1: yB + RAIL_H,
+        thick: RAIL_H,
+        steps: 0,
+        solid: true,
+      });
+    // The landing it arrives at: both lanes, at the low end
+    const atA = outer;
+    const [u0, u1] = atA ? [0, PAD] : [L - PAD, L];
+    box(k === n - 1 ? 'deck' : 'pad', u0, u1, d0, d2, yLo - PLATE, yLo);
+    levels.push(yLo);
+    // Rails round it: the outer edge, and the end (open at the bottom: the exit)
+    rail(u0, u1, d2 - RAIL_T, d2, yLo);
+    if (k < n - 1) {
+      if (atA) rail(0, RAIL_T, d0, d2, yLo);
+      else rail(L - RAIL_T, L, d0, d2, yLo);
+    }
+    for (const u of [u0, u1 - RAIL_T])
+      box('post', u, u + RAIL_T, d2 - RAIL_T, d2, yLo - PLATE, yLo + RAIL_H, false);
+  }
+  const exitEnd: 'A' | 'B' = (n - 1) % 2 === 0 ? 'A' : 'B';
+  const exitSpan: [number, number] = exitEnd === 'A' ? [-exit, 0] : [L, L + exit];
+  box('deck', exitSpan[0], exitSpan[1], d0, d2, spec.bottom - PLATE, spec.bottom);
+  // Its far end and outer edge are railed; the near end opens onto the last landing
+  const far = exitEnd === 'A' ? exitSpan[0] : exitSpan[1] - RAIL_T;
+  rail(far, far + RAIL_T, d0, d2, spec.bottom);
+  rail(exitSpan[0], exitSpan[1], d2 - RAIL_T, d2, spec.bottom);
+  const land = spec.land;
+  if (land !== undefined) {
+    const din = -(land.depth + 0.25);
+    box('deck', land.u0, land.u1, din, d0, spec.bottom - PLATE, spec.bottom);
+    const fall = spec.bottom - land.roof;
+    parts.push({
+      kind: 'ramp',
+      role: 'bridge',
+      axis: 'd',
+      u0: land.u0,
+      u1: land.u1,
+      d0: din,
+      d1: din - Math.max(1.6, fall / 0.6),
+      y0: spec.bottom,
+      y1: land.roof,
+      thick: 0.14,
+      steps: Math.max(2, Math.round(fall / STEP_RISE)),
+      solid: true,
+    });
+  }
+  return {
+    parts,
+    levels,
+    top,
+    length: L,
+    depth: d2,
+    // No drop ladder: the way on is the window (or the roof next door)
+    ladder: { u0: 0, u1: 0, top },
+    rise,
+    flights: n,
+    lane,
+    inset,
+    exitEnd,
+    exitSpan,
+  };
+}
+
+/** A scissor stair's walker checks (tests + a runtime guard). */
+export function checkTowerEscape(plan: TowerEscapePlan, spec: TowerEscapeSpec): string[] {
+  const errs: string[] = [];
+  const flights = plan.parts.filter(
+    (p): p is EscapeRamp => p.kind === 'ramp' && p.role === 'flight',
+  );
+  if (flights.length !== plan.flights) errs.push('flight count');
+  for (const f of flights) {
+    const ny = slopeNormalY(Math.abs(f.y1 - f.y0), f.u1 - f.u0);
+    if (ny < MIN_NORMAL_Y) errs.push(`flight too steep (normal.y ${ny.toFixed(2)})`);
+    if (Math.abs(f.y1 - f.y0) / f.steps > 0.26) errs.push('steps too tall');
+  }
+  // Each flight starts where the last one ended (same end, same height)
+  for (let k = 1; k < flights.length; k++) {
+    const a = flights[k - 1]!;
+    const b = flights[k]!;
+    const endA = Math.min(a.y0, a.y1);
+    const startB = Math.max(b.y0, b.y1);
+    if (Math.abs(endA - startB) > 1e-6) errs.push(`flight ${k} doesn't start where ${k - 1} ends`);
+    const aLowAtA = a.y0 < a.y1;
+    const bHighAtA = b.y0 > b.y1;
+    if (aLowAtA !== bHighAtA) errs.push(`flight ${k} starts at the wrong end`);
+  }
+  // Headroom: flights in the same lane are two rises apart
+  if (plan.flights > 2 && 2 * plan.rise < 2.6) errs.push('no headroom');
+  const last = flights[flights.length - 1];
+  if (last === undefined || Math.abs(Math.min(last.y0, last.y1) - spec.bottom) > 1e-6)
+    errs.push("doesn't reach the bottom");
+  if (Math.abs(plan.top - spec.top) > 1e-6) errs.push('walkway off the floor');
+  return errs;
+}

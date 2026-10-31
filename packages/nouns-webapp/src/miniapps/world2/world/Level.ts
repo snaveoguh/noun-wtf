@@ -1,6 +1,7 @@
 // ── Level loading: Blender-baked plaza (preferred) or procedural fallback ──
 
 import type { RailDef } from '../physics/Rails';
+import type { CampSite } from './camp/site';
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -52,6 +53,8 @@ export interface LevelData {
    * ≥ minZ you're out on the slope.
    */
   mountain?: { inCorridor: (x: number, z: number) => boolean; minZ: number };
+  /** NOUNS CAMP, the penthouse every first spawn wakes up in (world/camp). */
+  camp?: CampSite;
 }
 
 const BASE = '/world2/level/';
@@ -216,6 +219,7 @@ export async function loadLevel(
     let softBounds: number | undefined;
     let mountain: LevelData['mountain'];
     let skylineTop = 0;
+    let camp: CampSite | undefined;
     if (collisionMeshes.some(m => m.name === 'COL_Buildings')) {
       const roofs = collisionMeshes.find(m => m.name === 'COL_Buildings') ?? null;
       // Its block tops sit at parapet height: put them on the visible roofs
@@ -244,6 +248,7 @@ export async function loadLevel(
       const skyline = buildSkyline(roofs);
       scene.add(skyline.group);
       skylineTop = skyline.maxY;
+      camp = skyline.camp ?? undefined;
       collisionMeshes = collisionMeshes.filter(m => m.name !== 'COL_Boundary');
       collisionMeshes.push(...skyline.collision);
       softBounds = 93.6;
@@ -326,6 +331,7 @@ export async function loadLevel(
       baked: !!json.lightmaps && Object.keys(json.lightmaps).length > 0,
       softBounds,
       mountain,
+      camp,
     };
   } catch (err) {
     console.info(

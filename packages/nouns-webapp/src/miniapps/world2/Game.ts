@@ -106,6 +106,7 @@ import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
 import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
+import { CampSystem } from './world/camp/CampSystem';
 import { FacadeSystem } from './world/facades/FacadeSystem';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
 import { landmarksDecorator } from './world/landmarks/decorator';
@@ -361,6 +362,8 @@ export class Game {
   readonly missions: MissionSystem = new MissionSystem(this);
   /** Enterable buildings (interiors/): doors, rooms, residents; InteriorsApi. */
   readonly interiors: InteriorSystem = new InteriorSystem(this);
+  /** NOUNS CAMP (world/camp/): the condemned penthouse every first spawn wakes up in. */
+  readonly camp: CampSystem = new CampSystem(this);
   /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
   readonly facades: FacadeSystem = new FacadeSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
@@ -551,6 +554,8 @@ export class Game {
     if (this.disposed) return;
     this.level = level;
     this.assets = assets;
+    // Into the level before it's toonified and its collision is built
+    this.camp.build(level);
     this.gfx.scene.add(level.root);
     if (this.gfx.toon) {
       toonify(level.root);
@@ -1210,6 +1215,7 @@ export class Game {
     this.missions.update(dt);
     perf.lap('missions');
     this.interiors.update(dt);
+    this.camp.update(dt);
     perf.lap('interiors');
     if (!away) this.facades.update(dt);
     if (!away) {
@@ -1543,9 +1549,13 @@ export class Game {
 
   /** Cycle afternoon → golden → blue hour → night (2 s transition). */
   cycleTimeOfDay() {
-    if (this.nature === null || this.level === null) return;
     const i = Game.TOD.indexOf(this.hud.timeOfDay);
-    const next = Game.TOD[(i + 1) % Game.TOD.length];
+    this.setTimeOfDay(Game.TOD[(i + 1) % Game.TOD.length]!);
+  }
+
+  /** Straight to a time of day (CAMP wakes you at sunset: 'golden'). */
+  setTimeOfDay(next: TimeOfDayPreset) {
+    if (this.nature === null || this.level === null || this.hud.timeOfDay === next) return;
     applyTimeOfDay(this.gfx, next, this.level);
     this.hud = { ...this.hud, timeOfDay: next };
     this.emit();
@@ -2514,6 +2524,7 @@ export class Game {
     this.sfx.dispose();
     this.missions.dispose();
     this.interiors.dispose();
+    this.camp.dispose();
     this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();

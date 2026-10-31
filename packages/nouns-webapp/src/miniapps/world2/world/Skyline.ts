@@ -10,6 +10,8 @@ import * as THREE from 'three';
 
 import { MINOR_CAP, shrinkTexture, textureDiet } from '../render/textureDiet';
 
+import { CAMP_INSETS, campShellBoxes, campSite, type CampSite } from './camp/site';
+
 interface TowerSpec {
   /** Footprint centre (world XZ). */
   x: number;
@@ -22,6 +24,12 @@ interface TowerSpec {
   tint: number;
   /** Antenna mast on the crown. */
   mast?: number;
+  /**
+   * NOUNS CAMP's tower (world/camp): its plaza (−z) face runs flush all
+   * the way up (the fire escape hangs off it), slimmer setbacks, and the
+   * top storey is a hollow shell with a window instead of solid.
+   */
+  camp?: true;
 }
 
 // Ring of buildings sits at |x| or |z| ≈ 76–92. Plaza-facing facades are
@@ -29,7 +37,7 @@ interface TowerSpec {
 // (one continuous climb), the rest are set back across the roof.
 const TOWERS: TowerSpec[] = [
   // North side (z 76–94)
-  { x: -20, z: 82.5, w: 14, d: 13, top: 150, tint: 0xa9c6ea, mast: 18 },
+  { x: -20, z: 82.5, w: 14, d: 13, top: 150, tint: 0xa9c6ea, mast: 18, camp: true },
   { x: 56, z: 85, w: 12, d: 12, top: 96, tint: 0xf0b8a4 },
   // South side (z −94 – −76)
   { x: 12, z: -83, w: 15, d: 14, top: 122, tint: 0xf1d7a6, mast: 12 },
@@ -226,6 +234,8 @@ export interface Skyline {
   collision: THREE.Mesh[];
   /** Highest point of any tower (for bounds). */
   maxY: number;
+  /** Where NOUNS CAMP is (world/camp/site.ts), once its tower is built. */
+  camp: CampSite | null;
 }
 
 /**
@@ -241,6 +251,7 @@ export function buildSkyline(roofs: THREE.Object3D | null): Skyline {
   const ray = new THREE.Raycaster();
   const down = new THREE.Vector3(0, -1, 0);
   let maxY = 0;
+  let camp: CampSite | null = null;
   // Collision-only mesh (never rendered): make the probe winding-agnostic
   const roofMat = (roofs as THREE.Mesh | null)?.material;
   if (roofMat !== undefined && !Array.isArray(roofMat)) roofMat.side = THREE.DoubleSide;
@@ -286,24 +297,40 @@ export function buildSkyline(roofs: THREE.Object3D | null): Skyline {
     const tiers =
       span > 90
         ? [
-            { inset: 0, frac: 0.48 },
-            { inset: 1.8, frac: 0.78 },
-            { inset: 3.4, frac: 1 },
+            { inset: t.camp ? CAMP_INSETS[0] : 0, frac: 0.48 },
+            { inset: t.camp ? CAMP_INSETS[1] : 1.8, frac: 0.78 },
+            { inset: t.camp ? CAMP_INSETS[2] : 3.4, frac: 1 },
           ]
         : [
             { inset: 0, frac: 0.62 },
             { inset: 1.9, frac: 1 },
           ];
     const uvo = { u0: (ti * 0.37) % 1, v0: (ti * 0.29) % 1 };
+    // CAMP's plaza face is one plane all the way up: no setback there, and
+    // the bands stop just inside it (nothing proud for the fire escape to hit)
+    const flushZ = t.camp === true ? t.z - hz : null;
+    const nearZ = (inset: number, out: number) =>
+      flushZ !== null ? flushZ + 0.02 : t.z - hz + inset - out;
     let y = base;
-    for (const tier of tiers) {
+    tiers.forEach((tier, k) => {
       const yTop = base + span * tier.frac;
-      const min = V(t.x - hx + tier.inset, y, t.z - hz + tier.inset);
+      const min = V(t.x - hx + tier.inset, y, flushZ ?? t.z - hz + tier.inset);
       const max = V(t.x + hx - tier.inset, yTop, t.z + hz - tier.inset);
-      box(facade, trim, min, max, tint, roofCol, uvo);
-      addCollider(min, max);
+      if (t.camp === true && k === tiers.length - 1) {
+        // The top storey is NOUNS CAMP: a shell round a window, not a block
+        camp = campSite({ minX: min.x, maxX: max.x, minZ: min.z, maxZ: max.z }, yTop);
+        for (const b of campShellBoxes(camp, y, yTop)) {
+          const bMin = V(...b.min);
+          const bMax = V(...b.max);
+          box(facade, trim, bMin, bMax, tint, roofCol, uvo);
+          addCollider(bMin, bMax);
+        }
+      } else {
+        box(facade, trim, min, max, tint, roofCol, uvo);
+        addCollider(min, max);
+      }
       // Chunky trim band at the setback (flush with the roof, sticks out a bit)
-      const bMin = V(min.x - 0.3, yTop - 0.8, min.z - 0.3);
+      const bMin = V(min.x - 0.3, yTop - 0.8, nearZ(tier.inset, 0.3));
       const bMax = V(max.x + 0.3, yTop + 0.05, max.z + 0.3);
       box(trim, trim, bMin, bMax, band, roofCol, null);
       addCollider(bMin, bMax);
@@ -312,7 +339,7 @@ export function buildSkyline(roofs: THREE.Object3D | null): Skyline {
         box(
           trim,
           trim,
-          V(min.x - 0.08, ly - 0.25, min.z - 0.08),
+          V(min.x - 0.08, ly - 0.25, nearZ(tier.inset, 0.08)),
           V(max.x + 0.08, ly + 0.25, max.z + 0.08),
           white,
           white,
@@ -320,7 +347,7 @@ export function buildSkyline(roofs: THREE.Object3D | null): Skyline {
         );
       }
       y = yTop;
-    }
+    });
     // Crown: plant room + optional mast
     const ci = tiers[tiers.length - 1].inset + 2.2;
     const cMin = V(t.x - hx + ci, y, t.z - hz + ci);
@@ -369,5 +396,5 @@ export function buildSkyline(roofs: THREE.Object3D | null): Skyline {
     group.add(mesh);
   }
   group.updateMatrixWorld(true);
-  return { group, collision, maxY };
+  return { group, collision, maxY, camp };
 }

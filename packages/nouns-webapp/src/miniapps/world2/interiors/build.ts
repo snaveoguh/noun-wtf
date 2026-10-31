@@ -529,7 +529,7 @@ function shelvesOf(
   }
 }
 
-function buildItem(
+export function buildItem(
   kit: Kit,
   it: Item,
   P: Palette,
