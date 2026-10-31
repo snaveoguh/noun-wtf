@@ -1,25 +1,27 @@
 // ── The opening shot's last beat: the rider flicks through MEME VALUE ────
 //
-// The fly-in ends in the rider's eyes (first person: a Noun's head is up to
-// ~1.8 m of cube, so no over-the-shoulder angle gets past it): they're
-// holding an open copy, flick through ten random spreads (new ones every
-// load), then chuck it, and the camera pulls back out of their head into
-// play, revealing them as the book lands. The head is hidden while the
-// camera's inside it (CampSystem). Everything here is numbers (pure,
-// tested): the plan, where the book and the camera sit relative to the
-// rider, and the toss.
+// One continuous shot: the fly-in comes through the window straight at the
+// open book in the rider's hands, circles round it and up into their eyes
+// (first person: a Noun's head is up to ~1.8 m of cube, so no
+// over-the-shoulder angle gets past it). They flick through five random
+// spreads (new ones every load), the camera pulls back out of their head to
+// the whole rider, still reading, and then they chuck it. The rider is
+// hidden only while the camera's inside their head (CampSystem). Everything
+// here is numbers (pure, tested): the plan, where the book and the camera
+// sit relative to the rider, and the toss.
 
 import type { V3 } from './intro';
 
 /** Seconds per spread (a page turn takes FLIP_SECONDS of it). */
 export const SPREAD_SECONDS = 0.62;
 export const FLIP_SECONDS = 0.34;
-export const SPREADS = 10;
-/** A beat on the first spread; the book in the air; the pull back out (it starts just after the throw). */
+export const SPREADS = 5;
+/** A beat on the first spread; a beat on the last; the pull back out to the whole rider; the book in the air; the hand-off. */
 const SETTLE = 0.9;
+const LINGER = 0.55;
+const PULL = 1.9;
 const TOSS = 0.95;
-const PULL_DELAY = 0.2;
-const PULL = 2.1;
+const SETTLE_OUT = 0.35;
 
 /** Book pages: 252, square; spreads open on an even left page. */
 const FIRST = 4;
@@ -30,15 +32,17 @@ export interface ReadingPlan {
   spreads: number[];
   /** When (s, from the start of the read) each turn begins. */
   flips: number[];
-  tossAt: number;
-  landAt: number;
   /** The camera starts pulling back out of the head… */
   pullAt: number;
-  /** …and is the game camera again. */
+  /** …and has the whole rider in shot (the game camera's pose), still reading. */
+  pullEnd: number;
+  /** Then they chuck it. */
+  tossAt: number;
+  landAt: number;
   endAt: number;
 }
 
-/** Ten different random spreads and the timeline. `rnd` in [0, 1). */
+/** Five different random spreads and the timeline. `rnd` in [0, 1). */
 export function readingPlan(rnd: () => number): ReadingPlan {
   const pool: number[] = [];
   for (let p = FIRST; p <= LAST; p += 2) pool.push(p);
@@ -48,10 +52,11 @@ export function readingPlan(rnd: () => number): ReadingPlan {
   }
   const spreads = pool.slice(0, SPREADS);
   const flips = spreads.slice(1).map((_, i) => SETTLE + i * SPREAD_SECONDS);
-  const tossAt = SETTLE + (SPREADS - 1) * SPREAD_SECONDS + 0.35;
+  const pullAt = SETTLE + (SPREADS - 1) * SPREAD_SECONDS + LINGER;
+  const pullEnd = pullAt + PULL;
+  const tossAt = pullEnd + 0.15;
   const landAt = tossAt + TOSS;
-  const pullAt = tossAt + PULL_DELAY;
-  return { spreads, flips, tossAt, landAt, pullAt, endAt: pullAt + PULL };
+  return { spreads, flips, pullAt, pullEnd, tossAt, landAt, endAt: landAt + SETTLE_OUT };
 }
 
 /** Rider frame (facing yaw, +z forward, +x the rider's left) → world. */
@@ -68,9 +73,24 @@ export const BOOK_TILT = 0.55;
 /** First person: where the eyes are (rider frame), looking down at the pages. */
 export const EYES: V3 = [0, 1.38, 0.02];
 
+/**
+ * The fly-in's last stretch (rider frame, before the eyes): in from the
+ * front at book height straight at the book, then round its side and up
+ * into the reader's view. A big head hangs right over the book, so the
+ * camera goes into it face first (the face fills the frame, then the
+ * rider's hidden while the camera's inside: no pop); a small one it skirts.
+ */
+export const APPROACH: V3[] = [
+  [0, 1.05, 2.6],
+  [0.05, 1.08, 1.35],
+  [0.42, 1.24, 0.72],
+  [0.3, 1.36, 0.24],
+];
+
 /** The reading shot (world): from the rider's eyes, onto the book in their hands. */
-export function readingShot(pos: V3, yaw: number): { cam: V3; look: V3; book: V3 } {
+export function readingShot(pos: V3, yaw: number): { cam: V3; look: V3; book: V3; approach: V3[] } {
   return {
+    approach: APPROACH.map(p => riderToWorld(pos, yaw, ...p)),
     cam: riderToWorld(pos, yaw, ...EYES),
     look: riderToWorld(pos, yaw, BOOK_AT[0], BOOK_AT[1] - 0.02, BOOK_AT[2] + 0.03),
     book: BOOK_AT,

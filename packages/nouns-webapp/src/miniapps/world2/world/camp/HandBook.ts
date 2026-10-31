@@ -19,6 +19,8 @@ import { textureDiet } from '../../render/textureDiet';
 import { BOOK_AT, BOOK_TILT, riderToWorld, tossAt } from './reading';
 
 const PAGE = 0.25;
+/** The turning page's rest height over the spread (m). */
+const LEAF_Y = 0.012;
 const PAGE_URL = (n: number) => `/books/meme-value/sm/p${String(n).padStart(3, '0')}.webp`;
 
 /** Reading: hands either side of the book at `at` (rider frame), head kept upright. */
@@ -93,7 +95,7 @@ export class HandBook {
     // The open spread, face up in the book's frame (y up = out of the pages)
     const spread = new THREE.Mesh(plane(PAGE * 2, PAGE), basic(this.spreadTex));
     spread.rotation.x = -Math.PI / 2;
-    spread.position.y = 0.004;
+    spread.position.y = 0.003;
     // Covers under it (white, like the real copies), a spine
     const coverMat = new THREE.MeshBasicMaterial({ color: 0xf2f0ea });
     this.mats.push(coverMat);
@@ -104,10 +106,10 @@ export class HandBook {
     // The turning page: hinged on the spine (x = 0), lying over the right page at rest
     const f = new THREE.Mesh(plane(PAGE, PAGE), basic(this.front.t));
     f.rotation.x = -Math.PI / 2;
-    f.position.set(PAGE / 2, 0.006, 0);
+    f.position.set(PAGE / 2, 0, 0);
     const b = new THREE.Mesh(plane(PAGE, PAGE), basic(this.back.t));
     b.rotation.set(Math.PI / 2, 0, Math.PI);
-    b.position.set(PAGE / 2, 0.006, 0);
+    b.position.set(PAGE / 2, 0, 0);
     this.turn.add(f, b);
     this.turn.visible = false;
     this.group.add(cover, spread, this.turn);
@@ -173,6 +175,9 @@ export class HandBook {
       // Lift, over the spine, down onto the left (eased)
       const e = turning * turning * (3 - 2 * turning);
       this.turn.rotation.z = Math.PI * e;
+      // Well clear of the spread underneath (a 2 mm gap flickered), and
+      // lifting a little as it goes over
+      this.turn.position.y = LEAF_Y + 0.03 * Math.sin(Math.PI * e);
     } else {
       if (this.shown[0] !== cur) this.paintSpread(cur, cur + 1);
       this.turn.visible = false;
