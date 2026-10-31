@@ -4,7 +4,9 @@
 // place's name, your COIN, and what you can do right now (visit.ts menu),
 // as big buttons: a column on the right on desktop (with 1–9 keys), a
 // scrolling row along the bottom on a phone. Gifts open an amount picker
-// (1 / 5 / 25), Buy opens the shop list. Mounted once by World2Page.
+// (1 / 5 / 25), Buy opens the shop list. The first spawn (woken upstairs
+// in a plaza home) adds a banner and puts its two ways out, the roof and
+// downstairs, first in the menu. Mounted once by World2Page.
 
 import type { Game } from '../Game';
 import type { InteriorSystem, InteriorsView, UiAction } from './InteriorSystem';
@@ -80,6 +82,27 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
         </div>
       )}
 
+      {v.wake !== null && (
+        <div
+          data-interiors="wake"
+          className={
+            touch
+              ? 'absolute left-1/2 top-[16%] -translate-x-1/2 bg-[#ffd400] px-4 py-2 text-center font-black italic text-black shadow-[4px_4px_0_#d22209]'
+              : 'absolute left-1/2 top-[22%] -translate-x-1/2 bg-[#ffd400] px-5 py-2 text-center font-black italic text-black shadow-[6px_6px_0_#d22209]'
+          }
+        >
+          <span className="block whitespace-nowrap text-base">{v.wake.text}</span>
+          <span className="block text-xs font-bold not-italic">
+            {v.wake.sub}{' '}
+            {touch
+              ? 'Tap below.'
+              : v.actions.filter(a => a.a === 'wake').length > 1
+                ? 'Press 1 or 2.'
+                : 'Press 1.'}
+          </span>
+        </div>
+      )}
+
       {v.inside !== null && v.actions.length > 0 && v.shop === null && v.gift === null && (
         <div
           data-interiors="menu"
@@ -94,7 +117,7 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
               key={`${a.a}:${a.label}`}
               type="button"
               data-action={a.a}
-              className={`${BTN} ${touch ? 'shrink-0 text-sm' : 'text-sm'} ${a.a === 'accept' || a.a === 'thank' ? 'bg-[#ffd400]' : ''} ${a.a === 'steal' ? 'bg-[#2b2b2b] text-white' : ''}`}
+              className={`${BTN} ${touch ? 'shrink-0 text-sm' : 'text-sm'} ${a.a === 'accept' || a.a === 'thank' || a.a === 'wake' ? 'bg-[#ffd400]' : ''} ${a.a === 'steal' ? 'bg-[#2b2b2b] text-white' : ''}`}
               onClick={() => act({ a: 'menu', index: i })}
             >
               {!touch && i < 9 && <kbd className="text-[10px] font-bold opacity-60">{i + 1}</kbd>}

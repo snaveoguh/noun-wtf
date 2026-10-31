@@ -23,7 +23,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     }
   }, { weak });
   const p = await ctx.newPage();
-  await p.goto(`${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1`, { timeout: 600000 });
+  await p.goto(`${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1&spawn=plaza`, { timeout: 600000 });
   await p.getByText('PRESS START').first().click({ force: true, timeout: 600000 }).catch(()=>{});
   await p.waitForFunction(() => window.__w2 && window.__w2.me && window.__w2.running, null, { timeout: 900000, polling: 2000 });
   await p.evaluate(() => { window.__w2.ladder = null; if (window.__w2.adaptive) window.__w2.adaptive.frozen = true; });

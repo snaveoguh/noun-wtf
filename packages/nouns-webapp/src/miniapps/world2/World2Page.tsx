@@ -21,6 +21,7 @@ import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
 import { HUD_CSS } from './hud/hudStyle';
 import { initialHelp, RingHud } from './hud/RingHud';
+import { firstSpawnInside } from './interiors/firstSpawn';
 import { InteriorsUi } from './interiors/InteriorsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import { DROP_PARAM } from './missions/unlocks';
@@ -187,6 +188,24 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     game.spots.introPlayed = true;
     if (ok) void game.spots.intro();
   }, [game, phase, searchParams]);
+  // A plain /world load (no deep link, no `?spawn=plaza`): the first spawn is
+  // sat upstairs in a plaza home, offered the roof or the way down
+  // (interiors/firstSpawn.ts). If no home fits, the plaza spawn stands.
+  const wokeUp = useRef(false);
+  useEffect(() => {
+    if (!game || !started || wokeUp.current) return;
+    if (!firstSpawnInside(`?${searchParams.toString()}`)) return;
+    const tryWake = () => {
+      if (game.me === null || game.hud.loading !== null) return false;
+      wokeUp.current = true;
+      game.interiors.spawnUpstairs();
+      return true;
+    };
+    if (tryWake()) return;
+    const t = window.setInterval(() => tryWake() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   // `?drop=1` (the homepage's THE BIG DROP card): once the rider is in,
   // straight onto the mountain if the deepest door is open to them
   const dropLaunched = useRef(false);

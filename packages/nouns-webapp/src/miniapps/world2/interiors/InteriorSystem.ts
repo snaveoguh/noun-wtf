@@ -44,17 +44,9 @@ import { discounted, menuOf, type Food, type MenuItem } from './dialogue';
 import { BANNED, SHUT } from './dialogue';
 import { buildDoorMarkers, type DoorMarkers } from './doorMarkers';
 import { doorReach } from './doors';
+import { buildingFloors, pickSpawnHome } from './firstSpawn';
 import { box, cyl, disposeMaterials, sphere } from './kit';
-import {
-  entryPoint,
-  generateLayout,
-  itemBox,
-  layoutGrid,
-  planBuilding,
-  stealables,
-  type Grid,
-  type Layout,
-} from './layout';
+import { entryPoint, itemBox, layoutGrid, stealables, type Grid, type Layout } from './layout';
 import {
   FEATURED,
   SNAPSHOT,
@@ -72,12 +64,13 @@ import { handPos, poseEat, poseSit } from './pose';
 import { residentsFor, type ResidentDef } from './residents';
 import { hash32, mulberry32, pick, type Rng } from './rng';
 import { seatSpot, type RoomKey } from './roomNet';
-import { storeyHeight, upperUse, USE_LABEL } from './storeys';
+import { storeyHeight, USE_LABEL } from './storeys';
 import { njDoors, townDoors } from './townDoors';
 import {
   EAT_S,
   answersDoor,
   arrive,
+  asHouseGuest,
   caughtChance,
   menu,
   step,
@@ -122,7 +115,9 @@ export interface InteriorsView {
   /** The door prompt outside, the way out inside, or a thing you're at (a pool table, an exhibit). */
   prompt: { text: string; kind: 'enter' | 'leave' | 'spot'; sub?: string } | null;
   inside: { name: string; kind: InteriorKind; icon: string; label: string } | null;
-  actions: Action[];
+  actions: RoomAction[];
+  /** The first spawn: woken upstairs (the ways out are the first actions). */
+  wake: { text: string; sub: string } | null;
   /** The buy panel (goods for a shop, the menu elsewhere). */
   shop: { title: string; rows: ShopRow[] } | null;
   gift: { to: string; name: string; amounts: number[] } | null;
@@ -132,6 +127,16 @@ export interface InteriorsView {
   /** The Prop Museum: the prop you're reading. */
   exhibit: ExhibitView | null;
 }
+
+/** The first spawn's ways out (offered in the menu, ahead of the visit's own). */
+export interface WakeAction {
+  a: 'wake';
+  to: 'roof' | 'down';
+  label: string;
+  icon: string;
+}
+
+export type RoomAction = Action | WakeAction;
 
 export interface ExhibitView {
   id: number;
@@ -253,7 +258,8 @@ interface Live {
   saved: Saved;
   steal: number[];
   taken: Set<number>;
-  sit: { seat: number; anchor: THREE.Vector3; k: number } | null;
+  /** Sat on seat `seat` of floor `level`'s layout; `anchor` is where you stood (room frame). */
+  sit: { seat: number; level: number; anchor: THREE.Vector3; k: number } | null;
   eat: { food: Food; t: number; mesh: THREE.Object3D } | null;
   t: number;
   /** Leave after this many seconds (shown / thrown out). */
@@ -277,6 +283,10 @@ interface Live {
   /** The real rooftop (multi-storey buildings), and where you're going out to (it, or the street). */
   roof: Pose | null;
   exit: Pose | null;
+  /** The first spawn: sat upstairs, offered the roof or the way down (until you get up). */
+  wake: boolean;
+  /** The first spawn: the host's hello, held until you come downstairs. */
+  greet: Effect[] | null;
 }
 
 interface Area {
@@ -303,11 +313,16 @@ export class InteriorSystem implements InteriorsApi {
   private streamT = 0;
   private disposed = false;
   private started = false;
+  /** A hop between floors (the first spawn's "downstairs"): fade, move, fade back. */
+  private hop: { t: number; to: Pose; level: number } | null = null;
+  /** The first spawn has been tried (once a page load). */
+  private woke = false;
   private view: InteriorsView = {
     prompt: null,
     exhibit: null,
     inside: null,
     actions: [],
+    wake: null,
     shop: null,
     gift: null,
     coin: null,
@@ -508,11 +523,12 @@ export class InteriorSystem implements InteriorsApi {
           this.fadeT = -FADE_S;
         }
       }
-    } else if (this.fadeT < 0) {
+    } else if (this.fadeT < 0 && this.hop === null) {
       // Fading back in (fadeT runs −FADE_S → 0), once the room can draw
       if (!this.warming) this.fadeT = Math.min(0, this.fadeT + dt);
       this.setFade(-this.fadeT / FADE_S);
     }
+    if (this.hop !== null) this.updateHop(dt);
     if (this.stepOffT > 0) {
       this.stepOffT -= dt;
       if (this.stepOffT <= 0 && this.pending !== null) this.beginFade('in');
@@ -591,41 +607,171 @@ export class InteriorSystem implements InteriorsApi {
     this.overlay.style.display = k > 0.001 ? 'block' : 'none';
   }
 
+  // ── The first spawn (interiors/firstSpawn.ts) ──
+
+  /**
+   * Start the game sat upstairs in a plaza home (a random one with an
+   * upper floor, a roof hatch and a seat up there), the screen black until
+   * the room's ready. Once a page load; false (and nothing changed) when
+   * no home fits or anything fails, so the caller's plaza spawn stands.
+   */
+  spawnUpstairs(rnd: () => number = Math.random): boolean {
+    if (this.woke || this.disposed || !this.started) return false;
+    if (this.live !== null || this.phase !== 'outside' || this.pending !== null) return false;
+    this.woke = true;
+    const plaza = this.areas.get('plaza');
+    if (plaza === undefined) return false;
+    let back: { pos: THREE.Vector3; yaw: number } | null = null;
+    try {
+      const pick = pickSpawnHome(plaza.doors, rnd, d => {
+        const fl = buildingFloors(d).floors[0]!;
+        return this.findRoof(d, fl) !== null;
+      });
+      if (pick === null) return false;
+      const p = this.game.player;
+      back = { pos: p.pos.clone(), yaw: Math.atan2(p.fwd.x, p.fwd.z) };
+      if (p.mode === 'board') p.toggleBoard();
+      this.setFade(1);
+      this.goIn(pick.door, { level: pick.level, seat: pick.seat });
+      if ((this.live as Live | null)?.wake !== true) throw new Error('no seat upstairs');
+      console.info(`[interiors] woke up upstairs at ${pick.door.id} (floor ${pick.level + 1})`);
+      return true;
+    } catch (err) {
+      // Never leave the screen black: back out to the plaza spawn
+      console.warn('[interiors] first spawn failed', err);
+      if (this.live !== null) this.goOut();
+      // …right where the plaza spawn had put you
+      if (back !== null) {
+        this.game.player.spawn(back.pos, back.yaw);
+        this.game.cam.snap(this.game.player);
+      }
+      this.phase = 'outside';
+      this.fadeT = -FADE_S;
+      return false;
+    }
+  }
+
+  /** Woken upstairs: onto floor `level`, sat on `seat` (its "stand here" spot is the anchor). */
+  private wakeOn(L: Live, at: { level: number; seat: number }) {
+    const f = L.floors[at.level];
+    const seat = f?.layout.seats[at.seat];
+    if (f === undefined || seat === undefined || at.level < 1) return;
+    this.buildFloor(L, at.level);
+    L.level = at.level;
+    const g = this.game;
+    const fy = L.origin.y + at.level * L.storey;
+    g.player.spawn(
+      new THREE.Vector3(L.origin.x + seat.ax, fy + 0.05, L.origin.z + seat.az),
+      seat.yaw,
+    );
+    g.cam.snap(g.player);
+    L.sit = {
+      seat: at.seat,
+      level: at.level,
+      anchor: new THREE.Vector3(seat.ax, 0, seat.az),
+      k: 1,
+    };
+    // (a neutral visit: asHouseGuest, so this sit doesn't count as one)
+    this.visitStep({ t: 'sit', seat: at.seat });
+    L.wake = true;
+  }
+
+  /** The rider gets up off their seat (walked off, the menu, a floor change). */
+  private getUp(L: Live) {
+    L.sit = null;
+    L.wake = false;
+    this.visitStep({ t: 'stand' });
+  }
+
+  /** The first spawn's prompt, then the visit's own menu (Leave is "Downstairs" meanwhile). */
+  private actionsNow(L: Live): RoomAction[] {
+    const base = menu(L.visit, this.ctx);
+    if (!L.wake) return base;
+    const out: RoomAction[] = [];
+    if (L.roof !== null) out.push({ a: 'wake', to: 'roof', label: 'Up to the roof', icon: '🪜' });
+    out.push({ a: 'wake', to: 'down', label: 'Downstairs', icon: '🚪' });
+    return [...out, ...base.filter(a => a.a !== 'leave')];
+  }
+
+  /**
+   * Roof: out through the hatch onto the real rooftop. Down: a fade to the
+   * foot of the ground-floor flight, facing into the room (the front door
+   * just behind you).
+   */
+  private wakeGo(L: Live, to: 'roof' | 'down') {
+    if (this.phase !== 'inside' || this.hop !== null) return;
+    if (L.sit !== null) this.getUp(L);
+    L.wake = false;
+    if (to === 'roof') {
+      if (L.roof === null) return;
+      this.game.sfx.play('door-creak', { gain: 0.4 });
+      L.exit = L.roof;
+      this.requestLeave();
+      return;
+    }
+    const ground = L.layout;
+    const up = ground.stairs?.up ?? null;
+    const [ex, ez] = entryPoint(ground);
+    // The landing at the foot of the flight (kept clear), else just inside the door
+    const pose: Pose =
+      up !== null
+        ? { x: (up.x0 + up.x1) / 2, y: 0, z: Math.max(0.6, up.z0 - 0.7), yaw: 0 }
+        : { x: ex, y: 0, z: ez + 0.7, yaw: 0 };
+    this.game.sfx.play('ui-click', { gain: 0.4 });
+    this.hop = { t: 0, to: pose, level: 0 };
+  }
+
+  /** The hop's fade: to black, move (room frame → world), then the usual fade back in. */
+  private updateHop(dt: number) {
+    const h = this.hop!;
+    const L = this.live;
+    if (L === null || this.phase !== 'inside') {
+      this.hop = null;
+      return;
+    }
+    h.t += dt;
+    const k = Math.min(1, h.t / FADE_S);
+    this.setFade(k);
+    if (k < 1) return;
+    this.hop = null;
+    const g = this.game;
+    const p = g.player;
+    p.spawn(
+      new THREE.Vector3(
+        L.origin.x + h.to.x,
+        L.origin.y + h.level * L.storey + 0.05,
+        L.origin.z + h.to.z,
+      ),
+      h.to.yaw,
+    );
+    p.vel.set(0, 0, 0);
+    g.cam.snap(p);
+    if (g.me !== null) g.me.root.position.copy(p.pos);
+    this.camInit = false;
+    // (updateFloors picks up the new floor, and the host's hello, next frame)
+    this.fadeT = -FADE_S;
+  }
+
   // ── Going in ──
 
-  private goIn(entered: BuildingDoor) {
+  /**
+   * `wake`: the first spawn (spawnUpstairs): straight onto that floor's
+   * seat, sat down, with the way up / the way down offered.
+   */
+  private goIn(entered: BuildingDoor, wake?: { level: number; seat: number }) {
     const g = this.game;
     const fromRoof = this.roofDoors.get(entered.id);
     const door = fromRoof ?? entered;
     const t0 = performance.now();
-    const kind = door.kind ?? 'home';
-    const fp = door.footprint;
-    // Frontage along the door wall, depth into the building
-    const along = Math.abs(Math.sin(door.yaw)) > 0.7;
-    const frontage = fp === undefined ? undefined : along ? fp.maxZ - fp.minZ : fp.maxX - fp.minX;
-    const depth = fp === undefined ? undefined : along ? fp.maxX - fp.minX : fp.maxZ - fp.minZ;
     const museum = isPropMuseum(door)
       ? { walls: museumWalls ?? SNAPSHOT, plinths: FEATURED }
       : null;
-    const base = { id: door.id, kind, frontage, depth, height: fp?.height };
-    const plan = planBuilding(base);
+    // Every floor planned now (cheap); upstairs is built when you get near
+    const plan = buildingFloors(door, museum !== null ? 'prop-museum' : undefined);
+    const kind = plan.kind;
     const multi = plan.floors.length > 1;
-    const layout = generateLayout({
-      ...base,
-      ...(museum !== null ? { theme: 'prop-museum' as const } : {}),
-      ...(multi ? { size: plan.size, level: 0, stairs: plan.floors[0]! } : {}),
-    });
-    // Upstairs: planned now (cheap), built when you get near
-    const uppers = plan.floors.slice(1).map((st, i) =>
-      generateLayout({
-        ...base,
-        size: plan.size,
-        level: i + 1,
-        stairs: st,
-        use: upperUse(kind, i + 1, door.id),
-        roof: i + 1 === plan.floors.length - 1,
-      }),
-    );
+    const layout = plan.floors[0]!;
+    const uppers = plan.floors.slice(1);
     const tLayout = performance.now();
     const tier = this.tier();
     const atlas = buildArtAtlas(layout, {
@@ -646,7 +792,10 @@ export class InteriorSystem implements InteriorsApi {
     const tFolk0 = performance.now();
     const folk: Folk[] = defs.map(def => this.makeFolk(def, layout));
     const tFolk = performance.now();
-    const { visit, effects } = arrive(door.id, kind, tier, defs, rnd);
+    const arrived = arrive(door.id, kind, tier, defs, rnd);
+    // Woken upstairs: a neutral visit, and the host's hello waits until you come down
+    const visit = wake !== undefined ? asHouseGuest(arrived.visit) : arrived.visit;
+    const effects = wake !== undefined ? [] : arrived.effects;
     // (Everything that could fail is done: now change the world)
     if (g.gfx.toon) toonify(built.group);
     const origin = new THREE.Vector3(door.x, POCKET_Y, door.z);
@@ -761,6 +910,8 @@ export class InteriorSystem implements InteriorsApi {
       collision: null,
       roof: multi ? this.findRoof(door, layout) : null,
       exit: null,
+      wake: false,
+      greet: wake !== undefined ? arrived.effects : null,
     };
     this.live.floors[0]!.windows = this.live.windows;
     this.live.spots = this.hotspots(this.live);
@@ -800,10 +951,13 @@ export class InteriorSystem implements InteriorsApi {
       );
       g.cam.snap(g.player);
     }
+    // Woken upstairs: on that floor, sat on its seat
+    if (wake !== undefined && fromRoof === undefined) this.wakeOn(this.live, wake);
     // The floor above too, now while the screen is black: updateFloors built
     // it 0.4 s after the fade-in, a ~0.5 s freeze on a desktop, seconds on a phone
     if (
       fromRoof === undefined &&
+      wake === undefined &&
       this.live.floors.length > 1 &&
       this.live.floors[1]!.built === null
     )
@@ -887,6 +1041,7 @@ export class InteriorSystem implements InteriorsApi {
 
   private goOut() {
     this.warming = false;
+    this.hop = null;
     const L = this.live;
     if (L === null) return;
     const g = this.game;
@@ -1037,18 +1192,20 @@ export class InteriorSystem implements InteriorsApi {
   poseRemote(id: string, ch: NounCharacter, room: RoomKey | null, dt: number) {
     const L = this.live;
     const here = L !== null && room !== null && room.door === L.door.id && room.seat >= 0;
-    const seat = here ? L.layout.seats[room.seat] : undefined;
-    if (L === null || seat === undefined) {
+    // (the seat is on the floor they're on: upstairs too)
+    const seat = here ? L.floors[room.level]?.layout.seats[room.seat] : undefined;
+    if (L === null || room === null || seat === undefined) {
       this.remoteSit.delete(id);
       return;
     }
     const k = Math.min(1, (this.remoteSit.get(id) ?? 0) + dt * 4);
     this.remoteSit.set(id, k);
     const at = seatSpot(seat);
-    ch.root.position.set(L.origin.x + at.x, L.origin.y, L.origin.z + at.z);
+    const fy = L.origin.y + room.level * L.storey;
+    ch.root.position.set(L.origin.x + at.x, fy, L.origin.z + at.z);
     ch.root.quaternion.setFromAxisAngle(Y, at.yaw);
     ch.play({ clip: 'idle', fade: 0.3 });
-    poseSit(ch, L.origin.y, L.origin.y + seat.h, k);
+    poseSit(ch, fy, fy + seat.h, k);
   }
 
   // ── Inside ──
@@ -1083,19 +1240,19 @@ export class InteriorSystem implements InteriorsApi {
 
     // Sitting: the rider is drawn on the seat; walking off stands you up
     if (L.sit !== null) {
-      const seat = L.layout.seats[L.sit.seat]!;
-      if (Math.hypot(me.x - L.sit.anchor.x, me.z - L.sit.anchor.z) > 0.35) {
-        L.sit = null;
-        this.visitStep({ t: 'stand' });
+      const seat = L.floors[L.sit.level]?.layout.seats[L.sit.seat];
+      if (seat === undefined || Math.hypot(me.x - L.sit.anchor.x, me.z - L.sit.anchor.z) > 0.35) {
+        this.getUp(L);
       } else {
         L.sit.k = Math.min(1, L.sit.k + dt * 4);
         if (g.me !== null) {
           const r = g.me.root;
           const at = seatSpot(seat);
-          r.position.set(L.origin.x + at.x, L.origin.y, L.origin.z + at.z);
+          const fy = L.origin.y + L.sit.level * L.storey;
+          r.position.set(L.origin.x + at.x, fy, L.origin.z + at.z);
           r.quaternion.setFromAxisAngle(Y, at.yaw);
           g.me.play({ clip: 'idle', fade: 0.3 });
-          poseSit(g.me, L.origin.y, L.origin.y + seat.h, L.sit.k);
+          poseSit(g.me, fy, fy + seat.h, L.sit.k);
         }
         p.vel.set(0, 0, 0);
       }
@@ -1156,7 +1313,7 @@ export class InteriorSystem implements InteriorsApi {
     // Menu context
     this.ctx = {
       near: near?.def.id ?? null,
-      seat: L.sit !== null || !down ? null : this.nearSeat(L, me),
+      seat: L.sit !== null ? null : this.nearSeat(L, me),
       stealable: down ? this.nearStealable(L, me) : null,
       watched,
       canBuy: down && this.canBuy(L, me),
@@ -1212,11 +1369,13 @@ export class InteriorSystem implements InteriorsApi {
     canBuy: false,
   };
 
+  /** A free seat within reach on the floor you're on (downstairs residents take theirs). */
   private nearSeat(L: Live, me: THREE.Vector3): number | null {
     let best: number | null = null;
     let bd = NEAR_SEAT;
-    L.layout.seats.forEach((s, i) => {
-      if (L.folk.some(f => f.seat === i || f.goal?.seat === i)) return;
+    const down = L.level === 0;
+    L.floors[L.level]!.layout.seats.forEach((s, i) => {
+      if (down && L.folk.some(f => f.seat === i || f.goal?.seat === i)) return;
       const d = Math.min(Math.hypot(s.x - me.x, s.z - me.z), Math.hypot(s.ax - me.x, s.az - me.z));
       if (d < bd) {
         bd = d;
@@ -1551,9 +1710,11 @@ export class InteriorSystem implements InteriorsApi {
         if (L !== null) void this.buy(L, u.id);
         return;
       case 'menu': {
-        if (L === null) return;
-        const a = menu(L.visit, this.ctx)[u.index];
-        if (a !== undefined) this.doAction(L, a);
+        if (L === null || this.phase !== 'inside') return;
+        const a = this.actionsNow(L)[u.index];
+        if (a === undefined) return;
+        if (a.a === 'wake') this.wakeGo(L, a.to);
+        else this.doAction(L, a);
         return;
       }
     }
@@ -1572,16 +1733,15 @@ export class InteriorSystem implements InteriorsApi {
         this.visitStep({ t: 'thank' });
         break;
       case 'sit': {
-        const seat = L.layout.seats[a.seat];
+        const seat = L.floors[L.level]!.layout.seats[a.seat];
         if (seat === undefined) break;
         const me = this.toRoom(g.player.pos, new THREE.Vector3());
-        L.sit = { seat: a.seat, anchor: me.clone(), k: 0 };
+        L.sit = { seat: a.seat, level: L.level, anchor: me.clone(), k: 0 };
         this.visitStep({ t: 'sit', seat: a.seat });
         break;
       }
       case 'stand':
-        L.sit = null;
-        this.visitStep({ t: 'stand' });
+        this.getUp(L);
         break;
       case 'chat':
         this.visitStep({ t: 'chat', to: a.to });
@@ -1719,6 +1879,7 @@ export class InteriorSystem implements InteriorsApi {
             : null,
         inside: null,
         actions: [],
+        wake: null,
         shop: null,
         gift: null,
         coin,
@@ -1732,7 +1893,7 @@ export class InteriorSystem implements InteriorsApi {
     const atDoor = L.level === 0 && me.z < 1.3 && Math.abs(me.x - L.layout.door.x) < 1.1;
     const k = KIND_LABEL[L.kind];
     const pool = this.poolActive();
-    const actions = this.phase === 'inside' && !pool ? menu(L.visit, this.ctx) : [];
+    const actions = this.phase === 'inside' && !pool ? this.actionsNow(L) : [];
     const spot = this.phase === 'inside' && !pool && !atDoor ? L.spot : null;
     const r = L.reading;
     const giftF = this.giftTo !== null ? L.folk.find(f => f.def.id === this.giftTo) : undefined;
@@ -1758,6 +1919,13 @@ export class InteriorSystem implements InteriorsApi {
         label: L.level > 0 ? `FLOOR ${L.level + 1}` : k.label,
       },
       actions,
+      wake:
+        L.wake && this.phase === 'inside' && this.hop === null && !pool
+          ? {
+              text: `☀️ YOU CRASHED AT ${(L.door.name ?? 'A MATE’S').toUpperCase()}`,
+              sub: L.roof !== null ? 'Roof, or downstairs?' : 'Head downstairs?',
+            }
+          : null,
       shop: this.shopOpen
         ? { title: L.kind === 'shop' ? 'BUY · INTO THE VAN' : 'MENU', rows: this.shopRows(L) }
         : null,
@@ -1906,7 +2074,14 @@ export class InteriorSystem implements InteriorsApi {
     if (level !== L.level) {
       L.level = level;
       L.reading = null;
-      if (L.sit !== null) L.sit = null;
+      if (L.sit !== null) this.getUp(L);
+      L.wake = false;
+      // Woken upstairs: the host says hello once you come down
+      if (level === 0 && L.greet !== null) {
+        const hi = L.greet;
+        L.greet = null;
+        this.applyEffects(hi);
+      }
     }
     L.floors.forEach((f, i) => {
       if (f.built !== null) f.built.group.visible = i === L.level;

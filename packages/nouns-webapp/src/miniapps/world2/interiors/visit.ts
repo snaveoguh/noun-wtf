@@ -175,6 +175,16 @@ export function arrive(
   return { visit, effects };
 }
 
+/**
+ * The first spawn's visit (interiors/firstSpawn.ts): you woke up here, so
+ * it's neutral. Sitting doesn't count as a 'sat' (you were already sat
+ * down) and the welcome never runs out (no hint, no 'overstayed', never
+ * shown out). Food, gifts and stealing count as usual.
+ */
+export function asHouseGuest(v: Visit): Visit {
+  return { ...v, sat: true, welcome: Number.POSITIVE_INFINITY, hintedAt: null, overstayed: false };
+}
+
 function mood(v: Visit, id: string, d: number): Visit {
   return {
     ...v,

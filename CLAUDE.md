@@ -266,6 +266,15 @@ A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews 
 
 A room is built 4 km over its door (`POCKET_Y`, origin `(door.x, POCKET_Y, door.z)`), the same on every client, so positions inside are already a shared frame. The pose blob carries `in: [doorId, level, seat]` only while inside (`interiors/roomNet.ts`). `Game.updateNetwork` draws only riders in the same space (`sameSpace`): street riders in the street, and riders in the same room and on the same floor indoors, with their name tags (`data-room` gets past `[data-away]`). A seated rider is put on their seat by `InteriorSystem.poseRemote`. A window's view of the street shows only street riders. Older clients ignore `in`, so they still draw indoor riders 4 km up. No worker change is needed.
 
+### First spawn (woken upstairs in a plaza home)
+
+A plain `/world` load starts you sat on a seat on the top floor of a plaza home, not out on the plaza (fewer draws on weak phones, too). World2Page calls `game.interiors.spawnUpstairs()` once, on the first PRESS START → play.
+- **Pick** (`interiors/firstSpawn.ts`, pure, tested): a random plaza `home` (every home has an upstairs: their rooms are at least 8.5 m square) whose top floor has the roof hatch and a seat, and a real roof above (`findRoof`). The end of the bed if there is one. `buildingFloors` is the floor recipe goIn uses, so seat indices match.
+- **Prompt:** a yellow "☀️ YOU CRASHED AT …" banner, and the menu's first two actions are 🪜 Up to the roof (the hatch's own exit, `L.exit = L.roof`) and 🚪 Downstairs (a fade to the foot of the ground-floor flight, facing into the room, the front door behind). Keys 1 / 2, or tap. It goes once you get up, change floor or pick one.
+- **Neutral visit:** `asHouseGuest` (visit.ts): no 'sat', no hint / 'overstayed' / shown out. The host's hello waits until you come downstairs.
+- **Skipped** (normal plaza spawn) for `?spawn=plaza` and anything that sets its own spawn: `?play=`, `?drop=`, `?mode=`, `?spot=`, `?megaramp=`, `?town=`, `?dressing=` (`firstSpawnInside`). If nothing fits or it throws, you stay where the plaza spawn put you. Respawns are unchanged.
+- Sitting now works on any floor: `Live.sit.level`, and the pose blob's `in: [door, level, seat]` seat is that floor's (`poseRemote`). The perf harness (`.claude/perf-shots/harness/*.cjs`) passes `&spawn=plaza`.
+
 ### Respect
 
 One score for how you act (`world2/respect/`, contract in `interiors/contract.ts` `RespectApi`, on `game.respect`). Rules in `respect/rules.ts` (pure, shared with `netlify/functions/world-respect.ts`): gifts, eating/thanks, buying local, helping, clean big combos, graffiti pieces, serving, hoops/break wins up; stealing, bailing into people, tagging homes, refusing food, overstaying down. Per-kind rate limits + ±minute caps; tiers outcast / stranger / local (50) / regular (200) / legend (600) with hysteresis; slow drift above the tier floor. The client sends events only; the server re-scores them (Blobs store `noun-world-respect`). HUD meter top-right, tier banners, legend noggles badge on name labels.
