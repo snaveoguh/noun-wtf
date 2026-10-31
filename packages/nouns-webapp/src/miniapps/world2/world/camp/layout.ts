@@ -131,16 +131,17 @@ export function campLayout(
     p('notice', 2.3, d - 0.12, 0.42, 0.02, 0.56, { y: 1.25, yaw: Math.PI }),
     p('tape', 2.3, d - 0.08, 1.5, 0.02, 1.6, { y: 0.3, yaw: Math.PI }),
     p('tag', -0.4, d - 0.045, 3.4, 0.02, 1.25, { y: 1.35, yaw: Math.PI }),
-    // The book on the walls, pinned up crooked: NOUNS EATS EVERYTHING by the
+    // The book on the walls, pinned up crooked and hanging clear of the dado
+    // rail (its face is ~5 cm off the wall): NOUNS EATS EVERYTHING by the
     // window, the zebra on the west wall, DUNA SEASON (the biggest) on the east
-    p('print', (-W + winX0) / 2, 0.045, 0.72, 0.02, 1.44, { y: 0.85, v: 0 }),
-    p('print', -W + 0.045, 3.0, 0.8, 0.02, 1.6, { y: 0.8, yaw: Math.PI / 2, v: 1 }),
-    p('print', W - 0.045, 6.45, 2.6, 0.02, 1.3, { y: 1.2, yaw: -Math.PI / 2, v: 2 }),
+    p('print', (-W + winX0) / 2, 0.07, 0.72, 0.02, 1.44, { y: 0.85, v: 0 }),
+    p('print', -W + 0.07, 3.0, 0.8, 0.02, 1.6, { y: 0.8, yaw: Math.PI / 2, v: 1 }),
+    p('print', W - 0.07, 6.45, 2.6, 0.02, 1.3, { y: 1.2, yaw: -Math.PI / 2, v: 2 }),
     // The esports rug under the coffee table; every page of the book,
     // crumpled on the floor in front of the window
     p('rug', 0.5, 3.75, 2.4, 1.6, 0.04, { yaw: 0.12 }),
     p('sheet', -0.2, 1.55, 4.2, 1.35, 0.1, { yaw: -0.09 }),
-    p('poster', W - 0.045, 3.4, 0.9, 0.02, 1.3, { y: 1.15, yaw: -Math.PI / 2, v: 1 }),
+    p('poster', W - 0.07, 3.4, 0.9, 0.02, 1.3, { y: 1.15, yaw: -Math.PI / 2, v: 1 }),
     // Overhead: a bare bulb on its flex, a ceiling tile come down
     p('bulb', 0.5, 3.9, 0.16, 0.16, 0.9, { y: h - 0.9 }),
     p('ceiling_panel', -3.9, 3.7, 1.2, 1.2, 0.04, { y: h - 1.1, yaw: 0.3 }),

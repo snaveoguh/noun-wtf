@@ -2,9 +2,10 @@
 //
 // The first spawn opens on a flying camera: up over the plaza at sunset, a
 // sweeping climb round to the tallest tower, a dive at the window (slowing
-// as it comes), in through the opening, up over the rider's head under the
-// ceiling, swinging round to settle exactly where the game camera sits
-// behind them (so the hand-off has no snap). Everything here is numbers: a
+// as it comes), in through the opening, then round the rider's side at
+// head height (looking at them all the way, so it swings rather than flips)
+// to settle exactly where the game camera sits behind them (so the
+// hand-off has no snap). Everything here is numbers: a
 // centripetal Catmull–Rom through the shot's points, walked by arc length
 // on an ease-out, plus where the camera looks and its field of view.
 
@@ -54,14 +55,44 @@ export function introPoints(site: CampSite, rider: V3, final: V3): V3[] {
   const f = site.faceZ;
   const fy = site.floorY;
   const wy = Math.min(site.window.y1 - 0.75, fy + 2.0);
-  const head = Math.min(site.ceilY - 0.45, rider[1] + 2.9);
+  // The rider's facing (the final camera sits behind them) and their side
+  let bx = final[0] - rider[0];
+  let bz = final[2] - rider[2];
+  const bl = Math.hypot(bx, bz) || 1;
+  bx /= bl;
+  bz /= bl;
+  const fx = -bx;
+  const fz = -bz;
+  // Orbit round whichever side has more room
+  const r = site.room;
+  const room = (x: number, z: number) => Math.min(x - r.minX, r.maxX - x, z - r.minZ, r.maxZ - z);
+  const R = 2.3;
+  const sideOf = (s: number): V3 => [rider[0] + -fz * s * R, 0, rider[2] + fx * s * R];
+  const s = room(sideOf(1)[0], sideOf(1)[2]) >= room(sideOf(-1)[0], sideOf(-1)[2]) ? 1 : -1;
+  const sx = -fz * s;
+  const sz = fx * s;
+  const y = Math.min(site.ceilY - 0.6, rider[1] + 1.9);
+  const inRoom = (x: number, z: number): V3 => [
+    Math.min(r.maxX - 0.45, Math.max(r.minX + 0.45, x)),
+    y,
+    Math.min(r.maxZ - 0.45, Math.max(r.minZ + 0.6, z)),
+  ];
+  // In front of them (between them and the window), round their side,
+  // behind-and-beside, then the game camera: a swing, never a flip
+  const arc = (a: number) =>
+    inRoom(
+      rider[0] + (fx * Math.cos(a) + sx * Math.sin(a)) * R,
+      rider[2] + (fz * Math.cos(a) + sz * Math.sin(a)) * R,
+    );
   return [
     [o.x + 75, 92, f - 120], // far out over the plaza, low sun behind
     [o.x + 48, 128, f - 70], // the climb, swinging round
     [o.x + 14, fy + 6, f - 26], // lined up on the window, a little high
     [o.x, wy, f - 7], // straight at it
     [o.x, wy, f + 0.9], // through the opening
-    [rider[0], head, rider[2]], // over the rider's head, under the ceiling
+    arc(0.55), // ahead of the rider, off to one side
+    arc(Math.PI / 2), // beside them
+    arc(Math.PI * 0.8), // coming round behind
     final,
   ];
 }

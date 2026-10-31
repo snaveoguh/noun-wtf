@@ -72,6 +72,42 @@ describe("CAMP's opening shot", () => {
     });
   }
 
+  it('swings round the rider into play: the view turns smoothly, never flips', () => {
+    for (const sp of L.spawns) {
+      const o = site.origin;
+      const rider: V3 = [o.x + sp.x, site.floorY, o.z + sp.z];
+      const back = [-Math.sin(sp.yaw), -Math.cos(sp.yaw)];
+      const final: V3 = [
+        Math.min(site.room.maxX - 0.3, Math.max(site.room.minX + 0.3, rider[0] + back[0]! * 3)),
+        site.floorY + 2.1,
+        Math.min(site.room.maxZ - 0.3, rider[2] + back[1]! * 3),
+      ];
+      const shot = introShot(site, rider, final, [rider[0], rider[1] + 1.3, rider[2]], 62);
+      const yawAt = (s: number) => {
+        const q = shot(s);
+        return Math.atan2(q.look[0] - q.pos[0], q.look[2] - q.pos[2]);
+      };
+      // From the moment it's inside, heading turns at most ~6° a frame (60 fps)
+      let prev = yawAt(INTRO_SECONDS * 0.75);
+      let maxTurn = 0;
+      for (let s = INTRO_SECONDS * 0.75 + 1 / 60; s <= INTRO_SECONDS; s += 1 / 60) {
+        const y = yawAt(s);
+        const d = Math.abs(Math.atan2(Math.sin(y - prev), Math.cos(y - prev)));
+        maxTurn = Math.max(maxTurn, d);
+        prev = y;
+      }
+      expect(maxTurn, `spawn ${sp.x},${sp.z}`).toBeLessThan(0.11);
+      // …and stays in the room the whole way round
+      for (let s = INTRO_SECONDS * 0.8; s <= INTRO_SECONDS; s += 0.05) {
+        const p = shot(s).pos;
+        expect(p[0]).toBeGreaterThan(site.room.minX + 0.2);
+        expect(p[0]).toBeLessThan(site.room.maxX - 0.2);
+        expect(p[2]).toBeLessThan(site.room.maxZ - 0.2);
+        expect(p[1]).toBeLessThan(site.ceilY - 0.3);
+      }
+    }
+  });
+
   it('moves smoothly (no jumps between frames at 60 fps)', () => {
     const sp = L.spawns[0]!;
     const o = site.origin;
