@@ -14,8 +14,14 @@ import { ALLEYS, ALLEY_O0, alleyToWorld } from './config';
 export const RING_MIN_ROOF = 6.8;
 /** Camera must be at least this far inside the facade line. */
 const INSIDE = ALLEY_O0 - 0.5;
+/**
+ * Margins (m). Callers rerun the test only after the camera has moved
+ * `RERUN_MOVE`, so both stay above it: a sight line moves less than the
+ * camera does where it crosses the facade.
+ */
+export const RERUN_MOVE = 0.6;
 /** Treat a sight line this close under the roof line as clearing it. */
-const ROOF_MARGIN = 0.5;
+const ROOF_MARGIN = 0.75;
 /** Alley mouths count this much wider each side. */
 const MOUTH_MARGIN = 0.75;
 
@@ -54,11 +60,19 @@ function exitT(cx: number, cz: number, px: number, pz: number): number {
   return t;
 }
 
-/** Angle of (x, z) from the camera relative to the reference direction (rx, rz). */
+/**
+ * Direction of (x, z) from the camera relative to the reference direction
+ * (rx, rz), as a pseudo-angle in (−2, 2] that orders like the angle in
+ * (−π, π] (no trig: this runs for every prop mesh as the camera moves).
+ */
 function relAngle(cx: number, cz: number, x: number, z: number, rx: number, rz: number) {
   const dx = x - cx;
   const dz = z - cz;
-  return Math.atan2(rx * dz - rz * dx, rx * dx + rz * dz);
+  const c = rx * dz - rz * dx;
+  const d = rx * dx + rz * dz;
+  const ac = Math.abs(c);
+  if (d >= 0) return ac + d === 0 ? 0 : c / (d + ac);
+  return (c < 0 ? -1 : 1) * (2 - ac / (ac - d));
 }
 
 /**
@@ -93,7 +107,7 @@ export function ringHides(cx: number, cy: number, cz: number, b: Aabb): boolean 
     const a0 = relAngle(cx, cz, x0, z0, rx, rz);
     const a1 = relAngle(cx, cz, x1, z1, rx, rz);
     // A mouth behind the camera (or spanning the back) can't show this box
-    if (Math.abs(a0 - a1) > Math.PI) continue;
+    if (Math.abs(a0 - a1) > 2) continue;
     if (Math.max(a0, a1) >= lo && Math.min(a0, a1) <= hi) return false;
   }
 

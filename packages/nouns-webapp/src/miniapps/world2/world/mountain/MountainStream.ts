@@ -24,7 +24,7 @@ import * as THREE from 'three';
 
 import { toonify } from '../../render/Toon';
 
-import { ringHides, type Aabb } from './ringOcclusion';
+import { RERUN_MOVE, ringHides, type Aabb } from './ringOcclusion';
 import {
   hashInts,
   meshHeight,
@@ -39,8 +39,6 @@ import { tracks } from './tracks';
 
 /** Inside this (the facade line) the terrain is sunk under the street. */
 const UNDER_CITY = 76;
-/** The ring cull reruns once the camera has moved this far (m). */
-const CULL_MOVE = 0.3;
 
 interface CullItem {
   obj: THREE.Object3D;
@@ -406,7 +404,7 @@ export class MountainStream {
     const v = this.viewer;
     if (v === null) return;
     // Only the camera's position matters (not where it looks)
-    if (!this.cullDirty && v.distanceToSquared(this.cullFrom) < CULL_MOVE * CULL_MOVE) return;
+    if (!this.cullDirty && v.distanceToSquared(this.cullFrom) < RERUN_MOVE * RERUN_MOVE) return;
     this.cullFrom.copy(v);
     this.cullDirty = false;
     let n = 0;
