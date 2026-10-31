@@ -24,6 +24,7 @@ import * as THREE from 'three';
 
 import { toonify } from '../../render/Toon';
 
+import { ringHides, type Aabb } from './ringOcclusion';
 import {
   hashInts,
   meshHeight,
@@ -36,6 +37,71 @@ import {
 } from './terrain';
 import { tracks } from './tracks';
 
+/** Inside this (the facade line) the terrain is sunk under the street. */
+const UNDER_CITY = 76;
+/** The ring cull reruns once the camera has moved this far (m). */
+const CULL_MOVE = 0.3;
+
+interface CullItem {
+  obj: THREE.Object3D;
+  boxes: Aabb[];
+  hidden: boolean;
+  /** Its layer mask while hidden (restored when it shows again). */
+  mask: number;
+}
+
+/**
+ * World bounds bucketed by the side of the city square a point / box lies
+ * beyond (one box per side), plus any box that straddles the city as is.
+ */
+class SideBoxes {
+  private sides: (THREE.Box3 | null)[] = [null, null, null, null];
+  private loose: THREE.Box3[] = [];
+  empty = true;
+
+  private static side(x: number, z: number): number {
+    if (Math.max(Math.abs(x), Math.abs(z)) < UNDER_CITY) return -1;
+    if (Math.abs(x) >= Math.abs(z)) return x > 0 ? 0 : 1;
+    return z > 0 ? 2 : 3;
+  }
+
+  private into(k: number, b: THREE.Box3 | THREE.Vector3) {
+    const at = (this.sides[k] ??= new THREE.Box3());
+    if ((b as THREE.Box3).isBox3) at.union(b as THREE.Box3);
+    else at.expandByPoint(b as THREE.Vector3);
+    this.empty = false;
+  }
+
+  /** Terrain vertex (under-the-city ones are skipped: they're under the street). */
+  addPoint(p: THREE.Vector3) {
+    const k = SideBoxes.side(p.x, p.z);
+    if (k >= 0) this.into(k, p);
+  }
+
+  addBox(b: THREE.Box3) {
+    if (b.isEmpty()) return;
+    const k = SideBoxes.side((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2);
+    if (k >= 0) this.into(k, b);
+    else {
+      this.loose.push(b.clone());
+      this.empty = false;
+    }
+  }
+
+  item(obj: THREE.Object3D): CullItem {
+    const boxes = [...this.sides.filter((b): b is THREE.Box3 => b !== null), ...this.loose].map(
+      b => ({
+        minX: b.min.x,
+        minY: b.min.y,
+        minZ: b.min.z,
+        maxX: b.max.x,
+        maxY: b.max.y,
+        maxZ: b.max.z,
+      }),
+    );
+    return { obj, boxes, hidden: false, mask: obj.layers.mask };
+  }
+}
 export const CHUNK = 128;
 /** View radius; phones (low) stream a smaller ring: faster loads, fewer hitches. */
 const VIEW_BY_QUALITY: Record<Quality, number> = { low: 460, medium: 760, high: 760 };
@@ -106,6 +172,14 @@ interface Chunk {
   lod: number;
   job: GenJob | null;
   props: { group: THREE.Group; decorations: ChunkDecoration[] } | null;
+  /**
+   * What it draws (the terrain, each prop mesh) with world bounds per side
+   * of the square it lies beyond: hidden one by one when the plaza's ring of
+   * buildings hides every box of it from the camera.
+   */
+  cull: CullItem[];
+  /** All of it, per side (the quick whole-chunk test). */
+  boxes: Aabb[];
   dist: number;
   /** Distance to the look-ahead point (Infinity when slow). */
   ahead: number;
@@ -163,6 +237,11 @@ export class MountainStream {
   readonly network = tracks;
   /** Max ms of meshing work per frame (scaled up with speed). */
   budgetMs = 3;
+  /**
+   * The camera (Game sets it to the live camera position). From the plaza
+   * floor the ring of buildings hides most chunks: those aren't drawn.
+   */
+  viewer: THREE.Vector3 | null = null;
   /** In `prime`: build every prop chunk in range now, not one a frame. */
   private priming = false;
   private frameBudget = 3;
@@ -253,6 +332,8 @@ export class MountainStream {
               lod: -1,
               job: null,
               props: null,
+              cull: [],
+              boxes: [],
               dist: distTo({ origin: new THREE.Vector3(ox, 0, oz) }, fx, fz),
               ahead: Infinity,
             });
@@ -311,6 +392,87 @@ export class MountainStream {
     }
     this.stats.meshes = meshes;
     this.stats.propChunks = props;
+    this.cullByRing();
+  }
+
+  /** Chunks drawn / hidden behind the plaza's ring last frame. */
+  ringCulled = 0;
+
+  /** Where the ring cull last ran from; it reruns once the camera moves (or chunks change). */
+  private cullFrom = new THREE.Vector3(Infinity, 0, 0);
+  private cullDirty = true;
+
+  private cullByRing() {
+    const v = this.viewer;
+    if (v === null) return;
+    // Only the camera's position matters (not where it looks)
+    if (!this.cullDirty && v.distanceToSquared(this.cullFrom) < CULL_MOVE * CULL_MOVE) return;
+    this.cullFrom.copy(v);
+    this.cullDirty = false;
+    let n = 0;
+    const hides = (b: Aabb) => ringHides(v.x, v.y, v.z, b);
+    for (const c of this.chunks.values()) {
+      // Whole chunk hidden (most of them): no need to look at its pieces
+      const all = c.boxes.length > 0 && c.boxes.every(hides);
+      for (const it of c.cull) {
+        const hide = all || it.boxes.every(hides);
+        if (hide) n++;
+        if (hide === it.hidden) continue;
+        it.hidden = hide;
+        // By layer mask, so it never fights code that sets `visible`
+        if (hide) {
+          it.mask = it.obj.layers.mask;
+          it.obj.layers.mask = 0;
+        } else it.obj.layers.mask = it.mask;
+      }
+    }
+    this.ringCulled = n;
+  }
+
+  /** The chunk's cull items: its terrain and each prop mesh, boxed per side of the city. */
+  private updateBox(c: Chunk) {
+    // Anything hidden by the old items shows again until the next cull
+    for (const it of c.cull) if (it.hidden) it.obj.layers.mask = it.mask;
+    c.cull = [];
+    this.cullDirty = true;
+    const whole = new SideBoxes();
+    const p = new THREE.Vector3();
+    if (c.mesh !== null) {
+      // Vertices under the city are sunk out of sight under the street
+      const pos = c.mesh.geometry.attributes.position as THREE.BufferAttribute;
+      const sides = new SideBoxes();
+      for (let i = 0; i < pos.count; i++) {
+        p.fromBufferAttribute(pos, i).add(c.origin);
+        sides.addPoint(p);
+        whole.addPoint(p);
+      }
+      c.cull.push(sides.item(c.mesh));
+    }
+    // Props: per mesh; an instanced one boxed per instance
+    c.props?.group.updateMatrixWorld(true);
+    c.props?.group.traverse(o => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh && !(o as THREE.Points).isPoints) return;
+      const sides = new SideBoxes();
+      const im = o as THREE.InstancedMesh;
+      if (im.isInstancedMesh) {
+        if (im.geometry.boundingBox === null) im.geometry.computeBoundingBox();
+        const mat = new THREE.Matrix4();
+        const ib = new THREE.Box3();
+        for (let i = 0; i < im.count; i++) {
+          im.getMatrixAt(i, mat);
+          ib.copy(im.geometry.boundingBox!).applyMatrix4(mat.premultiply(im.matrixWorld));
+          sides.addBox(ib);
+          whole.addBox(ib);
+        }
+      } else {
+        const b = new THREE.Box3().setFromObject(o, false);
+        sides.addBox(b);
+        whole.addBox(b);
+      }
+      if (!sides.empty) c.cull.push(sides.item(o));
+    });
+    c.boxes = whole.item(this.group).boxes;
   }
 
   /** Synchronously mesh everything near `focus` (spawn / teleport). */
@@ -404,6 +566,7 @@ export class MountainStream {
       c.mesh.geometry = geo;
     }
     c.lod = j.lod;
+    this.updateBox(c);
     j.ms += performance.now() - t0;
     const st = this.stats.gen[j.lod];
     st[0]++;
@@ -577,6 +740,7 @@ export class MountainStream {
     group.updateMatrixWorld(true);
     this.group.add(group);
     c.props = { group, decorations };
+    this.updateBox(c);
     this.world.setDynamic(`mountain:${c.key}`, mergePositions(cols), c.origin);
     this.stats.propsMs += performance.now() - t0;
   }
@@ -587,6 +751,7 @@ export class MountainStream {
     for (const d of c.props.decorations) d.dispose?.();
     this.world.setDynamic(`mountain:${c.key}`, null);
     c.props = null;
+    this.updateBox(c);
   }
 
   private disposeChunk(c: Chunk) {
