@@ -245,9 +245,10 @@ async function loadSnapshot(): Promise<BorgsData> {
       born: born ?? 0,
     });
   }
-  const data: BorgsData = { meta, attributes: attrsRes.attributes, borgs };
-  await fetchNewBorgs(data).catch(() => undefined); // best effort live top-up
-  return data;
+  // The live top-up (anything newer than the snapshot) is the caller's to
+  // start: it's ~5 RPC reads a borg, so waiting for it left the page on its
+  // loading message for most of a minute.
+  return { meta, attributes: attrsRes.attributes, borgs };
 }
 
 export function loadBorgsData(): Promise<BorgsData> {
@@ -261,8 +262,10 @@ export function loadBorgsData(): Promise<BorgsData> {
 /**
  * Pull anything minted/bred after the snapshot, mutating `data` in place.
  * Also marks snapshot borgs burned when they became parents of a new child.
+ * `onChange` runs after each borg lands (and when birth dates fill in), so a
+ * page can show them as they arrive.
  */
-export async function fetchNewBorgs(data: BorgsData): Promise<number> {
+export async function fetchNewBorgs(data: BorgsData, onChange?: () => void): Promise<number> {
   const contract = { address: BORGS_ADDRESS, abi: borgsAbi } as const;
   const [generated, bred] = await polygonClient.multicall({
     contracts: [
@@ -276,20 +279,75 @@ export async function fetchNewBorgs(data: BorgsData): Promise<number> {
   if (liveMaxId <= knownMaxId) return 0;
 
   // Cap the per-visit top-up; the shipped snapshot should stay close to live.
-  const newIds = [];
+  const newIds: number[] = [];
   for (let id = knownMaxId + 1; id <= liveMaxId && newIds.length < 300; id++) newIds.push(id);
 
-  // Birth timestamps: binary-search each new borg's mint block using the
-  // monotonic generated+bred counters (borg id X exists from the first block
-  // where the combined count >= X), then read that block's timestamp. Ids are
-  // ascending, so the search floor walks forward — ~20 probes for the first
-  // id, a handful for each after. Budget-capped: leftovers keep born=0 until
-  // the next snapshot refresh fills them from event logs.
-  const births = new Map<number, number>();
+  // getBorg rebuilds the 576-pixel image in-contract — too gas-heavy to batch
+  // via multicall (inner calls hit the RPC eth_call gas cap). A few at a time.
+  const attrIndex = new Map(data.attributes.map((a, i) => [a.n, i]));
+  let added = 0;
+  const readOne = async (id: number) => {
+    let borgRes;
+    try {
+      borgRes = await polygonClient.readContract({
+        ...contract,
+        functionName: 'getBorg',
+        args: [BigInt(id)],
+      });
+    } catch {
+      return;
+    }
+    const [name, , attributes, parentId1, parentId2, childId] = borgRes;
+    // Attribute set is fixed on-chain post-lock, so every name should resolve.
+    const attrs = attributes.map(n => attrIndex.get(n) ?? -1);
+    if (attrs.includes(-1)) return;
+    const owner = await polygonClient
+      .readContract({ ...contract, functionName: 'ownerOf', args: [BigInt(id)] })
+      .then(a => a.toLowerCase())
+      .catch(() => null);
+    const borg: Borg = {
+      id,
+      attrs,
+      parent1: Number(parentId1),
+      parent2: Number(parentId2),
+      child: Number(childId),
+      owner,
+      name,
+      born: 0,
+    };
+    data.borgs.set(borg.id, borg);
+    // Bred child ⇒ parents were burned
+    for (const pid of [borg.parent1, borg.parent2]) {
+      const parent = data.borgs.get(pid);
+      if (parent) {
+        parent.owner = null;
+        parent.child = borg.id;
+      }
+    }
+    added++;
+    onChange?.();
+  };
+  const queue = [...newIds];
+  await Promise.all(
+    Array.from({ length: TOP_UP_CONCURRENCY }, async () => {
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) await readOne(id);
+    }),
+  );
+  data.meta.maxId = liveMaxId;
+  data.meta.generated = Number(generated);
+  data.meta.bred = Number(bred);
+  onChange?.();
+
+  // Birth timestamps (last: the borgs already show): binary-search each new
+  // borg's mint block using the monotonic generated+bred counters (borg id X
+  // exists from the first block where the combined count >= X), then read
+  // that block's timestamp. Ids are ascending, so the search floor walks
+  // forward — ~20 probes for the first id, a handful for each after.
+  // Budget-capped: leftovers keep born=0 until the next snapshot refresh.
   try {
     const latest = await polygonClient.getBlockNumber();
     const countAt = async (block: bigint) => {
-      const [gen, bred] = await polygonArchiveClient.multicall({
+      const [gen, bredAt] = await polygonArchiveClient.multicall({
         contracts: [
           { ...contract, functionName: 'getCurrentGenerationCount' },
           { ...contract, functionName: 'getCurrentBredCount' },
@@ -297,7 +355,7 @@ export async function fetchNewBorgs(data: BorgsData): Promise<number> {
         allowFailure: false,
         blockNumber: block,
       });
-      return Number(gen) + Number(bred);
+      return Number(gen) + Number(bredAt);
     };
     let probes = 0;
     let lo = BigInt(data.meta.snapshotBlock);
@@ -311,61 +369,18 @@ export async function fetchNewBorgs(data: BorgsData): Promise<number> {
       }
       if (lo < hi) break; // probe budget exhausted mid-search
       const block = await polygonArchiveClient.getBlock({ blockNumber: lo });
-      births.set(id, Number(block.timestamp));
+      const borg = data.borgs.get(id);
+      if (borg) borg.born = Number(block.timestamp);
     }
+    onChange?.();
   } catch {
     /* born stays 0 for this visit */
   }
-
-  // getBorg rebuilds the 576-pixel image in-contract — too gas-heavy to batch
-  // via multicall (inner calls hit the RPC eth_call gas cap). Read one by one.
-  const attrIndex = new Map(data.attributes.map((a, i) => [a.n, i]));
-  let added = 0;
-  for (const id of newIds) {
-    let borgRes;
-    try {
-      borgRes = await polygonClient.readContract({
-        ...contract,
-        functionName: 'getBorg',
-        args: [BigInt(id)],
-      });
-    } catch {
-      continue;
-    }
-    const [name, , attributes, parentId1, parentId2, childId] = borgRes;
-    // Attribute set is fixed on-chain post-lock, so every name should resolve.
-    const attrs = attributes.map(n => attrIndex.get(n) ?? -1);
-    if (attrs.includes(-1)) continue;
-    const owner = await polygonClient
-      .readContract({ ...contract, functionName: 'ownerOf', args: [BigInt(id)] })
-      .then(a => a.toLowerCase())
-      .catch(() => null);
-    const borg: Borg = {
-      id,
-      attrs,
-      parent1: Number(parentId1),
-      parent2: Number(parentId2),
-      child: Number(childId),
-      owner,
-      name,
-      born: births.get(id) ?? 0,
-    };
-    data.borgs.set(borg.id, borg);
-    // Bred child ⇒ parents were burned
-    for (const pid of [borg.parent1, borg.parent2]) {
-      const parent = data.borgs.get(pid);
-      if (parent) {
-        parent.owner = null;
-        parent.child = borg.id;
-      }
-    }
-    added++;
-  }
-  data.meta.maxId = liveMaxId;
-  data.meta.generated = Number(generated);
-  data.meta.bred = Number(bred);
   return added;
 }
+
+/** Borgs read at once in the live top-up. */
+const TOP_UP_CONCURRENCY = 4;
 
 /* -------------------------------- rendering ------------------------------- */
 
@@ -396,8 +411,8 @@ export function renderBorgImage(attrs: number[], attributes: BorgAttribute[]): s
   const img = ctx.createImageData(BORG_GRID, BORG_GRID);
 
   for (const attrIdx of attrs) {
-    const attr = attributes[attrIdx];
-    if (!attr) continue;
+    const attr = attributes[attrIdx] as BorgAttribute | undefined;
+    if (attr === undefined) continue;
     for (const [hex, positions] of Object.entries(attr.px)) {
       const c = parsePixelHex(hex);
       if (!c) continue;
