@@ -88,3 +88,53 @@ export function decodeCrew(v: unknown): string[] | null {
   }
   return out;
 }
+
+// ── The car you got out of (`lc`) ──
+//
+// Once you climb out, your blob carries `lc: ["toro.2", x, y, z, yaw]` (the
+// car's id + paint, where it's parked, its heading) for as long as it stays
+// parked where you left it, so other riders keep seeing it instead of it
+// vanishing with your `cr`. Getting into any car drops it. Older clients
+// ignore `lc`.
+
+export interface NetParked {
+  id: CarId;
+  paint: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+}
+
+const PARKED_RE = /^([a-z]{2,12})\.(\d)$/;
+/** Further out than any world coordinate (the Big Drop doesn't park cars). */
+const MAX_COORD = 50_000;
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+export function encodeParked(p: NetParked): [string, number, number, number, number] {
+  return [
+    `${p.id}.${Math.max(0, Math.min(9, Math.round(p.paint)))}`,
+    r2(p.x),
+    r2(p.y),
+    r2(p.z),
+    r2(Math.atan2(Math.sin(p.yaw), Math.cos(p.yaw))),
+  ];
+}
+
+export function decodeParked(v: unknown): NetParked | null {
+  if (!Array.isArray(v) || v.length !== 5) return null;
+  const [k, x, y, z, yaw] = v as unknown[];
+  if (typeof k !== 'string' || k.length > 15) return null;
+  const m = PARKED_RE.exec(k);
+  if (m === null || !isCarId(m[1])) return null;
+  for (const n of [x, y, z, yaw])
+    if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > MAX_COORD) return null;
+  return {
+    id: m[1],
+    paint: Number(m[2]),
+    x: x as number,
+    y: y as number,
+    z: z as number,
+    yaw: yaw as number,
+  };
+}

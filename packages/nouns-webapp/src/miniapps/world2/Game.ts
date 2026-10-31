@@ -50,6 +50,7 @@ import { encodeRoom, sameSpace } from './interiors/roomNet';
 import { MissionSystem } from './missions/MissionSystem';
 import { applyTimeOfDay, buildNatureShowcase, NatureSystem, replaceFallbackTrees } from './nature';
 import { setSkyGroundFog } from './nature/TimeOfDay';
+import { TodClock } from './nature/todClock';
 import { CALLOUT_CODES, Net, type NetPose, type RemoteCallout } from './net/Net';
 import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from './net/Stats';
 import { JerseyCrew } from './npc/JerseyCrew';
@@ -1216,6 +1217,9 @@ export class Game {
     perf.lap('missions');
     this.interiors.update(dt);
     this.camp.update(dt);
+    // A pocket room and the Big Drop set their own light: the sky waits
+    if (this.todClock.tick(dt, this.interiors.inside || this.missions.ud.active))
+      this.cycleTimeOfDay();
     perf.lap('interiors');
     if (!away) this.facades.update(dt);
     if (!away) {
@@ -1546,6 +1550,8 @@ export class Game {
   }
 
   private static TOD: TimeOfDayPreset[] = ['afternoon', 'golden', 'blue', 'night'];
+  /** Steps the time of day every 10 minutes of play (nature/todClock.ts). */
+  private readonly todClock = new TodClock();
 
   /** Cycle afternoon → golden → blue hour → night (2 s transition). */
   cycleTimeOfDay() {
@@ -1555,6 +1561,7 @@ export class Game {
 
   /** Straight to a time of day (CAMP wakes you at sunset: 'golden'). */
   setTimeOfDay(next: TimeOfDayPreset) {
+    this.todClock.reset();
     if (this.nature === null || this.level === null || this.hud.timeOfDay === next) return;
     applyTimeOfDay(this.gfx, next, this.level);
     this.hud = { ...this.hud, timeOfDay: next };
@@ -2118,6 +2125,7 @@ export class Game {
               ? 'dragon'
               : undefined,
         car: this.cars.netKey,
+        lc: this.cars.leftKey,
         pk: this.parkour.netKey(),
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)

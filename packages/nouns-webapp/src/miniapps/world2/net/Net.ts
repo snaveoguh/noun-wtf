@@ -82,6 +82,8 @@ export interface NetPose {
   pk?: unknown;
   /** Driving a car (cars/netCar.ts): its id + flags, e.g. "toro.2.0". */
   car?: string;
+  /** The car this rider got out of, parked (cars/netCar.ts `lc`), raw: decoded where it's drawn. */
+  lc?: unknown;
 }
 
 export type Vehicle = 'van' | 'dragon' | 'car';
@@ -367,6 +369,7 @@ export class Net {
     pose.vehicle = parseVehicle(blob.vh);
     pose.pk = Array.isArray(blob.pk) ? blob.pk : undefined;
     if (typeof blob.cr === 'string') pose.car = blob.cr.slice(0, 20);
+    pose.lc = Array.isArray(blob.lc) && blob.lc.length === 5 ? blob.lc : undefined;
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
     const co = parseCallout(blob.co);
     const cv = parseChatVoice(blob.cv);
@@ -461,6 +464,7 @@ export class Net {
       c.vehicle = b.pose.vehicle;
       c.pk = b.pose.pk;
       c.car = b.pose.car;
+      c.lc = b.pose.lc;
     }
     void dt;
   }
@@ -493,6 +497,7 @@ export class Net {
       // (an older client reads 'dragon' as nothing: the rider, no dragon)
       ...(pose.vehicle !== undefined ? { vh: pose.vehicle } : {}),
       ...(pose.car !== undefined ? { cr: pose.car } : {}),
+      ...(pose.lc !== undefined ? { lc: pose.lc } : {}),
       // Voice Booth (see the header): only when set
       ...(this.voiceTag !== '' ? { vo: this.voiceTag } : {}),
       ...(this.callout !== null ? { co: this.callout } : {}),
