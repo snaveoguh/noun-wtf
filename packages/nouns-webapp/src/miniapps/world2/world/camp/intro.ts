@@ -50,7 +50,7 @@ function cr(p0: V3, p1: V3, p2: V3, p3: V3, u: number): V3 {
 }
 
 /** The shot's control points (world), from the city to the final camera. */
-export function introPoints(site: CampSite, rider: V3, final: V3): V3[] {
+export function introPoints(site: CampSite, rider: V3, final: V3, tail?: V3[]): V3[] {
   const o = site.origin;
   const f = site.faceZ;
   const fy = site.floorY;
@@ -84,15 +84,27 @@ export function introPoints(site: CampSite, rider: V3, final: V3): V3[] {
       rider[0] + (fx * Math.cos(a) + sx * Math.sin(a)) * R,
       rider[2] + (fz * Math.cos(a) + sz * Math.sin(a)) * R,
     );
+  // Or a given way in (the reading shot's: at the book, round it, into the eyes)
+  const keep = (p: V3): V3 => [
+    Math.min(r.maxX - 0.45, Math.max(r.minX + 0.45, p[0])),
+    p[1],
+    Math.min(r.maxZ - 0.45, Math.max(r.minZ + 0.6, p[2])),
+  ];
+  const inside: V3[] =
+    tail !== undefined
+      ? tail.map(keep)
+      : [
+          arc(0.55), // ahead of the rider, off to one side
+          arc(Math.PI / 2), // beside them
+          arc(Math.PI * 0.8), // coming round behind
+        ];
   return [
     [o.x + 75, 92, f - 120], // far out over the plaza, low sun behind
     [o.x + 48, 128, f - 70], // the climb, swinging round
     [o.x + 14, fy + 6, f - 26], // lined up on the window, a little high
     [o.x, wy, f - 7], // straight at it
     [o.x, wy, f + 0.9], // through the opening
-    arc(0.55), // ahead of the rider, off to one side
-    arc(Math.PI / 2), // beside them
-    arc(Math.PI * 0.8), // coming round behind
+    ...inside,
     final,
   ];
 }
@@ -107,8 +119,10 @@ export function introShot(
   final: V3,
   finalLook: V3,
   finalFov: number,
+  /** In-room points before `final` (default: round the rider's side). */
+  tail?: V3[],
 ): (sec: number) => Shot {
-  const pts = introPoints(site, rider, final);
+  const pts = introPoints(site, rider, final, tail);
   // Ends padded so the first and last segments have neighbours
   const ext = (a: V3, b: V3): V3 => [2 * a[0] - b[0], 2 * a[1] - b[1], 2 * a[2] - b[2]];
   const P = [ext(pts[0]!, pts[1]!), ...pts, ext(pts[pts.length - 1]!, pts[pts.length - 2]!)];
@@ -143,7 +157,8 @@ export function introShot(
     // Fast over the city, slowing right down into the room
     const pos = at(total * (1 - (1 - t) ** 2.4));
     const toRider = smooth(0.62, 0.8, t);
-    const toFinal = smooth(0.86, 1, t);
+    // (a given way in looks at what it's heading for sooner)
+    const toFinal = tail !== undefined ? smooth(0.66, 0.84, t) : smooth(0.86, 1, t);
     const look = lerp3(lerp3(win, riderHead, toRider), finalLook, toFinal);
     // Wide as it dives through the window, then the game's own
     const fov = 52 + 22 * smooth(0.55, 0.78, t) * (1 - toFinal) + (finalFov - 52) * toFinal;

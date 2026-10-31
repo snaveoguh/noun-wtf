@@ -42,16 +42,7 @@ const WARM_GROUND = new THREE.Color(0x8a7058);
 /** The game camera's field of view on foot (SkateCamera). */
 const FOOT_FOV = 62;
 /** First person, on the book in your hands. */
-const READ_FOV = 52;
-/**
- * The blink through the rider's head: black within BLINK_BLACK (m) of its
- * surface (close by, the camera's beside the head looking down past it, so
- * the rider reads as headless), easing out to clear at BLINK_OUT; inside,
- * clear BLINK_IN in.
- */
-const BLINK_OUT = 1.3;
-const BLINK_BLACK = 0.55;
-const BLINK_IN = 0.2;
+const READ_FOV = 38;
 
 /** Book / table reach (m, flat distance). */
 const NEAR_BOOK = 1.5;
@@ -351,7 +342,7 @@ export class CampSystem {
     this.book = book;
     this.intro = {
       t: 0,
-      shot: introShot(this.site!, rider, sh.cam, sh.look, READ_FOV),
+      shot: introShot(this.site!, rider, sh.cam, sh.look, READ_FOV, sh.approach),
       rider,
       yaw,
       plan,
@@ -401,16 +392,18 @@ export class CampSystem {
         const since = k > 0 ? t - P.flips[k - 1]! : Infinity;
         const turning = since < FLIP_SECONDS ? since / FLIP_SECONDS : -1;
         if (me !== null) book.hold(me, I.rider, I.yaw, k, turning, dt);
-      } else {
-        if (me !== null) book.toss(me, I.rider, I.yaw, t - P.tossAt, dt);
-        if (t >= P.pullAt) {
-          // Pull back out of their head into the game camera (the reveal)
-          const u = Math.min(1, (t - P.pullAt) / (P.endAt - P.pullAt));
-          const e = u * u * (3 - 2 * u);
-          r.pos.copy(I.eyes.pos).lerp(I.play.pos, e);
-          r.look.copy(I.eyes.look).lerp(I.play.look, e);
-          r.fov = READ_FOV + (FOOT_FOV - READ_FOV) * e;
-        }
+      } else if (me !== null) book.toss(me, I.rider, I.yaw, t - P.tossAt, dt);
+      if (t >= P.pullAt) {
+        // Pull back out of their head to the whole rider (the game
+        // camera's pose), still reading; then they chuck it
+        const u = Math.min(1, (t - P.pullAt) / (P.pullEnd - P.pullAt));
+        const e = u * u * (3 - 2 * u);
+        r.pos.copy(I.eyes.pos).lerp(I.play.pos, e);
+        // (eyes on the book till the camera's out of the head: looking down
+        // from inside it showed the neck)
+        const el = u < 0.3 ? 0 : ((u - 0.3) / 0.7) ** 2 * (3 - (2 * (u - 0.3)) / 0.7);
+        r.look.copy(I.eyes.look).lerp(I.play.look, el);
+        r.fov = READ_FOV + (FOOT_FOV - READ_FOV) * e;
       }
     }
     // (dev: look at the scene from elsewhere while it plays)
@@ -427,62 +420,37 @@ export class CampSystem {
   }
 
   private readonly headBox = new THREE.Box3();
-  private headHidden: THREE.Object3D | null = null;
+  private firstPerson: { head: THREE.Object3D; hands: THREE.Object3D[] } | null = null;
   /**
-   * First person: the whole rider goes while the camera's inside their
-   * head, so you see only the book (the Noun's stubby arms poked through
-   * its pages). Passing through the head's surface, in or out, is hidden
-   * by a blink to black (`veil`): in, it reads as opening your eyes on the
-   * book; out, the rider fades up as the camera pulls back.
+   * First person, only while the camera's inside the rider's head: the
+   * head goes (from inside it would draw nothing anyway, but its glasses
+   * and bits would), and so do the hands (the hand bones shrink to nothing,
+   * the body being one skinned mesh), so you see their arms reaching to the
+   * book and the pages, no fingers through them. Going in, the face fills
+   * the frame first, so there's no pop.
    */
   private hideHead(cam: THREE.Vector3 | null) {
     const me = this.game.me;
     const h = me?.head ?? null;
-    const root = me?.root ?? null;
-    let hide = false;
-    let dark = 0;
-    if (cam !== null && h !== null) {
-      const b = this.headBox.setFromObject(h);
-      hide = b.containsPoint(cam);
-      if (hide) {
-        const depth = Math.min(
-          cam.x - b.min.x,
-          b.max.x - cam.x,
-          cam.y - b.min.y,
-          b.max.y - cam.y,
-          cam.z - b.min.z,
-          b.max.z - cam.z,
-        );
-        dark = 1 - depth / BLINK_IN;
-      } else dark = (BLINK_OUT - b.distanceToPoint(cam)) / (BLINK_OUT - BLINK_BLACK);
+    const hide = cam !== null && h !== null && this.headBox.setFromObject(h).containsPoint(cam);
+    const fp = this.firstPerson;
+    if (fp !== null && (fp.head !== h || !hide)) {
+      fp.head.visible = true;
+      for (const b of fp.hands) b.scale.setScalar(1);
+      this.firstPerson = null;
     }
-    const k = Math.max(0, Math.min(1, dark));
-    this.setVeil(k * k * (3 - 2 * k));
-    if (this.headHidden !== null && (this.headHidden !== root || !hide)) {
-      this.headHidden.visible = true;
-      this.headHidden = null;
+    if (hide && me !== null && h !== null) {
+      if (this.firstPerson === null) {
+        const hands: THREE.Object3D[] = [];
+        me.root.traverse(o => {
+          const n = o.name.replace(/[.:_]/g, '').toLowerCase();
+          if (n === 'handl' || n === 'handr') hands.push(o);
+        });
+        this.firstPerson = { head: h, hands };
+      }
+      h.visible = false;
+      for (const b of this.firstPerson.hands) b.scale.setScalar(0.001);
     }
-    if (hide && root !== null) {
-      root.visible = false;
-      this.headHidden = root;
-    }
-  }
-
-  private veil: HTMLDivElement | null = null;
-  private setVeil(a: number) {
-    if (a <= 0.001) {
-      if (this.veil !== null) this.veil.style.opacity = '0';
-      return;
-    }
-    if (this.veil === null) {
-      const d = document.createElement('div');
-      d.style.cssText =
-        'position:fixed;inset:0;background:#000;pointer-events:none;z-index:40;opacity:0';
-      d.dataset.campVeil = '';
-      document.body.appendChild(d);
-      this.veil = d;
-    }
-    this.veil.style.opacity = a.toFixed(3);
   }
 
   private skipIntro = () => {
@@ -630,8 +598,6 @@ export class CampSystem {
     if (this.intro !== null) this.endIntro();
     this.birds?.dispose();
     this.book?.dispose();
-    this.veil?.remove();
-    this.veil = null;
     this.releaseCull();
     if (this.keyBound) document.removeEventListener('keydown', this.onKey, true);
     this.keyBound = false;
