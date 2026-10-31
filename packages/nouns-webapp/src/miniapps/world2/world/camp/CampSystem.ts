@@ -43,8 +43,15 @@ const WARM_GROUND = new THREE.Color(0x8a7058);
 const FOOT_FOV = 62;
 /** First person, on the book in your hands. */
 const READ_FOV = 52;
-/** The head hides while the camera is this close to it (m) or inside it. */
-const HEAD_CLEAR = 0.45;
+/**
+ * The blink through the rider's head: black within BLINK_BLACK (m) of its
+ * surface (close by, the camera's beside the head looking down past it, so
+ * the rider reads as headless), easing out to clear at BLINK_OUT; inside,
+ * clear BLINK_IN in.
+ */
+const BLINK_OUT = 1.3;
+const BLINK_BLACK = 0.55;
+const BLINK_IN = 0.2;
 
 /** Book / table reach (m, flat distance). */
 const NEAR_BOOK = 1.5;
@@ -421,23 +428,61 @@ export class CampSystem {
 
   private readonly headBox = new THREE.Box3();
   private headHidden: THREE.Object3D | null = null;
-  /** First person: the rider's own head goes while the camera's in or right by it. */
+  /**
+   * First person: the whole rider goes while the camera's inside their
+   * head, so you see only the book (the Noun's stubby arms poked through
+   * its pages). Passing through the head's surface, in or out, is hidden
+   * by a blink to black (`veil`): in, it reads as opening your eyes on the
+   * book; out, the rider fades up as the camera pulls back.
+   */
   private hideHead(cam: THREE.Vector3 | null) {
-    const h = this.game.me?.head ?? null;
+    const me = this.game.me;
+    const h = me?.head ?? null;
+    const root = me?.root ?? null;
     let hide = false;
+    let dark = 0;
     if (cam !== null && h !== null) {
-      if (this.headHidden === h) h.visible = true; // measure it as drawn
-      this.headBox.setFromObject(h).expandByScalar(HEAD_CLEAR);
-      hide = this.headBox.containsPoint(cam);
+      const b = this.headBox.setFromObject(h);
+      hide = b.containsPoint(cam);
+      if (hide) {
+        const depth = Math.min(
+          cam.x - b.min.x,
+          b.max.x - cam.x,
+          cam.y - b.min.y,
+          b.max.y - cam.y,
+          cam.z - b.min.z,
+          b.max.z - cam.z,
+        );
+        dark = 1 - depth / BLINK_IN;
+      } else dark = (BLINK_OUT - b.distanceToPoint(cam)) / (BLINK_OUT - BLINK_BLACK);
     }
-    if (this.headHidden !== null && (this.headHidden !== h || !hide)) {
+    const k = Math.max(0, Math.min(1, dark));
+    this.setVeil(k * k * (3 - 2 * k));
+    if (this.headHidden !== null && (this.headHidden !== root || !hide)) {
       this.headHidden.visible = true;
       this.headHidden = null;
     }
-    if (hide && h !== null) {
-      h.visible = false;
-      this.headHidden = h;
+    if (hide && root !== null) {
+      root.visible = false;
+      this.headHidden = root;
     }
+  }
+
+  private veil: HTMLDivElement | null = null;
+  private setVeil(a: number) {
+    if (a <= 0.001) {
+      if (this.veil !== null) this.veil.style.opacity = '0';
+      return;
+    }
+    if (this.veil === null) {
+      const d = document.createElement('div');
+      d.style.cssText =
+        'position:fixed;inset:0;background:#000;pointer-events:none;z-index:40;opacity:0';
+      d.dataset.campVeil = '';
+      document.body.appendChild(d);
+      this.veil = d;
+    }
+    this.veil.style.opacity = a.toFixed(3);
   }
 
   private skipIntro = () => {
@@ -585,6 +630,8 @@ export class CampSystem {
     if (this.intro !== null) this.endIntro();
     this.birds?.dispose();
     this.book?.dispose();
+    this.veil?.remove();
+    this.veil = null;
     this.releaseCull();
     if (this.keyBound) document.removeEventListener('keydown', this.onKey, true);
     this.keyBound = false;
