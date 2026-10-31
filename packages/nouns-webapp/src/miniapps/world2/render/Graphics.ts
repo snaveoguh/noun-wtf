@@ -425,8 +425,12 @@ export class Graphics {
   /** Draw nothing (an opaque menu covers the canvas: Game.coverGame). */
   hold = false;
 
+  /** Runs right before every frame is drawn (per-frame culling / LOD). */
+  beforeRender: (() => void) | null = null;
+
   render(dt: number) {
     if (this.hold) return;
+    this.beforeRender?.();
     if (this.rawRender || !this.lite.post) {
       this.renderer.render(this.scene, this.camera);
       return;

@@ -889,6 +889,12 @@ export interface VanStation {
   atDecks(p: THREE.Vector3): boolean;
   /** Pulse the lights / cones and spin the platters. `level` 0..1. */
   animate(dt: number, level: number, live: boolean): void;
+  /**
+   * Show the NOUN FM details (lights, cones, platters, meters, signs) only
+   * within `far` m of `eye`: ~20 small draws, a few pixels from across the
+   * plaza. Infinity shows them always.
+   */
+  detail(eye: THREE.Vector3, far: number): void;
 }
 
 /** Hook up the station van's moving parts (call after toonify). */
@@ -918,6 +924,9 @@ export function vanStation(group: THREE.Object3D): VanStation {
   const tmp = new THREE.Vector3();
   let t = 0;
   let smooth = 0;
+  const details = [...lights, ...cones, ...platters, ...meters, ...Object.values(singles)];
+  let shown = true;
+  const centre = new THREE.Vector3();
   return {
     group,
     deckSpot,
@@ -933,8 +942,16 @@ export function vanStation(group: THREE.Object3D): VanStation {
         Math.abs(tmp.y - FLOOR) < 0.7
       );
     },
+    detail(eye, far) {
+      group.getWorldPosition(centre);
+      const show = far === Infinity || centre.distanceToSquared(eye) < far * far;
+      if (show === shown) return;
+      shown = show;
+      for (const m of details) m.visible = show;
+    },
     animate(dt, level, live) {
       t += dt;
+      if (!shown) return;
       smooth += (level - smooth) * Math.min(1, dt * 18);
       const k = live ? smooth : 0;
       lights.forEach((l, i) => {

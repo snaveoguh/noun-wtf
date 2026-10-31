@@ -102,6 +102,8 @@ const FALLBACK_CLIP: Record<string, string[]> = {
   celebrate: ['celebrate', 'wave'],
 };
 
+/** Scratch for the distance LOD. */
+const _lodPos = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
@@ -617,7 +619,44 @@ export class NounCharacter {
    */
   static castShadows = true;
 
+  /** Every live character, for the distance LOD (`updateLod`). */
+  private static readonly live = new Set<NounCharacter>();
+  /** 0: everything; 1: no board wheels / trucks; 2: not drawn. */
+  private lod = 0;
+  /** Never LOD'd (the local rider). */
+  noLod = false;
+  /** Time not animated while not drawn. */
+  private lodSkipped = 0;
+
+  /**
+   * Phones pay ~0.2 ms per draw and a Noun on a board is ~20 draws: from
+   * `near` m off the board's wheels and trucks go, past `far` the whole
+   * Noun (its name tag stays). Infinity for both turns it off.
+   */
+  static updateLod(eye: THREE.Vector3, near: number, far: number) {
+    for (const ch of NounCharacter.live) {
+      if (ch.root.parent === null) continue;
+      let lod = 0;
+      if (!ch.noLod && near !== Infinity) {
+        ch.root.getWorldPosition(_lodPos);
+        const d2 = _lodPos.distanceToSquared(eye);
+        lod = d2 > far * far ? 2 : d2 > near * near ? 1 : 0;
+      }
+      ch.setLod(lod);
+    }
+  }
+
+  private setLod(lod: number) {
+    if (lod === this.lod) return;
+    this.lod = lod;
+    this.lift.visible = lod < 2;
+    this.boardModel?.traverse(o => {
+      if ((o as THREE.Mesh).isMesh && /^(wheel|truck)/i.test(o.name)) o.visible = lod < 1;
+    });
+  }
+
   constructor(seed: NounSeed, assets: CharacterAssets) {
+    NounCharacter.live.add(this);
     this.seed = seed;
     this.assets = assets;
     this.root.add(this.lift);
@@ -666,7 +705,14 @@ export class NounCharacter {
         if (!m.isMesh) return;
         m.castShadow = true;
         m.receiveShadow = true;
-        m.frustumCulled = false;
+        // Skinned: the rest pose's bounds miss tricks, flips and hangs, so
+        // these used to be drawn always, every Noun in the world, on screen
+        // or not (~6 draws each). Cull against the rest-pose sphere tripled
+        // (~3 m round the body), which holds any pose the rig makes.
+        if (m.isSkinnedMesh) {
+          m.computeBoundingSphere();
+          m.boundingSphere!.radius *= 3;
+        } else m.frustumCulled = false;
         const mats = Array.isArray(m.material) ? m.material : [m.material];
         const out = mats.map(mat => {
           const sm = (mat as THREE.MeshStandardMaterial).clone();
@@ -757,6 +803,7 @@ export class NounCharacter {
       });
       this.board.add(m);
       this.boardModel = m;
+      this.lod = -1; // re-apply the LOD to the new board
       this.deckTop = sb.deckTopHeight ?? 0.1;
       if (Array.isArray(sb.wheelAxis)) this.wheelAxis.set(...sb.wheelAxis).normalize();
       if (sb.wheelRadius !== undefined && sb.wheelRadius > 0) this.wheelRadius = sb.wheelRadius;
@@ -786,6 +833,7 @@ export class NounCharacter {
       }
       this.board.add(g);
       this.boardModel = g;
+      this.lod = -1; // re-apply the LOD to the new board
       this.deckTop = 0.1;
     }
   }
@@ -1052,6 +1100,13 @@ export class NounCharacter {
       climb?: { phase: number; amount: number };
     },
   ) {
+    // Not drawn (far LOD): no posing; the clock catches up when it's back
+    if (this.lod === 2) {
+      this.lodSkipped += dt;
+      return;
+    }
+    dt += this.lodSkipped;
+    this.lodSkipped = 0;
     if (this.isRideMode()) this.readTrick();
     // Undo last frame's procedural pose so it never accumulates on bones a clip doesn't key
     this.restoreRidePose();
@@ -1483,6 +1538,7 @@ export class NounCharacter {
   }
 
   dispose() {
+    NounCharacter.live.delete(this);
     if (this.hoverFx !== null) inkExcluded.delete(this.hoverFx);
     this.mixer?.stopAllAction();
     this.root.removeFromParent();
