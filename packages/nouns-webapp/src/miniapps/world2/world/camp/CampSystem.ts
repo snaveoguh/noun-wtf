@@ -17,8 +17,10 @@ import * as THREE from 'three';
 import { Birds } from './birds';
 import { buildCamp, type CampBuild, type CampWorld } from './build';
 import { pickSpawn } from './firstSpawn';
+import { HandBook } from './HandBook';
 import { INTRO_SECONDS, introShot, type Shot, type V3 } from './intro';
 import { portalPlanes, seenFromRoom } from './portal';
+import { FLIP_SECONDS, readingPlan, readingShot, type ReadingPlan } from './reading';
 import { CAMP_TOWER, inCamp, toWorld, type CampSite } from './site';
 
 export interface CampPrompt {
@@ -39,6 +41,10 @@ const WARM_GROUND = new THREE.Color(0x8a7058);
 
 /** The game camera's field of view on foot (SkateCamera). */
 const FOOT_FOV = 62;
+/** First person, on the book in your hands. */
+const READ_FOV = 52;
+/** The head hides while the camera is this close to it (m) or inside it. */
+const HEAD_CLEAR = 0.45;
 
 /** Book / table reach (m, flat distance). */
 const NEAR_BOOK = 1.5;
@@ -85,7 +91,16 @@ export class CampSystem {
   };
   birds: Birds | null = null;
   /** The opening shot while it runs (spawnInside starts it). */
-  private intro: { t: number; shot: (s: number) => Shot } | null = null;
+  private intro: {
+    t: number;
+    shot: (s: number) => Shot;
+    rider: V3;
+    yaw: number;
+    plan: ReadingPlan;
+    /** First person, reading. */
+    eyes: { pos: THREE.Vector3; look: THREE.Vector3 };
+    play: { pos: THREE.Vector3; look: THREE.Vector3 };
+  } | null = null;
   /** How many meshes the portal cull is hiding (perf probes). */
   culled = 0;
 
@@ -145,7 +160,7 @@ export class CampSystem {
     g.cam.snap(p);
     g.setTimeOfDay('golden');
     b.art.loadPages();
-    this.startIntro([x, s.floorY, z]);
+    this.startIntro([x, s.floorY, z], sp.yaw);
     g.hud = {
       ...g.hud,
       toast: {
@@ -307,7 +322,7 @@ export class CampSystem {
    * the game camera's own pose behind the rider. Any key, click, tap or
    * move skips it; reduced motion never sees it.
    */
-  private startIntro(rider: V3) {
+  private startIntro(rider: V3, yaw: number) {
     const g = this.game;
     if (typeof window === 'undefined') return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true) return;
@@ -317,9 +332,25 @@ export class CampSystem {
     g.cam.update(1 / 60, g.player, 0, 0, performance.now());
     const c = g.gfx.camera;
     const dir = c.getWorldDirection(new THREE.Vector3());
-    const final: V3 = [c.position.x, c.position.y, c.position.z];
-    const look: V3 = [c.position.x + dir.x * 4, c.position.y + dir.y * 4, c.position.z + dir.z * 4];
-    this.intro = { t: 0, shot: introShot(this.site!, rider, final, look, FOOT_FOV) };
+    const play = {
+      pos: new THREE.Vector3().copy(c.position),
+      look: new THREE.Vector3().copy(c.position).addScaledVector(dir, 4),
+    };
+    // The fly-in ends in the rider's eyes, on the book in their hands
+    const sh = readingShot(rider, yaw);
+    const plan = readingPlan(Math.random);
+    const book = new HandBook(plan.spreads, this.site!.floorY, sh.book);
+    g.gfx.scene.add(book.group);
+    this.book = book;
+    this.intro = {
+      t: 0,
+      shot: introShot(this.site!, rider, sh.cam, sh.look, READ_FOV),
+      rider,
+      yaw,
+      plan,
+      eyes: { pos: new THREE.Vector3(...sh.cam), look: new THREE.Vector3(...sh.look) },
+      play,
+    };
     this.introRig = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: FOOT_FOV };
     this.view_ = { ...this.view_, intro: true };
     for (const l of this.listeners) l();
@@ -329,32 +360,99 @@ export class CampSystem {
   }
 
   private introRig: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null = null;
+  /** The copy of MEME VALUE the rider reads (it stays on the floor after). */
+  private book: HandBook | null = null;
 
+  /** Fly-in, then reading (reading.ts), the toss, and the camera easing back into play. */
   private stepIntro(dt: number) {
     const I = this.intro;
     if (I === null) return;
     const g = this.game;
     I.t += dt;
+    const P = I.plan;
+    const total = INTRO_SECONDS + P.endAt;
     // Moving (a gamepad stick, say) skips it too
-    if (I.t > 0.5 && g.player.speed > 0.5) I.t = INTRO_SECONDS;
-    const s = I.shot(Math.min(I.t, INTRO_SECONDS));
+    if (I.t > 0.5 && g.player.speed > 0.5) I.t = total;
     const r = this.introRig!;
-    r.pos.set(...s.pos);
-    r.look.set(...s.look);
-    r.fov = s.fov;
+    const me = g.me;
+    const book = this.book!;
+    if (I.t < INTRO_SECONDS) {
+      const s = I.shot(I.t);
+      r.pos.set(...s.pos);
+      r.look.set(...s.look);
+      r.fov = s.fov;
+      if (me !== null) book.hold(me, I.rider, I.yaw, 0, -1, dt);
+    } else {
+      const t = I.t - INTRO_SECONDS;
+      r.pos.copy(I.eyes.pos);
+      r.look.copy(I.eyes.look);
+      r.fov = READ_FOV;
+      if (t < P.tossAt) {
+        // Which spread, and how far through turning to it
+        let k = 0;
+        while (k < P.flips.length && P.flips[k]! <= t) k++;
+        const since = k > 0 ? t - P.flips[k - 1]! : Infinity;
+        const turning = since < FLIP_SECONDS ? since / FLIP_SECONDS : -1;
+        if (me !== null) book.hold(me, I.rider, I.yaw, k, turning, dt);
+      } else {
+        if (me !== null) book.toss(me, I.rider, I.yaw, t - P.tossAt, dt);
+        if (t >= P.pullAt) {
+          // Pull back out of their head into the game camera (the reveal)
+          const u = Math.min(1, (t - P.pullAt) / (P.endAt - P.pullAt));
+          const e = u * u * (3 - 2 * u);
+          r.pos.copy(I.eyes.pos).lerp(I.play.pos, e);
+          r.look.copy(I.eyes.look).lerp(I.play.look, e);
+          r.fov = READ_FOV + (FOOT_FOV - READ_FOV) * e;
+        }
+      }
+    }
+    // (dev: look at the scene from elsewhere while it plays)
+    const dev = import.meta.env.DEV
+      ? (window as { __campCam?: { pos: V3; look: V3 } }).__campCam
+      : undefined;
+    if (dev !== undefined) {
+      r.pos.set(...dev.pos);
+      r.look.set(...dev.look);
+    }
     g.cam.rig = r;
-    if (I.t >= INTRO_SECONDS) this.endIntro();
+    this.hideHead(dev === undefined && I.t < total ? r.pos : null);
+    if (I.t >= total) this.endIntro();
+  }
+
+  private readonly headBox = new THREE.Box3();
+  private headHidden: THREE.Object3D | null = null;
+  /** First person: the rider's own head goes while the camera's in or right by it. */
+  private hideHead(cam: THREE.Vector3 | null) {
+    const h = this.game.me?.head ?? null;
+    let hide = false;
+    if (cam !== null && h !== null) {
+      if (this.headHidden === h) h.visible = true; // measure it as drawn
+      this.headBox.setFromObject(h).expandByScalar(HEAD_CLEAR);
+      hide = this.headBox.containsPoint(cam);
+    }
+    if (this.headHidden !== null && (this.headHidden !== h || !hide)) {
+      this.headHidden.visible = true;
+      this.headHidden = null;
+    }
+    if (hide && h !== null) {
+      h.visible = false;
+      this.headHidden = h;
+    }
   }
 
   private skipIntro = () => {
-    if (this.intro !== null && this.intro.t > 0.3) this.intro.t = INTRO_SECONDS;
+    const I = this.intro;
+    if (I !== null && I.t > 0.3) I.t = INTRO_SECONDS + I.plan.endAt;
   };
 
   private endIntro() {
     const g = this.game;
+    const I = this.intro;
     this.intro = null;
+    if (I !== null) this.book?.drop(g.me, I.rider, I.yaw);
     if (g.cam.rig === this.introRig) g.cam.rig = null;
     g.cam.fov = FOOT_FOV;
+    this.hideHead(null);
     for (const ev of ['keydown', 'pointerdown', 'touchstart', 'wheel'] as const)
       window.removeEventListener(ev, this.skipIntro, { capture: true });
     this.view_ = { ...this.view_, intro: false };
@@ -486,6 +584,7 @@ export class CampSystem {
   dispose() {
     if (this.intro !== null) this.endIntro();
     this.birds?.dispose();
+    this.book?.dispose();
     this.releaseCull();
     if (this.keyBound) document.removeEventListener('keydown', this.onKey, true);
     this.keyBound = false;

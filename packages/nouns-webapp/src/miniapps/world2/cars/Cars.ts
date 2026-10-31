@@ -57,7 +57,15 @@ import {
   type LanePoint,
 } from './lanes';
 import { poseDoors } from './models';
-import { decodeCar, encodeCar, encodeCrew, encodeRide, type NetCar } from './netCar';
+import {
+  decodeCar,
+  decodeParked,
+  encodeCar,
+  encodeCrew,
+  encodeParked,
+  encodeRide,
+  type NetCar,
+} from './netCar';
 import { leaveSeat, poseInSeat } from './seatPose';
 import {
   assignSeats,
@@ -258,6 +266,10 @@ export class CarSystem {
   private velV = new THREE.Vector3();
   private hoppers: Hopper[] = [];
   private remotes = new Map<string, RemoteCar>();
+  /** Cars other riders got out of (their `lc`), parked where they left them. */
+  private parkedRemotes = new Map<string, { key: string; model: CarModel }>();
+  /** The car you last got out of, while it stays parked (your `lc`). */
+  private left: TCar | null = null;
   private remotePool = new Map<string, CarModel[]>();
   private started = false;
   private hidden = false;
@@ -312,6 +324,20 @@ export class CarSystem {
       flying: this.flying,
       doorsOpen: d.doors.k > 0.5,
       boosting: this.sim?.boosting === true || (this.flying && this.controls.boost),
+    });
+  }
+
+  /** For the pose blob once you've got out of a car (cars/netCar.ts `lc`), else undefined. */
+  get leftKey(): [string, number, number, number, number] | undefined {
+    const t = this.left;
+    if (t === null || this.driven !== null || t.mode !== 'parked') return undefined;
+    return encodeParked({
+      id: t.spec.id,
+      paint: t.paint,
+      x: t.pos.x,
+      y: t.pos.y,
+      z: t.pos.z,
+      yaw: t.yaw,
     });
   }
 
@@ -944,6 +970,7 @@ export class CarSystem {
     sim.boostTank = 1;
     this.sim = sim;
     this.driven = t;
+    this.left = null;
     this.flying = false;
     this.flight = null;
     this.exitQueued = false;
@@ -994,6 +1021,7 @@ export class CarSystem {
     if (t.model.thrusters !== null) t.model.thrusters.visible = false;
     t.doors.openThenClose();
     this.park(t);
+    this.left = t;
     // Passengers see the car parked (no `ps`) and climb out themselves
     this.crew = [];
     this.askedAt.clear();
@@ -1598,6 +1626,49 @@ export class CarSystem {
       this.releaseRemote(rc);
       this.remotes.delete(id);
     }
+    this.updateParkedRemotes(hideAll);
+  }
+
+  /** Cars other riders got out of stay where they left them (`lc`), doors shut, wheels down. */
+  private updateParkedRemotes(hideAll: boolean) {
+    const g = this.game;
+    for (const [id, rp] of g.net.players) {
+      const c = rp.current;
+      const p = hideAll || c.vehicle === 'car' ? null : decodeParked(c.lc);
+      const key = p !== null ? `${p.id}:${p.paint}` : '';
+      let pr = this.parkedRemotes.get(id);
+      if (pr !== undefined && pr.key !== key) {
+        this.releaseRemote(pr);
+        this.parkedRemotes.delete(id);
+        pr = undefined;
+      }
+      if (p === null) continue;
+      if (pr === undefined) {
+        const m = this.takeRemote(p.id, p.paint);
+        poseWheelsFlat(m, 0);
+        for (const w of m.wheels) {
+          w.pivot.rotation.set(0, 0, 0);
+          w.pivot.position.y = w.restY;
+          w.spinner.rotation.x = 0;
+        }
+        if (m.thrusters !== null) m.thrusters.visible = false;
+        poseDoors(m, 0);
+        m.driver.visible = false;
+        pr = { key, model: m };
+        this.parkedRemotes.set(id, pr);
+      }
+      const grp = pr.model.group;
+      if (grp.position.x !== p.x || grp.position.y !== p.y || grp.position.z !== p.z) {
+        grp.position.set(p.x, p.y, p.z);
+        grp.quaternion.setFromAxisAngle(UP, p.yaw);
+        grp.updateMatrixWorld(true);
+      }
+    }
+    for (const [id, pr] of this.parkedRemotes) {
+      if (g.net.players.has(id)) continue;
+      this.releaseRemote(pr);
+      this.parkedRemotes.delete(id);
+    }
   }
 
   private takeRemote(id: CarId, paint: number): CarModel {
@@ -1610,7 +1681,7 @@ export class CarSystem {
     return m;
   }
 
-  private releaseRemote(rc: RemoteCar) {
+  private releaseRemote(rc: { key: string; model: CarModel }) {
     this.game.gfx.scene.remove(rc.model.group);
     const k = rc.key;
     let pool = this.remotePool.get(k);

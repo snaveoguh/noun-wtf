@@ -514,11 +514,20 @@ function piece(kit: Kit, q: Piece, art: CampArt, at: At) {
       break;
     }
     case 'armchair_tipped': {
-      // On its back
-      at(q.x, q.d / 2, q.z, q.yaw, 0, -Math.PI / 2);
+      // On its back: the chair's own depth is now its height and its height
+      // runs along the floor (from its base, so shift it to sit centred on
+      // its collider, footprint w × d, q.h tall)
+      at(
+        q.x + (q.d / 2) * Math.sin(q.yaw),
+        q.h / 2,
+        q.z + (q.d / 2) * Math.cos(q.yaw),
+        q.yaw,
+        0,
+        -Math.PI / 2,
+      );
       buildItem(
         kit,
-        item('armchair', q, 11),
+        item('armchair', q, 11, { d: q.h, h: q.d }),
         { ...P, fabric: 0x8a5a4a },
         mulberry32(11),
         { slots: [], named: new Map() } as never,

@@ -113,7 +113,9 @@ export function campLayout(
     p('coffee_table', 0.5, 3.7, 1.3, 0.7, 0.42, { yaw: 0.12, solid: true }),
     p('book_stack', 0.85, 3.62, 0.36, 0.26, 0.2, { y: 0.42, yaw: 0.3, v: 6 }),
     p('book_open', 0.2, 3.78, 0.52, 0.36, 0.03, { y: 0.42, yaw: -0.2, v: 0 }),
-    p('armchair_tipped', -2.7, 4.6, 0.95, 0.9, 0.9, { yaw: 0.6, solid: true }),
+    // Square to the room and as big as its collider (solid boxes are axis
+    // aligned), so spray lands on the chair, not on the air beside it
+    p('armchair_tipped', -2.7, 4.6, 1.29, 1.28, 0.9, { solid: true }),
     p('chair_tipped', -1.7, 1.5, 0.48, 0.48, 0.9, { yaw: 2.2, solid: true }),
     p('lamp_down', -0.6, 6.85, 1.7, 0.3, 0.3, { yaw: 0.2 }),
     p('bookshelf_down', -4.0, 2.3, 0.9, 1.9, 0.4, { yaw: 0.12, solid: true }),

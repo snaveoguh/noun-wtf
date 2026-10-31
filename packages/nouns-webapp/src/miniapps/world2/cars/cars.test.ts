@@ -19,7 +19,7 @@ import {
   ROAD_OUT,
   type LanePoint,
 } from './lanes';
-import { decodeCar, encodeCar } from './netCar';
+import { decodeCar, decodeParked, encodeCar, encodeParked } from './netCar';
 import { CAR_IDS, CARS, isCarId, simParams } from './specs';
 
 const flat = heightGround(() => 0);
@@ -32,7 +32,7 @@ describe('car specs', () => {
       const s = CARS[id];
       expect(s.id).toBe(id);
       expect(isCarId(id)).toBe(true);
-      expect(s.name).toMatch(/^[A-Z0-9 '.]+$/);
+      expect(s.name).toMatch(/^[\d '.A-Z]+$/);
       const g = s.geo;
       expect(g.axleF).toBeGreaterThan(0);
       expect(g.axleR).toBeLessThan(0);
@@ -140,7 +140,7 @@ describe('ROADSTAR flight', () => {
     f: FlightSim,
     secs: number,
     c: Partial<FlightControls>,
-    ground = (_x: number, _z: number) => 0,
+    ground: (x: number, z: number) => number = () => 0,
   ) => {
     let landed = false;
     for (let i = 0; i < secs * 60 && !landed; i++)
@@ -179,7 +179,8 @@ describe('ROADSTAR flight', () => {
     expect(f.roll).toBeGreaterThan(0.1);
     fly(f, 40, { up: true });
     expect(f.y).toBeLessThanOrEqual(P.ceiling + 0.01);
-    fly(f, 3, { throttle: 1, boost: true });
+    // (500 km/h top: a few seconds of boost to get past it)
+    fly(f, 8, { throttle: 1, boost: true });
     expect(f.speed).toBeGreaterThan(P.maxSpeed);
     expect(f.speed).toBeLessThanOrEqual(P.boostSpeed + 0.5);
   });
@@ -362,5 +363,44 @@ describe('net: the car key', () => {
       'x'.repeat(40),
     ])
       expect(decodeCar(bad)).toBeNull();
+  });
+});
+
+describe('the car you got out of (lc)', () => {
+  it('round-trips id, paint, position and heading (rounded to a cm)', () => {
+    const lc = encodeParked({ id: 'roadstar', paint: 3, x: 12.3456, y: 0.5, z: -88.004, yaw: 7 });
+    expect(lc[0]).toBe('roadstar.3');
+    const p = decodeParked(JSON.parse(JSON.stringify(lc)));
+    expect(p).not.toBeNull();
+    expect(p!.id).toBe('roadstar');
+    expect(p!.paint).toBe(3);
+    expect(p!.x).toBeCloseTo(12.35, 5);
+    expect(p!.z).toBeCloseTo(-88, 5);
+    // the heading wraps into ±π but points the same way
+    expect(Math.cos(p!.yaw)).toBeCloseTo(Math.cos(7), 2);
+    expect(Math.sin(p!.yaw)).toBeCloseTo(Math.sin(7), 2);
+  });
+
+  it('every car id survives', () => {
+    for (const id of CAR_IDS)
+      expect(decodeParked(encodeParked({ id, paint: 1, x: 0, y: 0, z: 0, yaw: 0 }))?.id).toBe(id);
+  });
+
+  it('anything malformed is nothing', () => {
+    for (const bad of [
+      undefined,
+      null,
+      'toro.1',
+      ['toro.1', 0, 0, 0],
+      ['toro.1', 0, 0, 0, 0, 0],
+      ['nope.1', 0, 0, 0, 0],
+      ['toro.12', 0, 0, 0, 0],
+      ['__proto__.1', 0, 0, 0, 0],
+      ['toro.1', 0, Infinity, 0, 0],
+      ['toro.1', 0, 0, 1e9, 0],
+      ['toro.1', '0', 0, 0, 0],
+      ['toro.1', 0, 0, 0, NaN],
+    ])
+      expect(decodeParked(bad)).toBeNull();
   });
 });
