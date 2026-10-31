@@ -14,8 +14,10 @@ import type { Aabb } from '../mountain/ringOcclusion';
 
 import * as THREE from 'three';
 
+import { Birds } from './birds';
 import { buildCamp, type CampBuild, type CampWorld } from './build';
 import { pickSpawn } from './firstSpawn';
+import { INTRO_SECONDS, introShot, type Shot, type V3 } from './intro';
 import { portalPlanes, seenFromRoom } from './portal';
 import { CAMP_TOWER, inCamp, toWorld, type CampSite } from './site';
 
@@ -27,7 +29,16 @@ export interface CampPrompt {
 
 export interface CampView {
   prompt: CampPrompt | null;
+  /** The opening shot is running (letterbox, caption, skip hint). */
+  intro: boolean;
 }
+
+/** The sky light indoors (pocket rooms use the same). */
+const WARM_SKY = new THREE.Color(0xfff0dc);
+const WARM_GROUND = new THREE.Color(0x8a7058);
+
+/** The game camera's field of view on foot (SkateCamera). */
+const FOOT_FOV = 62;
 
 /** Book / table reach (m, flat distance). */
 const NEAR_BOOK = 1.5;
@@ -56,7 +67,7 @@ export class CampSystem {
   built: CampBuild | null = null;
   /** World2Page wires this to the router (opens the book in the navigator). */
   onRead: (() => void) | null = null;
-  private view_: CampView = { prompt: null };
+  private view_: CampView = { prompt: null, intro: false };
   private listeners = new Set<() => void>();
   private t = 0;
   /** Highest point of the current fall (null when grounded). */
@@ -72,6 +83,9 @@ export class CampSystem {
     items: [] as CullItem[],
     hidden: new Set<THREE.Object3D>(),
   };
+  birds: Birds | null = null;
+  /** The opening shot while it runs (spawnInside starts it). */
+  private intro: { t: number; shot: (s: number) => Shot } | null = null;
   /** How many meshes the portal cull is hiding (perf probes). */
   culled = 0;
 
@@ -96,6 +110,8 @@ export class CampSystem {
       const world = probeWorld(level.collisionMeshes, site);
       const built = buildCamp(site, world, { low: this.game.gfx.quality === 'low' });
       level.root.add(built.group);
+      this.birds = new Birds(site);
+      level.root.add(this.birds.mesh);
       level.collisionMeshes.push(...built.collision);
       this.site = site;
       this.built = built;
@@ -129,6 +145,7 @@ export class CampSystem {
     g.cam.snap(p);
     g.setTimeOfDay('golden');
     b.art.loadPages();
+    this.startIntro([x, s.floorY, z]);
     g.hud = {
       ...g.hud,
       toast: {
@@ -146,14 +163,22 @@ export class CampSystem {
     if (s === null || b === null) return;
     this.t += dt;
     if (!this.lit) this.selfLight(b);
+    this.ambient(dt);
     const g = this.game;
     const p = g.player.pos;
     const o = s.origin;
     if (Math.abs(p.x - o.x) < NEAR_CAMP && Math.abs(p.z - o.z) < NEAR_CAMP && p.y > o.y - 60)
       b.animate(this.t);
+    const cam = g.gfx.camera.position;
+    if (
+      this.birds !== null &&
+      cam.distanceTo(this.birds.mesh.geometry.boundingSphere!.center) < 220
+    )
+      this.birds.update(this.t);
+    this.stepIntro(dt);
     // Prompts, only inside
     let prompt: CampPrompt | null = null;
-    if (inCamp(s, p.x, p.y, p.z) && !g.pool.active && !g.paused) {
+    if (inCamp(s, p.x, p.y, p.z) && !g.pool.active && !g.paused && this.intro === null) {
       const lx = p.x - o.x;
       const lz = p.z - o.z;
       const L = b.layout;
@@ -163,7 +188,7 @@ export class CampSystem {
         prompt = { kind: 'pool', text: 'PLAY POOL', sub: '🎱' };
     }
     if (prompt?.kind !== this.view_.prompt?.kind) {
-      this.view_ = { prompt };
+      this.view_ = { ...this.view_, prompt };
       for (const l of this.listeners) l();
     }
     this.trackDrop();
@@ -277,6 +302,65 @@ export class CampSystem {
     this.culled = 0;
   }
 
+  /**
+   * The opening shot (intro.ts): over the city, in through the window, to
+   * the game camera's own pose behind the rider. Any key, click, tap or
+   * move skips it; reduced motion never sees it.
+   */
+  private startIntro(rider: V3) {
+    const g = this.game;
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true) return;
+    if (new URLSearchParams(window.location.search).get('camintro') === '0') return;
+    // Where the game camera will settle: let it place itself once
+    g.cam.rig = null;
+    g.cam.update(1 / 60, g.player, 0, 0, performance.now());
+    const c = g.gfx.camera;
+    const dir = c.getWorldDirection(new THREE.Vector3());
+    const final: V3 = [c.position.x, c.position.y, c.position.z];
+    const look: V3 = [c.position.x + dir.x * 4, c.position.y + dir.y * 4, c.position.z + dir.z * 4];
+    this.intro = { t: 0, shot: introShot(this.site!, rider, final, look, FOOT_FOV) };
+    this.introRig = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: FOOT_FOV };
+    this.view_ = { ...this.view_, intro: true };
+    for (const l of this.listeners) l();
+    for (const ev of ['keydown', 'pointerdown', 'touchstart', 'wheel'] as const)
+      window.addEventListener(ev, this.skipIntro, { capture: true, passive: true });
+    this.stepIntro(0);
+  }
+
+  private introRig: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null = null;
+
+  private stepIntro(dt: number) {
+    const I = this.intro;
+    if (I === null) return;
+    const g = this.game;
+    I.t += dt;
+    // Moving (a gamepad stick, say) skips it too
+    if (I.t > 0.5 && g.player.speed > 0.5) I.t = INTRO_SECONDS;
+    const s = I.shot(Math.min(I.t, INTRO_SECONDS));
+    const r = this.introRig!;
+    r.pos.set(...s.pos);
+    r.look.set(...s.look);
+    r.fov = s.fov;
+    g.cam.rig = r;
+    if (I.t >= INTRO_SECONDS) this.endIntro();
+  }
+
+  private skipIntro = () => {
+    if (this.intro !== null && this.intro.t > 0.3) this.intro.t = INTRO_SECONDS;
+  };
+
+  private endIntro() {
+    const g = this.game;
+    this.intro = null;
+    if (g.cam.rig === this.introRig) g.cam.rig = null;
+    g.cam.fov = FOOT_FOV;
+    for (const ev of ['keydown', 'pointerdown', 'touchstart', 'wheel'] as const)
+      window.removeEventListener(ev, this.skipIntro, { capture: true });
+    this.view_ = { ...this.view_, intro: false };
+    for (const l of this.listeners) l();
+  }
+
   act(kind: CampPrompt['kind']) {
     const s = this.site;
     const b = this.built;
@@ -292,10 +376,9 @@ export class CampSystem {
   }
 
   /**
-   * A little warm light of its own: the low sunset sun only gets in at the
-   * window, and lighting it for real (a point light) would relink every
-   * lit material in the game. Set after the time-of-day scan has run
-   * (Game.start), so it never reads as a lamp or a window to light at night.
+   * The printed things (book pages, whiteboard, posters) read a touch
+   * self-lit. Set after the time-of-day scan has run (Game.start), so they
+   * never count as lamps or windows to light up at night.
    */
   private selfLight(b: CampBuild) {
     this.lit = true;
@@ -312,12 +395,52 @@ export class CampSystem {
       seen.add(m);
       if (m.map !== null && m.map !== undefined) {
         // Printed things: self-lit through their own picture
-        m.emissive.setHex(0x86807a);
+        m.emissive.setHex(0x4a4642);
         m.emissiveMap = m.map;
-      } else m.emissive.setHex(0x625244);
+      } else return;
       m.needsUpdate = true;
     });
   }
+
+  /**
+   * Indoors light, like the pocket rooms': the room sits in the tower's own
+   * shadow and the low sun only reaches in at the window, so while you're
+   * inside the sky light warms and brightens (uniforms only: no relink).
+   * Eased in and out; whatever time of day sets meanwhile is kept.
+   */
+  private ambient(dt: number) {
+    const s = this.site!;
+    const h = this.game.gfx.hemi;
+    const p = this.game.player.pos;
+    // (during the opening shot only once the camera's nearly in: the city it
+    // flies over keeps its own light)
+    const shooting = this.intro !== null && this.intro.t < INTRO_SECONDS * 0.72;
+    const want = inCamp(s, p.x, p.y, p.z, 0.3) && !shooting ? 1 : 0;
+    const A = this.amb;
+    if (want === 0 && A.k === 0) return;
+    // Someone else (time of day) set the light since we last did: that's the new base
+    if (A.k === 0 || h.intensity !== A.wrote || !h.color.equals(A.wroteSky)) {
+      A.base = h.intensity;
+      A.sky.copy(h.color);
+      A.ground.copy(h.groundColor);
+    }
+    A.k = want > A.k ? Math.min(1, A.k + dt / 0.6) : Math.max(0, A.k - dt / 0.6);
+    const k = A.k * A.k * (3 - 2 * A.k);
+    h.intensity = A.base * (1 + 1.5 * k);
+    h.color.copy(A.sky).lerp(WARM_SKY, 0.55 * k);
+    h.groundColor.copy(A.ground).lerp(WARM_GROUND, 0.7 * k);
+    A.wrote = h.intensity;
+    A.wroteSky.copy(h.color);
+  }
+
+  private amb = {
+    k: 0,
+    base: 1,
+    wrote: NaN,
+    sky: new THREE.Color(),
+    ground: new THREE.Color(),
+    wroteSky: new THREE.Color(),
+  };
 
   /** A jump out of the window: how far you fell, called out when you land. */
   private trackDrop() {
@@ -361,6 +484,8 @@ export class CampSystem {
   };
 
   dispose() {
+    if (this.intro !== null) this.endIntro();
+    this.birds?.dispose();
     this.releaseCull();
     if (this.keyBound) document.removeEventListener('keydown', this.onKey, true);
     this.keyBound = false;

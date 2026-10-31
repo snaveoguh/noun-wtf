@@ -53,12 +53,12 @@ export interface CampWorld {
 }
 
 const PALETTE: Palette = {
-  wall: 0xd9d1c0,
-  wall2: 0xa2937c,
+  wall: 0xc4ae86,
+  wall2: 0x5d7a6c,
   floor: 0x9a7650,
   floor2: 0x7d5e40,
   trim: 0x4a4038,
-  ceiling: 0xe2dccd,
+  ceiling: 0xb9ad96,
   wood: 0x8a6440,
   fabric: 0x6f7f5a,
   accent: 0xc0533a,
@@ -98,7 +98,13 @@ export function buildCamp(site: CampSite, world: CampWorld, opts: { low: boolean
   const built = kit.build(mats, !opts.low);
   const group = new THREE.Group();
   group.name = 'NounsCamp';
-  for (const m of built.meshes) group.add(m);
+  for (const m of built.meshes) {
+    // The low sun's shadow through the window, drawn by a coarse shadow map,
+    // was a jagged dark band round the walls: the room takes the light
+    // without shadows (the ambient is lifted indoors, CampSystem.ambient)
+    m.receiveShadow = false;
+    group.add(m);
+  }
   group.position.set(site.origin.x, site.origin.y, site.origin.z);
   group.updateMatrixWorld(true);
 
@@ -113,6 +119,9 @@ export function buildCamp(site: CampSite, world: CampWorld, opts: { low: boolean
         new THREE.Vector3(o.x + b.maxX, o.y + Math.max(0.3, b.h), o.z + b.maxZ),
       );
     });
+  // The walls' and ceiling's linings sit a few cm in front of the tower's
+  // shell: collide with them too, so spray paint lands on what you see
+  for (const b of liningBoxes(site)) boxes.push(b);
   const collision: THREE.Mesh[] = [];
   // The mini ramp collides as its own surface (skateable), not a box
   const ramp = layout.pieces.find(q => q.type === 'miniramp');
@@ -452,19 +461,56 @@ function piece(kit: Kit, q: Piece, art: CampArt, at: At) {
       break;
     }
     case 'coffee_table': {
+      // Glass on a chrome frame, cracked across one corner
       at(q.x, 0, q.z, q.yaw);
-      buildItem(
-        kit,
-        item('coffee_table', q, 3),
-        { ...P, wood: 0x5b4330 },
-        mulberry32(3),
-        { slots: [], named: new Map() } as never,
-        LAYOUT_STUB,
-      );
-      // Rings from cans, a crushed can
-      kit.add(cyl(0.035, 0.035, 0.005, 8, -0.4, q.h, 0.15), 0x3f2d1f);
-      kit.add(cyl(0.035, 0.035, 0.005, 8, 0.45, q.h, -0.2), 0x3f2d1f);
-      kit.add(cyl(0.036, 0.03, 0.05, 8, -0.5, q.h, -0.18), 0xc23a2b);
+      const { w, d, h } = q;
+      const chrome = 0xc9ced4;
+      kit.add(boxAt(-w / 2, w / 2, h - 0.02, h, -d / 2, d / 2), 0xbfe3ea, 'glass');
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          kit.add(
+            cyl(0.016, 0.016, h - 0.02, 6, sx * (w / 2 - 0.05), 0, sz * (d / 2 - 0.05)),
+            chrome,
+          );
+      for (const sz of [-1, 1])
+        kit.add(
+          boxAt(
+            -w / 2 + 0.05,
+            w / 2 - 0.05,
+            h - 0.05,
+            h - 0.025,
+            sz * (d / 2 - 0.05) - 0.012,
+            sz * (d / 2 - 0.05) + 0.012,
+          ),
+          chrome,
+        );
+      for (const sx of [-1, 1])
+        kit.add(
+          boxAt(
+            sx * (w / 2 - 0.05) - 0.012,
+            sx * (w / 2 - 0.05) + 0.012,
+            h - 0.05,
+            h - 0.025,
+            -d / 2 + 0.05,
+            d / 2 - 0.05,
+          ),
+          chrome,
+        );
+      // The crack: thin dark lines just over the glass
+      const crack = (x0: number, z0: number, x1: number, z1: number) => {
+        const len = Math.hypot(x1 - x0, z1 - z0);
+        kit.add(
+          boxAt(-len / 2, len / 2, 0, 0.002, -0.004, 0.004)
+            .rotateY(-Math.atan2(z1 - z0, x1 - x0))
+            .translate((x0 + x1) / 2, h + 0.001, (z0 + z1) / 2),
+          0x3a4448,
+        );
+      };
+      crack(w / 2 - 0.05, -d / 2 + 0.06, w / 2 - 0.32, -0.02);
+      crack(w / 2 - 0.32, -0.02, w / 2 - 0.5, 0.2);
+      crack(w / 2 - 0.32, -0.02, w / 2 - 0.2, 0.22);
+      // A crushed can on the floor under it
+      kit.add(cyl(0.036, 0.03, 0.05, 8, -0.4, 0.02, -0.1), 0xc23a2b);
       break;
     }
     case 'armchair_tipped': {
@@ -518,6 +564,65 @@ function piece(kit: Kit, q: Piece, art: CampArt, at: At) {
         { slots: [], named: new Map() } as never,
         LAYOUT_STUB,
       );
+      break;
+    }
+    case 'print': {
+      // A spread pinned up crooked (each its own wonk), tape on the corners
+      const wonk = [0.07, -0.05, 0.028][q.v] ?? 0;
+      at(q.x, q.y, q.z, q.yaw, wonk);
+      kit.addArt(panel(q.w, q.h, 0, q.h / 2, 0.004), art.slot.prints[q.v]!);
+      for (const [tx, ty] of [
+        [-q.w / 2, q.h],
+        [q.w / 2, q.h],
+        [-q.w / 2, 0],
+        [q.w / 2, 0],
+      ] as const)
+        kit.add(
+          boxAt(-0.05, 0.05, -0.016, 0.016, 0.004, 0.008)
+            .rotateZ(tx * ty > 0 ? 0.6 : -0.6)
+            .translate(tx * 0.96, ty, 0),
+          0xe8dfb8,
+        );
+      break;
+    }
+    case 'rug': {
+      at(q.x, 0.02, q.z, q.yaw);
+      kit.add(boxAt(-q.w / 2, q.w / 2, 0, 0.012, -q.d / 2, q.d / 2), 0xece6d8);
+      kit.addArt(
+        new THREE.PlaneGeometry(q.w - 0.04, q.d - 0.04)
+          .rotateX(-Math.PI / 2)
+          .translate(0, 0.016, 0),
+        art.slot.rug,
+      );
+      break;
+    }
+    case 'sheet': {
+      // Every page of the book, a huge print crumpled flat on the floor
+      at(q.x, 0.02, q.z, q.yaw);
+      const g = new THREE.PlaneGeometry(q.w, q.d, 28, 10).rotateX(-Math.PI / 2);
+      const pos = g.attributes.position as THREE.BufferAttribute;
+      const cr = mulberry32(0x5ee7);
+      // A few creases across it, a curled-up corner
+      const folds = Array.from({ length: 5 }, () => ({
+        a: cr() * Math.PI,
+        o: (cr() - 0.5) * q.w * 0.8,
+        hgt: 0.02 + cr() * 0.05,
+      }));
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        let y = 0.006;
+        for (const f of folds) {
+          const dist = x * Math.cos(f.a) + z * Math.sin(f.a) - f.o;
+          y += f.hgt * Math.max(0, 1 - Math.abs(dist) / 0.22);
+        }
+        const cx = (x - q.w / 2 + 0.55) / 0.55;
+        const cz = (z + q.d / 2 - 0.45) / 0.45;
+        if (cx > 0 && cz < 0) y += 0.16 * cx * cx * Math.min(1, -cz);
+        pos.setY(i, y + 0.004 * Math.sin(x * 9 + z * 5));
+      }
+      g.computeVertexNormals();
+      kit.addArtMapped(g, art.slot.sheet);
       break;
     }
     case 'miniramp': {
@@ -772,4 +877,29 @@ function piece(kit: Kit, q: Piece, art: CampArt, at: At) {
     default:
       break;
   }
+}
+
+/** Thin boxes filling the gap between the shell's inner faces and the linings drawn in front (world). */
+function liningBoxes(site: CampSite): THREE.Box3[] {
+  const o = site.origin;
+  const W = site.w / 2;
+  const D = site.d;
+  const H = site.h;
+  const x0 = site.window.x0 - o.x;
+  const x1 = site.window.x1 - o.x;
+  const y1 = site.window.y1 - site.floorY;
+  const B = (ax: number, bx: number, ay: number, by: number, az: number, bz: number) =>
+    new THREE.Box3(
+      new THREE.Vector3(o.x + ax, o.y + ay, o.z + az),
+      new THREE.Vector3(o.x + bx, o.y + by, o.z + bz),
+    );
+  return [
+    B(-W, W, 0, H, D - IN, D), // back
+    B(-W, -W + IN, 0, H, 0, D), // west
+    B(W - IN, W, 0, H, 0, D), // east
+    B(-W, x0, 0, H, 0, IN), // plaza wall, left of the window
+    B(x1, W, 0, H, 0, IN), // …right of it
+    B(x0, x1, y1, H, 0, IN), // …over it
+    B(-W, W, H - IN - 0.03, H, 0, D), // ceiling
+  ];
 }

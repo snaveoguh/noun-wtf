@@ -162,6 +162,22 @@ export class Kit {
     this.order.set(this.geo[b][this.geo[b].length - 1]!, this.added++);
   }
 
+  /**
+   * Like addArt, but the geometry's own uvs (0–1, any number of vertices)
+   * are mapped into the slot, so a subdivided sheet (a crumpled poster)
+   * shows the whole picture across it.
+   */
+  addArtMapped(g: THREE.BufferGeometry, uv: [number, number, number, number]) {
+    const geo = g.index !== null ? g.toNonIndexed() : g;
+    if (geo !== g) g.dispose();
+    const a = geo.attributes.uv as THREE.BufferAttribute;
+    for (let i = 0; i < a.count; i++)
+      a.setXY(i, uv[0] + a.getX(i) * (uv[2] - uv[0]), uv[1] + a.getY(i) * (uv[3] - uv[1]));
+    this.geo.art.push(paint(geo, 0xffffff, this.frame));
+    this.tags.art.push(this.tag);
+    this.order.set(this.geo.art[this.geo.art.length - 1]!, this.added++);
+  }
+
   /** A small prop instance at local (x, y, z), turned by `yaw`. */
   addSmall(shape: SmallShape, x: number, y: number, z: number, color: number, yaw = 0, s = 1) {
     const local = new THREE.Matrix4().compose(
