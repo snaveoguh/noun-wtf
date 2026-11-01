@@ -76,7 +76,7 @@ const SHOT_CSS = `
 @keyframes bench-bar { from { transform: scaleY(0) } to { transform: scaleY(1) } }
 @keyframes bench-title { from { opacity: 0; transform: translateX(-12px) } to { opacity: 1; transform: none } }
 body[data-bench-shot] [data-hud], body[data-bench-shot] [data-w2hud], body[data-bench-shot] .mu-enter,
-body[data-bench-shot] .nos-tray {
+body[data-bench-shot] .nos-tray, body[data-bench-shot] [data-w2touch] {
   opacity: 0 !important; pointer-events: none !important; transition: opacity 0.6s ease-out;
 }
 @media (prefers-reduced-motion: reduce) { [data-bench=shot] * { animation: none !important } }
