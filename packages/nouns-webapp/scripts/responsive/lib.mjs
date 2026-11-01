@@ -152,7 +152,8 @@ export const ROUTES = [
   { path: 'icecreamvan', url: '/icecreamvan', group: 'world' },
   { path: 'world/voice', url: '/world/voice', group: 'world' },
   { path: 'books/meme-value', url: '/books/meme-value', group: 'art' },
-  { path: 'exchange', url: '/exchange', group: 'world' },
+  // offline: off the live multiplayer room, so shots are repeatable
+  { path: 'exchange', url: '/exchange?offline=1', group: 'world' },
   { path: '*', url: '/this-page-does-not-exist', group: 'info' },
 ].map(r => ({ kind: 'page', ...r }));
 

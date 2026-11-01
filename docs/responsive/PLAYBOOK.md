@@ -211,7 +211,8 @@ A full `pnpm install` fails here (403 on the contracts' GitHub tarballs).
 Install only what the webapp needs, then build its two workspace deps:
 
 ```bash
-pnpm install --frozen-lockfile --filter @nouns/webapp --filter @nouns/sdk --filter @nouns/assets
+pnpm install --frozen-lockfile --filter @nouns/webapp --filter @nouns/sdk --filter @nouns/assets \
+  --filter ./packages/voxel-engine   # tests that import voxel-engine can't resolve three without it
 (cd packages/nouns-assets && pnpm build) && (cd packages/nouns-sdk && pnpm build)
 ```
 
@@ -275,7 +276,13 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
   killed its own shell that way. And `$!` after `setsid nohup … &` is
   setsid's / npx's PID, not vite's, so `kill $!` leaves vite running.
 - **Never edit the webapp while a run is going**: pages loaded after the edit
-  get half-old modules and the shots are garbage.
+  get half-old modules and the shots are garbage. That includes committing:
+  the pre-commit hook's prettier / eslint rewrite the files you stage.
+- **Re-run after every round of fixes:** fixing one control often exposes the
+  next (it was hidden behind or squeezed by the first).
+- **3D name tags / labels on a canvas** count as clipped when they reach the
+  canvas edge: keep them inside it (clamp their position), or mark a
+  deliberate overlay `data-responsive-art-ok`.
 - **One route per process.** A group with `--jobs 2 --scroll 2` can take over
   10 minutes; start each route as its own `setsid nohup` process and read its
   log. Each run first loads its route once to warm vite (a cold server
