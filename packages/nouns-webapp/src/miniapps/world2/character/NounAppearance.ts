@@ -30,6 +30,9 @@ export interface NounSeed {
   missingnoun?: boolean;
 }
 
+/** How long a head waits for its 3D model before showing the generated one meanwhile (ms). */
+const MODEL_WAIT_MS = 2500;
+
 const HEAD_VIS: LayerVisibility = { body: false, accessory: false, head: true, glasses: true };
 
 /** `bg-body-acc-head-glasses`, plus `-m` for a missingnoun rider. */
@@ -221,7 +224,17 @@ export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
     if (now !== undefined) apply(now);
     else {
       if (headHasModel(seed.head) !== false) for (const o of generated) o.visible = false;
-      void loadGlbHead(seed.head, seed.glasses).then(apply);
+      // A slow model (a busy first load) mustn't leave the rider headless:
+      // after a moment show the generated head until the model lands
+      let landed = false;
+      const fallback = setTimeout(() => {
+        if (!landed) for (const o of generated) o.visible = true;
+      }, MODEL_WAIT_MS);
+      void loadGlbHead(seed.head, seed.glasses).then(m => {
+        landed = true;
+        clearTimeout(fallback);
+        apply(m);
+      });
     }
   }
 
