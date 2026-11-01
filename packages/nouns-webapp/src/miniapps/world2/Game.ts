@@ -1567,11 +1567,11 @@ export class Game {
     this.setTimeOfDay(Game.TOD[(i + 1) % Game.TOD.length]!);
   }
 
-  /** Straight to a time of day (CAMP wakes you at sunset: 'golden'). */
-  setTimeOfDay(next: TimeOfDayPreset) {
+  /** Straight to a time of day (CAMP wakes you at sunset: 'golden'); `duration` s, default 2. */
+  setTimeOfDay(next: TimeOfDayPreset, duration?: number) {
     this.todClock.reset();
     if (this.nature === null || this.level === null || this.hud.timeOfDay === next) return;
-    applyTimeOfDay(this.gfx, next, this.level);
+    applyTimeOfDay(this.gfx, next, this.level, { duration });
     this.hud = { ...this.hud, timeOfDay: next };
     this.emit();
   }

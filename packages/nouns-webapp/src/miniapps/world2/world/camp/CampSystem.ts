@@ -172,7 +172,8 @@ export class CampSystem {
     p.mode = 'foot';
     p.footGrounded = true;
     g.cam.snap(p);
-    g.setTimeOfDay('golden');
+    // At once: a 2 s crossfade played the shot's first second in the afternoon
+    g.setTimeOfDay('golden', 0);
     b.art.loadPages();
     this.startIntro([x, s.floorY, z], sp.yaw);
     g.hud = {
