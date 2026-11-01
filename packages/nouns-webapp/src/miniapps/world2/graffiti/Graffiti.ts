@@ -28,6 +28,7 @@ import * as THREE from 'three';
 import { type DrawItem, SprayHistory, WallLog, type Outgoing } from './history';
 import { inParallel, nearestFirst, retry, wallCentre } from './loadOrder';
 import { FAR_W, type LodCell, lodChanges } from './lod';
+import { joinRuns, simplifyVar, splitRuns } from './mural/runs';
 import {
   CELL_H,
   CELL_W,
@@ -48,6 +49,8 @@ import {
   intToHex,
   LEGACY_COLORS,
   MAX_POINTS,
+  MAX_RADIUS_MM,
+  MIN_RADIUS_MM,
   quantRadius,
   simplify,
   simplifyEps,
@@ -164,13 +167,17 @@ export interface SprayTools {
   /** 0xRRGGBB */
   color: number;
   hex: string;
+  /** Nearest NOZZLES index to `radius` (keys / wheel step through these). */
   size: number;
+  /** Nozzle radius in mm, continuous (mural sliders); NOZZLES[size].r after a step. */
+  radius: number;
   hard: boolean;
   /** 1..16 (sixteenths). */
   opacity: number;
   recent: number[];
   picking: boolean;
   canUndo: boolean;
+  canRedo: boolean;
   note: { text: string; at: number } | null;
 }
 
@@ -179,6 +186,18 @@ interface LiveStroke {
   stroke: Stroke;
   /** Line mode: the fixed start point (mm). */
   anchor: [number, number] | null;
+  /** Pen strokes: radius per point (mm), else null (one radius). */
+  rs: number[] | null;
+  /** Radius for the next point (pen strokes). */
+  r: number;
+}
+
+/** Nearest nozzle stop to a radius (log scale). */
+export function nozzleFor(r: number): number {
+  let best = 0;
+  for (let i = 1; i < NOZZLES.length; i++)
+    if (Math.abs(Math.log(NOZZLES[i].r / r)) < Math.abs(Math.log(NOZZLES[best].r / r))) best = i;
+  return best;
 }
 
 function hashStr(s: string) {
@@ -290,31 +309,106 @@ export function softPasses(widthPx: number): [number, number][] {
   return out;
 }
 
+/**
+ * A variable-width line as one filled shape: a disc at every point and the
+ * tangent band between each pair, all in one path (one fill = one union, so
+ * overlaps never darken a translucent stroke). Every piece winds the same
+ * way, so the nonzero rule leaves no holes.
+ */
+function traceVar(
+  ctx: CanvasRenderingContext2D,
+  pts: number[],
+  rs: number[],
+  s: number,
+  H: number,
+  k: number,
+) {
+  ctx.beginPath();
+  const n = pts.length / 2;
+  for (let i = 0; i < n; i++) {
+    const x = pts[i * 2] * s;
+    const y = H - pts[i * 2 + 1] * s;
+    const r = Math.max(0.5, rs[i] * s * k);
+    ctx.moveTo(x + r, y);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+  }
+  for (let i = 1; i < n; i++) {
+    const x1 = pts[i * 2 - 2] * s;
+    const y1 = H - pts[i * 2 - 1] * s;
+    const x2 = pts[i * 2] * s;
+    const y2 = H - pts[i * 2 + 1] * s;
+    const r1 = Math.max(0.5, rs[i - 1] * s * k);
+    const r2 = Math.max(0.5, rs[i] * s * k);
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const d = Math.hypot(dx, dy);
+    if (d <= Math.abs(r1 - r2) + 1e-6) continue; // one disc holds the other
+    const ex = dx / d;
+    const ey = dy / d;
+    const a = (r1 - r2) / d;
+    const b = Math.sqrt(Math.max(0, 1 - a * a));
+    // Outer tangent directions: a·e ± b·perp(e)
+    const px = -ey;
+    const py = ex;
+    const ox1 = a * ex + b * px;
+    const oy1 = a * ey + b * py;
+    const ox2 = a * ex - b * px;
+    const oy2 = a * ey - b * py;
+    const qx = [x1 + r1 * ox1, x2 + r2 * ox1, x2 + r2 * ox2, x1 + r1 * ox2];
+    const qy = [y1 + r1 * oy1, y2 + r2 * oy1, y2 + r2 * oy2, y1 + r1 * oy2];
+    // Same winding as the discs (positive shoelace area)
+    let area = 0;
+    for (let j = 0; j < 4; j++) area += qx[j] * qy[(j + 1) % 4] - qx[(j + 1) % 4] * qy[j];
+    ctx.moveTo(qx[0], qy[0]);
+    if (area >= 0) for (let j = 1; j < 4; j++) ctx.lineTo(qx[j], qy[j]);
+    else for (let j = 3; j >= 1; j--) ctx.lineTo(qx[j], qy[j]);
+    ctx.closePath();
+  }
+}
+
 export function drawStroke(
   ctx: CanvasRenderingContext2D,
   W: number,
   H: number,
   stroke: Stroke,
   seed: number,
+  rs?: number[] | null,
 ) {
   const s = W / CELL_W_MM;
   const op = stroke.opacity / 16;
   const width = Math.max(1, stroke.r * 2 * s);
+  const vary = rs !== undefined && rs !== null && rs.length * 2 === stroke.pts.length;
   ctx.save();
+  if (vary) {
+    ctx.fillStyle = rgba(stroke.color, 1);
+    if (stroke.hard) {
+      ctx.globalAlpha = op;
+      traceVar(ctx, stroke.pts, rs, s, H, 1);
+      ctx.fill();
+    } else
+      for (const [wf, a] of softPasses(width)) {
+        ctx.globalAlpha = a * op;
+        traceVar(ctx, stroke.pts, rs, s, H, wf);
+        ctx.fill();
+      }
+  }
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = rgba(stroke.color, 1);
-  tracePath(ctx, stroke.pts, s, H);
+  if (!vary) tracePath(ctx, stroke.pts, s, H);
   if (stroke.hard) {
-    ctx.globalAlpha = op;
-    ctx.lineWidth = width;
-    ctx.stroke();
-  } else {
-    for (const [wf, a] of softPasses(width)) {
-      ctx.globalAlpha = a * op;
-      ctx.lineWidth = Math.max(1, width * wf);
+    if (!vary) {
+      ctx.globalAlpha = op;
+      ctx.lineWidth = width;
       ctx.stroke();
     }
+  } else {
+    if (!vary)
+      for (const [wf, a] of softPasses(width)) {
+        ctx.globalAlpha = a * op;
+        ctx.lineWidth = Math.max(1, width * wf);
+        ctx.stroke();
+      }
     // Overspray speckle along the stroke, seeded so every client matches
     const rnd = mulberry32(seed);
     const pts = stroke.pts;
@@ -335,7 +429,8 @@ export function drawStroke(
       const x1 = pts.length > i + 2 ? pts[i + 2] : x0;
       const y1 = pts.length > i + 3 ? pts[i + 3] : y0;
       const a = rnd() * Math.PI * 2;
-      const rr = stroke.r * (0.85 + rnd() * 0.6);
+      const rk = vary ? rs[seg] + (rs[Math.min(rs.length - 1, seg + 1)] - rs[seg]) * t : stroke.r;
+      const rr = rk * (0.85 + rnd() * 0.6);
       const x = (x0 + (x1 - x0) * t + Math.cos(a) * rr) * s;
       const y = H - (y0 + (y1 - y0) * t + Math.sin(a) * rr) * s;
       ctx.fillRect(x, y, dot, dot);
@@ -346,10 +441,20 @@ export function drawStroke(
 
 function drawItem(ctx: CanvasRenderingContext2D, W: number, H: number, it: DrawItem) {
   if (it.kind === 'dabs') drawDabs(ctx, W, H, it);
-  else drawStroke(ctx, W, H, it.stroke, it.seed);
+  else drawStroke(ctx, W, H, it.stroke, it.seed, it.rs);
+}
+
+/** The smallest radius a draw item paints with (sets the canvas tier). */
+function finestOf(it: DrawItem): number {
+  if (it.kind !== 'stroke') return Infinity;
+  if (it.rs === undefined) return it.stroke.r;
+  let r = Infinity;
+  for (const x of it.rs) r = Math.min(r, x);
+  return r;
 }
 
 const _p = new THREE.Vector3();
+const _d = new THREE.Vector3();
 
 export class Graffiti {
   group = new THREE.Group();
@@ -371,6 +476,10 @@ export class Graffiti {
   private lineFrom: { plane: string; world: THREE.Vector3 } | null = null;
   private lastEnd: { plane: string; world: THREE.Vector3 } | null = null;
   private prevWorld: THREE.Vector3 | null = null;
+  /** A pen (mural mode) is painting: penBegin → penSample… → penEnd. */
+  private penOn = false;
+  /** The live stroke changed: redrawn once a frame, not per pen sample. */
+  private liveDirty = false;
   private sinceSpray = 0;
   /** Seconds to the next look at which cells should be sharp. */
   private lodClock = 0;
@@ -512,10 +621,14 @@ export class Graffiti {
     const next = { ...this.toolState, ...patch };
     next.hex = intToHex(next.color);
     next.canUndo = this.history.canUndo;
+    next.canRedo = this.history.canRedo;
     this.toolState = next;
     try {
-      const { color, size, hard, opacity, recent } = next;
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ color, size, hard, opacity, recent }));
+      const { color, size, radius, hard, opacity, recent } = next;
+      localStorage.setItem(
+        PREFS_KEY,
+        JSON.stringify({ color, size, radius, hard, opacity, recent }),
+      );
     } catch {
       // private mode: settings just don't stick
     }
@@ -527,11 +640,13 @@ export class Graffiti {
       color: 0xf3322c,
       hex: '#f3322c',
       size: 3,
+      radius: NOZZLES[3].r,
       hard: false,
       opacity: 16,
       recent: [],
       picking: false,
       canUndo: false,
+      canRedo: false,
       note: null,
     };
     try {
@@ -542,6 +657,10 @@ export class Graffiti {
         if (Number.isInteger(raw.color)) base.color = (raw.color as number) & 0xffffff;
         if (Number.isInteger(raw.size))
           base.size = Math.max(0, Math.min(NOZZLES.length - 1, raw.size!));
+        base.radius =
+          typeof raw.radius === 'number' && Number.isFinite(raw.radius)
+            ? Math.max(MIN_RADIUS_MM, Math.min(MAX_RADIUS_MM, raw.radius))
+            : NOZZLES[base.size].r;
         base.hard = raw.hard === true;
         if (Number.isInteger(raw.opacity)) base.opacity = Math.max(1, Math.min(16, raw.opacity!));
         if (Array.isArray(raw.recent))
@@ -579,7 +698,14 @@ export class Graffiti {
   }
 
   setSize(i: number) {
-    this.setTools({ size: Math.max(0, Math.min(NOZZLES.length - 1, Math.round(i))) });
+    const size = Math.max(0, Math.min(NOZZLES.length - 1, Math.round(i)));
+    this.setTools({ size, radius: NOZZLES[size].r });
+  }
+
+  /** Any nozzle radius in mm (the mural size slider and pads). */
+  setRadius(mm: number) {
+    const radius = Math.max(MIN_RADIUS_MM, Math.min(MAX_RADIUS_MM, mm));
+    this.setTools({ radius, size: nozzleFor(radius) });
   }
 
   stepSize(d: number) {
@@ -604,12 +730,19 @@ export class Graffiti {
   }
 
   private get radius() {
-    return NOZZLES[this.toolState.size]?.r ?? 40;
+    return this.toolState.radius;
   }
 
   private rememberColor(c: number) {
     const recent = [c, ...this.toolState.recent.filter(x => x !== c)].slice(0, 8);
     if (recent.join() !== this.toolState.recent.join()) this.setTools({ recent });
+  }
+
+  /** Pick the colour where a ray lands (mural mode's eyedropper). */
+  pickRay(from: THREE.Vector3, dir: THREE.Vector3): boolean {
+    const hit = this.world.raycast(from, dir, 60);
+    this.aim = hit === null ? null : { point: hit.point.clone(), normal: hit.normal.clone() };
+    return this.pickAt();
   }
 
   /** Pick the colour under the aim point. True if there was paint there. */
@@ -641,10 +774,24 @@ export class Graffiti {
     return false;
   }
 
-  /** Take back your last stroke (synced to everyone as a removal). */
-  undo() {
+  /** Put back the last stroke undo took (it goes out again as a new tag). */
+  redo() {
     this.finishStroke();
-    const { walls, out } = this.history.undo();
+    const { walls, out } = this.history.redo();
+    this.send(out);
+    for (const id of walls) {
+      const cell = this.cells.get(id);
+      if (cell !== undefined) this.redraw(cell);
+    }
+    this.lastEnd = null;
+    this.setTools({});
+    if (walls.size === 0) this.note('nothing to redo');
+  }
+
+  /** Take back your last stroke (synced to everyone as a removal). */
+  undo(redoable = true) {
+    this.finishStroke();
+    const { walls, out } = this.history.undo(redoable);
     this.send(out);
     for (const id of walls) {
       const cell = this.cells.get(id);
@@ -858,7 +1005,7 @@ export class Graffiti {
       }
       const want = Math.max(
         0,
-        ...res.items.map(i => (i.kind === 'stroke' ? tierFor(i.stroke.r) : 0)),
+        ...res.items.map(i => (i.kind === 'stroke' ? tierFor(finestOf(i)) : 0)),
       );
       if (want > cell.want) {
         cell.want = want;
@@ -871,7 +1018,8 @@ export class Graffiti {
         // Under a live stroke, paint into the snapshot so it isn't wiped
         const ctx =
           this.live?.cell === cell && this.snapshot ? this.snapshot.getContext('2d')! : cell.ctx;
-        for (const it of res.items) drawItem(ctx, cell.canvas.width, cell.canvas.height, it);
+        for (const it of joinRuns(res.items))
+          drawItem(ctx, cell.canvas.width, cell.canvas.height, it);
         if (this.live?.cell === cell) this.renderLive();
         cell.dirty = true;
       }
@@ -880,6 +1028,11 @@ export class Graffiti {
   }
 
   // ── Cells ─────────────────────────────────────────────────────────────
+
+  /** A wall's cell axes for a surface normal: u across, v up, n out (mural framing). */
+  wallBasis(n: THREE.Vector3) {
+    return this.basis(n);
+  }
 
   private basis(n: THREE.Vector3) {
     const nq = new THREE.Vector3(
@@ -1060,9 +1213,13 @@ export class Graffiti {
   private redraw(cell: Cell) {
     const { width: W, height: H } = cell.canvas;
     cell.ctx.clearRect(0, 0, W, H);
-    for (const it of cell.log.items()) drawItem(cell.ctx, W, H, it);
-    for (const s of this.history.pendingOn(cell.id))
-      if (s !== undefined) drawStroke(cell.ctx, W, H, s.stroke, s.seed);
+    for (const it of joinRuns(cell.log.items())) drawItem(cell.ctx, W, H, it);
+    const mine = this.history.pendingOn(cell.id);
+    if (mine.length > 0)
+      for (const it of joinRuns(
+        mine.map((s): DrawItem => ({ kind: 'stroke', stroke: s.stroke, seed: s.seed })),
+      ))
+        drawItem(cell.ctx, W, H, it);
     if (this.live?.cell === cell) {
       this.takeSnapshot(cell);
       this.renderLive();
@@ -1090,8 +1247,9 @@ export class Graffiti {
     const { canvas, ctx } = l.cell;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(this.snapshot, 0, 0);
-    drawStroke(ctx, canvas.width, canvas.height, l.stroke, 0);
+    drawStroke(ctx, canvas.width, canvas.height, l.stroke, 0, l.rs);
     l.cell.dirty = true;
+    this.liveDirty = false;
   }
 
   private toLocal(cell: Cell, p: THREE.Vector3): [number, number] {
@@ -1103,8 +1261,13 @@ export class Graffiti {
     return u >= -EDGE_MM && u <= CELL_W_MM + EDGE_MM && v >= -EDGE_MM && v <= CELL_H_MM + EDGE_MM;
   }
 
-  private startStroke(cell: Cell, first: [number, number], anchor: [number, number] | null) {
-    const r = quantRadius(this.radius);
+  private startStroke(
+    cell: Cell,
+    first: [number, number],
+    anchor: [number, number] | null,
+    pen: number | null = null,
+  ) {
+    const r = quantRadius(pen ?? this.radius);
     this.setNear(cell, true);
     cell.want = Math.max(cell.want, tierFor(r));
     if (this.retier(cell, tierFor(r))) this.redraw(cell);
@@ -1112,6 +1275,8 @@ export class Graffiti {
     this.live = {
       cell,
       anchor,
+      rs: pen !== null ? (anchor !== null ? [pen, pen] : [pen]) : null,
+      r: pen ?? r,
       stroke: {
         color: this.toolState.color,
         r,
@@ -1129,9 +1294,22 @@ export class Graffiti {
     const l = this.live;
     if (l === null) return;
     const s = l.stroke;
-    if (s.pts.length > 4) s.pts = simplify(s.pts, simplifyEps(s.r));
+    let runs: Stroke[] = [s];
+    if (l.rs !== null) {
+      // Pen: keep the taper, then cut into runs of radius (old clients draw
+      // the runs stepped, new ones join them back up: mural/runs.ts)
+      let lo = Infinity;
+      for (const r of l.rs) lo = Math.min(lo, r);
+      const sv = simplifyVar(s.pts, l.rs, simplifyEps(lo));
+      s.pts = sv.pts;
+      l.rs = sv.rs;
+      runs = splitRuns(s, sv.pts, sv.rs);
+      const want = tierFor(quantRadius(lo));
+      if (want > l.cell.want) l.cell.want = want;
+    } else if (s.pts.length > 4) s.pts = simplify(s.pts, simplifyEps(s.r));
     this.renderLive();
     this.live = null;
+    if (runs.length === 0) return;
     const n = s.pts.length;
     this.lastEnd = {
       plane: l.cell.plane,
@@ -1140,14 +1318,18 @@ export class Graffiti {
         .addScaledVector(l.cell.u, s.pts[n - 2] / 1000)
         .addScaledVector(l.cell.v, s.pts[n - 1] / 1000),
     };
-    const { out } = this.history.addStroke(l.cell.id, s);
-    this.send(out);
+    for (const run of runs) this.send(this.history.addStroke(l.cell.id, run).out);
     this.onStroke?.(l.cell.plane, this.lastEnd.world);
     this.rememberColor(s.color);
     this.setTools({});
   }
 
-  private capture(point: THREE.Vector3, normal: THREE.Vector3, line: boolean) {
+  private capture(
+    point: THREE.Vector3,
+    normal: THREE.Vector3,
+    line: boolean,
+    pen: number | null = null,
+  ) {
     const cell = this.cellFor(point, normal);
     const here = this.toLocal(cell, point);
     let l = this.live;
@@ -1160,7 +1342,7 @@ export class Graffiti {
       this.finishStroke();
       if (samePlane && prev !== null) {
         const back = this.toLocal(cell, prev);
-        if (this.inRange(back)) this.startStroke(cell, back, null);
+        if (this.inRange(back)) this.startStroke(cell, back, null, pen);
       }
       l = this.live;
     }
@@ -1170,30 +1352,124 @@ export class Graffiti {
         const a = this.toLocal(cell, this.lineFrom.world);
         if (this.inRange(a)) anchor = a;
       }
-      this.startStroke(cell, here, anchor);
+      this.startStroke(cell, here, anchor, pen);
       l = this.live!;
     }
+    if (pen !== null) l.r = pen;
     const pts = l.stroke.pts;
     if (l.anchor !== null) {
       // Straight line: anchor → cursor
       pts.length = 2;
       pts.push(here[0], here[1]);
+      if (l.rs !== null) {
+        l.rs.length = 1;
+        l.rs.push(l.r);
+      }
     } else {
       const n = pts.length;
-      const step = Math.max(1, l.stroke.r * 0.12);
-      if (Math.hypot(here[0] - pts[n - 2], here[1] - pts[n - 1]) >= step)
+      const rs = l.rs;
+      const step = Math.max(
+        1,
+        (rs !== null ? Math.min(l.r, rs[rs.length - 1]) : l.stroke.r) * 0.12,
+      );
+      if (Math.hypot(here[0] - pts[n - 2], here[1] - pts[n - 1]) >= step) {
         pts.push(here[0], here[1]);
+        if (rs !== null) {
+          rs.push(l.r);
+          if (l.r > l.stroke.r) l.stroke.r = quantRadius(l.r);
+        }
+      }
       if (pts.length / 2 >= MAX_POINTS) {
-        l.stroke.pts = simplify(pts, simplifyEps(l.stroke.r));
+        if (rs !== null) {
+          let lo = Infinity;
+          for (const r of rs) lo = Math.min(lo, r);
+          const sv = simplifyVar(pts, rs, simplifyEps(lo));
+          l.stroke.pts = sv.pts;
+          l.rs = sv.rs;
+        } else l.stroke.pts = simplify(pts, simplifyEps(l.stroke.r));
         if (l.stroke.pts.length / 2 >= MAX_POINTS * 0.75) {
           // Long stroke: close it and carry on in a fresh one
           this.finishStroke();
-          this.startStroke(cell, here, null);
+          this.startStroke(cell, here, null, pen);
         }
       }
     }
-    this.renderLive();
+    this.liveDirty = true;
   }
+
+  // ── Pen (mural mode) ──────────────────────────────────────────────────
+
+  /** A pen / finger stroke starts (one undo step until penEnd). */
+  penBegin() {
+    this.finishStroke();
+    this.history.beginGesture();
+    this.lineFrom = null;
+    this.prevWorld = null;
+    this.penOn = true;
+    this.spraying = true;
+    this.sinceSpray = 0;
+  }
+
+  /**
+   * One pen sample: paint where the ray lands, `r` mm wide. `accept` keeps
+   * paint on the wall being painted (a ray past its edge ends the stroke
+   * rather than painting the floor behind). True if paint landed.
+   */
+  penSample(
+    from: THREE.Vector3,
+    dir: THREE.Vector3,
+    r: number,
+    accept: ((point: THREE.Vector3, normal: THREE.Vector3) => boolean) | null = null,
+  ): boolean {
+    if (!this.penOn) return false;
+    const hit = this.world.raycast(from, dir, 60);
+    if (hit === null || (accept !== null && !accept(hit.point, hit.normal))) {
+      this.finishStroke();
+      this.prevWorld = null;
+      return false;
+    }
+    const rr = Math.max(MIN_RADIUS_MM, Math.min(MAX_RADIUS_MM, r));
+    this.capture(hit.point, hit.normal, false, rr);
+    if (this.prevWorld === null) this.prevWorld = new THREE.Vector3();
+    this.prevWorld.copy(hit.point);
+    this.sinceSpray = 0;
+    return true;
+  }
+
+  /** The pen lifts: the stroke is recorded (and sent after the usual pause). */
+  penEnd() {
+    if (!this.penOn) return;
+    this.finishStroke();
+    this.history.endGesture();
+    this.penOn = false;
+    this.spraying = false;
+    this.setTools({});
+  }
+
+  /** Throw the pen stroke away (a second finger landed: it was a pinch). */
+  penCancel() {
+    if (!this.penOn) return;
+    this.penOn = false;
+    this.spraying = false;
+    this.undo(false);
+    this.history.endGesture();
+    this.setTools({ note: null });
+  }
+
+  /** Put the aim cursor where a ray lands (pen hover), or hide it. */
+  hoverRay(from: THREE.Vector3 | null, dir: THREE.Vector3 | null) {
+    if (from === null || dir === null) {
+      this.hover = null;
+      return;
+    }
+    const hit = this.world.raycast(from, _d.copy(dir), 60);
+    this.hover = hit === null ? null : hit;
+  }
+
+  /** Mural mode's cursor: where the pen hovers / paints (null = none). */
+  private hover: { point: THREE.Vector3; normal: THREE.Vector3 } | null = null;
+  /** Mural mode drives the aim (set by MuralMode each frame). */
+  muralAim = false;
 
   // ── Spraying ──────────────────────────────────────────────────────────
 
@@ -1216,7 +1492,7 @@ export class Graffiti {
       const hit = this.world.raycast(from, dir, 40);
       return hit !== null && hit.point.distanceTo(playerPos) < RANGE ? hit : null;
     };
-    const last = dirs.length > 0 ? hitOf(dirs[dirs.length - 1]) : null;
+    const last = this.muralAim ? this.hover : dirs.length > 0 ? hitOf(dirs[dirs.length - 1]) : null;
     if (last !== null) this.aim = { point: last.point.clone(), normal: last.normal.clone() };
 
     if (active && !this.wasActive) {
@@ -1255,8 +1531,9 @@ export class Graffiti {
       this.lineFrom = null;
     }
     this.wasActive = active;
-    this.spraying = active && !this.pickPress;
-    this.sinceSpray = active ? 0 : this.sinceSpray + dt;
+    this.spraying = (active && !this.pickPress) || this.penOn;
+    this.sinceSpray = active || this.penOn ? 0 : this.sinceSpray + dt;
+    if (this.liveDirty) this.renderLive();
     // Flush after a short pause so one burst = one save per wall
     if (!active && this.sinceSpray > 0.8 && this.history.hasPending) this.flush();
 

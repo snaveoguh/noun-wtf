@@ -292,6 +292,16 @@ export function SprayPanel({ game }: { game: Game }) {
           >
             ⌖ PICK
           </button>
+          <button
+            type="button"
+            {...noFocus}
+            className="sp-chip"
+            data-spray="mural"
+            onClick={() => game.mural.enter()}
+            title="Square up to the wall you face and paint it like a canvas (`)"
+          >
+            🖌 MURAL
+          </button>
         </div>
         <Note t={t} />
         <div className="sp-hint">
@@ -417,6 +427,17 @@ export function SprayTouch({ game }: { game: Game }) {
               onClick={() => g.setPicking(!t.picking)}
             >
               ⌖
+            </button>
+            <button
+              type="button"
+              className="sp-chip sp-ico"
+              aria-label="mural mode: paint the wall you face like a canvas"
+              onClick={() => {
+                setOpen(false);
+                game.mural.enter();
+              }}
+            >
+              🖌
             </button>
             <button
               type="button"

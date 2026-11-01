@@ -27,7 +27,13 @@ const encodedChars = (list: LocalStroke[]) =>
 
 export type DrawItem =
   | { kind: 'dabs'; dabs: Dab[]; seed: number }
-  | { kind: 'stroke'; stroke: Stroke; seed: number };
+  | {
+      kind: 'stroke';
+      stroke: Stroke;
+      seed: number;
+      /** A pressure stroke's joined runs (mural/runs.ts): radius per point, mm. */
+      rs?: number[];
+    };
 
 function seedOf(s: string, i: number) {
   let h = 2166136261 ^ i;
@@ -125,11 +131,15 @@ const MAX_UNDO = 60;
 export class SprayHistory {
   private pending = new Map<string, LocalStroke[]>();
   private gestures: LocalStroke[][] = [];
+  /** Gestures undo took back, newest last (redo puts them back). */
+  private undone: LocalStroke[][] = [];
   private current: LocalStroke[] | null = null;
   private seq = 0;
 
   beginGesture() {
     this.current = [];
+    // A new stroke after an undo: the undone ones are gone for good
+    this.undone.length = 0;
   }
 
   endGesture() {
@@ -142,6 +152,32 @@ export class SprayHistory {
 
   get canUndo() {
     return this.gestures.length > 0 || (this.current?.length ?? 0) > 0;
+  }
+
+  get canRedo() {
+    return this.undone.length > 0;
+  }
+
+  /**
+   * Put the last undone gesture back. Its strokes go out again as new
+   * strokes (a sent one was taken down with a removal, which can't be
+   * reversed), so everyone sees them return.
+   */
+  redo(): { walls: Set<string>; out: Outgoing[] } {
+    const walls = new Set<string>();
+    const out: Outgoing[] = [];
+    const g = this.undone.pop();
+    if (g === undefined) return { walls, out };
+    const keep = this.undone;
+    this.undone = [];
+    this.current = [];
+    for (const s of g) {
+      walls.add(s.wallId);
+      out.push(...this.addStroke(s.wallId, s.stroke).out);
+    }
+    this.endGesture();
+    this.undone = keep;
+    return { walls, out };
   }
 
   /** Record a finished stroke. Returns any tag that had to go out early. */
@@ -202,7 +238,7 @@ export class SprayHistory {
    * Take back the last gesture. Returns the walls to redraw and the removal
    * tags to send for strokes that had already gone out.
    */
-  undo(): { walls: Set<string>; out: Outgoing[] } {
+  undo(redoable = true): { walls: Set<string>; out: Outgoing[] } {
     const walls = new Set<string>();
     const out: Outgoing[] = [];
     let g: LocalStroke[] | undefined;
@@ -211,6 +247,10 @@ export class SprayHistory {
       this.current = [];
     } else g = this.gestures.pop();
     if (g === undefined) return { walls, out };
+    if (redoable && g.length > 0) {
+      this.undone.push(g);
+      if (this.undone.length > MAX_UNDO) this.undone.shift();
+    }
     const byTag = new Map<string, { wallId: string; nonce: string; idx: number[] }>();
     for (const s of g) {
       if (s.undone) continue;

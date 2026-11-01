@@ -42,6 +42,7 @@ import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
+import { MuralMode } from './graffiti/mural/MuralMode';
 import { HideSeekMode } from './hideseek/net/HideSeekMode';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
@@ -346,6 +347,8 @@ export class Game {
   net = new Net();
   particles = new Particles();
   graffiti: Graffiti | null = null;
+  /** Mural mode: the camera squared up to a wall, pen / finger painting (graffiti/mural/). */
+  readonly mural = new MuralMode(this);
   /** On-chain drop party pickups (null when VITE_WORLD_DROPS_ADDRESS is unset). */
   readonly drops = Drops.create();
   level: LevelData | null = null;
@@ -1139,6 +1142,7 @@ export class Game {
     if (this.cutscene.active) return this.stepCutscene(dt, now);
     this.cutscene.tick();
     const input = this.input.poll(now);
+    this.mural.tick(dt, input);
     // Driving the ice cream van: E / R / spray are the van's this frame
     const driving =
       this.van2.preStep(input) || this.cars.preStep(input) || this.dragon.preStep(input);
@@ -1763,7 +1767,7 @@ export class Game {
       cam.getWorldDirection(dir);
       dirs.push(dir);
     }
-    g.update(dt, active, cam.position, dirs, p.pos, {
+    g.update(dt, active, cam.position, dirs, this.mural.focus ?? p.pos, {
       line: input.mode === 'keyboard' && input.sprint,
       cursor: p.mode === 'foot' || active,
     });

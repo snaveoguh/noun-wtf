@@ -15,6 +15,14 @@
 //                   (bits 0–3 opacity (n+1)/16, bit 4 hard cap) |
 //                   varint point count | first point u16 u16 (mm + 1000) |
 //                   then zigzag-varint deltas (mm)
+//                 A point count written as an overlong varint (a
+//                 redundant 0x00 continuation byte, which every decoder
+//                 has always accepted) marks a stroke that CONTINUES the
+//                 one before it: a pressure stroke goes out as runs of
+//                 constant radius, one stroke each. Old clients draw the
+//                 runs as they are (stepped width); new ones join them into
+//                 one stroke whose width tapers smoothly (mural/runs.ts).
+//                 Never on a tag's first stroke.
 //                 Points are millimetres in the wall cell's own frame
 //                 (u across, v up), allowed a metre past each edge so a
 //                 stroke crossing into the next cell joins up seamlessly.
@@ -76,6 +84,12 @@ export interface Stroke {
   opacity: number;
   /** Flat [u0, v0, u1, v1, …] in whole mm, cell-local. */
   pts: number[];
+  /**
+   * Continues the stroke before it in the same tag (a pressure stroke's
+   * next run of radius). Wire: an overlong point-count varint. Optional:
+   * absent = an ordinary stroke.
+   */
+  join?: boolean;
 }
 
 export interface StrokeTag {
@@ -203,6 +217,15 @@ class Writer {
     }
     this.byte(x);
   }
+  /** The same value with one redundant continuation byte (decodes identically). */
+  varintLong(x: number) {
+    while (x >= 0x80) {
+      this.byte((x & 0x7f) | 0x80);
+      x >>>= 7;
+    }
+    this.byte(x | 0x80);
+    this.byte(0);
+  }
   bytes() {
     return this.buf.slice(0, this.n);
   }
@@ -221,13 +244,18 @@ class Reader {
   u16() {
     return (this.byte() << 8) | this.byte();
   }
+  /** Set by varint(): the last one carried a redundant trailing 0x00. */
+  overlong = false;
   varint() {
     let x = 0;
     let shift = 0;
-    for (;;) {
+    for (let n = 1; ; n++) {
       const b = this.byte();
       x |= (b & 0x7f) << shift;
-      if ((b & 0x80) === 0) return x >>> 0;
+      if ((b & 0x80) === 0) {
+        this.overlong = n > 1 && b === 0;
+        return x >>> 0;
+      }
       shift += 7;
       if (shift > 21) throw new Error('varint');
     }
@@ -246,7 +274,7 @@ export function quantRadius(r: number) {
   return Math.max(MIN_RADIUS_MM, Math.min(MAX_RADIUS_MM, q));
 }
 
-function writeStroke(w: Writer, s: Stroke) {
+function writeStroke(w: Writer, s: Stroke, first: boolean) {
   const n = Math.min(MAX_POINTS, Math.floor(s.pts.length / 2));
   w.byte(s.color >> 16);
   w.byte(s.color >> 8);
@@ -254,7 +282,8 @@ function writeStroke(w: Writer, s: Stroke) {
   w.byte(quantRadius(s.r) / 2);
   const op = Math.max(1, Math.min(16, Math.round(s.opacity))) - 1;
   w.byte(op | (s.hard ? 16 : 0));
-  w.varint(n);
+  if (s.join === true && !first) w.varintLong(n);
+  else w.varint(n);
   let pu = clampU(s.pts[0]);
   let pv = clampV(s.pts[1]);
   w.u16(pu + EDGE_MM);
@@ -273,7 +302,12 @@ export function encodeStrokes(tag: StrokeTag): string {
   const w = new Writer();
   w.byte(VERSION);
   for (let i = 0; i < 6; i++) w.byte(parseInt(tag.id.slice(i * 2, i * 2 + 2), 16) || 0);
-  for (const s of tag.strokes.slice(0, MAX_STROKES)) if (s.pts.length >= 2) writeStroke(w, s);
+  let first = true;
+  for (const s of tag.strokes.slice(0, MAX_STROKES))
+    if (s.pts.length >= 2) {
+      writeStroke(w, s, first);
+      first = false;
+    }
   return 'g3:' + toB64(w.bytes());
 }
 
@@ -295,6 +329,7 @@ export function decodeStrokes(s: string): StrokeTag | null {
       const flags = r.byte();
       if (flags & 0xe0) return null;
       const n = r.varint();
+      const join = r.overlong && strokes.length > 0;
       if (n < 1 || n > MAX_POINTS) return null;
       let u = r.u16() - EDGE_MM;
       let v = r.u16() - EDGE_MM;
@@ -308,7 +343,15 @@ export function decodeStrokes(s: string): StrokeTag | null {
         if (pts[i] < -EDGE_MM || pts[i] > CELL_W_MM + EDGE_MM) return null;
         if (pts[i + 1] < -EDGE_MM || pts[i + 1] > CELL_H_MM + EDGE_MM) return null;
       }
-      strokes.push({ color, r: rad, hard: (flags & 16) !== 0, opacity: (flags & 15) + 1, pts });
+      const st: Stroke = {
+        color,
+        r: rad,
+        hard: (flags & 16) !== 0,
+        opacity: (flags & 15) + 1,
+        pts,
+      };
+      if (join) st.join = true;
+      strokes.push(st);
     }
     if (strokes.length === 0) return null;
     return { id, strokes };
