@@ -20,10 +20,20 @@ import { PK } from '../parkour/contract';
 import { wallAt } from '../parkour/sim/detect';
 
 import { SKY, type SkyInput } from './contract';
-import { canPull, end, enter, newSky, pull, shouldEnter, stepSky } from './sim/freefall';
+import {
+  canPull,
+  end,
+  enter,
+  newSky,
+  pull,
+  shouldEnter,
+  shouldOffer,
+  stepSky,
+} from './sim/freefall';
 
 export type SkyEvent =
-  | { type: 'enter' }
+  /** `taken`: the rider took an offered skydive (a big board air). */
+  | { type: 'enter'; taken?: boolean }
   | { type: 'pull' }
   /** Pressed pull too low (or not falling yet). */
   | { type: 'tooLow' }
@@ -54,6 +64,11 @@ export class SkyController {
   readonly events: SkyEvent[] = [];
   /** A touch PULL button press, consumed by the next step. */
   pullQueued = false;
+  /**
+   * A big board air where freefall doesn't start by itself (the mountain,
+   * the mega ramps) is offering one: jump (or the touch button) takes it.
+   */
+  offer = false;
   /** Seconds airborne (this fall). */
   private airT = 0;
   private lastRespawns = -1;
@@ -159,6 +174,7 @@ export class SkyController {
       if (s.phase !== 'off') end(s);
       this.airT = 0;
     }
+    this.offer = false;
     if (!this.allowed) {
       if (s.phase !== 'off') end(s);
       this.airT = 0;
@@ -178,7 +194,24 @@ export class SkyController {
     const queued = this.pullQueued;
     this.pullQueued = false;
     if (s.phase === 'off') {
-      if (p.mode === 'board' && !this.boardOk()) return;
+      if (p.mode === 'board' && !this.boardOk()) {
+        // Not by itself here, but a big enough air offers it
+        this.offer = shouldOffer({
+          offered: true,
+          airborne: true,
+          airT: this.airT,
+          clear: this.clear,
+          catchable: false,
+        });
+        if (this.offer && this.catchable()) this.offer = false;
+        if (!this.offer || !(f.jumpPressed || queued)) return;
+        // Taken: freefall from here; the next press pulls
+        this.offer = false;
+        enter(s, p.vel.y);
+        this.events.push({ type: 'enter', taken: true });
+        this.lastVy = p.vel.y;
+        return;
+      }
       const go = shouldEnter({
         airborne: true,
         vy: p.vel.y,

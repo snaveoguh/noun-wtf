@@ -145,11 +145,20 @@ function play(
 function jumpOut(
   mode: 'foot' | 'board',
   fps: number,
-  air: (t: number, clear: number) => Partial<InputFrame>,
+  air: (t: number, clear: number, sky: SkyController) => Partial<InputFrame>,
+  /** Ride as if over the mountain: a board air never turns into a skydive by itself there. */
+  mountain = false,
 ) {
   const { world, site } = campScene();
   const r = rig(world);
   const { p, sky } = r;
+  if (mountain)
+    p.terrain = {
+      height: () => -1e4,
+      inDomain: () => true,
+      surface: () => 'grass',
+      speedLimit: () => Infinity,
+    };
   const x = (site.window.x0 + site.window.x1) / 2;
   p.spawn(new THREE.Vector3(x, site.floorY + 0.02, site.origin.z + 4), Math.PI);
   p.mode = 'foot';
@@ -167,7 +176,7 @@ function jumpOut(
     40,
     t => {
       const out = p.pos.z < site.faceZ - 0.5;
-      return frame(out ? air(t, sky.clear) : { moveY: mode === 'foot' ? 1 : 0, sprint: true });
+      return frame(out ? air(t, sky.clear, sky) : { moveY: mode === 'foot' ? 1 : 0, sprint: true });
     },
     () => (mode === 'foot' ? p.footGrounded : p.state !== 'air') && p.pos.y < site.floorY - 5,
   );
@@ -359,4 +368,45 @@ describe('parkour keeps priority', () => {
     expect(climbed).toBeGreaterThan(SKY.enterClear + 5);
     expect(run.phases.has('freefall')).toBe(false);
   });
+});
+
+describe('a big board air where skydives never start by themselves', () => {
+  it('stays a plain air (the record still counts) unless you take the offer', () => {
+    const j = jumpOut('board', 60, () => ({}), true);
+    expect(j.events.map(e => e.type)).not.toContain('enter');
+    expect(j.phases.has('freefall')).toBe(false);
+  });
+
+  for (const fps of [60, 20])
+    it(`offers it high up: jump takes it, the next jump pulls, a soft landing (${fps} fps)`, () => {
+      let took = false;
+      let pulled = false;
+      let sawOffer = false;
+      const j = jumpOut(
+        'board',
+        fps,
+        (_t, clear, sky) => {
+          sawOffer ||= sky.offer;
+          if (!took && sky.offer) {
+            took = true;
+            return { jumpPressed: true };
+          }
+          if (took && !pulled && sky.phase === 'freefall' && clear < 70) {
+            pulled = true;
+            return { jumpPressed: true };
+          }
+          return {};
+        },
+        true,
+      );
+      expect(sawOffer).toBe(true);
+      const enter = j.events.find(e => e.type === 'enter');
+      expect(enter).toMatchObject({ taken: true });
+      // taking it never pulls in the same press
+      const types = j.events.map(e => e.type);
+      expect(types.indexOf('pull')).toBeGreaterThan(types.indexOf('enter'));
+      expect(j.events.find(e => e.type === 'land')).toMatchObject({ canopy: true });
+      expect(j.r.p.state).not.toBe('bail');
+      expect(j.minY).toBeGreaterThan(-0.3);
+    });
 });
