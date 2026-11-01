@@ -18,6 +18,8 @@
 //   --route <url>      one route (repeatable); query strings allowed (?sections=heroTools)
 //   --all              every route in lib.mjs ROUTES
 //   --group <name>     routes of one group (auction, governance, …)
+//   --skip <url>       leave a route out of --all / --group (repeatable), e.g. a
+//                      slow one whose recent shots you keep (/terraforms, ~45 min)
 //   --mode both|window|page   (default both)
 //   --widths a,b,c     subset of the 13 widths
 //   --label <name>     subfolder, e.g. before / after
@@ -74,6 +76,7 @@ for (let i = 0; i < argv.length; i++) {
   if (a === '--route') opt.routes.push(next());
   else if (a === '--all') opt.all = true;
   else if (a === '--group') opt.group = next();
+  else if (a === '--skip') (opt.skip ??= []).push(next());
   else if (a === '--mode') opt.mode = next();
   else if (a === '--widths') opt.widths = next().split(',').map(Number);
   else if (a === '--label') opt.label = next();
@@ -103,6 +106,7 @@ const outRoot = opt.out ? path.resolve(opt.out) : path.join(repo, '.claude', 're
 let urls = opt.routes;
 if (opt.all) urls = ROUTES.map(r => r.url);
 if (opt.group) urls = ROUTES.filter(r => r.group === opt.group).map(r => r.url);
+if (opt.skip) urls = urls.filter(u => !opt.skip.includes(u));
 if (urls.length === 0) {
   console.error('give --route <url>, --group <name> or --all (see --help)');
   process.exit(2);

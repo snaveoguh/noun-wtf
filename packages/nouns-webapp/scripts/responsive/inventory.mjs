@@ -20,12 +20,14 @@ const app = fs.readFileSync(path.join(src, 'App.tsx'), 'utf8');
 
 // ── source: route → element → file → components ────────────────────────
 const importOf = new Map();
-for (const m of app.matchAll(/const (\w+) = lazy\(\(\) => import\('([^']+)'\)\)/g)) importOf.set(m[1], m[2]);
+for (const m of app.matchAll(/const (\w+) = lazy\(\(\) => import\('([^']+)'\)\)/g))
+  importOf.set(m[1], m[2]);
 for (const m of app.matchAll(/^import (\w+) from '([^']+)';/gm)) importOf.set(m[1], m[2]);
 
 function elementFor(routePath) {
   if (routePath === '/') return 'AgentHome';
-  if (routePath.startsWith('explore/wallet') || routePath.startsWith('gamer')) return 'WalletProfilePage';
+  if (routePath.startsWith('explore/wallet') || routePath.startsWith('gamer'))
+    return 'WalletProfilePage';
   const i = app.indexOf(`path="${routePath}"`);
   if (i < 0) return null;
   const m = app.slice(i).match(/<(?!Suspense\b|Route\b|\w*Skeleton\b)([A-Z]\w+)/);
@@ -37,7 +39,13 @@ function resolve(spec, fromFile) {
   if (spec.startsWith('@/')) base = path.join(src, spec.slice(2));
   else if (spec.startsWith('.')) base = path.resolve(path.dirname(fromFile), spec);
   else return null;
-  for (const c of [base, `${base}.tsx`, `${base}.ts`, path.join(base, 'index.tsx'), path.join(base, 'index.ts')]) {
+  for (const c of [
+    base,
+    `${base}.tsx`,
+    `${base}.ts`,
+    path.join(base, 'index.tsx'),
+    path.join(base, 'index.ts'),
+  ]) {
     if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
   }
   return null;
@@ -47,7 +55,10 @@ function resolve(spec, fromFile) {
 function filesFor(entry) {
   const files = new Set();
   const dir = path.dirname(entry);
-  const own = path.basename(entry).startsWith('index.') || /pages\/[^/]+$/.test(dir) || /miniapps\/[^/]+$/.test(dir);
+  const own =
+    path.basename(entry).startsWith('index.') ||
+    /pages\/[^/]+$/.test(dir) ||
+    /miniapps\/[^/]+$/.test(dir);
   const addDir = d => {
     for (const f of fs.readdirSync(d)) {
       const p = path.join(d, f);
@@ -62,7 +73,8 @@ function filesFor(entry) {
     for (const m of code.matchAll(/from '(@\/components\/[^']+|\.\/[^']+|\.\.\/[^']+)'/g)) {
       const r = resolve(m[1], f);
       if (!r) continue;
-      if (m[1].startsWith('@/components/')) components.add(m[1].replace('@/components/', '').split('/')[0]);
+      if (m[1].startsWith('@/components/'))
+        components.add(m[1].replace('@/components/', '').split('/')[0]);
       const rd = path.dirname(r);
       if (m[1].startsWith('@/components/') && rd !== src) addDir(rd);
       else files.add(r);
@@ -135,7 +147,9 @@ const rows = ROUTES.map(r => {
 // ── work units ────────────────────────────────────────────────────────
 const sev = r => r.severity?.score ?? 0;
 const effort = r => r.viewport.total;
-const sorted = [...rows].filter(r => r.path !== 'noun/:id' && r.path !== 'v2/noun/:id').sort((a, b) => sev(b) - sev(a) || effort(b) - effort(a));
+const sorted = [...rows]
+  .filter(r => r.path !== 'noun/:id' && r.path !== 'v2/noun/:id')
+  .sort((a, b) => sev(b) - sev(a) || effort(b) - effort(a));
 const units = [];
 const grouped = new Map();
 const byEntry = new Map(); // routes rendering the same page component are one unit
@@ -167,7 +181,8 @@ for (const g of grouped.values()) {
   }
   if (cur.routes.length) units.push(cur);
 }
-const unitScore = u => Math.max(...u.routes.map(sev)) + u.routes.reduce((a, r) => a + sev(r), 0) / 100;
+const unitScore = u =>
+  Math.max(...u.routes.map(sev)) + u.routes.reduce((a, r) => a + sev(r), 0) / 100;
 units.sort((a, b) => unitScore(b) - unitScore(a));
 
 // ── markdown ──────────────────────────────────────────────────────────
@@ -197,10 +212,32 @@ function topIssues(rep) {
     for (const c of i.covered?.slice(0, 2) ?? []) add('covered', `${c.selector} ← ${c.by}`, tag);
     for (const c of i.overArt?.slice(0, 1) ?? []) add('on art', c.selector, tag);
     for (const c of i.overlaps?.slice(0, 1) ?? []) add('overlap', `${c.a} × ${c.b}`, tag);
-    if ((i.smallTargets?.length ?? 0) > 0) add('small taps', `${s.counts.smallTargets} controls`, tag);
+    if ((i.smallTargets?.length ?? 0) > 0)
+      add('small taps', `${s.counts.smallTargets} controls`, tag);
   }
   return [...seen.values()].sort((a, b) => b.widths.length - a.widths.length).slice(0, 6);
 }
+// The Done table is curated by hand (each unit's before → after and what it
+// left): carry its rows over from the current pages.md, regenerating only the
+// pilot row.
+const pagesFile = path.join(repo, 'docs', 'responsive', 'pages.md');
+const keptDone = (() => {
+  if (!fs.existsSync(pagesFile)) return [];
+  const old = fs.readFileSync(pagesFile, 'utf8');
+  const m = old.match(/## Done\n([\s\S]*?)\n## /);
+  if (!m) return [];
+  return m[1]
+    .split('\n')
+    .filter(
+      l =>
+        l.startsWith('| ') &&
+        !l.startsWith('| route |') &&
+        !l.startsWith('| --- ') &&
+        !l.startsWith('| `/noun/:id`'),
+    );
+})();
+const isClean = r => r.severity && r.severity.clean === r.severity.total && !r.severity.errors;
+
 const sum = rows.filter(r => r.severity);
 const cleanAll = sum.filter(r => r.severity.clean === r.severity.total).length;
 
@@ -223,28 +260,47 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | --- | --- |
 | \`/noun/:id\`, \`/v2/noun/:id\` (Auction) | pilot, ${(() => {
   const r = rows.find(x => x.path === 'noun/:id');
-  return r?.severity ? `${r.severity.clean}/${r.severity.total} clean in the last --all run` : 'see PLAYBOOK.md';
+  return r?.severity
+    ? `${r.severity.clean}/${r.severity.total} clean in the last --all run`
+    : 'see PLAYBOOK.md';
 })()} · before/after sheets in \`.claude/responsive-shots/noun-2062*/\` |
-
+${keptDone.join('\n')}${keptDone.length ? '\n' : ''}
 ## Work units (worst first)
 
 `;
 units.forEach((u, i) => {
   const names = u.routes.map(r => `\`${r.url}\``).join(', ');
   const s = Math.max(...u.routes.map(sev));
-  const e = [...new Map(u.routes.map(r => [r.entry, effort(r)])).values()].reduce((a, x) => a + x, 0);
+  const e = [...new Map(u.routes.map(r => [r.entry, effort(r)])).values()].reduce(
+    (a, x) => a + x,
+    0,
+  );
   const unmeasured = u.routes.filter(r => !r.severity).length;
-  const sevText = unmeasured === u.routes.length ? 'not measured' : `severity ${s}${unmeasured ? ` (${unmeasured} not measured)` : ''}`;
-  md += `${i + 1}. ${names} — ${sevText}, viewport code ${e}${u.routes.length > 1 ? ` (group: ${u.routes[0].group})` : ''}\n`;
+  const sevText =
+    unmeasured === u.routes.length
+      ? 'not measured'
+      : `severity ${s}${unmeasured ? ` (${unmeasured} not measured)` : ''}`;
+  const done = u.routes.every(isClean) ? ' · **clean at every width**' : '';
+  md += `${i + 1}. ${names} — ${sevText}, viewport code ${e}${u.routes.length > 1 ? ` (group: ${u.routes[0].group})` : ''}${done}\n`;
 });
 
 md += `\n## Routes\n`;
 for (const r of [...rows].sort((a, b) => sev(b) - sev(a))) {
-  const vpc = Object.entries(r.viewport.counts).map(([k, v]) => `${k} ${v}`).join(', ') || 'none';
+  const vpc =
+    Object.entries(r.viewport.counts)
+      .map(([k, v]) => `${k} ${v}`)
+      .join(', ') || 'none';
   md += `\n### \`${r.url}\` — severity ${r.severity ? r.severity.score : 'not measured'}\n\n`;
   md += `- route \`${r.path}\` · ${r.kind === 'home' ? 'homescreen (no window)' : 'navigator window'} · group ${r.group}\n`;
   md += `- element \`${r.element ?? '?'}\` in \`${r.entry}\` (${r.fileCount} files scanned)\n`;
-  md += `- components: ${r.components.length ? r.components.slice(0, 18).map(c => `\`${c}\``).join(', ') + (r.components.length > 18 ? ` +${r.components.length - 18}` : '') : '—'}\n`;
+  md += `- components: ${
+    r.components.length
+      ? r.components
+          .slice(0, 18)
+          .map(c => `\`${c}\``)
+          .join(', ') + (r.components.length > 18 ? ` +${r.components.length - 18}` : '')
+      : '—'
+  }\n`;
   md += `- viewport code: ${r.viewport.total} (${vpc})\n`;
   if (r.severity) {
     md += `- clean ${r.severity.clean}/${r.severity.total}${r.severity.errors ? `, ${r.severity.errors} errors` : ''}; worst ${r.severity.worst.join(', ') || '—'}\n`;
@@ -252,7 +308,8 @@ for (const r of [...rows].sort((a, b) => sev(b) - sev(a))) {
     const top = topIssues(r.report);
     if (top.length) {
       md += `- top issues:\n`;
-      for (const t of top) md += `  - ${t.kind}: \`${t.sel.slice(0, 110)}\` (${t.widths.slice(0, 8).join(' ')}${t.widths.length > 8 ? ' …' : ''})\n`;
+      for (const t of top)
+        md += `  - ${t.kind}: \`${t.sel.slice(0, 110)}\` (${t.widths.slice(0, 8).join(' ')}${t.widths.length > 8 ? ' …' : ''})\n`;
     }
   }
 }
