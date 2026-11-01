@@ -44,8 +44,9 @@ job is getting people in and getting them back tomorrow, not tokenomics.**
   artists, 5% builders (1-year cliff, 3-year vest).
 - **COIN stays in-game forever.** It never converts at a rate. Rewards come from a score:
   concave, capped, gated on a linked wallet, real days played and respect, and built only
-  from what the server can check (run proofs, the trade ledger, snapshot-attributed
-  graffiti).
+  from what the server can check (run proofs, the trade ledger), plus graffiti other players
+  keep up. Graffiti stays anonymous: writers can earn under an optional tag that's never
+  linked to them.
 - **Every in-game spend:** 50% burned, 30% treasury, 20% to the creator of what you bought.
 - **Base,** with rewards computed from the same daily snapshot roots as the art and records,
   so anyone can check them.
@@ -69,7 +70,7 @@ job is getting people in and getting them back tomorrow, not tokenomics.**
 | weekly active riders | ≥ 2,000 |
 | D1 / D7 retention | ≥ 30% / ≥ 12% |
 | weekly active creators | ≥ 200 |
-| attributed graffiti pieces a day | ≥ 300 |
+| graffiti pieces a day | ≥ 300 |
 | agent trades a day (≥ half with a human) | ≥ 1,000 |
 | linked wallets | ≥ 1,500 |
 
@@ -81,8 +82,9 @@ before launch, audited contracts, and the snapshot rules announced in advance.
 - **Legal:** a one-founder game with a token is a classic "efforts of others" pattern. The UK
   financial-promotion rules may cover even in-game mentions to UK players, and MiCA may need
   a white paper. Never use investment language.
-- **Farming:** respect events are client-reported and graffiti is anonymous today. Both must
-  be fixed before either pays anything.
+- **Farming:** respect events are client-reported, so they must be made server-witnessed
+  before they pay anything. Graffiti stays anonymous on purpose. It's rewarded through
+  writers' tags that other, verified players vouch for, so farm tags earn nothing.
 - **No sinks, no token:** burn only beats emission if people want to spend CITY in the city.
   The shop is the real tokenomics.
 
@@ -90,7 +92,7 @@ before launch, audited contracts, and the snapshot rules announced in advance.
 
 - [token-design.md](token-design.md): purpose, distribution, launch conversion, emission and
   sinks against the real COIN flows, anti-farm, Base / snapshots / Nouns / CC0.
-- [legal-risks.md](legal-risks.md): risk factors and questions for counsel (US, UK, EU).
+- [legal-risks.md](legal-risks.md): risk factors and questions for counsel (US, UK, EU, Costa Rica).
 - [growth-plan.md](growth-plan.md): phases, milestones, metrics, the marketing loop.
 - [model/](model/): a pure TS model of supply, sinks and player vs farmer rewards, with tests.
   Run it with `node --experimental-strip-types docs/strategy/model/run.ts`, or test it with
