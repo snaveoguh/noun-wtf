@@ -67,14 +67,15 @@ export function tiltOf(e: { altitudeAngle?: number; tiltX?: number; tiltY?: numb
 }
 
 /**
- * A finger's "pressure" from its contact size (CSS px): a light fingertip
- * ~10 px → 0.15, a flat pad ~34 px → 1. Null when the browser doesn't
- * report a size (width/height of 1 or less).
+ * A finger's "pressure" from its contact size (CSS px, as iPadOS reports
+ * it: 2 × the contact radius): a light fingertip ~30 px → 0.15, a pad
+ * pressed flat ~75 px → 1. Null when the browser doesn't report a real
+ * size (emulators and some browsers send 1–2 px).
  */
 export function touchPressure(width: number, height: number): number | null {
   const d = Math.max(width, height);
-  if (!(d > 1.5)) return null;
-  return clamp01(0.15 + ((d - 10) / 24) * 0.85);
+  if (!(d >= 6)) return null;
+  return clamp01(0.15 + ((d - 30) / 45) * 0.85);
 }
 
 /** Press-and-hold "pressure" (the size pad): grows over about a second. */
