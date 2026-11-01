@@ -756,8 +756,19 @@ export class NounCharacter {
       }
       this.mixer = new THREE.AnimationMixer(model);
       this.hasRig = this.assets.clips.size > 0;
-      const dresser = new OutfitDresser(model);
-      if (dresser.ok) this.dresser = dresser;
+      if (this.seed.missingnoun === true) {
+        // Missingnoun: no body, no clothes, just the head on its (still
+        // animated) head bone; the rig stays so it rides and tricks as usual
+        // (the head hangs off the head bone, inside the model: keep it)
+        const keep = new Set<THREE.Object3D>();
+        this.head?.traverse(o => keep.add(o));
+        model.traverse(o => {
+          if ((o as THREE.Mesh).isMesh && !keep.has(o)) o.visible = false;
+        });
+      } else {
+        const dresser = new OutfitDresser(model);
+        if (dresser.ok) this.dresser = dresser;
+      }
     } else {
       // Procedural blocky stand-in until the rigged GLB is available.
       const { shirt } = buildBodyTexture(this.seed, {});
@@ -778,11 +789,13 @@ export class NounCharacter {
         this.body.add(m);
         return m;
       };
-      mk(0.44, 0.5, 0.26, shirt, 0.92);
-      mk(0.16, 0.5, 0.18, 0x2c3e66, 0.42, -0.11);
-      mk(0.16, 0.5, 0.18, 0x2c3e66, 0.42, 0.11);
-      mk(0.12, 0.42, 0.14, shirt, 0.92, -0.3);
-      mk(0.12, 0.42, 0.14, shirt, 0.92, 0.3);
+      if (this.seed.missingnoun !== true) {
+        mk(0.44, 0.5, 0.26, shirt, 0.92);
+        mk(0.16, 0.5, 0.18, 0x2c3e66, 0.42, -0.11);
+        mk(0.16, 0.5, 0.18, 0x2c3e66, 0.42, 0.11);
+        mk(0.12, 0.42, 0.14, shirt, 0.92, -0.3);
+        mk(0.12, 0.42, 0.14, shirt, 0.92, 0.3);
+      }
       this.head.position.set(0, 1.18, 0);
       this.body.add(this.head);
     }
@@ -1107,6 +1120,8 @@ export class NounCharacter {
     }
     dt += this.lodSkipped;
     this.lodSkipped = 0;
+    // A missingnoun head glitches (character/missingNoun.ts)
+    (this.head?.userData.tick as ((dt: number) => void) | undefined)?.(dt);
     if (this.isRideMode()) this.readTrick();
     // Undo last frame's procedural pose so it never accumulates on bones a clip doesn't key
     this.restoreRidePose();

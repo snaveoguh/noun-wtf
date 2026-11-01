@@ -420,6 +420,33 @@ export class CampSystem {
   }
 
   private readonly headBox = new THREE.Box3();
+  private readonly headInv = new THREE.Matrix4();
+  private readonly headM = new THREE.Matrix4();
+  private readonly headP = new THREE.Vector3();
+  private readonly headB = new THREE.Box3();
+
+  /**
+   * Is the camera inside the head itself? Tested in the head's own frame:
+   * a world-aligned box round a head turned 45° is far bigger than the
+   * head, and the camera pulling out behind it stayed "inside" that box,
+   * so the rider was shown headless (2026-11-01). Only the meshes that
+   * draw count (a loaded 3D model, not the generated head it replaced).
+   */
+  private insideHead(h: THREE.Object3D, cam: THREE.Vector3): boolean {
+    h.updateWorldMatrix(true, true);
+    this.headInv.copy(h.matrixWorld).invert();
+    const box = this.headBox.makeEmpty();
+    h.traverse(o => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh !== true || !m.visible || m.geometry == null) return;
+      for (let p = m.parent; p !== null && p !== h; p = p.parent) if (!p.visible) return;
+      if (m.geometry.boundingBox === null) m.geometry.computeBoundingBox();
+      this.headM.multiplyMatrices(this.headInv, m.matrixWorld);
+      box.union(this.headB.copy(m.geometry.boundingBox!).applyMatrix4(this.headM));
+    });
+    if (box.isEmpty()) return false;
+    return box.containsPoint(this.headP.copy(cam).applyMatrix4(this.headInv));
+  }
   private firstPerson: { head: THREE.Object3D; hands: THREE.Object3D[] } | null = null;
   /**
    * First person, only while the camera's inside the rider's head: the
@@ -432,7 +459,7 @@ export class CampSystem {
   private hideHead(cam: THREE.Vector3 | null) {
     const me = this.game.me;
     const h = me?.head ?? null;
-    const hide = cam !== null && h !== null && this.headBox.setFromObject(h).containsPoint(cam);
+    const hide = cam !== null && h !== null && this.insideHead(h, cam);
     const fp = this.firstPerson;
     if (fp !== null && (fp.head !== h || !hide)) {
       fp.head.visible = true;
