@@ -173,6 +173,16 @@ info pages) needed again and again:
 - **Side columns in the default navigator:** the window opens ~950 px wide
   (lg), so step a side column (300 px from lg, 340 px from xl) rather than
   dropping to one column below xl.
+- **Card grids:** step them at `@lg:` (not `@md:`), and give a card's title row
+  `flex-wrap` with the title `min-w-[min(100%,14rem)]`, so a badge drops under
+  the title instead of crushing it.
+- **A bar segment that labels itself:** make the segment its own container
+  (`[container-type:inline-size]`) and show the word only when it fits
+  (`hidden [@container(min-width:4.5rem)]:inline`), with the % always there
+  (`/predictions`' odds bars).
+- **Before a `sed` on class names:** prettier's Tailwind plugin reorders
+  classes (the `@`-variants move to the front), so grep the file for the exact
+  string first; a pattern copied from memory often doesn't match.
 - Shell items (tray, NOUN FM, the OS icon) belong to the foundation: report them
   under "Foundation requests" rather than working round them in the page.
 
@@ -225,8 +235,11 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
 ```
 
 - **Restart vite after every source edit** (no HMR and no watcher: it keeps
-  serving what it first transformed). Stop it by the port it listens on:
-  `kill $(lsof -t -iTCP:5196 -sTCP:LISTEN)`. Before starting vite again,
+  serving what it first transformed). Stop it by its process group (the
+  `setsid` launch put npx and vite in a group of their own, so this takes both
+  and nothing else):
+  `kill -- -$(ps -o pgid= -p $(lsof -t -iTCP:5196 -sTCP:LISTEN) | tr -d ' ')`.
+  Before starting vite again,
   check nothing still listens (`lsof -iTCP:5196 -sTCP:LISTEN` prints nothing):
   a run against a stale vite measures the old code. Then check `vite.log` for
   "already in use".
@@ -271,8 +284,10 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
   shot) and the sheet flag a page showing "… not configured" (missing env, so
   you measured a stub) and **squeezed** text: a sentence wrapped to about one
   word per line (≥ 4 lines, ≤ 1.5 words a line), the float-crushes-the-column
-  bug `/nounv2` had while scoring clean. Look at any shot that warns; a clean
-  score with warnings isn't done. Read the sheets either way.
+  bug `/nounv2` had while scoring clean. Preformatted text (`white-space:
+  pre*`, ASCII art) and text with a token over 30 characters (a URL) are never
+  "squeezed". Look at any shot that warns; a clean score with warnings isn't
+  done. Read the sheets either way.
 
 - **Window mode**: a 1440 × 1000 desktop (2600 × 1440 for windows ≥ 1440), the
   navigator resized live through the dev-only `window.__nos` handle, so it also
