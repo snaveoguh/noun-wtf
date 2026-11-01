@@ -10,17 +10,7 @@
  */
 import type { TerrainData } from './TerrainView';
 
-import {
-  FC,
-  lazy,
-  RefObject,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { FC, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
@@ -781,31 +771,7 @@ const HoverPreview: FC<{
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-/** Height that fills the NounOS window body below `root` (null outside one). */
-function useFillHeight(root: RefObject<HTMLElement | null>): number | null {
-  const [h, setH] = useState<number | null>(null);
-  useEffect(() => {
-    const el = root.current;
-    const host = el?.closest('.nos-content');
-    if (!el || !(host instanceof HTMLElement)) return;
-    const measure = () => {
-      const top =
-        el.getBoundingClientRect().top - host.getBoundingClientRect().top + host.scrollTop;
-      setH(Math.max(420, Math.floor(host.clientHeight - top)));
-    };
-    const ro = new ResizeObserver(measure);
-    ro.observe(host);
-    measure();
-    return () => ro.disconnect();
-  }, [root]);
-  return h;
-}
-
 const HypercastleView: FC = () => {
-  // fill the window, not the viewport: in a NounOS window 100vh ran past the
-  // window's bottom edge and hid the Teleport / Deep Fry controls
-  const rootRef = useRef<HTMLDivElement>(null);
-  const fillH = useFillHeight(rootRef);
   const { parcels, loadedCount, isLoading, total } = useHypercastleData();
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [openParcelId, setOpenParcelId] = useState<number | null>(null);
@@ -833,12 +799,18 @@ const HypercastleView: FC = () => {
   const pct = Math.round((loadedCount / total) * 100);
 
   return (
+    // data-page-fill: the view is exactly as tall as its NounOS window (100vh
+    // ran past the window's bottom and hid Teleport / Deep Fry).
+    // data-responsive-art-ok: from md up the title, tabs and buttons float
+    // over the full-bleed 3D view by design (below md they get their own bars).
     <div
-      ref={rootRef}
       className="flex flex-col"
+      data-page-fill
+      data-responsive-art-ok
       style={{
         width: '100%',
-        height: fillH ?? '100vh',
+        height: '100%',
+        minHeight: 420,
         background: '#050510',
         position: 'relative',
         overflow: 'hidden',
