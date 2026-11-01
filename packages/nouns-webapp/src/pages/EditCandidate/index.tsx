@@ -26,6 +26,9 @@ import classes from '../CreateProposal/CreateProposal.module.css';
 
 import navBarButtonClasses from '@/components/NavBarButton/NavBarButton.module.css';
 
+// Two thirds of the window, centred, from container-lg (was bootstrap's viewport `lg` offset 2).
+const formColClass = clsx(classes.createProposalForm, 'mx-auto @lg:!w-2/3');
+
 const EditCandidatePage = () => {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -50,8 +53,7 @@ const EditCandidatePage = () => {
     const content = candidate.version.content;
     const description = content.description ?? '';
     const firstNewline = description.indexOf('\n');
-    const body =
-      firstNewline >= 0 ? description.slice(firstNewline + 1).replace(/^\n+/, '') : '';
+    const body = firstNewline >= 0 ? description.slice(firstNewline + 1).replace(/^\n+/, '') : '';
     setTitleValue(content.title ?? '');
     setBodyValue(body);
     const txs: ProposalTransaction[] = (content.targets ?? []).map((target, i) => ({
@@ -130,7 +132,7 @@ const EditCandidatePage = () => {
   if (candidateLoading) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <Col xs={12} className={formColClass}>
           <p>
             <Trans>Loading candidate…</Trans>
           </p>
@@ -142,7 +144,7 @@ const EditCandidatePage = () => {
   if (!candidate) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <Col xs={12} className={formColClass}>
           <Alert variant="danger">
             <Trans>Candidate not found.</Trans>
           </Alert>
@@ -155,7 +157,7 @@ const EditCandidatePage = () => {
   if (!account) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <Col xs={12} className={formColClass}>
           <Alert variant="info">
             <Trans>Connect your wallet to edit this candidate.</Trans>
           </Alert>
@@ -168,7 +170,7 @@ const EditCandidatePage = () => {
   if (!isProposer) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <Col xs={12} className={formColClass}>
           <Alert variant="warning">
             <Trans>Only the original proposer can edit this candidate.</Trans>
           </Alert>
@@ -186,7 +188,7 @@ const EditCandidatePage = () => {
         onActionAdd={handleAddProposalAction}
       />
 
-      <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+      <Col xs={12} className={formColClass}>
         <div className={classes.wrapper}>
           <Link to={`/candidates/${id}`}>
             <button className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>←</button>
@@ -205,7 +207,8 @@ const EditCandidatePage = () => {
           <br />
           <strong>
             <Trans>
-              Edit fee: {updateCandidateCost ? formatEther(updateCandidateCost) : '0'} ETH
+              Edit fee: {updateCandidateCost !== undefined ? formatEther(updateCandidateCost) : '0'}{' '}
+              ETH
             </Trans>
           </strong>
         </Alert>
@@ -261,7 +264,8 @@ const EditCandidatePage = () => {
         </Button>
         <p className={classes.feeNotice}>
           <Trans>
-            {updateCandidateCost ? formatEther(updateCandidateCost) : '0'} ETH fee upon submission
+            {updateCandidateCost !== undefined ? formatEther(updateCandidateCost) : '0'} ETH fee
+            upon submission
           </Trans>
         </p>
       </Col>
