@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { SKY, type SkyInput } from '../contract';
 
-import { canPull, end, enter, newSky, pull, shouldEnter, stepSky } from './freefall';
+import { canPull, end, enter, newSky, pull, shouldEnter, shouldOffer, stepSky } from './freefall';
 
 const inp = (o: Partial<SkyInput> = {}): SkyInput => ({
   moveX: 0,
@@ -153,5 +153,22 @@ describe('when a fall becomes a skydive', () => {
       entered ||= shouldEnter({ airborne: true, vy, airT: t, clear: y, catchable: false });
     }
     expect(entered).toBe(false);
+  });
+});
+
+describe('offering a skydive on a big board air', () => {
+  const ok = { offered: true, airborne: true, airT: 1, clear: 80, catchable: false };
+  it('high enough, where it would not start by itself', () => expect(shouldOffer(ok)).toBe(true));
+  it('not where freefall starts by itself, or on the ground', () => {
+    expect(shouldOffer({ ...ok, offered: false })).toBe(false);
+    expect(shouldOffer({ ...ok, airborne: false })).toBe(false);
+  });
+  it('only with room to pull after taking it', () => {
+    expect(shouldOffer({ ...ok, clear: SKY.offerClear - 1 })).toBe(false);
+    expect(SKY.offerClear).toBeGreaterThan(SKY.pullMin);
+  });
+  it('not the moment you leave the lip, nor with something to catch', () => {
+    expect(shouldOffer({ ...ok, airT: 0.1 })).toBe(false);
+    expect(shouldOffer({ ...ok, catchable: true })).toBe(false);
   });
 });

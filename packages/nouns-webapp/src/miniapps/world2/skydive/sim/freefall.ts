@@ -68,6 +68,26 @@ export function shouldEnter(c: EnterCheck): boolean {
   );
 }
 
+export interface OfferCheck {
+  /** On a board where freefall doesn't start by itself (the mountain, mega ramps). */
+  offered: boolean;
+  airborne: boolean;
+  airT: number;
+  clear: number;
+  catchable: boolean;
+}
+
+/**
+ * Offer a skydive on a big air where one wouldn't start by itself: high
+ * enough that there's still room to pull after taking it, and nothing in
+ * reach parkour could catch.
+ */
+export function shouldOffer(c: OfferCheck): boolean {
+  return (
+    c.offered && c.airborne && c.airT >= SKY.offerAirT && c.clear >= SKY.offerClear && !c.catchable
+  );
+}
+
 /** Start freefall (keeps the speed the rider already has). */
 export function enter(s: SkyState, vy: number) {
   s.phase = 'freefall';

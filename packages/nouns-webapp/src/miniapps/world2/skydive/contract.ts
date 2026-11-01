@@ -50,6 +50,14 @@ export const SKY = {
   enterVy: -4,
   /** Anything parkour could catch this close (m) keeps it a parkour fall. */
   catchReach: 1.25,
+  /**
+   * Where a board air never turns into a skydive by itself (the mountain,
+   * the mega ramps: their airs are records), one this high (m of clear air)
+   * offers it instead: jump takes it (and the air stops counting).
+   */
+  offerClear: 45,
+  /** …once it's been airborne this long (s). */
+  offerAirT: 0.3,
 
   // ── Freefall ──
   /** Terminal velocities (m/s) per body position. */
