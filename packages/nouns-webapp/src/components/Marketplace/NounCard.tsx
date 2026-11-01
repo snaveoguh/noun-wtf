@@ -59,7 +59,10 @@ export function NounCard({ noun }: { noun: NounMarketItem }) {
 
       {/* Info */}
       <div className="flex flex-1 flex-col p-3">
-        <Link to={`/nouns/${noun.nounId}`}>
+        <Link
+          to={`/nouns/${noun.nounId}`}
+          className="inline-flex items-center [@media(pointer:coarse)]:min-h-10"
+        >
           <h3 className="font-headline text-sm leading-snug text-[var(--ink)] transition-colors hover:text-[var(--accent-red)]">
             Noun {noun.nounId}
           </h3>
@@ -78,7 +81,7 @@ export function NounCard({ noun }: { noun: NounMarketItem }) {
           ) : (
             <Link
               to={`/marketplace/${noun.nounId}`}
-              className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)]"
+              className="inline-flex items-center font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
             >
               View Details
             </Link>

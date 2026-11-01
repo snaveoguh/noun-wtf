@@ -27,7 +27,7 @@ export const ProfileHeader: FC<{ profile: WalletProfile; identity: string; isOwn
   const represents = num(h.delegatedVotes ?? h.representsNouns?.length);
 
   return (
-    <div className="wp-card flex flex-col gap-4 sm:flex-row sm:items-start">
+    <div className="wp-card @md:flex-row @md:items-start flex flex-col gap-4">
       <div className="wp-avatar">
         {first != null && first.seed != null ? (
           <NounSeedImage nounId={first.nounId} seed={first.seed} title={`Noun ${first.nounId}`} />
@@ -38,7 +38,7 @@ export const ProfileHeader: FC<{ profile: WalletProfile; identity: string; isOwn
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h1
-            className="wp-ellipsis m-0 text-xl font-bold leading-tight sm:text-2xl"
+            className="wp-ellipsis @md:text-2xl m-0 text-xl font-bold leading-tight"
             title={address}
           >
             {primary}
@@ -61,7 +61,7 @@ export const ProfileHeader: FC<{ profile: WalletProfile; identity: string; isOwn
               href={`https://etherscan.io/address/${address}`}
               target="_blank"
               rel="noreferrer"
-              className="wp-link"
+              className="wp-link wp-tap"
             >
               etherscan ↗
             </a>
@@ -71,7 +71,7 @@ export const ProfileHeader: FC<{ profile: WalletProfile; identity: string; isOwn
               href={`https://warpcast.com/${fc.username}`}
               target="_blank"
               rel="noreferrer"
-              className="wp-link"
+              className="wp-link wp-tap"
               title={fc.fid != null ? `fid ${fc.fid}` : undefined}
             >
               @{fc.username} on farcaster ↗
@@ -170,7 +170,7 @@ export const StatTiles: FC<{ profile: WalletProfile }> = ({ profile }) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+    <div className="@md:grid-cols-4 @xl:grid-cols-8 grid grid-cols-2 gap-2">
       {tiles.map(tile => (
         <div key={tile.l} className="wp-stat">
           <div className="wp-stat-v" title={tile.v}>
@@ -185,7 +185,7 @@ export const StatTiles: FC<{ profile: WalletProfile }> = ({ profile }) => {
 };
 
 export const StatTilesSkeleton: FC = () => (
-  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+  <div className="@md:grid-cols-4 @xl:grid-cols-8 grid grid-cols-2 gap-2">
     {Array.from({ length: 8 }, (_, i) => `s${i}`).map(k => (
       <div key={k} className="wp-stat">
         <Skeleton h={22} w="60%" />
@@ -215,8 +215,8 @@ export const OverviewCard: FC<{ profile: WalletProfile; identity: string }> = ({
         <span className="flex items-center gap-2">
           <SparklesIcon size={12} /> AI overview
           {hasText && (
-            <span className="hidden normal-case opacity-60 sm:inline">
-             , generated {relTime(ov?.generatedAt)}
+            <span className="@md:inline hidden normal-case opacity-60">
+              , generated {relTime(ov?.generatedAt)}
               {ov?.model != null && ov.model !== '' ? `, ${ov.model}` : ''}
               {refresh.data?.cached === true ? ', rate-limited, showing cached' : ''}
             </span>

@@ -8,11 +8,15 @@
 }
 .headerRow h1 {
   color: var(--theme-text-primary);
-  font-size: 56px;
+  font-size: clamp(40px, 11cqi, 56px);
   font-family: 'Londrina Solid';
 }
 .headerRow p {
   color: var(--theme-text-primary);
+}
+/* Keep each link on one line: a link broken over two lines reads as two pieces. */
+.headerRow p a {
+  white-space: nowrap;
 }
 
 .primaryBtn {
@@ -57,6 +61,13 @@
   font-size: 15px;
   color: var(--theme-text-muted);
 }
+/* The browser's file input is 37 px tall: 40 px on touch. */
+@media (pointer: coarse) {
+  .fileUpload {
+    min-height: 40px;
+    line-height: 28px;
+  }
+}
 .nounYearsFooter {
   font-style: italic;
 }
@@ -71,4 +82,78 @@
   margin-bottom: 1rem;
   background-color: var(--brand-gray-background);
   border-radius: 16px;
+}
+
+/* Layout from the page container (each NounOS window is one), not the viewport:
+   a stack below lg (760), a 240 px sidebar + three Nouns a row from lg. */
+.page {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 15px;
+}
+.layout {
+  display: grid;
+  gap: 1.5rem 30px;
+}
+.sidebar {
+  min-width: 0;
+}
+.traitGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.5rem;
+}
+.nounGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 30px;
+}
+.nounButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 16px;
+}
+.nounButton:focus-visible {
+  outline: 2px solid var(--brand-dark-red);
+  outline-offset: 2px;
+}
+
+@container page (max-width: 559.98px) {
+  .traitGrid,
+  .nounGrid {
+    column-gap: 0.75rem;
+  }
+}
+@container page (min-width: 760px) {
+  .layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .traitGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .headerRow {
+    max-width: 83.333%;
+  }
+}
+/* From 900 the old desktop split: a 3 / 9 sidebar and four Nouns a row. */
+@container page (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 9fr);
+  }
+  .nounGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@container page (min-width: 1024px) {
+  .page {
+    max-width: 960px;
+  }
+}
+@container page (min-width: 1200px) {
+  .page {
+    max-width: 1140px;
+  }
 }
