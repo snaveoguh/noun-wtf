@@ -68,8 +68,10 @@ export interface WorldSettings {
   /** Mouse-look multiplier. */
   lookSens: number;
   invertY: boolean;
-  /** No speed lines, no camera shake. */
+  /** No speed lines, no camera shake (and no trippy intro). */
   reduceMotion: boolean;
+  /** CAMP's opening shot cuts between trippy / anime / hazy / b&w looks (it flashes). */
+  introFx: boolean;
   /** Real character voices (a one-off model download) or the babble. */
   voices: VoiceMode;
   /** The rider shouts on bails, speed and records. */
@@ -113,6 +115,7 @@ export function defaultSettings(reduceMotion = prefersReducedMotion()): WorldSet
     lookSens: 1,
     invertY: false,
     reduceMotion,
+    introFx: true,
     voices: 'auto',
     callouts: true,
     cleanVoices: false,
@@ -189,6 +192,7 @@ export function sanitize(raw: unknown, base: WorldSettings = defaultSettings()):
     lookSens: clamp(o.lookSens, LOOK_SENS_MIN, LOOK_SENS_MAX, base.lookSens),
     invertY: bool(o.invertY, base.invertY),
     reduceMotion: bool(o.reduceMotion, base.reduceMotion),
+    introFx: bool(o.introFx, base.introFx),
     voices: oneOf(o.voices, VOICE_MODES, base.voices),
     callouts: bool(o.callouts, base.callouts),
     cleanVoices: bool(o.cleanVoices, base.cleanVoices),

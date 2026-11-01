@@ -31,6 +31,7 @@ describe('defaults', () => {
     expect(d.lookSens).toBe(1);
     expect(d.invertY).toBe(false);
     expect(d.reduceMotion).toBe(false);
+    expect(d.introFx).toBe(true);
   });
 
   it('nothing stored → defaults', () => {
