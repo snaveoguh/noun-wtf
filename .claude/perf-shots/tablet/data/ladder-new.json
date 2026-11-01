@@ -1,0 +1,315 @@
+{
+ "boot": {
+  "rungs": [
+   {
+    "scale": 0.75,
+    "shadows": true,
+    "post": true
+   },
+   {
+    "scale": 0.6,
+    "shadows": true,
+    "post": true
+   },
+   {
+    "scale": 0.6,
+    "shadows": false,
+    "post": true
+   },
+   {
+    "scale": 0.6,
+    "shadows": false,
+    "post": false
+   }
+  ],
+  "lite": {
+   "scale": 0.75,
+   "shadows": true,
+   "post": true
+  }
+ },
+ "events": [
+  {
+   "at": 0,
+   "lite": {
+    "scale": 0.75,
+    "shadows": true,
+    "post": true
+   },
+   "progs": 47,
+   "t": 7930.000000000001,
+   "worstCpu": 187,
+   "worstGap": 575,
+   "top": [
+    [
+     "render",
+     170
+    ],
+    [
+     "audio",
+     4
+    ],
+    [
+     "towns",
+     3
+    ],
+    [
+     "nature",
+     3
+    ],
+    [
+     "vehicles",
+     2
+    ]
+   ],
+   "progsAfter": 50
+  },
+  {
+   "at": 1,
+   "lite": {
+    "scale": 0.6,
+    "shadows": true,
+    "post": true
+   },
+   "progs": 55,
+   "t": 22896,
+   "worstCpu": 225,
+   "worstGap": 349,
+   "top": [
+    [
+     "render",
+     222
+    ]
+   ],
+   "progsAfter": 55
+  },
+  {
+   "at": 2,
+   "lite": {
+    "scale": 0.6,
+    "shadows": false,
+    "post": true
+   },
+   "progs": 55,
+   "t": 37406,
+   "worstCpu": 92,
+   "worstGap": 307,
+   "top": [
+    [
+     "render",
+     85
+    ],
+    [
+     "physics",
+     2
+    ]
+   ],
+   "progsAfter": 55
+  },
+  {
+   "at": 3,
+   "lite": {
+    "scale": 0.6,
+    "shadows": false,
+    "post": false
+   },
+   "progs": 55,
+   "t": 51572,
+   "worstCpu": 89,
+   "worstGap": 305,
+   "top": [
+    [
+     "render",
+     83
+    ],
+    [
+     "modes",
+     2
+    ]
+   ],
+   "progsAfter": 56
+  }
+ ],
+ "worst": [
+  {
+   "at": 21413,
+   "frameMs": 308,
+   "cpuMs": 225,
+   "top": [
+    [
+     "render",
+     222
+    ]
+   ]
+  },
+  {
+   "at": 60083,
+   "frameMs": 289,
+   "cpuMs": 205,
+   "top": [
+    [
+     "render",
+     138
+    ],
+    [
+     "net",
+     23
+    ],
+    [
+     "physics",
+     12
+    ],
+    [
+     "character",
+     7
+    ],
+    [
+     "vehicles",
+     3
+    ]
+   ]
+  },
+  {
+   "at": 21768,
+   "frameMs": 349,
+   "cpuMs": 169,
+   "top": [
+    [
+     "render",
+     165
+    ]
+   ]
+  },
+  {
+   "at": 30140,
+   "frameMs": 294,
+   "cpuMs": 162,
+   "top": [
+    [
+     "render",
+     95
+    ],
+    [
+     "net",
+     21
+    ],
+    [
+     "physics",
+     11
+    ],
+    [
+     "character",
+     10
+    ],
+    [
+     "missions",
+     5
+    ]
+   ]
+  },
+  {
+   "at": 21105,
+   "frameMs": 298,
+   "cpuMs": 155,
+   "top": [
+    [
+     "render",
+     130
+    ],
+    [
+     "towns",
+     23
+    ]
+   ]
+  },
+  {
+   "at": 60808,
+   "frameMs": 288,
+   "cpuMs": 151,
+   "top": [
+    [
+     "render",
+     129
+    ],
+    [
+     "missions",
+     8
+    ],
+    [
+     "wild",
+     6
+    ],
+    [
+     "physics",
+     3
+    ],
+    [
+     "modes",
+     2
+    ]
+   ]
+  },
+  {
+   "at": 19900,
+   "frameMs": 339,
+   "cpuMs": 146,
+   "top": [
+    [
+     "render",
+     136
+    ],
+    [
+     "towns",
+     7
+    ]
+   ]
+  },
+  {
+   "at": 60521,
+   "frameMs": 451,
+   "cpuMs": 126,
+   "top": [
+    [
+     "render",
+     104
+    ],
+    [
+     "input",
+     6
+    ],
+    [
+     "warm",
+     5
+    ],
+    [
+     "physics",
+     3
+    ],
+    [
+     "mountain",
+     2
+    ]
+   ]
+  }
+ ],
+ "frame": {
+  "frames": 249,
+  "fps": 3.331950596138149,
+  "mean": 300.12449799196787,
+  "p50": 294,
+  "p95": 360,
+  "p99": 451,
+  "max": 575,
+  "hitches": 249
+ },
+ "cpu": {
+  "frames": 250,
+  "fps": 11.704667821527119,
+  "mean": 85.43600000000077,
+  "p50": 82,
+  "p95": 125,
+  "p99": 187,
+  "max": 225,
+  "hitches": 235
+ }
+}
