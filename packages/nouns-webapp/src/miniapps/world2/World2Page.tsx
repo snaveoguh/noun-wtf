@@ -36,6 +36,8 @@ import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
 import { HudPrefsStyle } from './settings/SettingsPanel';
 import { bootQuality } from './settings/store';
+import { startMiniApp } from './share/miniApp';
+import { ShareUi } from './share/ShareUi';
 import { TradeUi } from './trade/TradeUi';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
@@ -65,6 +67,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   // Installable as an app on /world: Noun World's manifest + offline worker
   useEffect(() => {
     registerWorldSw(window.location.pathname);
+    void startMiniApp(); // a Farcaster mini app: safe areas + hide the host's splash
     return applyWorldManifest(window.location.pathname);
   }, []);
   // Every HUD / panel button clicks (audio/sfx/uiSounds)
@@ -433,6 +436,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && !replaying && <CarHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <DragonHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
+      {game && started && <ShareUi game={game} />}
       {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && (
         <Suspense fallback={null}>

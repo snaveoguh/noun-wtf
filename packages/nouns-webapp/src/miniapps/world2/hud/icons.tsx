@@ -58,7 +58,8 @@ export type IconName =
   | 'decks'
   | 'chat'
   | 'fm'
-  | 'cog';
+  | 'cog'
+  | 'share';
 
 const PATHS: Record<IconName, ReactNode> = {
   mic: (
@@ -331,6 +332,12 @@ const PATHS: Record<IconName, ReactNode> = {
         strokeWidth={2}
       />
       <circle cx="12" cy="12" r="3" fill={INK} />
+    </>
+  ),
+  share: (
+    <>
+      <path d="M4.5 11v9.5h15V11" fill={CYAN} {...S} />
+      <path d="M12 15.5V3M7.5 7.5L12 3l4.5 4.5" fill="none" {...S} />
     </>
   ),
 };

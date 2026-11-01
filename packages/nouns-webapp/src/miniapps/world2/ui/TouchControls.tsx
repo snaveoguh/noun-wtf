@@ -159,8 +159,8 @@ export function TouchControls({ game }: { game: Game }) {
     const s = side[i]!;
     return {
       position: 'absolute' as const,
-      left: `calc(${s.left}px + env(safe-area-inset-left))`,
-      bottom: `calc(${s.bottom}px + env(safe-area-inset-bottom))`,
+      left: `calc(${s.left}px + var(--w2-safe-left, env(safe-area-inset-left)))`,
+      bottom: `calc(${s.bottom}px + var(--w2-safe-bottom, env(safe-area-inset-bottom)))`,
     };
   };
 
@@ -244,8 +244,8 @@ export function TouchControls({ game }: { game: Game }) {
               style={{
                 width: b.size,
                 height: b.size,
-                right: `calc(${b.right}px + env(safe-area-inset-right))`,
-                bottom: `calc(${b.bottom}px + env(safe-area-inset-bottom))`,
+                right: `calc(${b.right}px + var(--w2-safe-right, env(safe-area-inset-right)))`,
+                bottom: `calc(${b.bottom}px + var(--w2-safe-bottom, env(safe-area-inset-bottom)))`,
               }}
               {...handlers[b.id]}
             >
@@ -267,7 +267,7 @@ export function TouchControls({ game }: { game: Game }) {
 .w2-t-ollie:active{background:#fff}
 .w2-t-flip{background:rgba(32,214,255,.35)}
 .w2-tcan .w2-tbtn{width:44px;height:44px;min-width:44px;border-radius:50%}
-.w2-thint{bottom:calc(132px + env(safe-area-inset-bottom))}
+.w2-thint{bottom:calc(132px + var(--w2-safe-bottom, env(safe-area-inset-bottom)))}
 @media (orientation:landscape) and (max-height:520px){.w2-thint{display:none}}`}</style>
     </div>
   );

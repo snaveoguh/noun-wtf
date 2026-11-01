@@ -223,7 +223,7 @@ export function RingHud({
       <div
         ref={toastsRef}
         className="w2h-toasts absolute left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1.5"
-        style={{ top: `calc(${L.toastTop}px + env(safe-area-inset-top))` }}
+        style={{ top: `calc(${L.toastTop}px + var(--w2-safe-top, env(safe-area-inset-top)))` }}
       >
         {hud.shop && (
           <button type="button" className="w2-prompt" onClick={onShop}>
@@ -364,8 +364,8 @@ function panelsPos(L: HudLayout): React.CSSProperties {
     };
   // Phones: left of the icon column, from the toasts' line down
   return {
-    right: `calc(${L.right + L.icon + 8}px + env(safe-area-inset-right))`,
-    top: `calc(${L.kind === 'portrait' ? L.top + L.size + 6 : L.toastTop}px + env(safe-area-inset-top))`,
+    right: `calc(${L.right + L.icon + 8}px + var(--w2-safe-right, env(safe-area-inset-right)))`,
+    top: `calc(${L.kind === 'portrait' ? L.top + L.size + 6 : L.toastTop}px + var(--w2-safe-top, env(safe-area-inset-top)))`,
     maxWidth: 'calc(100vw - 80px)',
   };
 }
@@ -374,14 +374,14 @@ function panelsPos(L: HudLayout): React.CSSProperties {
 function chatPos(W: number, H: number, touch: boolean): React.CSSProperties {
   if (!touch)
     return {
-      left: 'calc(16px + env(safe-area-inset-left))',
-      bottom: 'calc(16px + env(safe-area-inset-bottom))',
+      left: 'calc(16px + var(--w2-safe-left, env(safe-area-inset-left)))',
+      bottom: 'calc(16px + var(--w2-safe-bottom, env(safe-area-inset-bottom)))',
       maxWidth: '34vw',
     };
   const c = stickCorner(W, H);
   return {
-    left: `calc(${c.left + 44 + 8}px + env(safe-area-inset-left))`,
-    bottom: `calc(${c.bottom + c.size + 12}px + env(safe-area-inset-bottom))`,
+    left: `calc(${c.left + 44 + 8}px + var(--w2-safe-left, env(safe-area-inset-left)))`,
+    bottom: `calc(${c.bottom + c.size + 12}px + var(--w2-safe-bottom, env(safe-area-inset-bottom)))`,
     maxWidth: '58vw',
   };
 }
@@ -472,8 +472,8 @@ function Ring({
           ? { position: 'absolute', right: 0, top: L.icons.y }
           : {
               position: 'absolute',
-              left: `calc(${L.icons.left}px + env(safe-area-inset-left))`,
-              top: `calc(${L.icons.top}px + env(safe-area-inset-top))`,
+              left: `calc(${L.icons.left}px + var(--w2-safe-left, env(safe-area-inset-left)))`,
+              top: `calc(${L.icons.top}px + var(--w2-safe-top, env(safe-area-inset-top)))`,
             }),
         ['--w2h-ib' as string]: `${L.icon}px`,
       }}
@@ -552,8 +552,8 @@ function Ring({
           ? { position: 'absolute', right: 0, top: L.modes.y, width: 420 }
           : {
               position: 'absolute',
-              left: `calc(${L.modes.left}px + env(safe-area-inset-left))`,
-              top: `calc(${L.modes.top}px + env(safe-area-inset-top))`,
+              left: `calc(${L.modes.left}px + var(--w2-safe-left, env(safe-area-inset-left)))`,
+              top: `calc(${L.modes.top}px + var(--w2-safe-top, env(safe-area-inset-top)))`,
               maxWidth: L.modes.maxW,
             }
       }
@@ -566,8 +566,8 @@ function Ring({
         id="ring"
         className="w2h-ringbox absolute z-30"
         style={{
-          right: `calc(${L.right}px + env(safe-area-inset-right))`,
-          top: `calc(${L.top}px + env(safe-area-inset-top))`,
+          right: `calc(${L.right}px + var(--w2-safe-right, env(safe-area-inset-right)))`,
+          top: `calc(${L.top}px + var(--w2-safe-top, env(safe-area-inset-top)))`,
           width: size,
           height: size,
         }}
