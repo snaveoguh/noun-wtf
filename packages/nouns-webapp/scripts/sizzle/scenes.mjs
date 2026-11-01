@@ -162,7 +162,24 @@ export function installWorld() {
   };
   const fixedAtHere = new V();
   // The game calls camHook just before it renders; chain to whatever else is hooked
-  g.camHook = (cam, dt) => sz.cam?.(cam, dt);
+  // `sz.fovK` (a shot sets it; vertical clips) widens whatever lens the
+  // frame ended up with: tan(fov/2) × K. The game's lenses are vertical, so
+  // a 9:16 frame at the same fov sees a sliver; K ≈ 1.4 gives it room.
+  // (Applied to the frame's own fov, never compounded: a lens nobody reset
+  // since we last widened it is widened from its old base again.)
+  g.camHook = (cam, dt) => {
+    sz.cam?.(cam, dt);
+    const K = sz.fovK ?? 1;
+    if (K === 1 && sz.wrote === undefined) return;
+    const baseFov = cam.fov === sz.wrote ? sz.baseFov : cam.fov;
+    sz.baseFov = baseFov;
+    const f = K === 1 ? baseFov : (2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * K) * 180) / Math.PI;
+    if (cam.fov !== f) {
+      cam.fov = f;
+      cam.updateProjectionMatrix();
+    }
+    sz.wrote = K === 1 ? undefined : f;
+  };
 }
 
 /** Noun World, then onto the Big Drop, with `__bd` helpers (peak coordinates). */
@@ -354,6 +371,92 @@ export async function installPool() {
  * and skips the countdown, `place(x, y, z, yaw)` stands the rider
  * somewhere, `pilot(phases)` scripts the controls (see installParkour).
  */
+/** The rider the CAMP clips star (a fresh page rolls a random Noun). */
+const CAMP_RIDER = { background: 1, body: 13, accessory: 31, head: 138, glasses: 7 };
+
+/**
+ * NOUNS CAMP (world/camp): a plain /world load, so the rider wakes up in
+ * CAMP, but with `?camintro=0` so that wake-up runs no opening shot. Shots
+ * replay the opening themselves, seeded (`__camp.intro(seed)`), so it's the
+ * same spawn spot and the same five MEME VALUE spreads every render. The
+ * parkour pilot (`__pk.pilot`) drives the rider on foot.
+ */
+export async function openCamp(p, base) {
+  await openWorld(p, base, '&camintro=0');
+  // World2Page's wake-up (a 250 ms interval, real time) puts the rider in CAMP
+  await p.waitForFunction(
+    () => {
+      const g = window.__w2;
+      return g.camp.site !== null && g.player.pos.y > g.camp.site.floorY - 1;
+    },
+    null,
+    { timeout: 300_000, polling: 1000 },
+  );
+  await p.evaluate(s => window.__w2.setSeed(s), CAMP_RIDER);
+  await p.waitForTimeout(10_000);
+  await p.evaluate(installParkour);
+  await p.evaluate(installCamp);
+  await cleanFrame(p);
+}
+
+/** Runs in the page. `__camp`: CAMP's site, a seeded opening shot, a spot in the room. */
+export function installCamp() {
+  const sz = window.__sz;
+  const g = sz.g;
+  // The sunset the wake-up set eases in over game time
+  sz.run(240);
+  const mulberry = seed => {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+  window.__camp = {
+    site: g.camp.site,
+    /** The opening shot + reading, as a plain load plays it, with Math.random seeded (spawn spot, spreads). */
+    intro(seed) {
+      // startIntro reads ?camintro=0 off the address: drop it (the router never sees this)
+      const u = new URL(location.href);
+      u.searchParams.delete('camintro');
+      history.replaceState(history.state, '', u);
+      const R = Math.random;
+      Math.random = mulberry(seed);
+      try {
+        return g.camp.spawnInside();
+      } finally {
+        Math.random = R;
+      }
+    },
+    /** On foot in the room (room frame: x across, z in from the window wall), facing yaw. */
+    place(x, z, yaw) {
+      const s = g.camp.site;
+      const p = g.player;
+      if (p.mode === 'board') p.toggleBoard();
+      p.spawn(new sz.V(s.origin.x + x, s.floorY + 0.05, s.origin.z + z), yaw);
+      p.mode = 'foot';
+      p.footGrounded = true;
+      g.pk?.motor?.reset?.();
+      sz.run(2);
+      g.cam.snap(p);
+    },
+  };
+}
+
+/**
+ * The plaza (`?spawn=plaza`) with a missingnoun rider from the address
+ * (`?seed=…-m`, character/missingNoun.ts): only the glitching voxel head
+ * and its noggles ride the board.
+ */
+export async function openMissingnoun(p, base) {
+  await openWorld(p, base, '&spawn=plaza&camintro=0&seed=1-13-31-138-7-m');
+  await p.waitForFunction(() => window.__w2.me?.seed?.missingnoun === true, null, { timeout: 120_000, polling: 1000 });
+  await p.waitForTimeout(8000);
+  await cleanFrame(p);
+}
+
 export async function openParkour(p, base) {
   await openWorld(p, base);
   // The same rider in every shot (a fresh page rolls a random Noun)

@@ -1,0 +1,10 @@
+{
+  "name": "camp-jump-h",
+  "size": [1920, 1080],
+  "out": "public/clips",
+  "frames": ".frames",
+  "poster": 3.0,
+  "maxrate": 2.6,
+  "grade": "eq=contrast=1.05:saturation=1.08,unsharp=5:5:0.35",
+  "cuts": [{ "shot": "camp-jump", "in": 0.3, "dur": 8.4 }]
+}

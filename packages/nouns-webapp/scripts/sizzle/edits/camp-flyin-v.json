@@ -1,0 +1,10 @@
+{
+  "name": "camp-flyin-v",
+  "size": [1080, 1920],
+  "out": "public/clips",
+  "frames": ".frames-v",
+  "poster": 9.0,
+  "maxrate": 1.9,
+  "grade": "eq=contrast=1.05:saturation=1.08,unsharp=5:5:0.35",
+  "cuts": [{ "shot": "camp-intro", "in": 0.3, "dur": 14.6 }]
+}

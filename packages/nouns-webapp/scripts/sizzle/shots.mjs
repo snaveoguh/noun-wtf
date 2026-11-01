@@ -3,7 +3,17 @@
 // installs `window.__sizzleFrame(i)` (advance one frame, leave it drawn).
 // Setups run in the browser, so each one is self-contained. See README.md.
 
-import { openBigDrop, openBreaks, openExchange, openParkour, openPool, openWarfare, openWorld } from './scenes.mjs';
+import {
+  openBigDrop,
+  openBreaks,
+  openCamp,
+  openExchange,
+  openMissingnoun,
+  openParkour,
+  openPool,
+  openWarfare,
+  openWorld,
+} from './scenes.mjs';
 
 export const SCENES = {
   world: openWorld,
@@ -13,6 +23,8 @@ export const SCENES = {
   pool: openPool,
   parkour: openParkour,
   warfare: openWarfare,
+  camp: openCamp,
+  missingnoun: openMissingnoun,
 };
 
 // ── Noun Breaks (scene: breaks; window.__d is the breakDev() harness) ──
@@ -503,6 +515,129 @@ const pk = (frames, route, arg, extra = {}) => ({
   ...extra,
 });
 
+// ── NOUNS CAMP (scene: camp; window.__camp, scenes.mjs) ──
+
+/**
+ * A CAMP shot. `intro`: the game's own opening shot from a plain load (the
+ * fly-in over the plaza, in through the window, into the rider's eyes on
+ * MEME VALUE, the flick through five spreads, the pull-out and the toss),
+ * seeded so it's the same every render. `jump`: run at the window, leap
+ * out and fall the 146 m to the plaza, rolling the landing, with a camera
+ * that looks in through the window and then drops with the rider.
+ * `portraitK` widens the lens in a vertical frame (scenes.mjs `fovK`).
+ */
+function campShot(o) {
+  const sz = window.__sz;
+  const g = sz.g;
+  const C = window.__camp;
+  const s = C.site;
+  sz.input = null;
+  sz.rig(null);
+  sz.fovK = innerHeight > innerWidth ? (o.portraitK ?? 1.4) : 1;
+  if (o.kind === 'intro') {
+    if (!C.intro(o.seed ?? 1)) throw new Error('no CAMP to wake up in');
+  } else if (o.kind === 'jump') {
+    C.place(o.x ?? 0, o.z ?? 4, Math.PI);
+    const face = s.faceZ;
+    window.__pk.pilot([
+      { dir: [0, -1], move: 0.5, dur: o.walk ?? 0.4 },
+      { dir: [0, -1], sprint: true, until: `p.pos.z < ${face - 1.0}` },
+      { dir: [0, -1], sprint: true, jump: true, dur: 1 / 60 },
+      { dir: [0, -1], until: 'p.pos.y < 8' },
+      // A timed duck rolls the landing (parkour's hard landing)
+      { dir: [0, -1], duck: true, until: 'p.footGrounded && t > 0.2' },
+      { dur: 3 },
+    ]);
+    const V = sz.V;
+    const pl = g.player;
+    // In through the window at the rider, then dropping with them
+    const inEye = new V(s.origin.x + (o.inSide ?? 1.4), s.floorY + 1.75, face - (o.inBack ?? 5.5));
+    const eye = new V();
+    const want = new V();
+    const look = new V();
+    let k = 0;
+    let first = true;
+    sz.cam = (cam, dt) => {
+      const out = pl.pos.z < face - 0.3;
+      k = out ? Math.min(1, k + dt / 0.9) : 0;
+      const e = k * k * (3 - 2 * k);
+      const [ox, oy, oz] = o.follow ?? [3.6, 2.6, -6.5];
+      want.set(pl.pos.x + ox, pl.pos.y + oy, pl.pos.z + oz);
+      // Down at the street it stops dropping (and keeps its distance)
+      want.y = Math.max(want.y, o.floor ?? 2.4);
+      want.lerp(inEye, 1 - e);
+      if (first) eye.copy(want);
+      else eye.lerp(want, 1 - Math.exp(-(o.smooth ?? 8) * dt));
+      first = false;
+      // Looking a little below them as they fall (the street coming up)
+      const fall = Math.min(1, Math.max(0, (-pl.vel.y - 4) / 30));
+      look.copy(pl.pos);
+      look.y += 0.9 - (o.lookDown ?? 1.6) * fall * e;
+      cam.position.copy(eye);
+      cam.lookAt(look);
+      if (cam.fov !== (o.fov ?? 60)) {
+        cam.fov = o.fov ?? 60;
+        cam.updateProjectionMatrix();
+      }
+    };
+  }
+  window.__sizzleFrame = () => sz.step();
+  window.__sizzleSkip = () => sz.run(2);
+}
+
+const camp = (frames, arg, extra = {}) => ({ scene: 'camp', frames, setup: campShot, arg, ...extra });
+
+// ── Missingnoun (scene: missingnoun; the plaza, `?seed=…-m`) ──
+
+/**
+ * Skating the plaza on a missingnoun (only its glitching head and noggles
+ * ride): board on at (x, z) heading `yaw`, pushing, a flip trick every
+ * `every` s from `tricks`, carving with `steer`, under a __sz.rig camera.
+ */
+function mnShot(o) {
+  const sz = window.__sz;
+  const g = sz.g;
+  const pl = g.player;
+  sz.input = null;
+  sz.rig(null);
+  sz.fovK = innerHeight > innerWidth ? (o.portraitK ?? 1.35) : 1;
+  if (pl.mode !== 'board') sz.input = { boardTogglePressed: true };
+  sz.run(4);
+  sz.input = null;
+  const V = sz.V;
+  const y = g.world.raycast(new V(o.at[0], 40, o.at[1]), new V(0, -1, 0), 80)?.point.y ?? 0;
+  pl.spawn(new V(o.at[0], y + 0.1, o.at[1]), o.yaw);
+  if (pl.mode !== 'board') pl.toggleBoard();
+  pl.fwd.set(Math.sin(o.yaw), 0, Math.cos(o.yaw));
+  pl.vel.copy(pl.fwd).multiplyScalar(o.speed ?? 8);
+  let t = 0;
+  let k = 0;
+  let next = o.first ?? 0.6;
+  sz.input = () => {
+    t += 1 / 60;
+    const air = pl.state === 'air';
+    let tricks = [];
+    if (o.every && t >= next && !air) {
+      tricks = [o.tricks[k++ % o.tricks.length]];
+      next = t + o.every;
+    }
+    return {
+      push: !air && (o.push ?? true),
+      tricks,
+      grabL: false,
+      moveX: o.steer ? Math.sin(t * (o.steerW ?? 1.1)) * o.steer : 0,
+      moveY: 0,
+    };
+  };
+  sz.run(Math.round((o.pre ?? 0.5) * 60));
+  g.cam.snap?.(pl);
+  if (o.cam) sz.rig(o.cam[0], o.cam[1]);
+  window.__sizzleFrame = () => sz.step();
+  window.__sizzleSkip = () => sz.run(2);
+}
+
+const mn = (frames, arg, extra = {}) => ({ scene: 'missingnoun', frames, setup: mnShot, arg, ...extra });
+
 // ── Noun Warfare (scene: warfare; window.__wf, scenes.mjs) ──
 
 /**
@@ -579,4 +714,14 @@ export const SHOTS = {
   'gx-trade': gx(120, { kind: 'trade', r: 11, push: 2.5, el: 0.55, w: 0.16 }),
   'gx-pullout': gx(165, { kind: 'pullout', pit: 0, secs: 5.2, r0: 12, r1: 760, el0: 0.25, elMid: 0.85, el1: 0.5 }),
   'gx-descent': gx(60, { kind: 'descent' }),
+
+  // NOUNS CAMP: the opening shot (7.5 s fly-in + 7.3 s of MEME VALUE), whole
+  'camp-intro': camp(450, { kind: 'intro', seed: 3 }, { settle: 8000 }),
+  // Out of the window and 146 m down to the plaza (~1 s run, ~5.3 s fall, the roll)
+  'camp-jump': camp(270, { kind: 'jump', z: 4 }),
+
+  // A missingnoun rider skating the plaza, flip tricks
+  'mn-side': mn(150, { at: [20, -20], yaw: 0, tricks: ['kickflip', 'treflip', 'heelflip'], every: 1.5, first: 0.9, cam: ['side', { side: 3.4, up: 0.7, ahead: 1.2, lead: 2, smooth: 6, fov: 60 }] }),
+  'mn-orbit': mn(120, { at: [-20, 20], yaw: Math.PI / 2, tricks: ['hardflip', 'shuvit', 'kickflip'], every: 1.4, first: 0.8, pre: 0.8, cam: ['orbit', { r: 4.5, h: 1.3, a0: 0.6, w: 0.55 }] }),
+  'mn-chase': mn(120, { at: [20, -20], yaw: 0, tricks: ['treflip', 'kickflip'], every: 1.6, first: 0.5, pre: 1.2, steer: 0.35, cam: null }),
 };

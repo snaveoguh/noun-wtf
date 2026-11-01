@@ -1,0 +1,10 @@
+{
+  "name": "camp-flyin-h",
+  "size": [1920, 1080],
+  "out": "public/clips",
+  "frames": ".frames",
+  "poster": 9.0,
+  "maxrate": 1.9,
+  "grade": "eq=contrast=1.05:saturation=1.08,unsharp=5:5:0.35",
+  "cuts": [{ "shot": "camp-intro", "in": 0.3, "dur": 14.6 }]
+}
