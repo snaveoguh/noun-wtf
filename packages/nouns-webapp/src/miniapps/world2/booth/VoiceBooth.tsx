@@ -470,7 +470,7 @@ function ShareBox({
           <label className="flex items-start gap-2 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:items-center">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 [@media(pointer:coarse)]:mt-0 [@media(pointer:coarse)]:h-6 [@media(pointer:coarse)]:w-6"
+              className="mt-0.5 h-4 w-4 shrink-0 [@media(pointer:coarse)]:mt-0 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10"
               checked={agree}
               onChange={e => setAgree(e.target.checked)}
               data-booth-consent=""
