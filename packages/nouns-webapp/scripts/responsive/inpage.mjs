@@ -184,8 +184,16 @@ export function collect(opts) {
     range.selectNodeContents(n);
     const r = range.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
-    const words = t.trim().split(/\s+/).length;
-    if (words >= 4 && squeezed.length < 12) {
+    const tokens = t.trim().split(/\s+/);
+    const words = tokens.length;
+    // Not squeezed: preformatted text (ASCII art, code: its lines are the
+    // author's) or text with a long unbreakable token (a URL wraps by itself).
+    if (
+      words >= 4 &&
+      squeezed.length < 12 &&
+      !css(el).whiteSpace.startsWith('pre') &&
+      !tokens.some(w => w.length > 30)
+    ) {
       const tops = new Set(Array.from(range.getClientRects(), q => Math.round(q.top)));
       if (tops.size >= 4 && words / tops.size <= 1.5) {
         squeezed.push({
