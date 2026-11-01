@@ -36,7 +36,7 @@ export interface MuralBillboardOpts {
 }
 
 /** The decal's quad in world space: origin on the wall at the quad's centre. */
-interface WallQuad {
+export interface WallQuad {
   origin: THREE.Vector3;
   right: THREE.Vector3;
   up: THREE.Vector3;
@@ -44,7 +44,20 @@ interface WallQuad {
   rect: WallRect;
 }
 
-function quadOf(mesh: THREE.Mesh): WallQuad | null {
+/** The plaza's mural decal mesh under `root` (its `mural__` material), or null. */
+export function findMuralDecal(root: THREE.Object3D): THREE.Mesh | null {
+  let hit: THREE.Mesh | null = null;
+  root.traverse(o => {
+    const m = o as THREE.Mesh;
+    if (hit !== null || m.isMesh !== true) return;
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    if (mats.some(x => /^mural__/i.test(x.name))) hit = m;
+  });
+  return hit;
+}
+
+/** A wall decal's quad in world space (the mural's: the billboard and the bench use it). */
+export function quadOf(mesh: THREE.Mesh): WallQuad | null {
   const pos = mesh.geometry.attributes.position;
   const nrm = mesh.geometry.attributes.normal;
   if (pos === undefined || pos.count < 3) return null;

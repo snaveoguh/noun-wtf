@@ -311,6 +311,16 @@ A long fall becomes a skydive, on foot and on a board (`world2/skydive/`, contra
 - **Stats:** an air with any skydive in it never claims an air / hang record (`Stats.airVoid`): drag and canopies don't fall at the game's gravity, so the server's proof would refuse it.
 - **Net:** optional `sk: [phase, posture, open, steer]` in the pose blob (`net/sk.ts`); remote riders pose and get a canopy from it. Older clients ignore it. No worker deploy.
 
+### The mural bench (Pipe, SIT, the cinematic shot)
+
+A park bench on the plaza pavement across the ring road from the GIF mural (`world/bench/`), with Pipe (a `head-pipe` Noun, traits found by filename) on seat 0.
+- **Placement** (`place.ts`, pure, probe-driven): out from the mural decal's own quad (`MuralBillboard.ts` `findMuralDecal` / `quadOf`), never hardcoded. Candidates run nearest-ideal first (21 m out, on the mural's centre line). A spot wins when the pad (bench, feet, room behind) is one flat surface at pavement height, nothing solid is within 0.7 m, and the shot's camera is in clear air with clear rays to the mural's corners, centre and a 120 × 7 grid. Only hits more than `NEAR_WALL` (6 m) from the wall count against the grid: the far pavement's lamp post stands in front of the picture from anywhere. It reads only the static level collision (`probeOf`), so every client puts it in the same place. On the real plaza it lands 21 m out, 1.5 m left of centre (~150 ms at load), which keeps the near lamp post at (−48, −57) out of the picture.
+- **Bench** (`build.ts`): one merged vertex-coloured mesh (1 draw, toonified), box collider `bench:mural`.
+- **Pipe** (`PipeHead.ts`): built within 70 m, posed within 45 m, hidden past 110 m (60 m on low). Uses `poseSit` plus turnBone: legs out, inner arm along the backrest, a slow nod. Pipe-smoke puffs go through `Particles.smokeAt`, which reuses the dust pool, so no extra draw. He says a line in a `w2-said` bubble when you walk up, sit down, or now and then while you're sat.
+- **Sitting** (`rules.ts` + `BenchSystem.ts`): on foot, grounded and slow within 1.6 m of seat 1 or 2 → SIT (E / tap, `BenchUi`). You ease onto the seat (`poseSit`), and the camera glides in over 1.8 s to `shot.ts` (pure): behind and over the sitters on the line from the mural's centre through the bench, long lens 31° → 33°, a 20 s push-in plus a slow drift, widening on portrait screens to keep the mural's width. There's a letterbox, and `body[data-bench-shot]` fades the HUD. While sat, input is muted (`muteInput`). A move, a jump, E, Esc or STAND UP (touch) stands you up; the camera snaps behind the rider and `BenchSystem.camera()` glides from the shot into the live game camera over 1.1 s.
+- **Net:** optional `bn: [seat]` in the pose blob (`Net.bench`). Remotes are posed on the seat only if their position is at that seat's stand spot (`remoteSeat`). Older clients ignore it and draw them standing in front of the bench. No worker deploy.
+- **Tests:** `npx vitest run src/miniapps/world2/world/bench`. They cover placement against the real plaza, framing on four aspects, and corner / grid rays against the real collision. Browser shots are in `.claude/mural-bench-shots/`.
+
 ### Graffiti on tablets (mural mode)
 
 iPad-first painting (`world2/graffiti/mural/`). An art competition runs on these walls, and artists paint on iPads.

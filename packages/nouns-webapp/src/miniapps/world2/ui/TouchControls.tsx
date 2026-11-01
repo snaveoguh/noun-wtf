@@ -167,7 +167,11 @@ export function TouchControls({ game }: { game: Game }) {
   return (
     // The layer itself lets taps through to the HUD (mic, stats, map…);
     // only the stick areas and buttons catch touches
-    <div className="pointer-events-none absolute inset-0" style={{ touchAction: 'none' }}>
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{ touchAction: 'none' }}
+      data-w2touch=""
+    >
       <div
         ref={leftRef}
         className="pointer-events-auto absolute bottom-0 left-0 h-[55%] w-1/2"
