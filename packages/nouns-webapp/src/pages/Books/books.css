@@ -15,6 +15,9 @@
   flex-direction: column;
   width: 100%;
   height: max(560px, calc(100dvh - 150px));
+  /* the reader lays out from its own width (a NounOS window, or the whole
+     screen when it goes fullscreen), never the viewport's */
+  container: bk / inline-size;
   background: var(--bg);
   color: var(--tx);
   font-family:
@@ -45,7 +48,7 @@
   margin: 0;
   font-family: 'Pip3', 'Londrina Solid', system-ui, sans-serif;
   font-weight: 400;
-  font-size: clamp(30px, 4.4vw, 52px);
+  font-size: clamp(30px, 5.5cqi, 52px);
   line-height: 0.86;
   letter-spacing: 0.01em;
   color: #fff;
@@ -634,15 +637,17 @@
 .bk-phone {
   display: none !important;
 }
-@media (max-width: 640px) {
+@container page (max-width: 639.98px) {
+  .bk {
+    height: max(520px, calc(100dvh - 120px));
+  }
+}
+@container bk (max-width: 639.98px) {
   .bk-phone {
     display: inline-flex !important;
   }
   .bk-desk {
     display: none !important;
-  }
-  .bk {
-    height: max(520px, calc(100dvh - 120px));
   }
   .bk-head {
     padding: 10px 14px 8px;
@@ -674,5 +679,23 @@
   }
   .bk-hint {
     display: none;
+  }
+}
+
+/* touch: 40 px targets (the phone bar wraps to two rows instead) */
+@media (pointer: coarse) {
+  .bk .bk-btn {
+    min-width: 40px;
+    height: 40px;
+  }
+  /* the byline link: a 40 px hit box without growing the line */
+  .bk-by a {
+    display: inline-block;
+    padding: 13px 0;
+    margin: -13px 0;
+    border-bottom: 0;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 47, 142, 0.7);
+    text-underline-offset: 3px;
   }
 }

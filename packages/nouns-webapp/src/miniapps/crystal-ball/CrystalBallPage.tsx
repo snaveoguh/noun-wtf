@@ -43,6 +43,7 @@ import {
 } from '@/contracts/nounv2-auction-house';
 import { NOUNV2_TOKEN_ADDRESS } from '@/contracts/nounv2-token';
 import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
+import { useContainerWidth } from '@/hooks/useContainerWidth';
 import { REST_API_BASE } from '@/lib/api';
 import { traitName } from '@/lib/traitName';
 import { config as wagmiConfig, defaultChain } from '@/wagmi';
@@ -299,17 +300,18 @@ function useSlowPending(pending: boolean, delayMs = 10_000): boolean {
   return slow;
 }
 
-function useBallSize() {
-  const [size, setSize] = useState(() =>
-    Math.min(420, window.innerWidth - 60, window.innerHeight * 0.45),
-  );
+/**
+ * The orb's size: from the page's container width (a narrow NounOS window on
+ * a wide screen gets a small orb), and the screen's height as before.
+ */
+function useBallSize(containerWidth: number) {
+  const [vh, setVh] = useState(() => window.innerHeight);
   useEffect(() => {
-    const onResize = () =>
-      setSize(Math.min(420, window.innerWidth - 60, window.innerHeight * 0.45));
+    const onResize = () => setVh(window.innerHeight);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  return Math.round(size);
+  return Math.round(Math.max(160, Math.min(420, containerWidth - 60, vh * 0.45)));
 }
 
 function useNounSeeds() {
@@ -619,7 +621,7 @@ function Pill<T extends string>({
       role="tab"
       aria-selected={active}
       onClick={() => onSelect(value)}
-      className={`relative flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${ringClass} ${
+      className={`relative flex items-center justify-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10 ${ringClass} ${
         active ? activeClasses : inactiveClasses
       }`}
     >
@@ -1074,13 +1076,6 @@ interface SettleOrbButtonProps {
  * modal instead of a no-op alert.
  */
 function SettleOrbButton({ state, isConnected, active }: SettleOrbButtonProps) {
-  const containerStyle: CSSProperties = {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 20,
-  };
-
   const baseBtnStyle: CSSProperties = {
     width: 44,
     height: 44,
@@ -1112,7 +1107,7 @@ function SettleOrbButton({ state, isConnected, active }: SettleOrbButtonProps) {
 
   if (!isConnected) {
     return (
-      <div style={containerStyle}>
+      <>
         <ConnectKitButton.Custom>
           {({ show }) => (
             <button
@@ -1126,12 +1121,12 @@ function SettleOrbButton({ state, isConnected, active }: SettleOrbButtonProps) {
             </button>
           )}
         </ConnectKitButton.Custom>
-      </div>
+      </>
     );
   }
 
   return (
-    <div style={containerStyle}>
+    <>
       <button
         type="button"
         aria-label={tooltip}
@@ -1142,7 +1137,7 @@ function SettleOrbButton({ state, isConnected, active }: SettleOrbButtonProps) {
       >
         <span aria-hidden="true">{state.isPending ? '\u23F3' : '\uD83D\uDD2E'}</span>
       </button>
-    </div>
+    </>
   );
 }
 
@@ -1150,6 +1145,10 @@ function SettleOrbButton({ state, isConnected, active }: SettleOrbButtonProps) {
 export default function CrystalBallPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'ascii';
+    // ?view=2d|3d|ascii wins over the remembered choice (deep links, and the
+    // responsive harness measures each view this way)
+    const fromUrl = new URLSearchParams(window.location.search).get('view');
+    if (fromUrl === '2d' || fromUrl === '3d' || fromUrl === 'ascii') return fromUrl;
     const saved = window.localStorage.getItem('crystal-ball:view-mode');
     if (saved === '2d' || saved === '3d' || saved === 'ascii') return saved;
     return 'ascii';
@@ -1169,7 +1168,8 @@ export default function CrystalBallPage() {
 
   const [settling, setSettling] = useState(false);
   const [settleTx, setSettleTx] = useState<string | null>(null);
-  const ballSize = useBallSize();
+  const { ref: pageRef, width: pageWidth } = useContainerWidth<HTMLDivElement>();
+  const ballSize = useBallSize(pageWidth);
   const allSeeds = useNounSeeds();
 
   const nounV2Prediction = useNounV2Prediction(activeDao === 'nounv2');
@@ -1283,6 +1283,7 @@ export default function CrystalBallPage() {
 
   return (
     <div
+      ref={pageRef}
       style={{
         minHeight: '100vh',
         display: 'flex',
@@ -1297,31 +1298,6 @@ export default function CrystalBallPage() {
         position: 'relative',
       }}
     >
-      {/* Floating crystal-ball settle button — top right of the page. */}
-      <SettleOrbButton state={userSettle} isConnected={isConnected} active={isNounOClock} />
-
-      {/* Settle tx hash — small breadcrumb under the orb button when broadcast. */}
-      {userSettle.txHash && (
-        <a
-          href={`https://etherscan.io/tx/${userSettle.txHash}`}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            position: 'absolute',
-            top: 64,
-            right: 16,
-            fontSize: 12,
-            color: '#4ade80',
-            fontFamily: 'monospace',
-            letterSpacing: '0.05em',
-            textDecoration: 'none',
-            zIndex: 20,
-          }}
-        >
-          TX: {userSettle.txHash.slice(0, 8)}…
-        </a>
-      )}
-
       {/* DAO + view-mode toggles. The DAO toggle navigates between
           /crystal-ball and /v2/crystal-ball. */}
       <div
@@ -1334,31 +1310,57 @@ export default function CrystalBallPage() {
           paddingTop: 12,
         }}
       >
-        <span
-          style={{
-            fontSize: 12,
-            letterSpacing: '0.2em',
-            color: 'var(--theme-text-muted)',
-            fontWeight: 700,
-            minWidth: 36,
-          }}
-        >
-          DAO
-        </span>
-        <DaoToggle dao={activeDao} setDao={setActiveDao} />
-        <span
-          style={{
-            fontSize: 12,
-            letterSpacing: '0.2em',
-            color: 'var(--theme-text-muted)',
-            fontWeight: 700,
-            minWidth: 36,
-            marginLeft: 8,
-          }}
-        >
-          VIEW
-        </span>
-        <ViewModeToggle mode={viewMode} setMode={setViewMode} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              fontSize: 12,
+              letterSpacing: '0.2em',
+              color: 'var(--theme-text-muted)',
+              fontWeight: 700,
+              minWidth: 36,
+            }}
+          >
+            DAO
+          </span>
+          <DaoToggle dao={activeDao} setDao={setActiveDao} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              fontSize: 12,
+              letterSpacing: '0.2em',
+              color: 'var(--theme-text-muted)',
+              fontWeight: 700,
+              minWidth: 36,
+              marginLeft: 8,
+            }}
+          >
+            VIEW
+          </span>
+          <ViewModeToggle mode={viewMode} setMode={setViewMode} />
+        </div>
+        {/* Crystal-ball settle button: top right of the page from md, the
+            end of this row below it (it sat on the VIEW toggle there). */}
+        <div className="cb-orb">
+          <SettleOrbButton state={userSettle} isConnected={isConnected} active={isNounOClock} />
+          {/* Settle tx hash: a small breadcrumb under the orb once broadcast. */}
+          {userSettle.txHash && (
+            <a
+              href={`https://etherscan.io/tx/${userSettle.txHash}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontSize: 12,
+                color: '#4ade80',
+                fontFamily: 'monospace',
+                letterSpacing: '0.05em',
+                textDecoration: 'none',
+              }}
+            >
+              TX: {userSettle.txHash.slice(0, 8)}…
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Orb + match panel side by side on desktop, stacked on mobile */}
@@ -1410,6 +1412,7 @@ export default function CrystalBallPage() {
                 letterSpacing: '0.1em',
                 lineHeight: 1.6,
                 maxWidth: ballSize * 0.7,
+                overflowWrap: 'anywhere',
               }}
             >
               No auction house address configured. Prediction unavailable until the
@@ -1639,6 +1642,7 @@ export default function CrystalBallPage() {
             {/* Twin noun link */}
             <a
               href={`/noun/${bestMatch.nounId}`}
+              className="cb-twin-link"
               style={{
                 fontSize: 14,
                 color: '#aaccff',
@@ -1817,6 +1821,14 @@ export default function CrystalBallPage() {
 
       {/* Settle pulse animation */}
       <style>{`
+        .cb-orb { position: absolute; top: 16px; right: 16px; z-index: 20;
+          display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+        @media (pointer: coarse) {
+          .cb-twin-link { display: inline-flex; align-items: center; min-height: 40px; }
+        }
+        @container page (max-width: 559.98px) {
+          .cb-orb { position: static; flex-direction: row; align-items: center; gap: 8px; }
+        }
         @keyframes settle-pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.03); }

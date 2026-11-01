@@ -8,29 +8,26 @@ import advanced from 'dayjs/plugin/advancedFormat';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
 import { Col, Row } from 'react-bootstrap';
-
-import editorClasses from '@/components/ProposalEditor/ProposalEditor.module.css';
-import headerClasses from '@/components/ProposalHeader/ProposalHeader.module.css';
-import Section from '@/layout/Section';
-import { useProposal, useProposalVersions } from '@/wrappers/nounsDao';
-import classes from './Vote.module.css';
-import navBarButtonClasses from '@/components/NavBarButton/NavBarButton.module.css';
-import ProposalContent from '@/components/ProposalContent';
-
 import ReactDiffViewer from 'react-diff-viewer';
 import ReactMarkdown from 'react-markdown';
+import { Link, useParams } from 'react-router';
 import rehypeRaw from 'rehype-raw';
-
-import VersionTab from './VersionTab';
-
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
+import ProposalContent from '@/components/ProposalContent';
 import ProposalTransactionsDiffs from '@/components/ProposalContent/ProposalTransactionsDiffs';
 import ProposalStatus from '@/components/ProposalStatus';
+import Section from '@/layout/Section';
 import { processProposalDescriptionText } from '@/utils/processProposalDescriptionText';
+import { useProposal, useProposalVersions } from '@/wrappers/nounsDao';
 
-import { Link, useParams } from 'react-router';
+import VersionTab from './VersionTab';
+import classes from './Vote.module.css';
+
+import navBarButtonClasses from '@/components/NavBarButton/NavBarButton.module.css';
+import editorClasses from '@/components/ProposalEditor/ProposalEditor.module.css';
+import headerClasses from '@/components/ProposalHeader/ProposalHeader.module.css';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -61,14 +58,20 @@ const ProposalHistory = () => {
     }
   }, [showToast]);
 
+  // Versions are 1-based; a version the indexer doesn't have (or hasn't loaded yet) renders
+  // nothing rather than crashing (/vote/:id/history/1 used to throw on an empty list).
+  const currentVersion = activeVersion >= 1 ? proposalVersions?.[activeVersion - 1] : undefined;
+  const previousVersion = activeVersion >= 2 ? proposalVersions?.[activeVersion - 2] : undefined;
+
   const highlightSyntax = (str: string) => {
     return (
       <ReactMarkdown
         className={clsx(editorClasses.markdown, editorClasses.diffs)}
-        children={str}
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw]}
-      />
+      >
+        {str}
+      </ReactMarkdown>
     );
   };
   const headerDiffs = (str: string) => {
@@ -81,15 +84,17 @@ const ProposalHistory = () => {
         {proposal && (
           <>
             <div className={headerClasses.backButtonWrapper}>
-              <Link to={`/vote/${id}`}>
-                <button className={clsx(headerClasses.backButton, navBarButtonClasses.whiteInfo)}>
-                  ←
-                </button>
+              <Link
+                to={`/vote/${id}`}
+                aria-label={`Back to proposal ${id}`}
+                className={clsx(classes.backLink, navBarButtonClasses.whiteInfo)}
+              >
+                ←
               </Link>
             </div>
             <div className={headerClasses.headerRow}>
               <span>
-                <div className="d-flex">
+                <div className="d-flex flex-wrap items-center gap-y-1">
                   <div>
                     <Trans>Proposal {i18n.number(Number(proposal.id || '0'))}</Trans>
                   </div>
@@ -103,11 +108,11 @@ const ProposalHistory = () => {
               </span>
               <div className={headerClasses.proposalTitleWrapper}>
                 <div className={clsx(headerClasses.proposalTitle, classes.proposalTitle)}>
-                  {isDiffsVisible && proposalVersions && activeVersion >= 2 ? (
+                  {isDiffsVisible && previousVersion && currentVersion ? (
                     <div className={classes.diffsWrapper}>
                       <ReactDiffViewer
-                        oldValue={proposalVersions[activeVersion - 2].title}
-                        newValue={proposalVersions[activeVersion - 1].title}
+                        oldValue={previousVersion.title}
+                        newValue={currentVersion.title}
                         splitView={false}
                         hideLineNumbers={true}
                         extraLinesSurroundingDiff={10000}
@@ -117,11 +122,7 @@ const ProposalHistory = () => {
                       />
                     </div>
                   ) : (
-                    <h1>
-                      {proposalVersions &&
-                        activeVersion &&
-                        proposalVersions[activeVersion - 1].title}{' '}
-                    </h1>
+                    <h1>{currentVersion?.title} </h1>
                   )}
                 </div>
               </div>
@@ -130,18 +131,17 @@ const ProposalHistory = () => {
         )}
       </Col>
       <Col lg={12} className={clsx(classes.proposal, classes.wrapper)}>
-        <Row>
-          <Col lg={8} md={12}>
-            {((!isDiffsVisible && proposalVersions && activeVersion) ||
-              (isDiffsVisible && proposalVersions && activeVersion < 2)) && (
+        <div className={classes.historyGrid}>
+          <div className="min-w-0">
+            {currentVersion && !(isDiffsVisible && previousVersion) && (
               <ProposalContent
-                description={proposalVersions[activeVersion - 1].description}
-                title={proposalVersions[activeVersion - 1].title}
-                details={proposalVersions[activeVersion - 1].details}
+                description={currentVersion.description}
+                title={currentVersion.title}
+                details={currentVersion.details}
                 hasSidebar={true}
               />
             )}
-            {isDiffsVisible && proposalVersions && activeVersion >= 2 && (
+            {isDiffsVisible && previousVersion && currentVersion && (
               <div className={classes.diffsWrapper}>
                 <Col className={clsx(classes.section, 'm-0 p-0')}>
                   <h5>
@@ -150,12 +150,12 @@ const ProposalHistory = () => {
                 </Col>
                 <ReactDiffViewer
                   oldValue={processProposalDescriptionText(
-                    proposalVersions[activeVersion - 2].description,
-                    proposalVersions[activeVersion - 2].title,
+                    previousVersion.description,
+                    previousVersion.title,
                   )}
                   newValue={processProposalDescriptionText(
-                    proposalVersions[activeVersion - 1].description,
-                    proposalVersions[activeVersion - 1].title,
+                    currentVersion.description,
+                    currentVersion.title,
                   )}
                   splitView={false}
                   hideLineNumbers={true}
@@ -171,15 +171,15 @@ const ProposalHistory = () => {
                     </h5>
                     <ProposalTransactionsDiffs
                       activeVersionNumber={activeVersion}
-                      oldTransactions={proposalVersions[activeVersion - 2].details}
-                      newTransactions={proposalVersions[activeVersion - 1].details}
+                      oldTransactions={previousVersion.details}
+                      newTransactions={currentVersion.details}
                     />
                   </Col>
                 </Row>
               </div>
             )}
-          </Col>
-          <Col lg={4} md={12}>
+          </div>
+          <div className="min-w-0">
             <div className={classes.versionHistory}>
               <div className={classes.versionHistoryHeader}>
                 <h2>Version History</h2>
@@ -204,6 +204,7 @@ const ProposalHistory = () => {
               </div>
               {activeVersion > 1 && (
                 <button
+                  type="button"
                   className={clsx(
                     classes.diffsLink,
                     isDiffsVisible ? classes.diffsLinkActive : classes.diffsLinkInactive,
@@ -214,8 +215,8 @@ const ProposalHistory = () => {
                 </button>
               )}
             </div>
-          </Col>
-        </Row>
+          </div>
+        </div>
       </Col>
     </Section>
   );

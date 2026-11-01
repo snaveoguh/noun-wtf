@@ -145,7 +145,6 @@ const TraitsPage: React.FC = () => {
     loadTraits();
   }, []);
 
-  // eslint-disable-next-line sonarjs/cognitive-complexity
   const downloadAllTraitsAsZip = async () => {
     if (zipLoading) return;
 
@@ -156,7 +155,7 @@ const TraitsPage: React.FC = () => {
       // Group traits by category for organized folder structure
       const traitsByCategory = traits.reduce(
         (acc, trait) => {
-          if (!acc[trait.category]) {
+          if (!(trait.category in acc)) {
             acc[trait.category] = [];
           }
           acc[trait.category].push(trait);
@@ -236,7 +235,7 @@ const TraitsPage: React.FC = () => {
   // Group traits by category
   const traitsByCategory = traits.reduce(
     (acc, trait) => {
-      if (!acc[trait.category]) {
+      if (!(trait.category in acc)) {
         acc[trait.category] = [];
       }
       acc[trait.category].push(trait);
@@ -247,14 +246,14 @@ const TraitsPage: React.FC = () => {
 
   // Define the order for categories
   const categoryOrder = ['Noggles', 'Heads', 'Accessories', 'Bodies', 'Backgrounds'];
-  const orderedCategories = categoryOrder.filter(category => traitsByCategory[category]);
+  const orderedCategories = categoryOrder.filter(category => category in traitsByCategory);
 
   return (
     <div className="container mx-auto px-4 pt-8">
       <div className="mb-8">
         <div>
           <div className="flex flex-wrap items-end justify-between gap-6">
-            <h1 className="mt-2 text-5xl font-bold text-gray-900">
+            <h1 className="mt-2 text-[clamp(2.25rem,12cqi,3rem)] font-bold text-gray-900">
               <Trans>Traits</Trans>
             </h1>
             <Button
@@ -275,24 +274,27 @@ const TraitsPage: React.FC = () => {
       {orderedCategories.map(category => (
         <div key={category} className="mb-12">
           <h2 className="font-londrina mb-6 text-3xl font-bold text-gray-900">{category}</h2>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6">
+          <div className="@sm:grid-cols-3 @md:grid-cols-4 @lg:grid-cols-6 grid grid-cols-2 gap-2">
             {traitsByCategory[category].map(trait => (
               <Dialog key={trait.filename}>
                 <DialogTrigger asChild>
-                  <div className="flex h-full cursor-pointer flex-col rounded-lg border border-gray-200 bg-white p-2 transition-shadow hover:shadow-md">
-                    <div className="bg-checkerboard mb-2 flex aspect-square items-center justify-center overflow-hidden rounded-lg shadow-inner">
+                  <button
+                    type="button"
+                    className="flex h-full w-full min-w-0 cursor-pointer flex-col rounded-lg border border-gray-200 bg-white p-2 text-left transition-shadow hover:shadow-md"
+                  >
+                    <span className="bg-checkerboard mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg shadow-inner">
                       <img
                         src={`data:image/svg+xml;base64,${btoa(trait.svg)}`}
                         alt={trait.name}
                         className="h-full w-full object-contain drop-shadow"
                       />
-                    </div>
-                    <div className="flex flex-1 items-center justify-center">
-                      <h3 className="text-center text-sm font-medium text-gray-900">
+                    </span>
+                    <span className="flex w-full min-w-0 flex-1 items-center justify-center">
+                      <h3 className="m-0 min-w-0 text-center text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
                         {trait.name}
                       </h3>
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                 </DialogTrigger>
                 <DialogContent className="max-w-[min(calc(100vw-2rem),28rem)] rounded-xl">
                   <DialogHeader>
