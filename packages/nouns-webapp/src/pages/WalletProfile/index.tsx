@@ -113,17 +113,17 @@ const WalletProfilePage: React.FC = () => {
 
   if (!identity) {
     return (
-      <div className="wp mt-1 px-2 pb-10 sm:px-4 lg:px-6">
+      <div className="wp @md:px-4 @lg:px-6 mt-1 px-2 pb-10">
         <WalletSearch basePath={basePath} />
       </div>
     );
   }
 
   return (
-    <div className="wp mt-1 grid gap-3 px-2 pb-10 pt-3 sm:px-4 lg:px-6">
+    <div className="wp @md:px-4 @lg:px-6 mt-1 grid gap-3 px-2 pb-10 pt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="wp-muted text-xs uppercase tracking-widest">Gamer profile</div>
-        <div className="w-full sm:w-80">
+        <div className="@md:w-80 w-full">
           <WalletSearch compact initial={paramIdentity ?? ''} basePath={basePath} />
         </div>
       </div>

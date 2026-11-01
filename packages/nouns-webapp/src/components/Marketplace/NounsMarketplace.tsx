@@ -49,7 +49,9 @@ export function NounsMarketplace() {
     <div>
       {/* ── Masthead ── */}
       <div className="mb-6 border-b-2 border-[var(--rule)] pb-4">
-        <h1 className="font-headline text-4xl text-[var(--ink)] sm:text-5xl">Nouns Marketplace</h1>
+        <h1 className="font-headline text-[clamp(1.875rem,9cqi,3rem)] leading-tight text-[var(--ink)]">
+          Nouns Marketplace
+        </h1>
         <p className="font-body-serif mt-1 text-sm text-[var(--ink-light)]">
           Buy and sell Nouns NFTs with 0% marketplace fees. Direct peer-to-peer trading via Seaport
           1.6 on Ethereum.
@@ -70,8 +72,9 @@ export function NounsMarketplace() {
           <span key={opt.value} className="flex shrink-0 items-center">
             {i > 0 && <span className="mx-1 text-[var(--rule-light)]">|</span>}
             <button
+              type="button"
               onClick={() => setSort(opt.value)}
-              className={`transition-colors ${
+              className={`inline-flex items-center transition-colors [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:px-1 ${
                 sort === opt.value
                   ? 'font-bold text-[var(--ink)] underline underline-offset-4'
                   : 'text-[var(--ink-faint)] hover:text-[var(--ink)]'
@@ -87,7 +90,7 @@ export function NounsMarketplace() {
 
       {/* ── Grid ── */}
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="@md:grid-cols-3 @md:gap-4 @lg:grid-cols-4 @xl:grid-cols-5 grid grid-cols-2 gap-3">
           {Array.from({ length: 10 }).map((_, i) => (
             <div
               key={i}
@@ -104,7 +107,7 @@ export function NounsMarketplace() {
           </span>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="@md:grid-cols-3 @md:gap-4 @lg:grid-cols-4 @xl:grid-cols-5 grid grid-cols-2 gap-3">
           {items.map(item => (
             <NounCard key={item.nounId} noun={item} />
           ))}

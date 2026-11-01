@@ -77,13 +77,13 @@ export function YourNouns() {
       </div>
 
       {ownedNouns.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="@md:grid-cols-3 @md:gap-4 @lg:grid-cols-4 @xl:grid-cols-5 grid grid-cols-2 gap-3">
           {ownedNouns.map(item => (
             <NounCard key={item.nounId} noun={item} />
           ))}
         </div>
       ) : balance > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="@md:grid-cols-3 @md:gap-4 @lg:grid-cols-4 @xl:grid-cols-5 grid grid-cols-2 gap-3">
           {Array.from({ length: Math.min(balance, 5) }).map((_, i) => (
             <div
               key={i}

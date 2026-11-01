@@ -4,7 +4,7 @@ import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Alert, Button, Col, FormControl } from 'react-bootstrap';
+import { Alert, Button, FormControl } from 'react-bootstrap';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { formatEther } from 'viem';
@@ -25,9 +25,6 @@ import {
 import classes from '../CreateProposal/CreateProposal.module.css';
 
 import navBarButtonClasses from '@/components/NavBarButton/NavBarButton.module.css';
-
-// Two thirds of the window, centred, from container-lg (was bootstrap's viewport `lg` offset 2).
-const formColClass = clsx(classes.createProposalForm, 'mx-auto @lg:!w-2/3');
 
 const EditCandidatePage = () => {
   const { id = '' } = useParams<{ id: string }>();
@@ -132,11 +129,11 @@ const EditCandidatePage = () => {
   if (candidateLoading) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col xs={12} className={formColClass}>
+        <div className={classes.createProposalForm}>
           <p>
             <Trans>Loading candidate…</Trans>
           </p>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -144,12 +141,12 @@ const EditCandidatePage = () => {
   if (!candidate) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col xs={12} className={formColClass}>
+        <div className={classes.createProposalForm}>
           <Alert variant="danger">
             <Trans>Candidate not found.</Trans>
           </Alert>
           <Link to="/candidates">← Back to candidates</Link>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -157,12 +154,12 @@ const EditCandidatePage = () => {
   if (!account) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col xs={12} className={formColClass}>
+        <div className={classes.createProposalForm}>
           <Alert variant="info">
             <Trans>Connect your wallet to edit this candidate.</Trans>
           </Alert>
           <Link to={`/candidates/${id}`}>← Back to candidate</Link>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -170,12 +167,12 @@ const EditCandidatePage = () => {
   if (!isProposer) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col xs={12} className={formColClass}>
+        <div className={classes.createProposalForm}>
           <Alert variant="warning">
             <Trans>Only the original proposer can edit this candidate.</Trans>
           </Alert>
           <Link to={`/candidates/${id}`}>← Back to candidate</Link>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -188,7 +185,7 @@ const EditCandidatePage = () => {
         onActionAdd={handleAddProposalAction}
       />
 
-      <Col xs={12} className={formColClass}>
+      <div className={classes.createProposalForm}>
         <div className={classes.wrapper}>
           <Link to={`/candidates/${id}`}>
             <button className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>←</button>
@@ -268,7 +265,7 @@ const EditCandidatePage = () => {
             upon submission
           </Trans>
         </p>
-      </Col>
+      </div>
     </Section>
   );
 };

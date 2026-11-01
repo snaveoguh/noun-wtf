@@ -7,15 +7,29 @@
 }
 
 .createProposalForm {
+  flex: 0 0 auto;
+  width: 100%;
   border-radius: 5px;
-  padding: 0rem 2.5rem;
+  /* 2.5rem in a roomy window, down to 1rem on a phone */
+  padding: 0 clamp(1rem, 5cqi, 2.5rem);
   background-color: var(--theme-bg-card);
+}
+
+/* Was react-bootstrap's Col lg={{ span: 8, offset: 2 }}, which read the
+   viewport: a narrow window on a desktop got the 8/12 column. */
+@container page (min-width: 760px) {
+  .createProposalForm {
+    width: 66.666667%;
+    margin-left: 16.666667%;
+  }
 }
 
 .heading {
   margin: 1rem 0;
   font-family: 'Londrina Solid';
-  font-size: 42px;
+  font-size: clamp(28px, 9cqi, 42px);
+  line-height: 1.1;
+  min-width: 0;
 }
 
 .section {
@@ -28,6 +42,11 @@
 .addTransactionButton,
 .createProposalButton {
   margin-top: 1rem;
+}
+
+.wrapper > a {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .backButton {
@@ -137,4 +156,25 @@ button.modalButtonLink:hover {
 }
 .inlineButton:hover {
   text-decoration: none;
+}
+
+/* Touch: 40 px targets */
+@media (pointer: coarse) {
+  .backButton {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .inlineButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+    vertical-align: middle;
+  }
+
+  .commitMessage input {
+    min-height: 40px;
+  }
 }
