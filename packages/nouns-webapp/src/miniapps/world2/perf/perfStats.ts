@@ -99,3 +99,43 @@ export function summarizeBuckets(buckets: ReadonlyMap<string, Ring>): BucketSumm
   }
   return out.sort((a, b) => b.mean - a.mean);
 }
+
+// ── Hitch log: what ran in each bad frame ───────────────────────────────
+
+/** One frame that stalled: when, how long, and the systems that took the time. */
+export interface HitchEntry {
+  /** performance.now() at the frame's start (ms). */
+  at: number;
+  /** rAF interval that ended in this frame (ms; the gap the player saw). */
+  frameMs: number;
+  /** Main-thread ms inside Game.step this frame. */
+  cpuMs: number;
+  /** Systems over 2 ms this frame, biggest first: [name, ms]. */
+  top: [string, number][];
+}
+
+/** A frame whose own work took this long is a hitch whatever the frame rate. */
+export const HITCH_CPU_MS = 50;
+
+/**
+ * Is this frame a hitch? Either the game's own work took over 50 ms, or the
+ * gap since the last frame was far longer than usual (3× the running median
+ * and over 100 ms): something outside Game.step (GC, a long task, the
+ * browser) held the main thread. Relative to the median because a slow
+ * device (or headless software GL) misses 50 ms every frame.
+ */
+export function isHitch(frameMs: number, cpuMs: number, medianFrameMs: number): boolean {
+  if (cpuMs > HITCH_CPU_MS) return true;
+  return frameMs > 100 && frameMs > 3 * Math.max(medianFrameMs, 16.7);
+}
+
+/** The systems worth naming in a hitch: over `min` ms, biggest first, at most `n`. */
+export function topSystems(
+  acc: ReadonlyMap<string, number>,
+  n = 5,
+  min = 2,
+): [string, number][] {
+  const out: [string, number][] = [];
+  for (const [k, v] of acc) if (v >= min) out.push([k, Math.round(v * 10) / 10]);
+  return out.sort((a, b) => b[1] - a[1]).slice(0, n);
+}

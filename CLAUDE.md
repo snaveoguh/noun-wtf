@@ -207,7 +207,14 @@ A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Andro
 - **Adaptive quality:** `render/qualityController.ts` (pure, tested) steps on median / p95 frame times.
   - Phones: render scale → shadows → ink pass.
   - Desktop: render scale only, never under 1.25 on Retina.
-  - It steps back up only across scale rungs; dropping shadows or post relinks every lit material, one long hitch. An explicit Low (Settings / `?q=low`) stays as chosen.
+  - It steps back up only across scale rungs. No rung relinks a material (`Graphics.applyLite`): shadows off clears and freezes the sun's map (`castShadow` stays true), ink off sets the ink effect to `BlendFunction.DST` so its pass only copies. Turning `castShadow` off or rendering straight to the screen changes every lit program's key: a 0.6 s and a 3.4 s freeze on an iPad. An explicit Low (Settings / `?q=low`) stays as chosen.
+- **Tablets (2026-11-01, `.claude/perf-shots/tablet/README.md`; "it stalls on tablet"):** iPads and Android tablets boot `low` like phones, but within a phone's pixel budget (`budgetScale`, 0.6 MP: ~0.75 on a tablet, phones stay at 1). Fixed stalls:
+  - a new rider / resident / crowd Noun's head texture is softened in JS (`character/softenAtlas.ts`), not a canvas `blur()` + `getImageData` (~40 ms a head in Chrome, 550 ms the first);
+  - `toToon`'s `userData.toonSrc` is non-enumerable: three's `Material.copy` JSON-copies userData, which serialised the source material's textures (`toDataURL`) on every clone;
+  - at most one new remote rider is built a frame (`REMOTE_BUILDS_PER_FRAME`), and `setDeckGraphic` does nothing for a stock deck;
+  - entering a room builds the floor above on the next frame (still black), and the z-fight pass bins each plane along one axis (byte-identical output);
+  - a breaks battle's stage links hidden during the countdown (`warmHidden`, 1.5 s cap).
+  - `?perf=quiet`'s snapshot has a `hitchLog`: each frame over 50 ms CPU (or a gap 3× the median), with the systems that ran in it. WebKit (iPad) runs: `.claude/perf-shots/tablet/` (`session.cjs`, `ladder.cjs`).
 - **Desktop heat (2026-10-28, `.claude/perf-shots/desktop/README.md`):**
   - `render/framePacer.ts` caps `Game.frame` at 60 fps by default (Settings → Frame rate 30 / 60 / max). It drops to 30 while the window is blurred or a menu covers the game (`game.coverGame(reason, opaque)`; an opaque one sets `gfx.hold`). The sim still steps on the interval since the last run frame: a capped 144 Hz screen plays like a 60 Hz one.
   - High draws at 1.5 on Retina (`bootScale`). Settings → Sharp restores 2. The ink thickness follows the render scale.

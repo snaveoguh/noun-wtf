@@ -10,14 +10,19 @@
 import type * as THREE from 'three';
 
 import {
-  Ring,
   type BucketSummary,
   type FrameSummary,
+  type HitchEntry,
+  isHitch,
+  percentile,
+  Ring,
   summarize,
   summarizeBuckets,
+  topSystems,
 } from './perfStats';
 
 const WINDOW = 600; // frames kept (~10 s at 60 fps)
+const HITCH_LOG = 200; // hitches kept (oldest dropped)
 
 export interface PerfSnapshot {
   /** rAF-to-rAF frame interval (what the player feels). */
@@ -42,6 +47,8 @@ export interface PerfSnapshot {
   /** MB/s of heap growth between GCs (allocation pressure). */
   allocMBps: number | null;
   longTasks: { count: number; totalMs: number; maxMs: number };
+  /** Frames that stalled since the last reset, with what ran in them (newest last). */
+  hitchLog: HitchEntry[];
   /** Anything the game adds (quality tier, step-downs). */
   extra: Record<string, unknown>;
 }
@@ -63,6 +70,9 @@ class Probe {
   private heapGrow = 0;
   private heapT = 0;
   private allocMBps: number | null = null;
+  private hitchLog: HitchEntry[] = [];
+  private lastFrameMs = 0;
+  private medianFrame = 16.7;
   extra: Record<string, unknown> = {};
 
   /** Turn on (from Game's constructor when the URL says ?perf=1). */
@@ -102,7 +112,8 @@ class Probe {
 
   frameStart(now: number) {
     if (!this.on) return;
-    if (this.lastRaf > 0) this.frames.push(now - this.lastRaf);
+    this.lastFrameMs = this.lastRaf > 0 ? now - this.lastRaf : 0;
+    if (this.lastRaf > 0) this.frames.push(this.lastFrameMs);
     this.lastRaf = now;
     this.t0 = this.mark = performance.now();
     this.renderer?.info.reset();
@@ -120,7 +131,20 @@ class Probe {
     if (!this.on) return;
     const t = performance.now();
     if (t - this.mark > 0.01) this.lap('other');
-    this.cpu.push(t - this.t0);
+    const cpuMs = t - this.t0;
+    this.cpu.push(cpuMs);
+    // Running median, refreshed every 30 frames (sorting 600 numbers a frame isn't free)
+    if (this.frames.count % 30 === 0 && this.frames.length > 10)
+      this.medianFrame = percentile(this.frames.values().sort((a, b) => a - b), 50);
+    if (isHitch(this.lastFrameMs, cpuMs, this.medianFrame)) {
+      this.hitchLog.push({
+        at: Math.round(this.t0),
+        frameMs: Math.round(this.lastFrameMs),
+        cpuMs: Math.round(cpuMs),
+        top: topSystems(this.acc),
+      });
+      if (this.hitchLog.length > HITCH_LOG) this.hitchLog.shift();
+    }
     for (const [k, v] of this.acc) {
       let r = this.buckets.get(k);
       if (r === undefined) {
@@ -164,6 +188,7 @@ class Probe {
     this.buckets.clear();
     this.acc.clear();
     this.longTasks = { count: 0, totalMs: 0, maxMs: 0 };
+    this.hitchLog = [];
     this.lastRaf = 0;
   }
 
@@ -192,6 +217,7 @@ class Probe {
       heapMB: mem === undefined ? null : mem.usedJSHeapSize / 1e6,
       allocMBps: this.allocMBps,
       longTasks: { ...this.longTasks },
+      hitchLog: this.hitchLog.slice(),
       extra: { ...this.extra },
     };
   }

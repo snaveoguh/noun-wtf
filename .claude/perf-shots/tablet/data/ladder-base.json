@@ -1,0 +1,347 @@
+{
+ "boot": {
+  "rungs": [
+   {
+    "scale": 1,
+    "shadows": true,
+    "post": true
+   },
+   {
+    "scale": 0.85,
+    "shadows": true,
+    "post": true
+   },
+   {
+    "scale": 0.7,
+    "shadows": true,
+    "post": true
+   },
+   {
+    "scale": 0.6,
+    "shadows": true,
+    "post": true
+   },
+   {
+    "scale": 0.6,
+    "shadows": false,
+    "post": true
+   },
+   {
+    "scale": 0.6,
+    "shadows": false,
+    "post": false
+   }
+  ],
+  "lite": {
+   "scale": 1,
+   "shadows": true,
+   "post": true
+  }
+ },
+ "events": [
+  {
+   "at": 0,
+   "lite": {
+    "scale": 1,
+    "shadows": true,
+    "post": true
+   },
+   "progs": 47,
+   "t": 8276,
+   "worstCpu": 218,
+   "worstGap": 656,
+   "top": [
+    [
+     "render",
+     161
+    ],
+    [
+     "towns",
+     38
+    ],
+    [
+     "nature",
+     8
+    ],
+    [
+     "audio",
+     5
+    ]
+   ],
+   "progsAfter": 50
+  },
+  {
+   "at": 1,
+   "lite": {
+    "scale": 0.85,
+    "shadows": true,
+    "post": true
+   },
+   "progs": 55,
+   "t": 24661,
+   "worstCpu": 216,
+   "worstGap": 363,
+   "top": [
+    [
+     "render",
+     211
+    ],
+    [
+     "modes",
+     2
+    ]
+   ],
+   "progsAfter": 55
+  },
+  {
+   "at": 2,
+   "lite": {
+    "scale": 0.7,
+    "shadows": true,
+    "post": true
+   },
+   "progs": 55,
+   "t": 40527,
+   "worstCpu": 127,
+   "worstGap": 357,
+   "top": [
+    [
+     "render",
+     106
+    ],
+    [
+     "hud",
+     14
+    ],
+    [
+     "modes",
+     4
+    ]
+   ],
+   "progsAfter": 55
+  },
+  {
+   "at": 3,
+   "lite": {
+    "scale": 0.6,
+    "shadows": true,
+    "post": true
+   },
+   "progs": 55,
+   "t": 55586,
+   "worstCpu": 124,
+   "worstGap": 337,
+   "top": [
+    [
+     "render",
+     119
+    ]
+   ],
+   "progsAfter": 55
+  },
+  {
+   "at": 4,
+   "lite": {
+    "scale": 0.6,
+    "shadows": false,
+    "post": true
+   },
+   "progs": 55,
+   "t": 71400,
+   "worstCpu": 587,
+   "worstGap": 824,
+   "top": [
+    [
+     "render",
+     582
+    ]
+   ],
+   "progsAfter": 79
+  },
+  {
+   "at": 5,
+   "lite": {
+    "scale": 0.6,
+    "shadows": false,
+    "post": false
+   },
+   "progs": 85,
+   "t": 88357,
+   "worstCpu": 3352,
+   "worstGap": 424,
+   "top": [
+    [
+     "render",
+     3349
+    ]
+   ],
+   "progsAfter": 122
+  }
+ ],
+ "worst": [
+  {
+   "at": 88480,
+   "frameMs": 356,
+   "cpuMs": 3352,
+   "top": [
+    [
+     "render",
+     3349
+    ]
+   ]
+  },
+  {
+   "at": 71620,
+   "frameMs": 369,
+   "cpuMs": 587,
+   "top": [
+    [
+     "render",
+     582
+    ]
+   ]
+  },
+  {
+   "at": 92155,
+   "frameMs": 3675,
+   "cpuMs": 269,
+   "top": [
+    [
+     "render",
+     200
+    ],
+    [
+     "physics",
+     21
+    ],
+    [
+     "character",
+     11
+    ],
+    [
+     "input",
+     6
+    ],
+    [
+     "wild",
+     6
+    ]
+   ]
+  },
+  {
+   "at": 92885,
+   "frameMs": 729,
+   "cpuMs": 266,
+   "top": [
+    [
+     "render",
+     253
+    ],
+    [
+     "mountain",
+     3
+    ],
+    [
+     "modes",
+     2
+    ]
+   ]
+  },
+  {
+   "at": 97476,
+   "frameMs": 368,
+   "cpuMs": 179,
+   "top": [
+    [
+     "render",
+     173
+    ]
+   ]
+  },
+  {
+   "at": 60024,
+   "frameMs": 358,
+   "cpuMs": 166,
+   "top": [
+    [
+     "render",
+     97
+    ],
+    [
+     "net",
+     23
+    ],
+    [
+     "physics",
+     8
+    ],
+    [
+     "character",
+     6
+    ],
+    [
+     "vehicles",
+     6
+    ]
+   ]
+  },
+  {
+   "at": 48157,
+   "frameMs": 342,
+   "cpuMs": 152,
+   "top": [
+    [
+     "render",
+     145
+    ],
+    [
+     "missions",
+     3
+    ]
+   ]
+  },
+  {
+   "at": 69791,
+   "frameMs": 294,
+   "cpuMs": 147,
+   "top": [
+    [
+     "render",
+     104
+    ],
+    [
+     "nature",
+     23
+    ],
+    [
+     "physics",
+     11
+    ],
+    [
+     "modes",
+     6
+    ]
+   ]
+  }
+ ],
+ "frame": {
+  "frames": 382,
+  "fps": 2.9438510503845503,
+  "mean": 339.6910994764398,
+  "p50": 324,
+  "p95": 390,
+  "p99": 656,
+  "max": 3675,
+  "hitches": 382
+ },
+ "cpu": {
+  "frames": 383,
+  "fps": 10.683403068340285,
+  "mean": 93.60313315926912,
+  "p50": 83,
+  "p95": 147,
+  "p99": 266,
+  "max": 3352.0000000000146,
+  "hitches": 306
+ }
+}

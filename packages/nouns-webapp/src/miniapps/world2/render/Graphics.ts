@@ -5,6 +5,7 @@ import type { LevelData } from '../world/Level';
 import type { N8AOPostPass } from 'n8ao';
 
 import {
+  BlendFunction,
   BloomEffect,
   BrightnessContrastEffect,
   type Effect,
@@ -378,7 +379,20 @@ export class Graphics {
       this.renderer.setPixelRatio(s.scale);
       this.fitInk();
     }
-    if (s.shadows !== this.lite.shadows) this.sun.castShadow = s.shadows;
+    // Shadows off without relinking: the sun keeps casting (castShadow
+    // false changes every lit program's shadow count, a 2.8 s relink of
+    // every material on an iPad), its map is cleared once (nothing shadowed)
+    // and frozen, so the shadow pass stops drawing. On: it updates again.
+    if (s.shadows !== this.lite.shadows) {
+      this.sun.shadow.autoUpdate = s.shadows;
+      this.sun.shadow.needsUpdate = s.shadows;
+      this.clearShadow = !s.shadows;
+    }
+    // Post off: the ink pass skips its effect and only copies to the screen.
+    // Rendering straight to the screen instead changed the scene's output
+    // colour space, which relinked every material: a second multi-second freeze.
+    if (s.post !== this.lite.post && this.outline !== null)
+      this.outline.blendMode.blendFunction = s.post ? BlendFunction.NORMAL : BlendFunction.DST;
     // SMAA off: the pass before it draws to the screen instead (no relink)
     const aa = this.aaPass;
     if (aa !== null && s.aa !== undefined && aa.enabled !== s.aa) {
@@ -414,7 +428,7 @@ export class Graphics {
   asDrawn<T>(fn: () => T): T {
     const r = this.renderer;
     const prev = r.getRenderTarget();
-    r.setRenderTarget(this.rawRender || !this.lite.post ? null : this.composer.inputBuffer);
+    r.setRenderTarget(this.rawRender ? null : this.composer.inputBuffer);
     try {
       return fn();
     } finally {
@@ -425,13 +439,27 @@ export class Graphics {
   /** Draw nothing (an opaque menu covers the canvas: Game.coverGame). */
   hold = false;
 
+  /** Shadows just went off (applyLite): clear the frozen map before the next draw. */
+  private clearShadow = false;
+
   /** Runs right before every frame is drawn (per-frame culling / LOD). */
   beforeRender: (() => void) | null = null;
 
   render(dt: number) {
     if (this.hold) return;
     this.beforeRender?.();
-    if (this.rawRender || !this.lite.post) {
+    if (this.clearShadow) {
+      this.clearShadow = false;
+      const map = this.sun.shadow.map;
+      if (map !== null) {
+        const r = this.renderer;
+        const prev = r.getRenderTarget();
+        r.setRenderTarget(map as THREE.WebGLRenderTarget);
+        r.clear(); // depth 1: every fragment in front of it, lit
+        r.setRenderTarget(prev);
+      }
+    }
+    if (this.rawRender) {
       this.renderer.render(this.scene, this.camera);
       return;
     }

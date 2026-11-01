@@ -11,6 +11,7 @@ import type { VoxelPixel } from '@nouns/voxel-engine';
 import * as THREE from 'three';
 
 import { textureDiet } from '../render/textureDiet';
+import { parseRgb, softenAtlas } from './softenAtlas';
 
 const S = 4; // sub-samples per pixel
 const N = 32 * S;
@@ -279,11 +280,9 @@ export function buildSmoothHead(
   geometry.computeBoundingBox();
 
   // Pixel-art texture atlas (dilated so edge texels never sample
-  // transparency): the front art, and an interpreted back.
-  const canvas = document.createElement('canvas');
-  canvas.width = ATLAS_W;
-  canvas.height = 32;
-  const ctx = canvas.getContext('2d')!;
+  // transparency): the front art, and an interpreted back. RGBA, row 0 at
+  // the top (art y is up).
+  const atlas = new Uint8ClampedArray(ATLAS_W * 32 * 4);
   const front: (string | null)[] = new Array(32 * 32).fill(null);
   for (const p of pixels) front[p.y * 32 + p.x] = `rgb(${p.r},${p.g},${p.b})`;
   const back = opts.crisp === true ? front.slice() : interpretBack(front);
@@ -295,33 +294,37 @@ export function buildSmoothHead(
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 32; x++) {
         const c = grid[y * 32 + x];
-        if (c === null) continue;
-        ctx.fillStyle = c;
-        ctx.fillRect(ox + x, 31 - y, 1, 1);
+        const rgb = c === null ? null : parseRgb(c);
+        if (rgb === null) continue;
+        const o = ((31 - y) * ATLAS_W + ox + x) * 4;
+        atlas[o] = rgb[0];
+        atlas[o + 1] = rgb[1];
+        atlas[o + 2] = rgb[2];
+        atlas[o + 3] = 255;
       }
     }
   }
   // Soften the pixel art into smooth colour regions: upscale bilinearly,
   // blur, then gently posterise so it reads as painted shapes, not pixels.
-  // 8 px per art pixel (4 on a weak phone's texture diet: render/textureDiet)
+  // 8 px per art pixel (4 on a weak phone's texture diet: render/textureDiet).
+  // Light blur only: enough to lose the pixel staircase, not enough to
+  // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
+  // In JS, not a canvas `filter: blur()` + getImageData: that was ~40 ms a
+  // head in Chrome (550 ms the first), a hitch per new Noun (softenAtlas.ts)
   const up = textureDiet.on ? 4 : 8;
+  const crisp = opts.crisp === true;
+  const soft = softenAtlas(
+    atlas,
+    ATLAS_W,
+    32,
+    up,
+    crisp ? 0 : ((opts.blur ?? 1.6) * up) / 8,
+    !crisp,
+  );
   const big = document.createElement('canvas');
   big.width = ATLAS_W * up;
   big.height = 32 * up;
-  // Read back below: a CPU canvas, so getImageData doesn't stall on the GPU
-  const bctx = big.getContext('2d', { willReadFrequently: true })!;
-  bctx.imageSmoothingEnabled = opts.crisp !== true;
-  bctx.imageSmoothingQuality = 'high';
-  // Light blur only: enough to lose the pixel staircase, not enough to
-  // average 1px stripes/spots (zebra, checkers) into a muddy mid-tone.
-  bctx.filter = opts.crisp === true ? 'none' : `blur(${((opts.blur ?? 1.6) * up) / 8}px)`;
-  bctx.drawImage(canvas, 0, 0, big.width, big.height);
-  bctx.filter = 'none';
-  const img = bctx.getImageData(0, 0, big.width, big.height);
-  for (let p = 0; p < img.data.length; p += 4) {
-    for (let k = 0; k < 3; k++) img.data[p + k] = Math.round(img.data[p + k] / 12) * 12;
-  }
-  bctx.putImageData(img, 0, 0);
+  big.getContext('2d')!.putImageData(new ImageData(soft, big.width, big.height), 0, 0);
   const texture = new THREE.CanvasTexture(big);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;

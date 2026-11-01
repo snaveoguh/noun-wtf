@@ -73,7 +73,17 @@ export function toToon(src: THREE.Material): THREE.Material {
     polygonOffsetFactor: s.polygonOffsetFactor,
     polygonOffsetUnits: s.polygonOffsetUnits,
   });
-  m.userData = { ...s.userData, toonFrom: s.type, toonSrc: s };
+  m.userData = { ...s.userData, toonFrom: s.type };
+  // Not enumerable: three's Material.copy (every clone) deep-copies userData
+  // with JSON.stringify, which serialised the source material and its
+  // textures (toDataURL) on every clone, 0.75 s for 16 riders' decks on a
+  // tablet. A clone has no toonSrc (it used to get a JSON husk, not a material).
+  Object.defineProperty(m.userData, 'toonSrc', {
+    value: s,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
   converted.set(src, m);
   return m;
 }

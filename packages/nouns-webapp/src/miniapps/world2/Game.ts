@@ -69,7 +69,13 @@ import {
   type TownThemeState,
 } from './radio/townTheme';
 import { localTransport, netTransport } from './radio/transport';
-import { autoQuality, isWeakDevice, readDevice, WEAK_BOOT_SCALE } from './render/deviceTier';
+import {
+  autoQuality,
+  budgetScale,
+  isWeakDevice,
+  readDevice,
+  WEAK_BOOT_SCALE,
+} from './render/deviceTier';
 import { BLURRED_FPS, COVERED_FPS, effectiveFps, makePacer, pace } from './render/framePacer';
 import { bootScale, Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
@@ -273,6 +279,9 @@ export interface GameOptions {
   offline?: boolean;
 }
 
+/** New remote riders' Nouns built per frame (a build is a hitch: see updateNetwork). */
+const REMOTE_BUILDS_PER_FRAME = 1;
+
 export class Game {
   gfx: Graphics;
   input: Input;
@@ -450,11 +459,13 @@ export class Game {
     // may keep stepping down (an explicit Low / ?q=low stays as chosen)
     if (quality === 'low' && opts.quality === undefined) {
       this.weakDevice = isWeakDevice(readDevice(this.gfx.renderer.getContext()));
-      if (this.weakDevice)
-        this.gfx.applyLite({
-          ...this.gfx.lite,
-          scale: Math.min(this.gfx.lite.scale, WEAK_BOOT_SCALE),
-        });
+      // A tablet draws a phone's worth of pixels, not 3× (deviceTier budgetScale)
+      const scale = Math.min(
+        this.gfx.lite.scale,
+        this.weakDevice ? WEAK_BOOT_SCALE : 1,
+        budgetScale(window.innerWidth, window.innerHeight),
+      );
+      if (scale !== this.gfx.lite.scale) this.gfx.applyLite({ ...this.gfx.lite, scale });
       this.adaptive = makeController(phoneRungs(this.gfx.lite), PHONE_TUNING);
     } else if (quality !== 'low') {
       this.adaptive = makeController(
@@ -2162,9 +2173,16 @@ export class Game {
     const cam = this.gfx.camera;
     const w = this.opts.canvas.clientWidth;
     const h = this.opts.canvas.clientHeight;
+    // At most one new rider's Noun built a frame: joining a busy room (or a
+    // crowd arriving) built them all in one frame, 1 s for 16 on an iPad and
+    // 4 s on an Android tablet; the rest appear over the next frames
+    let builds = 0;
     for (const [id, rp] of this.net.players) {
+      const fresh = this.remotes.get(id)?.seedKey !== rp.seedKey;
+      if (fresh && builds >= REMOTE_BUILDS_PER_FRAME) continue;
       const r = this.ensureRemote(id, rp.seedKey);
       if (!r) continue;
+      if (fresh) builds++;
       const c = rp.current;
       const ch = r.character;
       // Only riders where I am are drawn: the street, or the same room and
