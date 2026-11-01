@@ -16,13 +16,14 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | route | status |
 | --- | --- |
 | `/noun/:id`, `/v2/noun/:id` (Auction) | pilot, 26/26 clean in the last --all run · before/after sheets in `.claude/responsive-shots/noun-2062*/` |
+| `/vote`, `/candidates` (governance lists) | 26/26 clean each (before 12/26 and 22/26, with live indexer data) · sheets in `.claude/responsive-shots/{vote,candidates}/` · PR responsive: governance lists |
 
 ## Work units (worst first)
 
 1. `/` — severity 21.5, viewport code 4
 2. `/studio` — severity 12.2, viewport code 0
 3. `/probe` — severity 10.1, viewport code 65
-4. `/vote`, `/candidates` — severity 5.9, viewport code 47 (group: governance)
+4. ~~`/vote`, `/candidates`~~ — done (see Done)
 5. `/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist` — severity 3.7 (1 not measured), viewport code 4 (group: info)
 6. `/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3` — severity 3.2 (4 not measured), viewport code 32 (group: art)
 7. `/nounv2/1`, `/nounv2/create`, `/nounv2` — severity 0.7, viewport code 48 (group: nounv2)
