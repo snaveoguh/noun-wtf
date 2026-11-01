@@ -63,11 +63,16 @@ describe('tilt and finger pressure', () => {
     expect(tiltOf({ tiltX: 0, tiltY: 0 })).toBe(0);
     expect(tiltOf({ tiltX: 45, tiltY: 0 })).toBeCloseTo(0.5);
   });
-  it('contact size maps to 0.15..1, null when unreported', () => {
+  it('contact size maps to 0.15..1 on iPad scales, null when unreported', () => {
     expect(touchPressure(1, 1)).toBeNull();
-    expect(touchPressure(10, 10)).toBeCloseTo(0.15);
-    expect(touchPressure(34, 30)).toBeCloseTo(1);
-    expect(touchPressure(80, 80)).toBe(1);
+    // Emulators report 1–2 px: no real contact is that small
+    expect(touchPressure(2, 2)).toBeNull();
+    // iPadOS: a light fingertip ~30 px, a pressed pad ~75 px (2 × contact radius)
+    expect(touchPressure(30, 28)).toBeCloseTo(0.15);
+    expect(touchPressure(52, 52)).toBeGreaterThan(0.4);
+    expect(touchPressure(52, 52)).toBeLessThan(0.75);
+    expect(touchPressure(75, 70)).toBeCloseTo(1);
+    expect(touchPressure(120, 120)).toBe(1);
   });
   it('hold time ramps 0 → ~1 over about a second', () => {
     expect(holdPressure(0)).toBe(0);
@@ -77,7 +82,7 @@ describe('tilt and finger pressure', () => {
   it('samplePressure: pen as reported, finger by size, mouse full', () => {
     expect(samplePressure('pen', 0.3, 1, 1, DEFAULT_FEEL)).toBe(0.3);
     expect(samplePressure('pen', 0, 1, 1, DEFAULT_FEEL)).toBe(0.5);
-    expect(samplePressure('touch', 0.5, 34, 34, DEFAULT_FEEL)).toBeCloseTo(1);
+    expect(samplePressure('touch', 0.5, 75, 75, DEFAULT_FEEL)).toBeCloseTo(1);
     expect(samplePressure('touch', 0.5, 1, 1, DEFAULT_FEEL)).toBe(1);
     expect(samplePressure('touch', 0.5, 10, 10, { ...DEFAULT_FEEL, fingerPressure: false })).toBe(
       1,
