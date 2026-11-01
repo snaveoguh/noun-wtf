@@ -133,6 +133,14 @@ export const ROUTES = [
   { path: 'gamer/:identity', url: '/gamer/nouns.eth', group: 'wallet' },
   { path: 'crystal-ball', url: '/crystal-ball', group: 'auction' },
   { path: 'v2/crystal-ball', url: '/v2/crystal-ball', group: 'auction' },
+  // the default view is ASCII; ?view= picks the 2D and 3D ones
+  ...['/crystal-ball', '/v2/crystal-ball'].flatMap(base =>
+    ['2d', '3d'].map(view => ({
+      path: base.slice(1),
+      url: `${base}?view=${view}`,
+      group: 'auction',
+    })),
+  ),
   { path: 'feed', url: '/feed', group: 'explore' },
   { path: 'highway', url: '/highway', group: 'explore' },
   { path: 'terraforms', url: '/terraforms', group: 'art' },

@@ -1145,6 +1145,10 @@ function SettleOrbButton({ state, isConnected, active }: SettleOrbButtonProps) {
 export default function CrystalBallPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'ascii';
+    // ?view=2d|3d|ascii wins over the remembered choice (deep links, and the
+    // responsive harness measures each view this way)
+    const fromUrl = new URLSearchParams(window.location.search).get('view');
+    if (fromUrl === '2d' || fromUrl === '3d' || fromUrl === 'ascii') return fromUrl;
     const saved = window.localStorage.getItem('crystal-ball:view-mode');
     if (saved === '2d' || saved === '3d' || saved === 'ascii') return saved;
     return 'ascii';
