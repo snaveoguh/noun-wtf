@@ -18,6 +18,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | `/noun/:id`, `/v2/noun/:id` (Auction) | pilot, 26/26 clean in the last --all run · before/after sheets in `.claude/responsive-shots/noun-2062*/` |
 | `/` (homescreen) | severity 21.5 → 13.7, 0/13 clean both runs. Phones' own problems are fixed (hero stacked, tap sizes, jump chips, no clipping in the page); what's left is shell (tray, NOUN FM button) or harness false positives, plus the wide hero kept as designed · `claude/responsive-home`, sheets in `.claude/responsive-shots/home/` |
 | `/studio` | 6/26 → 26/26 clean (branch `claude/responsive-studio`) · before/after sheets in `.claude/responsive-shots/studio/` |
+| `/vote`, `/candidates` (governance lists) | 26/26 clean each (before 12/26 and 22/26, with live indexer data) · sheets in `.claude/responsive-shots/{vote,candidates}/` · PR responsive: governance lists |
 
 ## Work units (worst first)
 
