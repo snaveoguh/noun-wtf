@@ -3,6 +3,13 @@
 // rule here is ≥ 0,2,0 and !important. The intro and the dialogs render in
 // portals on <body>, outside .nos-root, so they're prefixed with `body`.
 
+import {
+  WORDMARK_INK,
+  WORDMARK_SHIMMER,
+  WORDMARK_SHIMMER_SIZE,
+  WORDMARK_TRACKING,
+} from './wordmark';
+
 const GRAIN =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.6'/></svg>\")";
 
@@ -35,8 +42,8 @@ export const HOME_CSS = `
   box-shadow:0 1px 0 rgba(255,255,255,.06),0 12px 30px rgba(0,0,0,.4)}
 .nh-brand{display:flex;align-items:baseline;gap:9px;color:var(--tx);text-decoration:none;flex-shrink:0}
 /* Quiet lockup: dark grey letters; a light band sweeps across on hover */
-.nh-wordmark{font-size:14px;line-height:1;letter-spacing:.06em;text-shadow:none;color:#34343b;
-  background:linear-gradient(100deg,#34343b 0 40%,#d9d9e0 50%,#34343b 60% 100%) 100% 0/250% 100% no-repeat;
+.nh-wordmark{font-size:14px;line-height:1;letter-spacing:${WORDMARK_TRACKING};text-shadow:none;color:${WORDMARK_INK};
+  background:${WORDMARK_SHIMMER} 100% 0/${WORDMARK_SHIMMER_SIZE} no-repeat;
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .nh-brand:hover .nh-wordmark,.nh-brand:focus-visible .nh-wordmark{animation:nh-shimmer .9s ease-out both}
 @keyframes nh-shimmer{from{background-position:100% 0}to{background-position:0 0}}

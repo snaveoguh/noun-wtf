@@ -7,9 +7,11 @@ import type { InputFrame } from '../../core/Input';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
+import { CollisionPkWorld } from '../../parkour/world';
 import { CollisionWorld } from '../../physics/Collision';
 import { RailSet } from '../../physics/Rails';
 import { Player } from '../../skate/Player';
+import { SkyController } from '../../skydive/SkyController';
 
 import { buildEscape } from './details';
 import {
@@ -170,6 +172,10 @@ function walk(world: CollisionWorld, start: THREE.Vector3, path: { x: number; z:
   p.spawn(start, Math.PI);
   p.mode = 'foot';
   p.footGrounded = true;
+  // Skydiving hooked in: a walk down the stair must never become a freefall
+  const sky = new SkyController(world, new CollisionPkWorld(world), p);
+  sky.attach();
+  let skydived = false;
   const dt = 1 / 60;
   let i = 0;
   let minGap = Infinity;
@@ -190,8 +196,9 @@ function walk(world: CollisionWorld, start: THREE.Vector3, path: { x: number; z:
     maxFall = Math.max(maxFall, prevY - p.pos.y);
     prevY = p.pos.y;
     minGap = Math.min(minGap, p.pos.y);
+    skydived ||= sky.phase !== 'off';
   }
-  return { p, reached: i, t, maxFall, minY: minGap };
+  return { p, reached: i, t, maxFall, minY: minGap, skydived };
 }
 
 describe('walking down a tower escape (the real foot controller)', () => {
@@ -214,6 +221,7 @@ describe('walking down a tower escape (the real foot controller)', () => {
       expect(r.p.pos.z).toBeLessThan(-3);
       // Never fell: walked every flight (no drop bigger than a step)
       expect(r.maxFall).toBeLessThan(0.3);
+      expect(r.skydived).toBe(false);
       // A flight every few seconds at a run
       expect(r.t).toBeLessThan(plan.flights * 4 + 15);
     });

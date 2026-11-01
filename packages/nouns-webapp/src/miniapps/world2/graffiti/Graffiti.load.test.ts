@@ -134,6 +134,35 @@ describe('Graffiti: loading a wall on arrival', () => {
     g.dispose();
   });
 
+  it('says when the arrival load is done: every listed wall fetched and painted', async () => {
+    const OTHER = 'plaza|0.00,0.00,-1.00|-38.75|-2|0';
+    vi.stubGlobal('fetch', fakeStore({ [WALL]: [tag(0)], [OTHER]: [tag(1), tag(2)] }, []));
+    const g = new Graffiti({} as CollisionWorld, 'plaza', {
+      save: () => undefined,
+      load: () => undefined,
+    });
+    expect(g.loadProgress).toEqual({ done: 0, total: null });
+    let arrived = false;
+    void g.arrived.then(() => (arrived = true));
+    await flushAsync();
+    expect(arrived).toBe(true);
+    expect(g.loadProgress).toEqual({ done: 2, total: 2 });
+    // ...and by then the paint is on the walls (the world loader relies on it)
+    expect(g.cells.get(WALL)?.log.count).toBe(1);
+    expect(g.cells.get(OTHER)?.log.count).toBe(2);
+    g.dispose();
+  });
+
+  it('offline, it has arrived as soon as the local copy is painted', async () => {
+    const g = new Graffiti({} as CollisionWorld, 'plaza', null);
+    let arrived = false;
+    void g.arrived.then(() => (arrived = true));
+    await flushAsync();
+    expect(arrived).toBe(true);
+    expect(g.loadProgress).toEqual({ done: 0, total: 0 });
+    g.dispose();
+  });
+
   it('retries a store read that failed instead of leaving its walls bare', async () => {
     vi.useFakeTimers();
     try {

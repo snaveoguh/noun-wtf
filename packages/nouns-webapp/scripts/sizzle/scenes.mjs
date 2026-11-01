@@ -24,24 +24,12 @@ export async function openWorld(p, base, extra = '') {
   await cleanFrame(p);
 }
 
-/** Click PRESS START (in the page: Playwright's own click can stall on a busy page) and wait for the rider. */
+/** Wait out the loader (the wordmark holds until the level and every graffiti piece are in) and for the rider. */
 export async function pressStart(p) {
-  const btn = () => {
-    const has = b => /PRESS START/.test(b.textContent ?? '');
-    const bs = [...document.querySelectorAll('button, [role=button]')].filter(has);
-    if (bs.length > 0) return bs[bs.length - 1];
-    // The innermost element carrying the text
-    return [...document.querySelectorAll('div, span, a')].filter(has).pop();
-  };
-  await p.waitForFunction(btn, null, { timeout: 1_500_000, polling: 3000 });
   await p.waitForFunction(
-    btn => {
-      const b = new Function(`return (${btn})()`)();
-      b?.click();
-      return window.__w2 && window.__w2.me;
-    },
-    btn.toString(),
-    { timeout: 900_000, polling: 5000 },
+    () => document.querySelector('[data-w2loader]') === null && window.__w2 && window.__w2.me,
+    null,
+    { timeout: 1_500_000, polling: 3000 },
   );
 }
 
@@ -121,7 +109,8 @@ export function installWorld() {
       fwd.normalize();
       side.set(-fwd.z, 0, fwd.x).normalize();
       if (mode === 'side') {
-        tmp.copy(pl.pos)
+        tmp
+          .copy(pl.pos)
           .addScaledVector(side, o.side ?? 6)
           .addScaledVector(fwd, o.ahead ?? 0);
         tmp.y += o.up ?? 1.5;
@@ -130,7 +119,8 @@ export function installWorld() {
       } else if (mode === 'fixed') {
         if (fixedAt === null && first) {
           // 'here': fixed in the world where the rider is now, plus an offset
-          tmp.copy(pl.pos)
+          tmp
+            .copy(pl.pos)
             .addScaledVector(side, o.side ?? 0)
             .addScaledVector(fwd, o.ahead ?? 0);
           tmp.y += o.up ?? 0;
@@ -142,7 +132,8 @@ export function installWorld() {
       } else if (mode === 'orbit') {
         const a = (o.a0 ?? 0) + (o.w ?? 0.4) * t;
         const r = o.r ?? 6;
-        tmp.copy(pl.pos)
+        tmp
+          .copy(pl.pos)
           .addScaledVector(side, Math.cos(a) * r)
           .addScaledVector(fwd, Math.sin(a) * r);
         tmp.y += o.h ?? 1.5;
@@ -230,10 +221,14 @@ export async function installBigDrop() {
  */
 export async function openPool(p, base) {
   await openWorld(p, base, '&play=pool');
-  await p.waitForFunction(() => window.__w2.pool.ui.phase === 'menu' && window.__w2.pool.view !== null, null, {
-    timeout: 300_000,
-    polling: 1000,
-  });
+  await p.waitForFunction(
+    () => window.__w2.pool.ui.phase === 'menu' && window.__w2.pool.view !== null,
+    null,
+    {
+      timeout: 300_000,
+      polling: 1000,
+    },
+  );
   await p.evaluate(installPool);
   // The players' Nouns load their heads
   await p.waitForTimeout(8000);
@@ -357,7 +352,9 @@ export async function installPool() {
 export async function openParkour(p, base) {
   await openWorld(p, base);
   // The same rider in every shot (a fresh page rolls a random Noun)
-  await p.evaluate(() => window.__w2.setSeed({ background: 0, body: 13, accessory: 31, head: 138, glasses: 7 }));
+  await p.evaluate(() =>
+    window.__w2.setSeed({ background: 0, body: 13, accessory: 31, head: 138, glasses: 7 }),
+  );
   await p.waitForTimeout(10_000);
   await p.evaluate(installParkour);
   await cleanFrame(p);
@@ -407,7 +404,9 @@ export function installParkour() {
       let fresh = true;
       pkx.log = [];
       pkx.steps = 0;
-      const conds = phases.map(ph => (ph.until ? new Function('p', 'm', 'a', 't', `return (${ph.until})`) : null));
+      const conds = phases.map(ph =>
+        ph.until ? new Function('p', 'm', 'a', 't', `return (${ph.until})`) : null,
+      );
       sz.input = () => {
         pkx.steps++;
         const p = g.player;
@@ -415,12 +414,21 @@ export function installParkour() {
         while (i < phases.length) {
           const ph = phases[i];
           const c = conds[i];
-          const done = (ph.dur !== undefined && t >= ph.dur) || (c !== null && c(p, pk.motor.move, pk.anim.kind, t));
+          const done =
+            (ph.dur !== undefined && t >= ph.dur) ||
+            (c !== null && c(p, pk.motor.move, pk.anim.kind, t));
           if (!done) break;
           i++;
           t = 0;
           fresh = true;
-          pkx.log.push({ step: pkx.steps, phase: i, kind: pk.anim.kind, x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2) });
+          pkx.log.push({
+            step: pkx.steps,
+            phase: i,
+            kind: pk.anim.kind,
+            x: +p.pos.x.toFixed(2),
+            y: +p.pos.y.toFixed(2),
+            z: +p.pos.z.toFixed(2),
+          });
         }
         const ph = phases[i] ?? {};
         t += 1 / 60;
@@ -484,7 +492,13 @@ export function installParkour() {
         const a = pk.anim.kind;
         const p = g.player;
         if (seen.length === 0 || seen[seen.length - 1].a !== a)
-          seen.push({ k, a, x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2) });
+          seen.push({
+            k,
+            a,
+            x: +p.pos.x.toFixed(2),
+            y: +p.pos.y.toFixed(2),
+            z: +p.pos.z.toFixed(2),
+          });
       }
       return seen;
     },
@@ -501,7 +515,10 @@ export function installParkour() {
  */
 export async function openWarfare(p, base) {
   await p.goto(`${base}/warfare?q=high`, { timeout: 1_200_000, waitUntil: 'commit' });
-  await p.waitForFunction(() => window.__warfare?.game?.assets, null, { timeout: 900_000, polling: 2000 });
+  await p.waitForFunction(() => window.__warfare?.game?.assets, null, {
+    timeout: 900_000,
+    polling: 2000,
+  });
   await p.evaluate(installWarfare);
   await cleanFrame(p);
 }
@@ -598,7 +615,14 @@ export async function openExchange(p, base) {
       const W = window.innerWidth;
       const H = window.innerHeight;
       const corner = document.elementFromPoint(W - 2, H - 2);
-      return r.left === 0 && r.top === 0 && r.width === W && r.height === H && !!corner && c.closest('.gx3d-root').contains(corner);
+      return (
+        r.left === 0 &&
+        r.top === 0 &&
+        r.width === W &&
+        r.height === H &&
+        !!corner &&
+        c.closest('.gx3d-root').contains(corner)
+      );
     },
     null,
     { timeout: 30_000, polling: 250 },

@@ -208,4 +208,22 @@ describe('world-graffiti store', () => {
       expect(new Set((await walls([OTHER]))[OTHER])).toEqual(new Set([tag(1), tag(2)]));
     }
   });
+
+  it('serves when each tag was stored with at=1 (the onchain snapshot reads it)', async () => {
+    const before = Date.now();
+    const sent = [30, 31].map(tag);
+    for (const d of sent) await post(WALL, d);
+    settle();
+    const res = await handler({
+      httpMethod: 'GET',
+      body: null,
+      queryStringParameters: { level: 'plaza', ids: JSON.stringify([WALL]), at: '1' },
+    });
+    const got = (JSON.parse(res.body) as { walls: Record<string, { d: string; at: number }[]> })
+      .walls[WALL];
+    expect(got.map(t => t.d)).toEqual(sent);
+    for (const t of got) expect(t.at).toBeGreaterThanOrEqual(before);
+    // without it, the answer the game reads is unchanged
+    expect((await walls([WALL]))[WALL]).toEqual(sent);
+  });
 });
