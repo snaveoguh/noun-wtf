@@ -65,8 +65,8 @@ Rules that follow from the tokens:
 - Sizes: body 15px, small 13px, never below 12px for anything readable
   (`0.75rem` is the floor; `0.6rem` / `10px` captions were raised app-wide).
 - Lowercase, plain, short. No middots (·) or em-dashes as decoration.
-- Display exceptions: Pip3 for the NOUN WORLD title only, Londrina Solid
-  for game buttons (PRESS START) and the manifesto headline.
+- Display exceptions: Pip3 for the noun.wtf wordmark (the header and Noun
+  World's loader), Londrina Solid for game buttons and the manifesto headline.
 
 ## Buttons
 

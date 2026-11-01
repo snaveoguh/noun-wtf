@@ -1,6 +1,6 @@
 // ── Noun World v2 — skate the plaza as your Noun ───────────────────────
 
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router';
 
@@ -16,7 +16,7 @@ import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppeara
 import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { DragonHud } from './dragon/DragonHud';
-import { Game, type HudState } from './Game';
+import { Game } from './Game';
 import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
 import { HUD_CSS } from './hud/hudStyle';
@@ -27,7 +27,6 @@ import { DROP_PARAM } from './missions/unlocks';
 import { ParkourUi } from './parkour/game/ParkourUi';
 import { PoolUi, usePoolActive } from './pool/net/PoolUi';
 import { applyWorldManifest, registerWorldSw } from './pwa/install';
-import { InstallButton } from './pwa/InstallButton';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
 import { introAllowed, introEnabled } from './radio/FmSpots';
 import { FmSpotsUi } from './radio/FmSpotsUi';
@@ -41,6 +40,7 @@ import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/C
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
 import { DropClaim } from './ui/DropClaim';
 import { TouchControls, useIsTouch } from './ui/TouchControls';
+import { LOADER_CSS, WorldLoader } from './ui/WorldLoader';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
 import { CampUi } from './world/camp/CampUi';
@@ -73,8 +73,14 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     if (game === null || root === null) return;
     return bindUiSounds(root, game.sfx);
   }, [game]);
-  // title → select (character select over the live showroom) → play
-  const [phase, setPhase] = useState<'title' | 'select' | 'play'>('title');
+  // loading (the noun.wtf wordmark's one shimmer, held until the level and
+  // every graffiti piece are in: ui/WorldLoader.tsx) → select (character
+  // select over the live showroom) → play. No title / PRESS START screen.
+  const [phase, setPhase] = useState<'loading' | 'select' | 'play'>('loading');
+  // Browsers lock audio until a gesture. PRESS START used to be that
+  // gesture; now the first click, tap or key anywhere (the character select
+  // included) unlocks it, and NOUN FM's start-of-game intro starts then.
+  const [audioOn, setAudioOn] = useState(false);
   // Character select: the music screens (NOUN BEATS, the site's NOUN FM) sat
   // over its fields on phones. Hidden, not unmounted, so the music plays on
   useEffect(() => {
@@ -174,10 +180,25 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const driving = vanDriving || carDriving;
   const replaying = useReplayActive(game);
 
-  // NOUN FM's start-of-game intro: from PRESS START, so it plays over character
-  // select (once per page load; ?fmintro=1 forces it offline)
   useEffect(() => {
-    if (!game || phase === 'title') return;
+    if (!game || audioOn) return;
+    const unlock = () => {
+      game.unlockAudio();
+      setAudioOn(true);
+    };
+    // capture: the character select's own handlers can't swallow it
+    window.addEventListener('pointerdown', unlock, true);
+    window.addEventListener('keydown', unlock, true);
+    return () => {
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
+    };
+  }, [game, audioOn]);
+  // NOUN FM's start-of-game intro: on the first gesture after the loader, so
+  // it plays over character select (once per page load; ?fmintro=1 forces it
+  // offline). Before that gesture there's no audio to play it into.
+  useEffect(() => {
+    if (!game || phase === 'loading' || !audioOn) return;
     const ok = introAllowed({
       enabled: introEnabled(),
       played: game.spots.introPlayed,
@@ -188,7 +209,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     });
     game.spots.introPlayed = true;
     if (ok) void game.spots.intro();
-  }, [game, phase, searchParams]);
+  }, [game, phase, audioOn, searchParams]);
   // A plain /world load (no deep link, no `?spawn=plaza`): everyone wakes
   // up in NOUNS CAMP, the condemned penthouse (world/camp). Once per page
   // load; if CAMP isn't there the plaza spawn stands.
@@ -381,8 +402,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const begin = () => {
-    gameRef.current?.unlockAudio();
+  // The loader let go: straight into CREATE YOUR RIDER (or into play with ?skip=1)
+  const loaded = () => {
     if (gameRef.current?.showroom === true) setPhase('select');
     else setPhase('play');
   };
@@ -409,7 +430,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       }}
       onPointerDown={() => gameRef.current?.unlockAudio()}
     >
-      <style>{CSS + FM_CSS + SETTINGS_CSS + MISSIONS_CSS + CUTSCENE_CSS + HUD_CSS}</style>
+      <style>
+        {CSS + LOADER_CSS + FM_CSS + SETTINGS_CSS + MISSIONS_CSS + CUTSCENE_CSS + HUD_CSS}
+      </style>
       <HudPrefsStyle />
       <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
@@ -423,10 +446,10 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
           onChat={() => setChatOpen(true)}
         />
       )}
-      {/* NOUN FM from PRESS START: its screen and the intro's skip chip show over character select too */}
-      {game && phase !== 'title' && <FmScreen fm={game.fm} touch={touchPage} />}
-      {game && phase !== 'title' && <BeatsScreen game={game} touch={touchPage} />}
-      {game && phase !== 'title' && <FmSpotsUi spots={game.spots} />}
+      {/* NOUN FM from the character select on: its screen and the intro's skip chip show over it too */}
+      {game && phase !== 'loading' && <FmScreen fm={game.fm} touch={touchPage} />}
+      {game && phase !== 'loading' && <BeatsScreen game={game} touch={touchPage} />}
+      {game && phase !== 'loading' && <FmSpotsUi spots={game.spots} />}
       {game && started && fmOpen && <FmPanel game={game} onClose={() => setFmOpen(false)} />}
       {game && started && !hoopsOn && !driving && <TouchControls game={game} />}
       {game && started && !hoopsOn && !replaying && <VanHud game={game} touch={touchPage} />}
@@ -485,7 +508,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         />
       )}
       {game && deckOpen && <DeckDesigner game={game} onClose={closeDeck} />}
-      {(phase === 'title' || !game) && !error && <SplashGate game={game} onStart={begin} />}
+      {phase === 'loading' && !error && <WorldLoader game={game} onDone={loaded} />}
       {game && searchParams.get('diag') === '1' && <Diagnostics game={game} />}
 
       {error && (
@@ -498,13 +521,6 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         </div>
       )}
     </div>
-  );
-}
-
-function useHud(game: Game): HudState {
-  return useSyncExternalStore(
-    cb => game.subscribe(cb),
-    () => game.hud,
   );
 }
 
@@ -550,59 +566,6 @@ function Diagnostics({ game }: { game: Game }) {
   );
 }
 
-function SplashGate({ game, onStart }: { game: Game | null; onStart: () => void }) {
-  if (!game) return <Splash loading="booting" ready={false} onStart={onStart} />;
-  return <SplashLive game={game} onStart={onStart} />;
-}
-
-function SplashLive({ game, onStart }: { game: Game; onStart: () => void }) {
-  const hud = useHud(game);
-  return <Splash loading={hud.loading} ready={!hud.loading} onStart={onStart} />;
-}
-
-function Splash({
-  loading,
-  ready,
-  onStart,
-}: {
-  loading: string | null;
-  ready: boolean;
-  onStart: () => void;
-}) {
-  useEffect(() => {
-    if (!ready) return;
-    const k = (e: KeyboardEvent) => {
-      if (worldPause.get()) return;
-      if (e.code === 'Enter' || e.code === 'Space') onStart();
-    };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  }, [ready, onStart]);
-  return (
-    <div className="w2-splash absolute inset-0 flex flex-col items-center justify-center">
-      <div className="w2-title">
-        NOUN<span>WORLD</span>
-      </div>
-      <div className="mt-1 text-sm tracking-[0.35em] opacity-70">SKATE THE PLAZA</div>
-      <div className="mt-10 h-12">
-        {ready ? (
-          <button className="w2-btn w2-pulse" onClick={onStart}>
-            PRESS START ⌐◨-◨
-          </button>
-        ) : (
-          <div className="flex items-center gap-3 text-lg opacity-80">
-            <span className="w2-spinner" /> {loading}…
-          </div>
-        )}
-      </div>
-      <InstallButton className="mt-6" />
-      <div className="absolute bottom-6 text-xs opacity-50">
-        gamepad recommended, headphones on, mic optional
-      </div>
-    </div>
-  );
-}
-
 const CSS = `
 .w2-speedlines{position:absolute;inset:-10%;background:repeating-conic-gradient(from 0deg at 50% 52%,rgba(255,255,255,0) 0deg 5deg,rgba(255,255,255,.55) 5deg 5.4deg,rgba(255,255,255,0) 5.4deg 9deg,rgba(255,255,255,.35) 9deg 9.25deg);-webkit-mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);mask-image:radial-gradient(ellipse at 50% 52%,transparent 38%,#000 78%);animation:w2lines .24s steps(3) infinite;transition:opacity .3s}
 @keyframes w2lines{0%{transform:rotate(0)}100%{transform:rotate(3deg)}}
@@ -617,16 +580,6 @@ const CSS = `
 .w2-live{border-color:#3ddc84;background:rgba(61,220,132,.35)}
 .w2-btn{pointer-events:auto;background:#d22209;color:#fff;font-size:22px;letter-spacing:.06em;padding:12px 28px;border-radius:14px;box-shadow:0 6px 0 #7a1405,0 10px 30px rgba(0,0,0,.4);transition:transform .08s}
 .w2-btn:active{transform:translateY(4px);box-shadow:0 2px 0 #7a1405}
-.w2-pulse{animation:w2pulse 1.6s ease-in-out infinite}
-@keyframes w2pulse{50%{transform:scale(1.05)}}
-.w2-splash{background:radial-gradient(ellipse at 50% 40%,rgba(30,40,70,.55),rgba(5,6,12,.92))}
-/* Site themes force *{font-family:...!important}; out-specify it for the title only */
-.w2-splash .w2-title,.w2-splash .w2-title *{font-family:'Pip3',system-ui,sans-serif !important;text-transform:uppercase !important}
-.w2-splash .w2-btn{font-family:'Londrina Solid',system-ui,sans-serif !important;font-size:30px;letter-spacing:.04em;font-weight:900}
-.w2-title{font-family:'Pip3',system-ui,sans-serif;text-transform:uppercase;font-size:clamp(64px,13vw,170px);line-height:.85;font-weight:400;letter-spacing:.01em;text-shadow:0 8px 0 #d22209,0 16px 40px rgba(0,0,0,.6);font-style:italic}
-.w2-title span{display:block;color:#ffd400;font-size:.55em;text-align:right}
-.w2-spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,.25);border-top-color:#ffd400;border-radius:50%;animation:w2spin .8s linear infinite}
-@keyframes w2spin{to{transform:rotate(360deg)}}
 .w2-combo-label{font-size:clamp(16px,2.4vw,26px);font-style:italic;font-weight:800;text-shadow:0 2px 0 #000,0 0 18px rgba(0,0,0,.6);max-width:90vw}
 .w2-combo-score{font-size:clamp(28px,4.4vw,52px);font-weight:900;color:#ffd400;font-style:italic;text-shadow:0 3px 0 #7a5a00,0 0 24px rgba(0,0,0,.5)}
 .w2-combo-score span{color:#fff;font-size:.6em}
@@ -634,7 +587,10 @@ const CSS = `
 .w2-bailed{color:#ff4d3d;text-shadow:0 3px 0 #6a0f06}
 @keyframes w2bank{0%{transform:scale(.6);opacity:0}10%{transform:scale(1.1);opacity:1}20%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-20px)}}
 .w2-nowplaying{display:flex;flex-direction:column;align-items:center;gap:2px;background:#ffd400;color:#000;padding:8px 18px;transform-origin:center;box-shadow:6px 6px 0 #d22209;font-family:system-ui,sans-serif;animation:w2np 4.5s ease-out forwards}.w2-nowplaying span{font-size:10px;letter-spacing:.2em}.w2-nowplaying b{font-size:18px;font-style:italic}.w2-np-stations{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;margin-top:2px}.w2-np-stations i{font-style:normal;opacity:.55}.w2-np-stations i.w2-np-cur{opacity:1;font-weight:800;text-decoration:underline}@keyframes w2np{0%{opacity:0;transform:translate(-50%,-20px) rotate(-3deg)}8%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}85%{opacity:1}100%{opacity:0}}
-body[data-w2select] [data-beats="screen"],body[data-w2select] [data-nounfm]{visibility:hidden!important;pointer-events:none!important}
+/* Character select: the music screens sat over its fields. They move to the rider's side (left on desktop, the top on phones) rather than hide: YouTube needs a visible player, and hidden ones left the select silent */
+body[data-w2select] [data-nounfm],body[data-w2select] [data-fm="screen"],body[data-w2select] :has(> [data-beats="screen"]){left:12px!important;right:auto!important}
+body[data-w2select] :has(> [data-beats="screen"]){left:250px!important}
+@media (max-width:760px),(pointer:coarse){body[data-w2select] [data-nounfm],body[data-w2select] [data-fm="screen"],body[data-w2select] :has(> [data-beats="screen"]){top:12px!important;bottom:auto!important}}
 .w2-nametag{position:absolute;left:0;top:0;text-align:center;font-family:system-ui,sans-serif;font-size:12px;white-space:nowrap}
 .w2-nametag span{background:rgba(0,0,0,.55);padding:2px 8px;border-radius:999px}
 .w2-panel{background:rgba(10,12,20,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px;font-family:system-ui,sans-serif;white-space:normal;box-shadow:0 12px 40px rgba(0,0,0,.45)}

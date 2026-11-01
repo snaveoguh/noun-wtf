@@ -889,7 +889,7 @@ function FmScreenInner({ fm, touch, label }: { fm: NounFm; touch: boolean; label
       </div>
       <div
         ref={ref}
-        className="overflow-hidden rounded bg-black"
+        className="w2-yt overflow-hidden rounded bg-black"
         style={{ width: Math.max(YT_MIN_PX, 220), height: Math.max(YT_MIN_PX, 220) }}
       />
     </div>
@@ -901,4 +901,7 @@ export const FM_CSS = `
 .w2-fm-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#666;flex:none}
 .w2-fm-live{background:#ff3020;box-shadow:0 0 8px #ff3020;animation:w2fmblink 1.2s steps(2) infinite}
 @keyframes w2fmblink{50%{opacity:.35}}
+/* YouTube screens (COMMUNITY RADIO, NOUN BEATS): YouTube needs a visible player, so it stays in the page, at 10% until you hover or focus it */
+.w2-yt{opacity:.1;transition:opacity .2s ease}
+[data-fm="screen"]:hover .w2-yt,[data-fm="screen"]:focus-within .w2-yt,[data-beats="screen"]:hover .w2-yt,[data-beats="screen"]:focus-within .w2-yt{opacity:1}
 `;

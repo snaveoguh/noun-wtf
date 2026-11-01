@@ -36,6 +36,7 @@ import {
 } from './home/rows';
 import { Shelf } from './home/Shelf';
 import { ident, unlockAudio } from './home/sound';
+import { WORDMARK_TEXT } from './home/wordmark';
 import { cx } from './osStore';
 
 export type { GameId } from './home/rows';
@@ -252,7 +253,7 @@ export default function AgentHome({
           aria-label="noun.wtf home"
         >
           <span className="nh-wordmark" data-keep-font>
-            NOUN.WTF
+            {WORDMARK_TEXT}
           </span>
         </a>
         <nav className="nh-nav" aria-label="Sections">

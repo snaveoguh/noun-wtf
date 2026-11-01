@@ -271,6 +271,13 @@ A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews 
 
 A room is built 4 km over its door (`POCKET_Y`, origin `(door.x, POCKET_Y, door.z)`), the same on every client, so positions inside are already a shared frame. The pose blob carries `in: [doorId, level, seat]` only while inside (`interiors/roomNet.ts`). `Game.updateNetwork` draws only riders in the same space (`sameSpace`): street riders in the street, and riders in the same room and on the same floor indoors, with their name tags (`data-room` gets past `[data-away]`). A seated rider is put on their seat by `InteriorSystem.poseRemote`. A window's view of the street shows only street riders. Older clients ignore `in`, so they still draw indoor riders 4 km up. No worker change is needed.
 
+### Noun World start flow (loader → CREATE YOUR RIDER → CAMP)
+
+No title / PRESS START screen. A `/world` load opens on the noun.wtf header wordmark (`world2/ui/WorldLoader.tsx`; ink and band shared with the homescreen header through `NounOS/home/wordmark.ts`) with ONE shimmer pass whose band is the progress. It holds until the level is in AND the graffiti's arrival load is done (`Graffiti.arrived`, `loadProgress`: every wall the store lists, ~3,400 on the plaza), then goes straight to the character select (`?skip=1`: straight into play). Rules in `ui/worldLoad.ts` (pure, tested): slow-but-moving graffiti is waited for; it lets go only after 15 s with no new wall (a dead store) or 90 s after the level. Reduced motion: no shimmer. So the select's scene and CAMP's opening shot open with all graffiti up (measured 2026-11-01 headless: 3,393 / 3,393 walls on screen at the select).
+- **Audio:** the first click, tap or key after the loader unlocks it (World2Page, capture listeners), and NOUN FM's start-of-game intro starts then, not before. On the select, keys never skip the jingle (`skipsSpot` in `radio/FmSpotsUi.tsx`): its arrows and name field used to cut it off.
+- **YouTube screens** (site NOUN FM widget, COMMUNITY RADIO's `FmScreen`, NOUN BEATS): never hidden (YouTube needs a visible player; hiding them on the select left it silent). They sit at 10% opacity until hovered or focused (`.w2-yt`, the widget's `group-hover`), and on the select they move to the rider's side, off its fields.
+- Scripts that drove PRESS START (sizzle `pressStart`, `.claude/perf-shots/harness`) now wait for `[data-w2loader]` to go.
+
 ### CAMP (first spawn)
 
 NOUNS CAMP is a condemned penthouse on top of the tallest tower (Skyline `TOWERS[0]`, 150 m, plaza north side), and every plain `/world` load wakes up in it (`world/camp/`).
