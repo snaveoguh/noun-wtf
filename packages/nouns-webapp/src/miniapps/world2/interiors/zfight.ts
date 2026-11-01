@@ -169,16 +169,91 @@ export function findFights(faces: Face[], tol = FIGHT_TOL, minArea = 2e-4): Figh
     seen.add(key);
     out.push({ a, b, area, gap });
   };
+  // Within a plane cell, only faces whose bounds overlap along one in-plane
+  // axis can fight: bin each cell along it, and test a face only against the
+  // faces in the bins it spans. Candidates are tested in the cell's own order,
+  // so fights come out exactly as the all-pairs loop found them (a room's
+  // floor plane holds ~560 faces: ~300k pair tests a pass before, entering a
+  // room spent ~0.3 s here on a tablet)
+  const binned = new Map<Face[], Binned>();
+  const binsOf = (list: Face[]) => {
+    let b = binned.get(list);
+    if (b === undefined) binned.set(list, (b = binFaces(list)));
+    return b;
+  };
+  const cand: number[] = [];
+  const against = (a: Face, list: Face[]) => {
+    if (list.length < BIN_MIN) {
+      for (const b of list) test(a, b);
+      return;
+    }
+    const g = binsOf(list);
+    const k = g.axis;
+    const lo = Math.floor((a.lo[k]! + SHRINK) / BIN);
+    const hi = Math.floor((a.hi[k]! - SHRINK) / BIN);
+    g.stamp++;
+    cand.length = 0;
+    for (let c = lo; c <= hi; c++) {
+      const bin = g.bins.get(c);
+      if (bin === undefined) continue;
+      for (const i of bin)
+        if (g.seen[i] !== g.stamp) {
+          g.seen[i] = g.stamp;
+          cand.push(i);
+        }
+    }
+    cand.sort((x, y) => x - y);
+    for (const i of cand) test(a, list[i]!);
+  };
   for (const { list, nk, cell } of order) {
     const cells = byNormal.get(nk)!;
     const near = cells.get(cell) ?? none;
     const next = cells.get(cell + 1) ?? none;
     for (const a of list) {
-      for (const b of near) test(a, b);
-      for (const b of next) test(a, b);
+      against(a, near);
+      against(a, next);
     }
   }
   return out;
+}
+
+/** Bin width (m) along a plane cell's in-plane axis, and the cell size worth binning. */
+const BIN = 0.25;
+const BIN_MIN = 24;
+/** Bounds shrink before binning: under half test()'s 1e-4 sliver, so two faces
+ * overlapping by 1e-4 still share a bin. */
+const SHRINK = 4e-5;
+
+interface Binned {
+  axis: number;
+  /** Bin → indices into the cell's list, ascending. */
+  bins: Map<number, number[]>;
+  seen: Int32Array;
+  stamp: number;
+}
+
+/**
+ * Bin a plane cell's faces along the in-plane axis the normal is least
+ * aligned with. A face goes in every bin its bounds span (shrunk by under half
+ * the 1e-4 sliver test() ignores), so a pair test() could accept always shares a bin.
+ */
+function binFaces(list: Face[]): Binned {
+  const n = list[0]!.n;
+  const ax = Math.abs(n[0]);
+  const ay = Math.abs(n[1]);
+  const az = Math.abs(n[2]);
+  const axis = ax <= ay && ax <= az ? 0 : ay <= az ? 1 : 2;
+  const bins = new Map<number, number[]>();
+  list.forEach((f, i) => {
+    const lo = Math.floor((f.lo[axis]! + SHRINK) / BIN);
+    const hi = Math.floor((f.hi[axis]! - SHRINK) / BIN);
+    for (let c = lo; c <= hi; c++) {
+      let b = bins.get(c);
+      if (b === undefined) bins.set(c, (b = []));
+      b.push(i);
+    }
+  });
+  return { axis, bins, seen: new Int32Array(list.length), stamp: 0 };
 }
 
 /** Overlap area of two (nearly) coplanar triangles, projected on their dominant plane. */

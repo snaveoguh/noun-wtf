@@ -39,6 +39,7 @@ import type {
 import * as THREE from 'three';
 
 import { type CharacterAssets } from '../../character/NounCharacter';
+import { warmHidden } from '../../render/shaderWarm';
 import { inkExcluded, toonify } from '../../render/Toon';
 import { fetchTrack, HOUSE_ID, loadManifest, trackById } from '../tracks';
 
@@ -74,6 +75,8 @@ export interface BreakViewDeps {
   labelLayer: HTMLElement | null;
   /** The game's audio bus, when it has one running. */
   audio: () => AudioBus | null;
+  /** Runs a compile with the render target the frame draws into (Graphics.asDrawn). */
+  asDrawn?: <T>(fn: () => T) => T;
 }
 
 const EMPTY_ASSETS: CharacterAssets = { gltf: null, board: null, manifest: {}, clips: new Map() };
@@ -169,6 +172,10 @@ export class BreakView implements BattleView {
     this.winnerAt = null;
     this.cam.cut();
     this.loadSong(config);
+    // The stage's programs link in the background during the countdown (3 s
+    // before the first beat); drawn at once they linked on first sight, a
+    // 1.7 s freeze on an Android tablet. Shown when ready, 1.5 s at the latest.
+    void warmHidden(d.renderer, g, d.camera, d.scene, d.asDrawn, 1500);
   }
 
   /** BattleConfig.track: the host's song, when this client can load it (the drums otherwise). */
@@ -618,6 +625,7 @@ export function createBattleView(game: Game): BreakView {
     quality: game.gfx.quality,
     toon: game.gfx.toon,
     labelLayer: game.labelLayerEl,
+    asDrawn: fn => game.gfx.asDrawn(fn),
     audio: () =>
       game.audio.ctx !== null && game.audio.master !== null
         ? { ctx: game.audio.ctx, out: game.audio.master }

@@ -1573,6 +1573,9 @@ export class NounCharacter {
    * first. The procedural deck (no GLB) gets a grip top + graphic bottom.
    */
   setDeckGraphic(tex: THREE.Texture | null, grip: THREE.ColorRepresentation | null = null) {
+    // Stock deck asked for and nothing custom was ever applied: nothing to do
+    // (most riders; building the per-rider deck materials cloned them for nothing)
+    if (tex === null && grip === null && this.deckMats === null) return;
     // (Re)build when the board model is new or swapped (other board types)
     if (this.deckMats === null || this.deckMats.model !== this.boardModel) {
       const dm: NonNullable<NounCharacter['deckMats']> = {
