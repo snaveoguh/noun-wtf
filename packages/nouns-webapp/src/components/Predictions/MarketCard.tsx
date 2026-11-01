@@ -133,18 +133,20 @@ export function MarketCard({
       <div className="mb-2">
         <div className="flex h-6 w-full overflow-hidden border border-[var(--rule-light)]">
           <div
-            className="flex items-center justify-center bg-[var(--ink)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
+            className="flex items-center justify-center overflow-hidden whitespace-nowrap bg-[var(--ink)] font-mono text-xs font-bold leading-none text-[var(--paper)] transition-all [container-type:inline-size]"
             style={{ width: `${displayMarket.forPercent}%` }}
           >
-            {displayMarket.forPercent > 10 ? `PASS ${displayMarket.forPercent.toFixed(0)}%` : ''}
+            {displayMarket.forPercent > 10 && (
+              <OddsLabel word="PASS" pct={displayMarket.forPercent.toFixed(0)} />
+            )}
           </div>
           <div
-            className="flex items-center justify-center bg-[var(--accent-red)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
+            className="flex items-center justify-center overflow-hidden whitespace-nowrap bg-[var(--accent-red)] font-mono text-xs font-bold leading-none text-[var(--paper)] transition-all [container-type:inline-size]"
             style={{ width: `${displayMarket.againstPercent}%` }}
           >
-            {displayMarket.againstPercent > 10
-              ? `FAIL ${displayMarket.againstPercent.toFixed(0)}%`
-              : ''}
+            {displayMarket.againstPercent > 10 && (
+              <OddsLabel word="FAIL" pct={displayMarket.againstPercent.toFixed(0)} />
+            )}
           </div>
         </div>
       </div>
@@ -161,7 +163,7 @@ export function MarketCard({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 uppercase tracking-wider transition-colors hover:text-[var(--ink)]"
+              className="inline-flex shrink-0 items-center uppercase tracking-wider transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
             >
               View &rarr;
             </a>
@@ -266,7 +268,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
       <div className="flex gap-2">
         <button
           onClick={() => setSide('for')}
-          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors [@media(pointer:coarse)]:min-h-10 ${
             side === 'for'
               ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -276,7 +278,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
         </button>
         <button
           onClick={() => setSide('against')}
-          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors [@media(pointer:coarse)]:min-h-10 ${
             side === 'against'
               ? 'border-[var(--accent-red)] bg-[var(--accent-red)] text-[var(--paper)]'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -294,7 +296,7 @@ function InlineWager({ dao, proposalId }: { dao: string; proposalId: string }) {
               key={amt}
               onClick={() => handleQuickStake(amt)}
               disabled={isPending || isConfirming}
-              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-xs text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-xs text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
             >
               {isPending || isConfirming ? '...' : `${amt} ETH`}
             </button>
@@ -334,9 +336,31 @@ function ClaimButton({ dao, proposalId }: { dao: string; proposalId: string }) {
         })
       }
       disabled={isPending || isConfirming}
-      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
+      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
     >
       {isPending ? 'Signing...' : isConfirming ? 'Confirming...' : 'Claim Winnings'}
     </button>
+  );
+}
+
+/**
+ * An odds-bar segment's label. The segment is its own inline-size container,
+ * so the word ("PASS") shows only when the segment is wide enough for it;
+ * a narrow segment shows just the percentage.
+ */
+export function OddsLabel({ word, pct }: { word: string; pct: string | number }) {
+  return (
+    <span className="min-w-0 truncate px-0.5">
+      <span
+        className={
+          word.length <= 4
+            ? 'hidden [@container(min-width:4.5rem)]:inline'
+            : 'hidden [@container(min-width:5.75rem)]:inline'
+        }
+      >
+        {word}{' '}
+      </span>
+      {pct}%
+    </span>
   );
 }

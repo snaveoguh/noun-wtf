@@ -21,7 +21,9 @@ export default function PredictionsPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6 border-b-2 border-neutral-200 pb-4 dark:border-neutral-700">
-        <h1 className="font-londrina text-4xl">Nouns + Lil Nouns Predictions</h1>
+        <h1 className="font-londrina text-[clamp(1.875rem,8cqi,2.25rem)] leading-[1.1]">
+          Nouns + Lil Nouns Predictions
+        </h1>
         <p className="mt-1 text-xs uppercase tracking-widest text-neutral-500">
           Parimutuel, Ethereum Mainnet, 2% Resolution Fee
         </p>
@@ -29,7 +31,7 @@ export default function PredictionsPage() {
 
       {/* Next Auction, Price Guess */}
       <section className="mb-8">
-        <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-widest">
+        <h2 className="mb-3 font-mono text-xs font-bold uppercase leading-snug tracking-widest">
           Next Auction, Price Guess
         </h2>
         <AuctionMarketCard />
@@ -41,10 +43,10 @@ export default function PredictionsPage() {
 
       {resolved.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-widest">
+          <h2 className="mb-3 font-mono text-xs font-bold uppercase leading-snug tracking-widest">
             Resolved Markets ({resolved.length})
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="@md:grid-cols-2 grid gap-4">
             {resolved.map(p => (
               <MarketCard
                 key={`${p.dao}-${p.proposalId}`}
@@ -64,8 +66,10 @@ export default function PredictionsPage() {
       )}
 
       <section className="mt-10 rounded border border-neutral-200 p-5 dark:border-neutral-700">
-        <h3 className="mb-3 font-mono text-xs font-bold uppercase tracking-widest">How It Works</h3>
-        <div className="grid gap-4 text-sm sm:grid-cols-3">
+        <h3 className="mb-3 font-mono text-xs font-bold uppercase leading-snug tracking-widest">
+          How It Works
+        </h3>
+        <div className="@md:grid-cols-3 grid gap-4 text-sm">
           <div>
             <span className="font-mono text-lg font-bold">1</span>
             <p className="mt-1 text-neutral-600 dark:text-neutral-400">

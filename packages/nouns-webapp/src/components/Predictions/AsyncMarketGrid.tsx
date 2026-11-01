@@ -38,10 +38,10 @@ export function AsyncMarketGrid() {
 
   return (
     <section className="mb-8">
-      <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-widest">
+      <h2 className="mb-3 font-mono text-xs font-bold uppercase leading-snug tracking-widest">
         Active Markets ({proposals.length})
       </h2>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="@md:grid-cols-2 grid gap-4">
         {proposals.map(p => (
           <MarketCard
             key={`${p.dao}-${p.proposalId}`}
