@@ -1342,26 +1342,34 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
 
-/* NOIR: inputs are natural glass, never a black box */
-[data-theme='abacus'] .form-control,
-[data-theme='abacus'] .form-select,
-[data-theme='abacus'] .input-group-text,
-[data-theme='abacus'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.nos-bare),
-[data-theme='abacus'] textarea,
-[data-theme='abacus'] select {
+/* NOIR: inputs are natural glass, never a black box.
+   A panel that stays light in every theme marks itself data-surface="light"
+   and its fields keep their own colours (light text on it was unreadable). */
+[data-theme='abacus'] .form-control:not([data-surface='light'] *),
+[data-theme='abacus'] .form-select:not([data-surface='light'] *),
+[data-theme='abacus'] .input-group-text:not([data-surface='light'] *),
+[data-theme='abacus']
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.nos-bare):not(
+    [data-surface='light'] *
+  ),
+[data-theme='abacus'] textarea:not([data-surface='light'] *),
+[data-theme='abacus'] select:not([data-surface='light'] *) {
   background-color: rgba(255, 255, 255, 0.08) !important;
   color: #ecebe4 !important;
   border-color: transparent !important;
   border-radius: 12px;
 }
-[data-theme='abacus'] .form-control:focus,
-[data-theme='abacus'] input:not(.nos-bare):focus,
-[data-theme='abacus'] textarea:focus {
+[data-theme='abacus'] .form-control:focus:not([data-surface='light'] *),
+[data-theme='abacus'] input:not(.nos-bare):focus:not([data-surface='light'] *),
+[data-theme='abacus'] textarea:focus:not([data-surface='light'] *) {
   background-color: rgba(255, 255, 255, 0.12) !important;
   box-shadow: none !important;
 }
 [data-theme='abacus'] ::placeholder {
   color: rgba(236, 235, 228, 0.4) !important;
+}
+[data-theme='abacus'] [data-surface='light'] ::placeholder {
+  color: rgba(0, 0, 0, 0.4) !important;
 }
 
 /* NOIR: alerts/tips are dark glass */
