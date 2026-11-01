@@ -28,8 +28,9 @@ export function NounsListButton({ nounId }: NounsListButtonProps) {
   if (!showInput && status === 'idle') {
     return (
       <button
+        type="button"
         onClick={() => setShowInput(true)}
-        className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)]"
+        className="inline-flex items-center font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
       >
         List for Sale
       </button>
@@ -66,27 +67,30 @@ export function NounsListButton({ nounId }: NounsListButtonProps) {
           placeholder="ETH"
           value={priceInput}
           onChange={e => setPriceInput(e.target.value)}
-          className="w-24 border border-[var(--rule)] bg-[var(--paper)] px-1 py-0.5 font-mono text-xs text-[var(--ink)] outline-none focus:border-[var(--ink)]"
+          className="w-24 border border-[var(--rule)] bg-[var(--paper)] px-1 py-0.5 font-mono text-xs text-[var(--ink)] outline-none focus:border-[var(--ink)] [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:text-base"
         />
         <button
+          type="button"
           onClick={() => list(priceInput)}
           disabled={!priceInput || parseFloat(priceInput) <= 0}
-          className="border border-[var(--ink)] bg-[var(--ink)] px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
+          className="border border-[var(--ink)] bg-[var(--ink)] px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
         >
           List
         </button>
         <button
+          type="button"
           onClick={() => {
             setShowInput(false);
             reset();
           }}
-          className="font-mono text-xs text-[var(--ink-faint)] hover:text-[var(--ink)]"
+          className="font-mono text-xs text-[var(--ink-faint)] hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10"
         >
           &times;
         </button>
       </span>
       {status === 'error' && error && (
         <button
+          type="button"
           onClick={reset}
           className="mt-0.5 font-mono text-xs text-[var(--accent-red)] hover:underline"
         >
