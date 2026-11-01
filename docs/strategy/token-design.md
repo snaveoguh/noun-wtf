@@ -39,7 +39,7 @@ Working name: **CITY**. It's a placeholder. Don't use NOUN or NOUNS: Nouns DAO a
 | **NounTradeGoods + NTCOIN** (built, not deployed) | `packages/noun-trade-contracts/` (`SUPPLY.md`, `src/NounTradeGoods.sol`), cash-out `netlify/functions/world-trade-claim.ts`, deposit `world-trade-deposit.ts` | An ERC-1155 for goods plus an ERC-20 **NTCOIN**, minted when players cash out earned COIN through server-signed vouchers. Caps: 5k/wallet/day, 500k/day globally, halving every 180 days, 210M max supply. Off everywhere: `VITE_TRADE_ONCHAIN: ''` in `.github/workflows/netlify-deploy.yml`, `deployments/` is empty. |
 | **Respect** | `src/miniapps/world2/respect/rules.ts`, `netlify/functions/world-respect.ts` | Good conduct as a score, with tiers (local 50, regular 200, legend 600), rate limits and decay. **The client reports the events**: the server re-scores them but can't witness most of them ("helped", "ate"). Good as a gate, too weak to pay out on directly. |
 | **Records + wallet links** | `netlify/functions/world-stats.ts`, `../lib/runProof.ts`, `../lib/walletAuth.ts` | Speed, air and hang-time records rise only with a ride proof checked against the physics. A signed `link` ties a rider to one ETH address, and `winners` lists linked leaders for payouts. The best existing anti-farm asset. |
-| **Graffiti** | `netlify/functions/world-graffiti.ts` | Persisted and validated with the game's own codec, but **anonymous**: a POST has no rider. It can't be rewarded until the snapshot work attributes pieces. |
+| **Graffiti** | `netlify/functions/world-graffiti.ts` | Persisted and validated with the game's own codec, and **anonymous**: a POST has no rider. **Keep it that way.** Like real graffiti, you're known by your tag, not your name. §6a shows how anonymous writers can still earn without the city ever knowing who they are. |
 
 **On NTCOIN:** NounTradeGoods is careful work: vouchers, caps that only go down, a max
 supply, deposit burns. The problem is what it is, not how it's built. A freely tradeable
@@ -126,7 +126,7 @@ ERC20Votes and ERC20Permit, with no owner, no pause, no blacklist and no transfe
 | --- | ---: | ---: | --- |
 | **Launch conversion** (players' COIN / points) | 22.5 | 225,000,000 | one snapshot, §4. 25% at claim, 75% streamed over 6 months. Unclaimed after 12 months, or clipped by the caps, goes to play rewards. |
 | **Play rewards** | 25 | 250,000,000 | weekly epochs for 4 years, halving yearly (`emissionSchedule`), §5 |
-| **Creator rewards** | 12.5 | 125,000,000 | weekly for 4 years, halving yearly, pro rata to snapshot-attributed work that other players kept up |
+| **Creator rewards** | 12.5 | 125,000,000 | weekly for 4 years, halving yearly, pro rata to work in the snapshots that other players kept up. Graffiti is paid to anonymous writer tags (§6a), not to accounts. |
 | **Agents** | 5 | 50,000,000 | fee rebates and bond matching against distinct-user agent activity, §2.2 |
 | **City treasury** | 20 | 200,000,000 | governed through the timelock, spending at most 5% of the treasury balance a quarter |
 | **Liquidity** | 5 | 50,000,000 | single-sided range liquidity on a Uniswap pool on Base (no presale means no ETH to pair). The timelock holds the position, it's never withdrawn for the first 2 years and its fees go to the treasury. |
@@ -167,7 +167,7 @@ points (`retroPoints` in the model):
 points = √(trade COIN earned + max(0, exchange equity − exchange grant))
        + 25 · max(0, respect tier − 1)      local 25, regular 50, legend 75
        + 40 · √(proved records held)
-       + 15 · √(snapshot-attributed graffiti pieces)
+       + 15 · √(graffiti pieces, only if the writer chose to link their tag; see §6a)
        + 10 · √(distinct days played)
 ```
 
@@ -277,10 +277,9 @@ What to take from it:
 Assume every rule will be attacked on the first day. In order of importance:
 
 1. **Reward only what the server can check.** Records need run proofs (`runProof.ts`, exists).
-   COIN must come from the server ledger (`world-trade.ts`, exists). Graffiti counts only
-   once a signed daily snapshot attributes it. **Gaps to close first:** graffiti POSTs carry
-   no rider (`world-graffiti.ts`), and respect events are client-claimed. Respect gates; it
-   never pays out on its own.
+   COIN must come from the server ledger (`world-trade.ts`, exists). Graffiti stays
+   anonymous and is judged by other players (§6a). **Gap to close first:** respect events are
+   client-claimed. Respect gates; it never pays out on its own.
 2. **Wallet link with age:** a world-stats `link` at least 2 weeks before an epoch counts
    (`minLinkedWeeks`). One address per identity is already enforced, and merging browsers is
    fine.
@@ -291,7 +290,7 @@ Assume every rule will be attacked on the first day. In order of importance:
    score. A pure trade bot is a one-trick account.
 6. **Quality over quantity for creators:** pieces other players kept up, reacted to or didn't
    paint over in the next snapshot (`piecesKept`, weighted 2×) count more than raw pieces.
-   Spamming walls earns little.
+   Spamming walls earns little. For graffiti, see §6a.
 7. **A review window and clawback:** rewards unlock two weeks after each epoch. In that time,
    clustering (shared IP hash, device fingerprint, a common funding wallet, identical paths or
    timing) can void a cluster. Publish the method, not the exact thresholds.
@@ -304,6 +303,49 @@ Assume every rule will be attacked on the first day. In order of importance:
 11. **Human review at the top:** the top 1% of each epoch by payout gets a manual look before
     unlock.
 
+### 6a. Anonymous graffiti that can still earn
+
+Graffiti is anonymous today (`world-graffiti.ts` stores strokes with no rider), and that's
+right for it: you can paint without anyone knowing who you are. The design keeps that and
+adds a **writer's tag**, which is optional:
+
+- **No tag (the default):** the piece is anonymous art. It goes in the snapshot, earns nothing
+  and links to nothing.
+- **Tag:**
+  - the first time you sign a piece, the browser makes a random keypair, the *tag key*;
+  - it's separate from your rider id and your wallet, and lives only on your device, with an
+    export for backup;
+  - each stroke batch carries the tag's public key and a signature, so the snapshot records
+    "this piece is by tag X" and nothing else;
+  - the public sees only the tag's name. Nobody, the server included, can tie it to a rider
+    or a wallet.
+- **Getting paid:** each epoch, the tag key signs a claim naming any address. A fresh one
+  keeps you anonymous. The merkle distributor pays the tag's share there. Linking a tag to
+  your account (so its pieces count in your retro points) is opt-in and one-way.
+- **Who decides a piece is good:** other players do, not the writer. Credit comes from:
+  - pieces left up, and not painted over, across the following snapshots;
+  - "respect the piece" props from gated, wallet-linked players (≥ local tier, a few props
+    each a week).
+
+  The writer is anonymous; the people vouching aren't. That's the anti-farm lever. Making 100
+  tags gets you nothing unless real players vouch for each of them, and each prop spent on a
+  farm tag is one fewer for real art.
+- **Tags build standing slowly:** a tag's weekly share grows with its age and its history
+  of kept-up pieces (√, capped per tag, like accounts). A brand-new tag earns little, so
+  splitting across tags dilutes your own standing.
+- **Privacy hygiene:** the graffiti endpoint must not log IPs or rider ids next to tags. Any
+  rate limiting uses short-lived hashes held separately and never published. Pieces stay
+  CC0 when published (§7).
+
+Uncertainties:
+
+- Props from linked players can be farmed by colluding rings. The review window (§6.7)
+  applies to prop rings, and caps per giver limit the damage.
+- A writer who loses their tag key loses the tag. That's like a real tag, but say so
+  plainly in the UI.
+- Counsel should look at paying anonymous recipients: sanctions screening of the claim
+  address still applies (legal-risks.md §5).
+
 ---
 
 ## 7. Chain, snapshots, Nouns and CC0
@@ -312,8 +354,8 @@ Assume every rule will be attacked on the first day. In order of importance:
   Coinbase audience already is, and NounTradeGoods already targets it (`TRADE_CHAIN_ID`
   8453).
 - **The snapshot is the source of truth.** The daily Base snapshot (another session is building
-  it) commits a merkle root of the day's attributed graffiti and proved records. Extend each
-  leaf with the account's daily score inputs. The weekly epoch root is computed from seven
+  it) commits a merkle root of the day's graffiti (anonymous, or under a writer's tag, §6a) and
+  proved records. Extend each leaf with the account's, or the tag's, daily score inputs. The weekly epoch root is computed from seven
   daily roots by a published script, so anyone can recompute every payout. CITY rewards
   then become a function of public data, not of a server's say-so.
 - **Ownable pieces stay free.** Being in a daily snapshot is free and automatic. Minting your
@@ -338,8 +380,8 @@ Assume every rule will be attacked on the first day. In order of importance:
   merge before any conversion snapshot: the seam is noted in `world-exchange.ts`.
 - **Respect is client-reported.** Make the high-value events server-witnessed (spends are
   already ledger actions) before respect gates anything that pays.
-- **Graffiti attribution** needs a signed rider (or linked address) on every stroke batch,
-  with privacy that matches the voice booth's public-tag approach.
+- **Writer's tags** (§6a): a signed tag key on stroke batches that are signed, never a rider
+  id or an address. Decide the prop budget per player and how a tag's standing grows.
 - **Agent economy shape** isn't known yet. The 5% agent bucket and the 0.5% fee are
   placeholders.
 - **Legal:** everything in §2–§4 needs counsel's read. In particular: the builders bucket, the
