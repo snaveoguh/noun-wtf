@@ -99,3 +99,17 @@
   width: 150px;
   height: 150px;
 }
+
+/* Touch: "Help mint the next Noun" reaches 40 px. */
+@media (pointer: coarse) {
+  .nextNounLink {
+    display: flex;
+    align-items: center;
+  }
+
+  .nextNounLink a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+}
