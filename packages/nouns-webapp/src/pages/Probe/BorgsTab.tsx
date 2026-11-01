@@ -329,10 +329,19 @@ const BorgsTab: FC = () => {
           </span>
         </div>
         <div className="ml-auto flex gap-2">
-          <Button size="sm" onClick={() => setMintOpen(true)} className="gap-1">
+          <Button
+            size="sm"
+            onClick={() => setMintOpen(true)}
+            className="gap-1 [@media(pointer:coarse)]:min-h-10"
+          >
             <Sparkles className="h-4 w-4" /> Mint
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setBreedOpen(true)} className="gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBreedOpen(true)}
+            className="gap-1 [@media(pointer:coarse)]:min-h-10"
+          >
             <Flame className="h-4 w-4" /> Breed
           </Button>
         </div>
@@ -345,13 +354,13 @@ const BorgsTab: FC = () => {
           placeholder="Search ID / name..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="border-border w-36 rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+          className="border-border w-36 rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black [@media(pointer:coarse)]:min-h-10"
         />
         <BorgOwnerDropdown entries={ownerEntries} value={ownerAddress} onChange={setOwnerAddress} />
         <select
           value={status}
           onChange={e => setStatus(e.target.value as StatusFilter)}
-          className="border-border rounded-lg border bg-white px-3 py-2 text-sm"
+          className="border-border rounded-lg border bg-white px-3 py-2 text-sm [@media(pointer:coarse)]:min-h-10"
         >
           <option value="alive">Alive</option>
           <option value="burned">☠️ Bred away</option>
@@ -360,7 +369,7 @@ const BorgsTab: FC = () => {
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value as TypeFilter)}
-          className="border-border rounded-lg border bg-white px-3 py-2 text-sm"
+          className="border-border rounded-lg border bg-white px-3 py-2 text-sm [@media(pointer:coarse)]:min-h-10"
         >
           <option value="all">Any origin</option>
           <option value="generated">Generated</option>
@@ -369,7 +378,7 @@ const BorgsTab: FC = () => {
         <select
           value={sortBy}
           onChange={e => setSortBy(e.target.value as SortOption)}
-          className="border-border rounded-lg border bg-white px-3 py-2 text-sm"
+          className="border-border rounded-lg border bg-white px-3 py-2 text-sm [@media(pointer:coarse)]:min-h-10"
         >
           {sortOptions.map(opt => (
             <option key={opt.value} value={opt.value}>
@@ -381,7 +390,7 @@ const BorgsTab: FC = () => {
           variant={showTraits ? 'default' : 'outline'}
           size="sm"
           onClick={() => setShowTraits(!showTraits)}
-          className="gap-1"
+          className="gap-1 [@media(pointer:coarse)]:min-h-10"
         >
           <Filter className="h-4 w-4" />
           Traits
@@ -392,7 +401,12 @@ const BorgsTab: FC = () => {
           )}
         </Button>
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-red-500">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="gap-1 text-red-500 [@media(pointer:coarse)]:min-h-10"
+          >
             <X className="h-4 w-4" /> Clear
           </Button>
         )}
@@ -632,11 +646,11 @@ function BorgOwnerDropdown({
     : 'Owner';
 
   return (
-    <div ref={ref} className="relative @max-sm:static">
+    <div ref={ref} className="@max-sm:static relative">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`border-border flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm ${value ? 'font-semibold text-black' : 'text-gray-400'}`}
+        className={`border-border flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm [@media(pointer:coarse)]:min-h-10 ${value ? 'font-semibold text-black' : 'text-gray-400'}`}
       >
         <span className="max-w-32 truncate">{selectedLabel}</span>
         {value ? (
@@ -653,7 +667,7 @@ function BorgOwnerDropdown({
         )}
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl @sm:right-auto @sm:w-64">
+        <div className="@sm:right-auto @sm:w-64 absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl">
           <input
             type="text"
             placeholder="Search..."

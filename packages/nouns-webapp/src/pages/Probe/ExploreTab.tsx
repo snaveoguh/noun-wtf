@@ -83,7 +83,7 @@ function AddressDropdown({
     : label;
 
   return (
-    <div ref={ref} className="relative @max-sm:static">
+    <div ref={ref} className="@max-sm:static relative">
       <button
         onClick={() => setOpen(!open)}
         className={`border-border flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm [@media(pointer:coarse)]:min-h-10 ${value ? 'font-semibold text-black' : 'text-gray-400'}`}
@@ -104,7 +104,7 @@ function AddressDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl @sm:right-auto @sm:w-64">
+        <div className="@sm:right-auto @sm:w-64 absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl">
           <input
             type="text"
             placeholder="Search..."
