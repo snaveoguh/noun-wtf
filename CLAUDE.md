@@ -333,6 +333,7 @@ A head with a hand-modelled 3D model hides its generated head while the model lo
 
 - The roadster (`roadstar` in `cars/specs.ts`) tops out at 500 km/h, 580 boosting, on the road and in the air (its flight `maxSpeed` / `boostSpeed` match).
 - A car you get out of stays visible to other players: your pose blob carries `lc: ["<id>.<paint>", x, y, z, yaw]` (`encodeParked` / `decodeParked` in `cars/netCar.ts`, tested) while it stays parked where you left it (`Cars.leftKey`); getting into any car drops it. Others draw it parked, doors shut (`Cars.updateParkedRemotes`). Older clients ignore `lc`; no worker deploy.
+- Anyone can drive off in it: E beside someone's parked car moves your own fleet's copy of that model there, in their paint (`Cars.takeParked`), and stops drawing theirs (`claimed`). The owner's client sees the same car appear under that rider where theirs stood (`takenFrom` in `netCar.ts`: same model + paint, within 3.5 m, appeared in the last 1.5 s), sends its own copy home in the traffic plan (`rehome`) and drops its `lc`, so there aren't two.
 
 ### Time of day
 

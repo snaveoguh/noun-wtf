@@ -19,7 +19,7 @@ import {
   ROAD_OUT,
   type LanePoint,
 } from './lanes';
-import { decodeCar, decodeParked, encodeCar, encodeParked } from './netCar';
+import { decodeCar, decodeParked, encodeCar, encodeParked, parkedKey, takenFrom } from './netCar';
 import { CAR_IDS, CARS, isCarId, simParams } from './specs';
 
 const flat = heightGround(() => 0);
@@ -402,5 +402,36 @@ describe('the car you got out of (lc)', () => {
       ['toro.1', 0, 0, 0, NaN],
     ])
       expect(decodeParked(bad)).toBeNull();
+  });
+});
+
+describe('someone drives off in the car you left', () => {
+  const left = { id: 'toro' as const, paint: 2, x: 10, z: -4 };
+  const car = (
+    o: Partial<{ id: 'toro' | 'dip'; paint: number; x: number; z: number; age: number }>,
+  ) => ({
+    id: 'toro' as 'toro' | 'dip',
+    paint: 2,
+    x: 10.6,
+    z: -3.2,
+    age: 0.2,
+    ...o,
+  });
+
+  it('is taken when the same car appears under someone where it stood', () => {
+    expect(takenFrom(left, [car({})])).toBe(true);
+  });
+
+  it('not by another model, another paint, far off, or one driving past', () => {
+    expect(takenFrom(left, [car({ id: 'dip' })])).toBe(false);
+    expect(takenFrom(left, [car({ paint: 1 })])).toBe(false);
+    expect(takenFrom(left, [car({ x: 20 })])).toBe(false);
+    expect(takenFrom(left, [car({ age: 5 })])).toBe(false);
+  });
+
+  it('claims a parked car by where it was left', () => {
+    const p = { id: 'toro' as const, paint: 2, x: 1, y: 0.2, z: 3, yaw: 0 };
+    expect(parkedKey(p)).toBe(parkedKey({ ...p }));
+    expect(parkedKey(p)).not.toBe(parkedKey({ ...p, x: 5 }));
   });
 });
