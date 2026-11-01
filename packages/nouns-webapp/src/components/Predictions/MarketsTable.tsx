@@ -133,7 +133,7 @@ export function MarketsTable() {
       </div>
 
       {/* Mobile: stacked cards. Desktop (md+): legacy table layout. */}
-      <div className="block space-y-2 md:hidden">
+      <div className="@md:hidden block space-y-2">
         {paged.map(entry => (
           <div key={entry.id} className="rounded border border-[var(--rule)] p-3 font-mono text-xs">
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -170,7 +170,7 @@ export function MarketsTable() {
                   href={entry.link}
                   target={entry.link.startsWith('/') ? undefined : '_blank'}
                   rel="noreferrer"
-                  className="block break-words hover:text-[var(--ink)]"
+                  className="block break-words hover:text-[var(--ink)] [@media(pointer:coarse)]:py-3"
                 >
                   {entry.title}
                 </a>
@@ -192,21 +192,21 @@ export function MarketsTable() {
         ))}
       </div>
 
-      <div className="hidden w-full overflow-x-auto md:block">
+      <div className="@md:block hidden w-full overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse font-mono text-xs">
           <thead>
             <tr className="border-b border-[var(--rule)] text-left text-[var(--ink-faint)]">
-              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Kind</th>
-              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Market</th>
-              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Pool</th>
-              <th className="whitespace-nowrap py-1 pr-2 sm:pr-3">Status</th>
+              <th className="@sm:pr-3 whitespace-nowrap py-1 pr-2">Kind</th>
+              <th className="@sm:pr-3 whitespace-nowrap py-1 pr-2">Market</th>
+              <th className="@sm:pr-3 whitespace-nowrap py-1 pr-2">Pool</th>
+              <th className="@sm:pr-3 whitespace-nowrap py-1 pr-2">Status</th>
               <th className="whitespace-nowrap py-1">Action</th>
             </tr>
           </thead>
           <tbody>
             {paged.map(entry => (
               <tr key={entry.id} className="border-b border-[var(--rule-light)]">
-                <td className="whitespace-nowrap py-1.5 pr-2 sm:pr-3">
+                <td className="@sm:pr-3 whitespace-nowrap py-1.5 pr-2">
                   <span
                     className="border px-1 py-0.5 text-xs uppercase tracking-wider"
                     style={{
@@ -226,13 +226,13 @@ export function MarketsTable() {
                         : 'NOUNS'}
                   </span>
                 </td>
-                <td className="max-w-[160px] truncate py-1.5 pr-3 text-[var(--ink-light)] sm:max-w-[240px]">
+                <td className="@sm:max-w-[240px] max-w-[160px] truncate py-1.5 pr-3 text-[var(--ink-light)]">
                   {entry.link != null ? (
                     <a
                       href={entry.link}
                       target={entry.link.startsWith('/') ? undefined : '_blank'}
                       rel="noreferrer"
-                      className="hover:text-[var(--ink)]"
+                      className="block truncate hover:text-[var(--ink)] [@media(pointer:coarse)]:py-3"
                     >
                       {entry.title}
                     </a>
@@ -273,7 +273,7 @@ export function MarketsTable() {
             type="button"
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="border border-[var(--rule)] px-2 py-0.5 uppercase tracking-wider transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-40"
+            className="border border-[var(--rule)] px-2 py-0.5 uppercase tracking-wider transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-40 [@media(pointer:coarse)]:min-h-10"
           >
             ‹ Prev
           </button>
@@ -284,7 +284,7 @@ export function MarketsTable() {
             type="button"
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page === totalPages - 1}
-            className="border border-[var(--rule)] px-2 py-0.5 uppercase tracking-wider transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-40"
+            className="border border-[var(--rule)] px-2 py-0.5 uppercase tracking-wider transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-40 [@media(pointer:coarse)]:min-h-10"
           >
             Next ›
           </button>
@@ -330,7 +330,7 @@ function ResolveActionButton({ entry }: { entry: MarketEntry }) {
         type="button"
         onClick={onClick}
         disabled={isPending || isConfirming}
-        className="border border-[var(--accent-red)] px-2 py-0.5 text-[var(--accent-red)] transition-colors hover:bg-[var(--accent-red)] hover:text-[var(--paper)] disabled:opacity-50"
+        className="border border-[var(--accent-red)] px-2 py-0.5 text-[var(--accent-red)] transition-colors hover:bg-[var(--accent-red)] hover:text-[var(--paper)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
       >
         {isPending ? 'Sign…' : isConfirming ? 'Confirming…' : 'Resolve'}
       </button>

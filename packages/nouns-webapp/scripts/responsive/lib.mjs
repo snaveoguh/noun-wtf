@@ -81,8 +81,10 @@ export const ROUTES = [
   { path: 'candidates', url: '/candidates', group: 'governance', settle: 15000 },
   {
     path: 'candidates/*',
-    url: '/candidates/0x0000000000000000000000000000000000000000-sample',
+    // a real candidate: a made-up slug never loads, so it measured a spinner
+    url: '/candidates/0xc7ccec521eed20fcddff8f95424816ac421c7d87-unwrap-stake-treasury-weth',
     group: 'governance',
+    settle: 15000,
   },
   { path: 'candidates/:id/edit', url: '/candidates/sample/edit', group: 'governance-create' },
   { path: 'playground', url: '/playground', group: 'tools' },
@@ -131,6 +133,14 @@ export const ROUTES = [
   { path: 'gamer/:identity', url: '/gamer/nouns.eth', group: 'wallet' },
   { path: 'crystal-ball', url: '/crystal-ball', group: 'auction' },
   { path: 'v2/crystal-ball', url: '/v2/crystal-ball', group: 'auction' },
+  // the default view is ASCII; ?view= picks the 2D and 3D ones
+  ...['/crystal-ball', '/v2/crystal-ball'].flatMap(base =>
+    ['2d', '3d'].map(view => ({
+      path: base.slice(1),
+      url: `${base}?view=${view}`,
+      group: 'auction',
+    })),
+  ),
   { path: 'feed', url: '/feed', group: 'explore' },
   { path: 'highway', url: '/highway', group: 'explore' },
   { path: 'terraforms', url: '/terraforms', group: 'art' },
