@@ -5,7 +5,7 @@ import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Alert, Col } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
 import { Link, useSearchParams } from 'react-router';
 import { withStepProgress } from 'react-stepz';
 import { toast } from 'sonner';
@@ -335,7 +335,7 @@ const CreateCandidatePage = () => {
         onActionAdd={handleAddProposalAction}
       />
 
-      <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+      <div className={classes.createProposalForm}>
         <div className={classes.wrapper}>
           <Link to={'/candidates'}>
             <button className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>←</button>
@@ -594,7 +594,7 @@ const CreateCandidatePage = () => {
             </Trans>
           )}
         </p>
-      </Col>
+      </div>
     </Section>
   );
 };

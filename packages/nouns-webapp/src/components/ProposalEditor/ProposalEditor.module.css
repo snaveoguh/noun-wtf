@@ -21,6 +21,12 @@
   font-size: 1.25rem;
 }
 
+@media (pointer: coarse) {
+  .titleInput {
+    min-height: 40px;
+  }
+}
+
 .propTitle {
   font-family: 'Londrina Solid';
 }
