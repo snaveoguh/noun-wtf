@@ -226,8 +226,14 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
 
 - **Restart vite after every source edit** (no HMR and no watcher: it keeps
   serving what it first transformed). Stop it by the port it listens on:
-  `kill $(lsof -t -iTCP:5196 -sTCP:LISTEN)`, then check `vite.log` for
-  "already in use" before trusting a run.
+  `kill $(lsof -t -iTCP:5196 -sTCP:LISTEN)`. Before starting vite again,
+  check nothing still listens (`lsof -iTCP:5196 -sTCP:LISTEN` prints nothing):
+  a run against a stale vite measures the old code. Then check `vite.log` for
+  "already in use".
+- **Stopping a harness run:** find its PID with `ps -o pid,args -C node` and
+  read the args yourself (don't pipe a pattern into kill). A plain `kill` may
+  not stop it; use `kill -9 <pid>` and check `ps` again before re-running the
+  route, or the old run keeps writing into the same `after/` folder as the new one.
 - **Never kill by name.** `pkill -f`, `pgrep -f … | xargs kill` and
   `ps … | grep <pattern> | xargs kill` all match your own shell (its command
   line contains the pattern) and other sessions' processes: the integrator
