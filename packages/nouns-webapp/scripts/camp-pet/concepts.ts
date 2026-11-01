@@ -1005,4 +1005,19 @@ export async function measure() {
   return out;
 }
 
-(window as unknown as { petConcepts: unknown }).petConcepts = { shot, measure, setup, VARIANTS };
+/** A posed, toon pet for dropping into another scene (the live game). */
+export async function petModel(id: string, name: PoseName, phase = 0.25): Promise<THREE.Group> {
+  const nog = await loadNoggles();
+  const pet = buildPet(VARIANTS.find(x => x.id === id)!, nog);
+  toonify(pet.root);
+  pose(pet, name, phase);
+  return pet.root;
+}
+
+(window as unknown as { petConcepts: unknown }).petConcepts = {
+  shot,
+  measure,
+  setup,
+  petModel,
+  VARIANTS,
+};
