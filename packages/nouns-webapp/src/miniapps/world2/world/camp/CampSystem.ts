@@ -22,6 +22,7 @@ import { pickSpawn } from './firstSpawn';
 import { HandBook } from './HandBook';
 import { INTRO_SECONDS, introShot, type Shot, type V3 } from './intro';
 import { steppedTime, styleAt, styleCuts, windowCrossAt, type StyleCut } from './introStyles';
+import { Loungers } from './LoungerSystem';
 import { portalPlanes, seenFromRoom } from './portal';
 import { FLIP_SECONDS, readingPlan, readingShot, type ReadingPlan } from './reading';
 import { CAMP_TOWER, inCamp, toWorld, type CampSite } from './site';
@@ -91,6 +92,8 @@ export class CampSystem {
     hidden: new Set<THREE.Object3D>(),
   };
   birds: Birds | null = null;
+  /** COIN HEAD and MICROWAVE HEAD, lounging (LoungerSystem.ts). */
+  loungers: Loungers | null = null;
   /** The opening shot while it runs (spawnInside starts it). */
   private intro: {
     t: number;
@@ -135,6 +138,7 @@ export class CampSystem {
       const built = buildCamp(site, world, { low: this.game.gfx.quality === 'low' });
       level.root.add(built.group);
       this.birds = new Birds(site);
+      this.loungers = new Loungers(this.game, site, built.layout);
       level.root.add(this.birds.mesh);
       level.collisionMeshes.push(...built.collision);
       this.site = site;
@@ -197,8 +201,10 @@ export class CampSystem {
     const g = this.game;
     const p = g.player.pos;
     const o = s.origin;
-    if (Math.abs(p.x - o.x) < NEAR_CAMP && Math.abs(p.z - o.z) < NEAR_CAMP && p.y > o.y - 60)
-      b.animate(this.t);
+    const near =
+      Math.abs(p.x - o.x) < NEAR_CAMP && Math.abs(p.z - o.z) < NEAR_CAMP && p.y > o.y - 60;
+    if (near) b.animate(this.t);
+    this.loungers?.update(dt, this.t, near, inCamp(s, p.x, p.y, p.z) && this.intro === null);
     const cam = g.gfx.camera.position;
     if (
       this.birds !== null &&
@@ -664,6 +670,7 @@ export class CampSystem {
     if (this.intro !== null) this.endIntro();
     this.endGrade();
     this.birds?.dispose();
+    this.loungers?.dispose();
     this.book?.dispose();
     this.releaseCull();
     if (this.keyBound) document.removeEventListener('keydown', this.onKey, true);

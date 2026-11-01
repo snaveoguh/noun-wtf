@@ -24,6 +24,7 @@ import { Geo } from '../facades/geom';
 
 import { buildCampArt, type CampArt } from './art';
 import { campLayout, solidBox, type CampLayout, type Piece } from './layout';
+import { SOFA_ROLL, SOFA_SINK } from './loungers';
 import { CAMP_RAMP, rampSides, rampSurface } from './miniramp';
 
 /** Lanes start this far out from the plaza face (no bands on CAMP's face). */
@@ -445,7 +446,7 @@ function piece(kit: Kit, q: Piece, art: CampArt, at: At) {
   switch (q.type) {
     case 'sofa': {
       // One leg gone: it sags to the left
-      at(q.x, -0.04, q.z, q.yaw, 0.05);
+      at(q.x, -SOFA_SINK, q.z, q.yaw, SOFA_ROLL);
       buildItem(
         kit,
         item('sofa', q, 7),
@@ -814,6 +815,19 @@ function piece(kit: Kit, q: Piece, art: CampArt, at: At) {
         kit.add(g, pick(r, [0x1d1f22, 0x2a2c30, 0x3a3a2a]));
         kit.add(cyl(0.02, 0.04, 0.08, 5, (r() - 0.5) * 0.1, s * 0.8, 0), 0x1d1f22);
       }
+      break;
+    }
+    case 'cash': {
+      // A wad of notes: green, a paper band round the middle, the top few skewed
+      at(q.x, q.y, q.z, q.yaw, SOFA_ROLL);
+      const t = q.h / q.v;
+      for (let i = 0; i < q.v; i++) {
+        const dx = i >= q.v - 3 ? (r() - 0.5) * 0.03 : 0;
+        const g = boxAt(-q.w / 2, q.w / 2, i * t, (i + 1) * t - 0.001, -q.d / 2, q.d / 2);
+        if (dx !== 0) g.rotateY((r() - 0.5) * 0.25).translate(dx, 0, 0);
+        kit.add(g, i % 2 === 0 ? 0x7fb069 : 0x6c9c58);
+      }
+      kit.add(boxAt(-0.02, 0.02, -0.001, q.h + 0.002, -q.d / 2 - 0.002, q.d / 2 + 0.002), 0xf4ead2);
       break;
     }
     case 'tub': {

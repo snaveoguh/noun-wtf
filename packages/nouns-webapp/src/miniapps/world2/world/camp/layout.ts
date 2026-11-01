@@ -7,6 +7,7 @@
 
 import { mulberry32 } from '../../interiors/rng';
 
+import { CASH_STACKS, onPiece, sofaY } from './loungers';
 import { CAMP_RAMP } from './miniramp';
 
 export type PieceType =
@@ -38,7 +39,8 @@ export type PieceType =
   | 'miniramp'
   | 'print'
   | 'rug'
-  | 'sheet';
+  | 'sheet'
+  | 'cash';
 
 export interface Piece {
   type: PieceType;
@@ -152,6 +154,18 @@ export function campLayout(
     p('trash', -3.9, 0.85, 0.8, 0.6, 0.55),
     p('trash', 4.3, 7.0, 0.7, 0.6, 0.5),
   ];
+  // COIN HEAD's cash (loungers.ts): stacked on the sofa arm and seat, as the sofa sags
+  const sofa = pieces[0]!;
+  for (const [lx, lz, n] of CASH_STACKS) {
+    const c = onPiece(sofa, lx, lz);
+    pieces.push(
+      p('cash', c.x, c.z, 0.16, 0.07, n * 0.012, {
+        y: sofaY(lx, lx < -0.95),
+        yaw: sofa.yaw + 0.2 * Math.sin(lz * 9),
+        v: n,
+      }),
+    );
+  }
   // The other copies: open on the floor at their pages, a stack by the sofa
   const floorBooks: [number, number, number][] = [
     [-1.2, 2.9, 0.7],
