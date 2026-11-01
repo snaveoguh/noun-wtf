@@ -222,7 +222,11 @@ async function shoot(page, { url, mode, width, dir, touch }) {
     touch,
     score: result.score,
     counts: result.counts,
-    line: result.error ? `error: ${result.error}` : issueLine(result.counts),
+    line: result.error
+      ? `error: ${result.error}`
+      : issueLine(result.counts) +
+        (result.warnings?.length ? ` · ⚠ ${result.warnings.length}` : ''),
+    warnings: result.warnings ?? [],
     issues: result.issues,
     error: result.error,
     shots,
@@ -233,7 +237,15 @@ async function shoot(page, { url, mode, width, dir, touch }) {
 // page: the shot is retried once in a fresh context. A dead browser is
 // rethrown, so the route is requeued on a new browser (see the job loop).
 const closedError = e => /closed|crashed|disconnected/i.test(e?.message ?? '');
-const retryable = (browser, e, attempt) => attempt === 0 && closedError(e) && browser.isConnected();
+const retryable = (browser, e, attempt) =>
+  attempt === 0 && (closedError(e) || e?.retryShot === true) && browser.isConnected();
+// A shot whose in-page collection failed (cold vite reloading, the error
+// boundary, no window yet) gets one more go in a fresh context.
+function failedShot(s) {
+  const e = new Error(`shot failed: ${s.error}`);
+  e.retryShot = true;
+  return e;
+}
 
 async function runWindowMode(browser, url, dir, log) {
   const out = [];
@@ -269,6 +281,7 @@ async function runWindowMode(browser, url, dir, log) {
             () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))),
           );
           const s = await shoot(page, { url, mode: 'window', width: w, dir, touch: false });
+          if (s.error && attempt === 0) throw failedShot(s);
           log(`  window ${String(w).padStart(4)} content ${s.contentWidth} ${s.tier} → ${s.line}`);
           out.push(s);
         }
@@ -308,6 +321,7 @@ async function runPageMode(browser, url, dir, log) {
         const page = await ctx.newPage();
         await load(page, url);
         const s = await shoot(page, { url, mode: 'page', width: w, dir, touch });
+        if (s.error && attempt === 0) throw failedShot(s);
         log(`  page   ${String(w).padStart(4)} content ${s.contentWidth} ${s.tier} → ${s.line}`);
         out.push(s);
       } catch (e) {
@@ -333,7 +347,12 @@ async function contactSheet(browser, dir, report) {
       .map(f => `<img src="${f}" style="height:${s.mode === 'window' ? 320 : 360}px">`)
       .join('');
     const cls = s.error ? 'err' : s.score > 0 ? 'bad' : 'ok';
-    return `<figure><figcaption><b>${s.width}</b> <span>${s.contentWidth ?? '?'}px · ${s.tier ?? '?'}${s.touch ? ' · touch' : ''}</span><i class="${cls}">${s.error ? 'error: ' + s.error.slice(0, 60) : s.line}${s.score ? ` (${s.score})` : ''}</i></figcaption><div class="stack">${imgs}</div></figure>`;
+    return `<figure><figcaption><b>${s.width}</b> <span>${s.contentWidth ?? '?'}px · ${s.tier ?? '?'}${s.touch ? ' · touch' : ''}</span><i class="${cls}">${s.error ? 'error: ' + s.error.slice(0, 60) : s.line}${s.score ? ` (${s.score})` : ''}</i>${(
+      s.warnings ?? []
+    )
+      .slice(0, 2)
+      .map(w => `<i class="warn">⚠ ${w.replace(/</g, '&lt;').slice(0, 90)}</i>`)
+      .join('')}</figcaption><div class="stack">${imgs}</div></figure>`;
   };
   const section = (mode, title) => {
     const ss = report.shots.filter(s => s.mode === mode);
@@ -346,7 +365,7 @@ async function contactSheet(browser, dir, report) {
     figure{margin:0;background:#202227;border-radius:8px;padding:8px}
     figcaption{display:flex;flex-direction:column;gap:2px;margin-bottom:6px;max-width:520px}
     figcaption b{font-size:16px} figcaption span{color:#999}
-    i{font-style:normal} .ok{color:#7ddc8a} .bad{color:#ff8a7a} .err{color:#ffcf5a}
+    i{font-style:normal} .ok{color:#7ddc8a} .warn{color:#ffcf5a} .bad{color:#ff8a7a} .err{color:#ffcf5a}
     .stack{display:flex;flex-direction:column;gap:4px} img{display:block;border:1px solid #333;background:#fff}
   </style><h1>${report.url}</h1><div>${report.label ? report.label + ' · ' : ''}${report.generated} · severity ${report.severity.score} · clean ${report.severity.clean}/${report.severity.total}</div>
   ${section('window', 'In a NounOS window (desktop 1440 × 1000; 2600 × 1440 for ≥ 1440)')}
@@ -389,13 +408,31 @@ async function runRoute(browser, url, log) {
   };
   fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(report, null, 2));
   if (opt.sheet) await contactSheet(browser, dir, report).catch(e => log(`  sheet: ${e.message}`));
+  const warned = shots.filter(x => x.warnings?.length).length;
   log(
-    `✔ ${url}: severity ${report.severity.score}, clean ${report.severity.clean}/${report.severity.total}`,
+    `✔ ${url}: severity ${report.severity.score}, clean ${report.severity.clean}/${report.severity.total}` +
+      (warned ? ` · ⚠ warnings on ${warned} shot(s): look at the sheet` : ''),
   );
   return report;
 }
 
 const browser = await chromium.launch(LAUNCH);
+
+// Warm the dev server: a cold vite optimises deps on the first load and
+// reloads the page mid-shot. One throwaway load of the first route first.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await ctx.newPage();
+  try {
+    await page.goto(opt.base + urls[0], { waitUntil: 'domcontentloaded', timeout: 300000 });
+    await page.waitForSelector('.nos-root', { timeout: 120000 });
+    await settle(page, 8000);
+  } catch (e) {
+    console.log(`warm-up: ${e.message.split('\n')[0]}`);
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+}
 const queue = [...urls];
 const reports = [];
 const started = Date.now();

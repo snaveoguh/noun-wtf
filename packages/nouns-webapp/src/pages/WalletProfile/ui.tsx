@@ -18,7 +18,7 @@ export const Card: FC<{
 }> = ({ children, className, title, right }) => (
   <section className={`wp-card ${className ?? ''}`}>
     {(title != null || right != null) && (
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="wp-card-head mb-2 flex items-center justify-between gap-2">
         {title != null && <h3 className="wp-h !mb-0">{title}</h3>}
         {right}
       </div>

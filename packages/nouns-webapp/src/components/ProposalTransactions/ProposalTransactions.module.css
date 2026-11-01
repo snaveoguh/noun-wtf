@@ -9,7 +9,13 @@
   border-radius: 8px !important;
 }
 
+.transactionDetails > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .removeTransactionButton {
+  flex-shrink: 0;
   border: none;
   background: none;
   outline: none !important;
@@ -18,4 +24,11 @@
 
 .removeTransactionButton img {
   width: 1rem;
+}
+
+@media (pointer: coarse) {
+  .removeTransactionButton {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }
