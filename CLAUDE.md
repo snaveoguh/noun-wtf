@@ -271,6 +271,15 @@ A rhythm-game cypher at the plaza (0, −15): VS CPU, 1v1 online, 2v2/3v3 crews 
 
 A room is built 4 km over its door (`POCKET_Y`, origin `(door.x, POCKET_Y, door.z)`), the same on every client, so positions inside are already a shared frame. The pose blob carries `in: [doorId, level, seat]` only while inside (`interiors/roomNet.ts`). `Game.updateNetwork` draws only riders in the same space (`sameSpace`): street riders in the street, and riders in the same room and on the same floor indoors, with their name tags (`data-room` gets past `[data-away]`). A seated rider is put on their seat by `InteriorSystem.poseRemote`. A window's view of the street shows only street riders. Older clients ignore `in`, so they still draw indoor riders 4 km up. No worker change is needed.
 
+### Noun World start flow (loader → CREATE YOUR RIDER → CAMP)
+
+No title / PRESS START screen. A `/world` load opens on a small noun.wtf wordmark (`world2/ui/WorldLoader.tsx`, header-wordmark size; ink and band from `NounOS/home/wordmark.ts`): every letter shimmers on a steady loop (its own sweep, staggered so the band crosses the word) and one letter at a time pops to another of Pip3's five versions of itself (the font's `rand` feature, `font-feature-settings: "rand" 2–5`, base = off; `flickVariants` in `ui/worldLoad.ts`). `?loader=hold` keeps it on screen. Reduced motion: no shimmer, no pops.
+- **When it lets go** (`worldLoaded`, pure, tested): the level is in AND every graffiti wall within 60 m of the rider is painted (`Graffiti.loadedAround`), so nothing pops in on the select; the far walls finish behind it. A dead store can't hold play: 15 s with no new wall, or 45 s after the level. Then straight to the character select (`?skip=1`: straight into play).
+- **Graffiti downloads early** (`graffiti/storeLoad.ts`): the homepage starts it when idle after its intro (`AgentHome`, not on data saver / slower than 4g) and World2Page on mount (not `?offline=1`), nearest the plaza centre first, 40 walls a batch, 4 at a time, kept in memory. `Graffiti` takes it once (`takePrefetched`) and paints what's there nearest-first in yielding batches; whatever failed is fetched as before.
+- **Audio:** the first click, tap or key after the loader unlocks it (World2Page, capture listeners), and NOUN FM's start-of-game intro starts then, not before. On the select, keys never skip the jingle (`skipsSpot` in `radio/FmSpotsUi.tsx`): its arrows and name field used to cut it off.
+- **YouTube screens** (site NOUN FM widget, COMMUNITY RADIO's `FmScreen`, NOUN BEATS): never hidden (YouTube needs a visible player; hiding them on the select left it silent). They sit at 10% opacity until hovered or focused (`.w2-yt`, the widget's `group-hover`), and on the select they move to the rider's side, off its fields.
+- Scripts that drove PRESS START (sizzle `pressStart`, `.claude/perf-shots/harness`) now wait for `[data-w2loader]` to go.
+
 ### CAMP (first spawn)
 
 NOUNS CAMP is a condemned penthouse on top of the tallest tower (Skyline `TOWERS[0]`, 150 m, plaza north side), and every plain `/world` load wakes up in it (`world/camp/`).
@@ -287,6 +296,17 @@ NOUNS CAMP is a condemned penthouse on top of the tallest tower (Skyline `TOWERS
 - **The way out is the window:** a scissor fire escape (`facades/escape.ts` `planTowerEscape`, two lanes, alternating flights, a landing at every turn, ~3.6 m per flight, 36 flights) hangs off the plaza face from the window's walkway down to the ring roof east of the tower, then an exit deck and a bridge over the parapet (`probeWorld` reads the roof and parapet off the level collision). `towerEscape.test.ts` walks it all with the real Player. Or jump: `drop.test.ts` checks a 146 m fall lands (no tunnelling); on foot it's the parkour hard landing (roll with a timed duck), on a board a bail you get up from where you landed, plus a `SENT IT · N M` toast.
 - **Camera:** SkateCamera's "keep above the ground" probe ignores a hit more than 1.5 m over the rider's head (it used to find CAMP's roof and lift the camera through the ceiling).
 - **Controls card:** never opens by default; the help icon pulses with an H until it's been opened once (`RingHud` `helpHint`).
+
+### Skydiving (long falls, CAMP's window)
+
+A long fall becomes a skydive, on foot and on a board (`world2/skydive/`, contract + tuning in `contract.ts` `SKY`).
+- **When:** airborne, falling (≤ −4 m/s), 0.35 s in, more than 24 m of clear air under you (a ray down), and nothing parkour could catch within 1.25 m (parkour's own `wallAt` at the hands round the body, plus a capsule test for poles). `shouldEnter` in `sim/freefall.ts` (pure, tested). A ledge, wall or pole on the way down still catches you: `player.sky` steps first, parkour right after, and a catch ends the skydive. Climbing, the fire escape and ordinary jumps never trip it. Not on the Big Drop, in vehicles, hoops / breaks / pool / freestyle, rooms, cutscenes or replays (`SkydiveSystem.allowed`); on a board, never on the mountain or the mega ramps (their airs are records).
+- **Physics** (`sim/freefall.ts`, pure): it only shapes velocity before the Player's own step (gravity, collision, landing, the game's substeps all stay), so the parkour hard landing / timed-duck roll, the board's bail and no tunnelling at terminal all still hold. Drag `g·(vy/vt)²` toward terminal: belly 55, SHIFT / RUN / L3 dive 75, S flare 45, W track 52 m/s; tracking up to 14 m/s with momentum; A/D (stick x) turn.
+- **Parachute:** jump key (SPACE / gamepad A / touch jump, or the HUD's PULL button) with ≥ 30 m clear (`pullMin`; lower says TOO LOW). Opens over 1 s, front-loaded, to 6 m/s down + 5.5 m/s glide; W faster, S brake, A/D steer. Lands under the roll threshold: a normal landing.
+- **Hook:** `Player.sky` (`SkyController.ts`, no Game, tested with the real Player + parkour motor in `skydive.test.ts`: out of CAMP's window, pull and no-pull, foot and board, 60 / 20 fps, diving at terminal from 1.5 km, a ledge on a facade still hangs). `towerEscape.test.ts` checks the walk down the fire escape never skydives. The parkour `PlayerBody` + `pkInputFrom` moved to `parkour/playerBody.ts` for this.
+- **View:** the pose blends in over 0.5 s (eased, `SkyRig` `FADE_IN`) out of the fall clip's arms-spread air pose, never a snap; short drops look exactly as before. Poses on the rig through breakdance's `PoseDriver` (`view/poses.ts`: belly arch, track, head-down dive, flare, hanging under the canopy, skysurf stance on a board); `view/Canopy.ts` a yellow / red ram-air wing with the canonical noggles (NounOS intro's `NOGGLES`) and lines to the shoulders; `view/Streaks.ts` wind streaks; `audio.ts` wind noise rising with speed. Camera: `SkateCamera.skyCam` (behind and a little above like today's fall camera, city and tower in frame, settles behind the heading, own speed FOV, feed-forward so it keeps up at 55 m/s, a buffet near terminal via `addShake`, so none under reduce motion). HUD: `SkyHud.ts` (plain DOM: altimeter + km/h, the pull floor on the bar, hints, PULL prompt under 90 m, a touch PULL button).
+- **Stats:** an air with any skydive in it never claims an air / hang record (`Stats.airVoid`): drag and canopies don't fall at the game's gravity, so the server's proof would refuse it.
+- **Net:** optional `sk: [phase, posture, open, steer]` in the pose blob (`net/sk.ts`); remote riders pose and get a canopy from it. Older clients ignore it. No worker deploy.
 
 ### Head models load late
 
@@ -382,6 +402,36 @@ The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,
 - **Trading** (`ui/TradePanel.tsx`, logic `sim/tradeForm.ts`): click / tap a player, rider or bot for a direct deal (`engine/deals.ts`: offer / accept / decline, 90 s); a simulated trader gets a limit order on the real book. Targets are masked tags only; the server resolves a tag to its account when offered (`toOwner`, never sent out) and only that account can accept. Accounts are opened (`join`) only once another player is in the room or you trade.
 - **Crowd**: instanced low-poly Nouns with swinging legs; trouser / shoe colours come from Noun World's `outfitFromSeed` (`sim/outfit.ts` `outfitFor`), the outfit a rig dresses itself in, so the LOD swap never changes clothes. A far LOD (one trouser block) in VAST and the hall copies. Your rider wears your saved outfit and sends it to other players as `of` (Net.ts's key).
 
+### Agent economy (agents on the Exchange, in rooms)
+
+AI agents keep Noun World's economy moving while nobody's online. Design: `docs/agent-economy.md`.
+- **Model:** `src/miniapps/agents/`.
+  - Who they are: `roster.ts`, five agents with ids `agent:<slug>`; never reuse an id.
+  - Types: `contract.ts`.
+  - Wallets are ordinary Grand Exchange accounts.
+  - Records and the ledger live in Blobs `noun-world-agents`, key `agents`.
+- **Tick:** `netlify/functions/world-agents-tick.ts` runs every 5 min (logic in `netlify/lib/agentsTick.ts`).
+  - It ticks the exchange's bots, then `runAgents` (`run.ts`, pure).
+  - It checks invariants before saving, and retries on an etag conflict.
+- **Policies:** rule policies in `policies/` (shopkeeper, maker, collector).
+  - Every decision goes through `guard.ts`: 12 actions a turn, own goods only, a ±50% price band, a 60% spend cap.
+  - Then it goes through the engine.
+- **Guardrails:**
+  - Agents are funded once with the rider starter grant; nothing else ever funds them (no bailouts).
+  - `playerAct` and `dealAct` refuse `agent:` owners.
+- **Shops:** `exchange/engine/shops.ts`.
+  - Posted quotes live in `ExchangeState.shops`; `setShop` clamps them, and they go stale after 2 h.
+  - A player trades with a shop through a normal deal `offer` to the agent id at its price, which `shopTakes` answers.
+- **LLM policy (`llm.ts`):** off unless `AGENT_LLM=1` + `ANTHROPIC_API_KEY`.
+  - Only agents with `llm: true`, once an hour each, 2 a run; `AGENT_LLM_MODEL` overrides the model.
+  - Its output goes through the same guard; on an error it falls back to the rules.
+- **Client:**
+  - Exchange floor: agents walk as "Name · AGENT"; a click opens `AgentShop`, and 🤖 AGENT LEDGER opens `AgentLedger`.
+  - Rooms: `rooms.ts` puts an agent in place of the owner in about half the eligible rooms (`withAgent`); InteriorsUi shows `RoomAgent`.
+  - `?offline=1` runs the agents in the tab (`LocalAgents`).
+- **Admin:** `POST world-agents` with `X-World-Admin`: `pause` / `resume` an agent, or `run`.
+- **Tests:** `npx vitest run src/miniapps/agents netlify/lib/agentsTick.test.ts`.
+
 ### Crystal ball (/crystal-ball, /v2/crystal-ball)
 
 - Every read (auction, latest block, descriptor counts) and the settle tx use the Nouns chain (`NOUNS_CHAIN` = `defaultChain.id`), never the wallet's: wagmi's config also carries Polygon, and with a wallet on Polygon the page fell back to a cached "still live" prediction at Noun O'Clock (2026-11-01). The settle button judges "ended" from the end time against the clock. The terminal feed's indexer health and chain fallbacks had the same bug (`indexerHealth.ts`, `v1/v2ChainFallback.ts`, `grantsChainFallback.ts`).
@@ -400,6 +450,17 @@ The loop: a moment gets shared, the share unfurls as a playable card, one tap dr
 - **In game:** `share/ShareUi.tsx` puts a share icon in the HUD's util slot (PLAY-AS LINK, SNAPSHOT) using the missions panel's look; `share/share.ts` routes a link to a cast (mini app) / the share sheet (touch) / the clipboard, and a snapshot (frame drawn then `toBlob`, with a yellow link strip) to the share sheet on phones or a download. One line in World2Page mounts it.
 - **Mini app:** manifest `public/.well-known/farcaster.json` (the `accountAssociation` is empty until the owner signs it, steps in the webapp README); images in `public/fc/` from `netlify/lib/fcAssets.ts` (test checks them; `WRITE_FC=1` redraws). `share/miniApp.ts` imports the SDK from esm.sh only inside a Farcaster client (no npm dependency), sets `--w2-safe-top/right/bottom/left` from the host's insets and calls `ready()`. RingHud, hudStyle, TouchControls and WorldMap read `var(--w2-safe-*, env(safe-area-inset-*))`; other HUDs still use `env()` only.
 - **Clips:** `public/clips/` (vertical 1080 × 1920 + horizontal, webm + mp4 + poster, < 4 MB) from the sizzle pipeline's growth edit lists.
+
+### Onchain snapshots (NounWorldLedger on Base, /onchain)
+
+Noun World's graffiti and records are kept on Base as an append-only, versioned history. Positions are only saved as part of a snapshot, never live. Full details, costs and the switch-on steps are in `packages/noun-world-chain/README.md`.
+- **Contract:** `packages/noun-world-chain` (Foundry, forge-std vendored, CI `.github/workflows/noun-world-chain.yml`). `NounWorldLedger.commit(root, manifestURI, kind)` appends a version (root, URI, timestamp, kind 1 graffiti / 2 records). Only the committer can call it; the owner rotates the committer (two-step ownership). Nothing edits or deletes a version. A root equal to the latest of its kind is refused (`SameRoot`). It also has `verify(index, leaf, proof)`. Not deployed yet: `LEDGER_DEPLOYMENTS` in `src/miniapps/world2/onchain/contract.ts` is empty until it is. Never handle keys: the deploy script signs with `--ledger` / `--account`.
+- **Builder** (`src/miniapps/world2/onchain/`, pure, tested):
+  - `snapshot.ts`: `graffitiPieces` (g3 / g2 tags as the game draws them, the wall parsed from the wall id, the public tag id, undo tags folded into `hidden`; their nonce is never published), `recordRows` (public board rows; the rider id and "last seen" are left out) and `buildSnapshot` (`manifest.json` + `p/<contentHash>.json`).
+  - `merkle.ts`: canonical JSON → keccak content hash → leaf `keccak(keccak(abi.encode(kind, key, contentHash)))`, sorted pairs (OZ style). Leaves are sorted, so a root depends only on the world's contents. Change the leaf format and old versions can no longer be checked: add a new kind instead.
+- **Storage** (`storage.ts`): Pinata (IPFS directory, `PINATA_JWT`), Irys (Arweave, `IRYS_KEY`, optional SDK loaded dynamically) or a dry run. A dry-run upload is never committed.
+- **Job:** `.github/workflows/world-onchain-snapshot.yml` (daily, 04:17 UTC) runs `scripts/onchain/snapshot.ts` → `job.ts` `runSnapshot`. It reads noun.wtf over HTTP the way the game does (`world-graffiti ?ids=…&at=1`, which serves `{d, at}`; `world-stats` GET). It skips a kind whose root didn't change, uploads, then commits when `LEDGER_COMMITTER_KEY` + `LEDGER_ADDRESS` are set. With no secrets it's a dry run that keeps the files as an artifact. It isn't a Netlify scheduled function because of their 30 s limit.
+- **Page:** `/onchain` (`src/pages/Onchain/`). Lists versions read from Base's public RPC, fetches a manifest through a gateway and rebuilds its root against the chain's. You can search by a pasted tag (`g3:…`), a tag id, a wall, a rider name or an address. For a picked leaf it checks the file's hash, the proof locally, and the contract's `verify()`, and draws the piece. `VITE_LEDGER_ADDRESS` / `VITE_LEDGER_CHAIN_ID` / `VITE_LEDGER_RPC` / `VITE_IPFS_GATEWAY` override the defaults.
 
 ### Security headers
 

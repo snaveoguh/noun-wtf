@@ -5,11 +5,11 @@
 // storeys and bays, its window openings, its door, its sign and (on brick
 // and loft buildings, where a street wall has room) a fire escape.
 
-import type { BuildingDoor } from '../../interiors/contract';
-import type { Footprint } from '../../interiors/doors';
 import type { BuildingPlan, EscapePlacement, SegmentPlan } from './details';
 import type { FaceRect } from './faces';
 import type { DoorRect, WallRect } from './layout';
+import type { BuildingDoor } from '../../interiors/contract';
+import type { Footprint } from '../../interiors/doors';
 
 import { SIGN_SLOTS } from './atlas';
 import { checkEscape, minEscapeLength, planEscape } from './escape';
@@ -61,6 +61,9 @@ export function doorOnFace(d: BuildingDoor, f: FaceRect, s0: number, s1: number)
 }
 
 /** The s-ranges along a face that obstacles stand in, over heights [y0, y1]. */
+/** Clear wall kept round a tall decal's span (the mural billboard's frame). */
+const TALL_DECAL_PAD = 0.8;
+
 function blockedOn(f: FaceRect, obs: readonly Obstacle[], y0: number, y1: number, reach: number) {
   const out: [number, number][] = [];
   for (const o of obs) {
@@ -187,6 +190,11 @@ export function placeEscape(
     const roof = roofFor(fp.ground + fp.height, sp.face);
     if (roof < 2 * STOREY - 0.1) continue;
     const blocked = blockedOn(sp.face, obstacles, STOREY, sp.face.y1 + 1.5, 2.6);
+    // Tall pieces on the wall (the mural: a framed billboard that grows up to
+    // the roofline, world/MuralBillboard.ts) keep the stairs off them, frame
+    // included; street-level graffiti doesn't
+    for (const d of sp.decals)
+      if (d.y1 > 2 * STOREY) blocked.push([d.s0 - TALL_DECAL_PAD, d.s1 + TALL_DECAL_PAD]);
     const span = escapeSpan(sp.seg.s0, sp.seg.s1, sp.door, blocked, [6.8, 6.4, minLen]);
     if (span === null) continue;
     const spec = { length: span.length, roof, parapet: sp.face.y1, parapetDepth: 0.25 };

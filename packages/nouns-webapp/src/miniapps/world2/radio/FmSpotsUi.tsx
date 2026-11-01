@@ -6,18 +6,31 @@ import { HudSlot } from '../hud/slots';
 
 import { type FmSpots } from './FmSpots';
 
+/** Does a key press move past the jingle / DJ? */
+export function skipsSpot(target: EventTarget | null, selecting: boolean): boolean {
+  if (selecting) return false;
+  const el = target as HTMLElement | null;
+  if (el?.closest?.('[data-fm-spot]')) return false;
+  const tag = el?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable === true)
+    return false;
+  return true;
+}
+
 export function useSpots(spots: FmSpots) {
   return useSyncExternalStore(spots.subscribe, spots.getView);
 }
 
 export function FmSpotsUi({ spots }: { spots: FmSpots }) {
   const v = useSpots(spots);
-  // Any key moves past a jingle / the DJ; the song keeps
-  // playing unless you hit the chip.
+  // Any key moves past a jingle / the DJ in play; the song keeps playing
+  // unless you hit the chip. Not on the character select (its arrows,
+  // Enter and the name field are all keys: they cut the jingle off before
+  // it got going) and never while typing.
   useEffect(() => {
     if (v.stage !== 'jingle' && v.stage !== 'dj') return;
-    const skip = (e: Event) => {
-      if ((e.target as HTMLElement | null)?.closest?.('[data-fm-spot]')) return;
+    const skip = (e: KeyboardEvent) => {
+      if (!skipsSpot(e.target, document.body.hasAttribute('data-w2select'))) return;
       spots.skip();
     };
     window.addEventListener('keydown', skip);

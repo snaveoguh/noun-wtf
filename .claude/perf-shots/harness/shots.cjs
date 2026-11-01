@@ -13,7 +13,6 @@ const DEV = {
     const ctx = await b.newContext(DEV[name]);
     const p = await ctx.newPage();
     await p.goto(`${base}/world?offline=1&skip=1&bday=0&debug=1&spawn=plaza`, { timeout: 600000 });
-    await p.getByText('PRESS START').first().click({ force: true, timeout: 600000 }).catch(() => {});
     await p.waitForFunction(() => window.__w2 && window.__w2.me && window.__w2.running, null, { timeout: 900000, polling: 2000 });
     await p.evaluate(() => { const g = window.__w2; if (g.adaptive) g.adaptive.frozen = true; const V = g.player.pos.constructor; const hit = g.world.raycast(new V(0, 40, 14), new V(0, -1, 0), 80); g.player.spawn(new V(0, (hit ? hit.point.y : 0) + 0.05, 14), 0); g.cam.snap(g.player); });
     await sleep(12000);

@@ -9,12 +9,14 @@
 // players in the Exchange live, and click / tap anyone to trade with them
 // (sim/tradeForm.ts → source.act → the world-exchange function).
 
+import type { AgentPublic, LedgerEntry } from '../../agents/contract';
 import type { ActReply, ClientAction } from '../../exchange/client';
 import type { DealsView, GoodId, Ticker, YouView } from '../../exchange/engine/types';
 import type { TradeTarget } from '../sim/tradeForm';
 
 import * as THREE from 'three';
 
+import { AGENT_BY_ID, AGENTS } from '../../agents/roster';
 import { BOT_BY_ID, ROSTER } from '../../exchange/engine/bots/roster';
 import { GOOD_INFO } from '../../exchange/engine/goods';
 import {
@@ -110,6 +112,9 @@ export interface HudState {
   /** The good of the pit nearest you. */
   nearPit: GoodId;
   now: number;
+  /** The city's agents (shop boards) and their recent trades. */
+  agents: AgentPublic[];
+  ledger: LedgerEntry[];
 }
 
 export interface FloorSceneOpts {
@@ -249,6 +254,8 @@ export class FloorScene {
     }
     // The regulars (real bots, real seeds) and you
     for (const b of ROSTER) this.realTrader(b.id, PIT_GOODS[hashStr(b.id) % PIT_GOODS.length]!);
+    // The agents (src/miniapps/agents): on the floor at their first good's pit
+    for (const a of AGENTS) this.realTrader(a.id, a.goods[0]!);
     this.source = new FloorSource(o.offline, o.speed ?? 1);
     // You: your own rider, walking (the floor's 'you' trader is pinned to you)
     this.walk = new WalkMode(o.me, () => this.source.tag, o.online);
@@ -319,7 +326,13 @@ export class FloorScene {
     let kind: Exclude<Trader['kind'], 'sim'>;
     let name: string;
     let seed: Seed;
-    if (owner.startsWith('bot:')) {
+    if (owner.startsWith('agent:')) {
+      // Agents walk the floor like the bots do (kind 'bot'); targetOf tells them apart
+      const def = AGENT_BY_ID[owner];
+      kind = 'bot';
+      name = def !== undefined ? `${def.name} · AGENT` : owner.slice(6);
+      seed = def !== undefined ? seedFromArray(def.seed) : seedFromId(owner, ART);
+    } else if (owner.startsWith('bot:')) {
       const def = BOT_BY_ID[owner];
       kind = 'bot';
       name = def?.name ?? owner.slice(4);
@@ -1241,6 +1254,13 @@ export class FloorScene {
     const t = this.crowd.traders[i];
     if (t === undefined || t.kind === 'you') return null;
     const name = t.name ?? `TRADER #${t.i + 1}`;
+    if (t.kind === 'bot' && t.id.startsWith('agent:'))
+      return {
+        kind: 'agent',
+        key: t.id,
+        name: AGENT_BY_ID[t.id]?.name.toUpperCase() ?? name,
+        agent: t.id,
+      };
     if (t.kind === 'bot') return { kind: 'bot', key: t.id, name, bot: t.id };
     if (t.kind === 'rider') return { kind: 'rider', key: t.id, name, tag: t.id };
     return { kind: 'sim', key: t.id, name, good: PITS[t.home % PITS.length]!.good };
@@ -1369,6 +1389,8 @@ export class FloorScene {
       online: this.walk.net?.connected === true,
       nearPit: this.nearPit(),
       now: Date.now(),
+      agents: this.source.agents,
+      ledger: this.source.ledger,
     });
   }
 

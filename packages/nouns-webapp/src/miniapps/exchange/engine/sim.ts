@@ -46,6 +46,7 @@ import {
   type TownId,
 } from './goods';
 import { rngFrom, type Rng } from './rng';
+import { isAgent } from './shops';
 
 export const STEP_MS = 5_000;
 export const MAX_STEPS = 120; // 10 sim-minutes per call
@@ -280,7 +281,7 @@ export function playerAct(
   a: ExchangeAction,
   now = s.now,
 ): ActResult {
-  if (isBot(owner)) return { ok: false, reason: 'reserved', fills: [] };
+  if (isBot(owner) || isAgent(owner)) return { ok: false, reason: 'reserved', fills: [] };
   riderAccount(s, owner, now);
   if (a.t === 'cancel') {
     const r = cancel(s, owner, String(a.order));

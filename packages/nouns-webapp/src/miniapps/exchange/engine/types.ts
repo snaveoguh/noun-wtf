@@ -114,6 +114,27 @@ export interface ExchangeState {
    * Optional: blobs saved before deals existed don't have it.
    */
   deals?: Deal[];
+  /**
+   * Agent shops (shops.ts): posted prices per agent id. Optional: blobs
+   * saved before agents existed don't have it.
+   */
+  shops?: Record<string, Shop>;
+}
+
+/** One good on an agent's shop board. null = not buying / not selling. */
+export interface ShopLine {
+  /** The agent buys at this (a player sells to it). */
+  bid: number | null;
+  /** The agent sells at this (a player buys from it). */
+  ask: number | null;
+  /** Most units per sale. */
+  max: number;
+}
+
+export interface Shop {
+  /** When the agent last posted (ms); stale shops are shut. */
+  at: number;
+  lines: Partial<Record<GoodId, ShopLine>>;
 }
 
 /** A direct offer (server side: `from` is the proposer's raw rider id). */

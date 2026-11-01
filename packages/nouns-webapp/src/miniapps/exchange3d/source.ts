@@ -11,8 +11,10 @@
 // deals), against whichever of those is answering, and keeps your
 // balances and offers in / out from the last answer.
 
+import type { AgentPublic, LedgerEntry } from '../agents/contract';
 import type { DealsView, YouView } from '../exchange/engine/types';
 
+import { LocalAgents } from '../agents/client';
 import {
   HttpExchange,
   LocalExchange,
@@ -24,7 +26,6 @@ import {
   botsPublic,
   dealsView,
   snapshot,
-  tick,
   tickers,
   type ExchangeSnapshot,
 } from '../exchange/engine';
@@ -33,6 +34,9 @@ import { maskOwner, publicFloor, type FeedMode, type Floor3d, type FloorFrame } 
 
 const URL_ = '/.netlify/functions/world-exchange';
 const RETRY_LIVE_MS = 60_000;
+const AGENTS_URL = '/.netlify/functions/world-agents';
+/** Agents act every few minutes: their board and ledger needn't poll at 3 s. */
+const AGENTS_POLL_MS = 15_000;
 const NO_DEALS: DealsView = { incoming: [], outgoing: [] };
 
 export class FloorSource {
@@ -46,6 +50,11 @@ export class FloorSource {
   you: YouView | null = null;
   deals: DealsView = NO_DEALS;
   private joined = false;
+  /** The city's agents (their shop boards) and the agent ledger. */
+  agents: AgentPublic[] = [];
+  ledger: LedgerEntry[] = [];
+  private localAgents: LocalAgents | null = null;
+  private agentsAt = 0;
 
   constructor(
     offline: boolean,
@@ -108,6 +117,18 @@ export class FloorSource {
       }));
     this.you = s.you ?? null;
     this.deals = s.deals ?? NO_DEALS;
+    if (Date.now() - this.agentsAt > AGENTS_POLL_MS) {
+      this.agentsAt = Date.now();
+      void fetch(`${AGENTS_URL}?rider=${encodeURIComponent(this.rider)}`, { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null))
+        .then((v: { agents?: AgentPublic[]; ledger?: LedgerEntry[] } | null) => {
+          if (v && Array.isArray(v.agents)) {
+            this.agents = v.agents;
+            this.ledger = Array.isArray(v.ledger) ? v.ledger : [];
+          }
+        })
+        .catch(() => {});
+    }
     return {
       mode: 'live',
       now: s.now,
@@ -124,7 +145,11 @@ export class FloorSource {
   private fromLocal(): FloorFrame {
     this.local ??= new LocalExchange(7, this.speed);
     const st = this.local.state;
-    tick(st, this.local.now(), { maxSteps: 400 });
+    // The bots and the agents, here in this tab
+    this.localAgents ??= new LocalAgents(this.local);
+    const av = this.localAgents.view();
+    this.agents = av.agents;
+    this.ledger = av.ledger;
     const pub = publicFloor(st, this.local.owner);
     this.you = snapshot(st, { good: 'ICECREAM', owner: this.local.owner }).you;
     this.deals = dealsView(st, this.local.owner, st.now, o => maskOwner(o, null));

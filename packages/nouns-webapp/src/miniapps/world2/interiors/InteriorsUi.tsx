@@ -11,6 +11,7 @@ import type { InteriorSystem, InteriorsView, UiAction } from './InteriorSystem';
 
 import { useSyncExternalStore, type ReactNode } from 'react';
 
+import { RoomAgent } from '../../agents/ui/RoomAgent';
 import { HudSlot } from '../hud/slots';
 function useInteriors(sys: InteriorSystem): InteriorsView {
   return useSyncExternalStore(sys.subscribe, sys.getView);
@@ -56,6 +57,10 @@ export function InteriorsUi({ game, touch }: { game: Game; touch: boolean }) {
           <span className="text-[10px] font-bold text-[#ffd400]">{v.inside.label}</span>
           {v.coin !== null && <span className="ml-1 text-xs font-bold">🪙 {v.coin}</span>}
         </div>
+      )}
+
+      {v.inside !== null && v.agent != null && (
+        <RoomAgent key={v.agent.id} agentId={v.agent.id} name={v.agent.name} touch={touch} />
       )}
 
       {v.note !== null && (

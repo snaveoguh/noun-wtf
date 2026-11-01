@@ -1,0 +1,27 @@
+# Noun World Ledger: Noun World snapshots (graffiti, records) on Base. Standalone Foundry project.
+# forge-std v1.9.4 is vendored under lib/ (copied from noun-trade-contracts, pruned to sources).
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+cache_path = "cache"
+libs = ["lib"]
+solc_version = "0.8.24"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10_000
+bytecode_hash = "none"
+remappings = ["forge-std/=lib/forge-std/src/"]
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+
+[profile.default.fuzz]
+runs = 512
+
+[rpc_endpoints]
+base_sepolia = "${BASE_SEPOLIA_RPC}"
+base = "${BASE_RPC}"
+
+[etherscan]
+base_sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 84532 }
+base = { key = "${ETHERSCAN_API_KEY}", chain = 8453 }
