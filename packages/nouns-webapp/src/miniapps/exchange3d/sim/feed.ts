@@ -47,9 +47,9 @@ export interface Floor3d {
   orders: PublicOrder[];
 }
 
-/** Bots and the exchange keep their names; the viewer is 'you'; other riders a tag. */
+/** Bots, agents and the exchange keep their names; the viewer is 'you'; other riders a tag. */
 export function maskOwner(owner: string, viewer: string | null): string {
-  if (owner.startsWith('bot:') || owner === 'gx') return owner;
+  if (owner.startsWith('bot:') || owner.startsWith('agent:') || owner === 'gx') return owner;
   if (viewer !== null && owner === viewer) return 'you';
   return `r:${hashStr(`gx3d:${owner}`).toString(36).padStart(7, '0').slice(0, 7)}`;
 }

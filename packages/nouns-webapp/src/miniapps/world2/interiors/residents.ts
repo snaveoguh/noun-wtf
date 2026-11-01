@@ -22,6 +22,8 @@ export interface ResidentDef extends Resident {
   /** A little about how they are: hospitality (offers food) and how watchful they are. */
   generous: number;
   watchful: number;
+  /** Set when an agent (src/miniapps/agents) is this resident (agents/rooms.ts withAgent). */
+  agent?: string;
 }
 
 const FIRST = [

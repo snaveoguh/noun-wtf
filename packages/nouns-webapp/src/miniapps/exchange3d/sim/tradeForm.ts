@@ -19,6 +19,8 @@ export type TradeTarget =
   | { kind: 'peer'; key: string; name: string; tag: string; seedKey: string }
   | { kind: 'rider'; key: string; name: string; tag: string }
   | { kind: 'bot'; key: string; name: string; bot: string }
+  /** An agent (src/miniapps/agents): its shop board opens instead of the form. */
+  | { kind: 'agent'; key: string; name: string; agent: string }
   | { kind: 'sim'; key: string; name: string; good: GoodId };
 
 export interface TradeForm {
@@ -74,7 +76,8 @@ export function formProblem(f: TradeForm, you: YouView | null): string | null {
 export function formAction(target: TradeTarget, f: TradeForm): ClientAction {
   if (target.kind === 'sim')
     return { t: 'order', side: f.side, good: f.good, qty: f.qty, price: f.price, kind: 'limit' };
-  const to = target.kind === 'bot' ? target.bot : target.tag;
+  const to =
+    target.kind === 'bot' ? target.bot : target.kind === 'agent' ? target.agent : target.tag;
   return { t: 'offer', to, side: f.side, good: f.good, qty: f.qty, price: f.price };
 }
 
@@ -86,6 +89,8 @@ export function formNote(target: TradeTarget): string {
       return 'A direct offer: they get it on their screen and can accept for 90 s.';
     case 'bot':
       return 'Bots answer at once, if the price is right for them.';
+    case 'agent':
+      return 'Agents answer at once, at their posted shop prices.';
     case 'sim':
     default:
       return 'A simulated trader: your order goes on the real order book at this price.';

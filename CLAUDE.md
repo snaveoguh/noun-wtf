@@ -382,6 +382,36 @@ The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,
 - **Trading** (`ui/TradePanel.tsx`, logic `sim/tradeForm.ts`): click / tap a player, rider or bot for a direct deal (`engine/deals.ts`: offer / accept / decline, 90 s); a simulated trader gets a limit order on the real book. Targets are masked tags only; the server resolves a tag to its account when offered (`toOwner`, never sent out) and only that account can accept. Accounts are opened (`join`) only once another player is in the room or you trade.
 - **Crowd**: instanced low-poly Nouns with swinging legs; trouser / shoe colours come from Noun World's `outfitFromSeed` (`sim/outfit.ts` `outfitFor`), the outfit a rig dresses itself in, so the LOD swap never changes clothes. A far LOD (one trouser block) in VAST and the hall copies. Your rider wears your saved outfit and sends it to other players as `of` (Net.ts's key).
 
+### Agent economy (agents on the Exchange, in rooms)
+
+AI agents keep Noun World's economy moving while nobody's online. Design: `docs/agent-economy.md`.
+- **Model:** `src/miniapps/agents/`.
+  - Who they are: `roster.ts`, five agents with ids `agent:<slug>`; never reuse an id.
+  - Types: `contract.ts`.
+  - Wallets are ordinary Grand Exchange accounts.
+  - Records and the ledger live in Blobs `noun-world-agents`, key `agents`.
+- **Tick:** `netlify/functions/world-agents-tick.ts` runs every 5 min (logic in `netlify/lib/agentsTick.ts`).
+  - It ticks the exchange's bots, then `runAgents` (`run.ts`, pure).
+  - It checks invariants before saving, and retries on an etag conflict.
+- **Policies:** rule policies in `policies/` (shopkeeper, maker, collector).
+  - Every decision goes through `guard.ts`: 12 actions a turn, own goods only, a ±50% price band, a 60% spend cap.
+  - Then it goes through the engine.
+- **Guardrails:**
+  - Agents are funded once with the rider starter grant; nothing else ever funds them (no bailouts).
+  - `playerAct` and `dealAct` refuse `agent:` owners.
+- **Shops:** `exchange/engine/shops.ts`.
+  - Posted quotes live in `ExchangeState.shops`; `setShop` clamps them, and they go stale after 2 h.
+  - A player trades with a shop through a normal deal `offer` to the agent id at its price, which `shopTakes` answers.
+- **LLM policy (`llm.ts`):** off unless `AGENT_LLM=1` + `ANTHROPIC_API_KEY`.
+  - Only agents with `llm: true`, once an hour each, 2 a run; `AGENT_LLM_MODEL` overrides the model.
+  - Its output goes through the same guard; on an error it falls back to the rules.
+- **Client:**
+  - Exchange floor: agents walk as "Name · AGENT"; a click opens `AgentShop`, and 🤖 AGENT LEDGER opens `AgentLedger`.
+  - Rooms: `rooms.ts` puts an agent in place of the owner in about half the eligible rooms (`withAgent`); InteriorsUi shows `RoomAgent`.
+  - `?offline=1` runs the agents in the tab (`LocalAgents`).
+- **Admin:** `POST world-agents` with `X-World-Admin`: `pause` / `resume` an agent, or `run`.
+- **Tests:** `npx vitest run src/miniapps/agents netlify/lib/agentsTick.test.ts`.
+
 ### Crystal ball (/crystal-ball, /v2/crystal-ball)
 
 - Every read (auction, latest block, descriptor counts) and the settle tx use the Nouns chain (`NOUNS_CHAIN` = `defaultChain.id`), never the wallet's: wagmi's config also carries Polygon, and with a wallet on Polygon the page fell back to a cached "still live" prediction at Noun O'Clock (2026-11-01). The settle button judges "ended" from the end time against the clock. The terminal feed's indexer health and chain fallbacks had the same bug (`indexerHealth.ts`, `v1/v2ChainFallback.ts`, `grantsChainFallback.ts`).
