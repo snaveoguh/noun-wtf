@@ -84,7 +84,7 @@ const NoundersPage = () => {
                     href={`https://twitter.com/${bio.handle}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-foreground transition-colors hover:text-red-600"
+                    className="text-foreground transition-colors hover:text-red-600 [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:items-center"
                   >
                     <svg
                       fill="currentColor"
