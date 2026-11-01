@@ -604,7 +604,11 @@ export class Game {
     this.buildNature(level);
     if (new URLSearchParams(window.location.search).get('dressing') === '1')
       this.buildDressingDemo(level);
-    void this.billboards.attach(level.root);
+    void this.billboards.attach(level.root, {
+      world: this.world,
+      toon: this.gfx.toon,
+      shadows: this.gfx.quality !== 'low',
+    });
     this.interiors.start(level);
     this.facades.start(level);
 

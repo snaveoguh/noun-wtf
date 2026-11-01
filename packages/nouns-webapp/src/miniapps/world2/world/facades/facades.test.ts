@@ -248,7 +248,9 @@ describe('the real plaza', async () => {
 
   it('hangs walkable fire escapes on brick and loft buildings, clear of doors', () => {
     const escapes = plans.filter(p => p.escape !== null);
-    expect(escapes.length).toBeGreaterThanOrEqual(4);
+    // The mural's loft (-49.5,-85) has none: its 16.5 m street wall is the
+    // billboard's (no stairs over the mural, frame included)
+    expect(escapes.length).toBeGreaterThanOrEqual(3);
     for (const p of escapes) {
       expect(['tenement', 'loft']).toContain(p.style);
       const e = p.escape!;
@@ -286,6 +288,20 @@ describe('the real plaza', async () => {
     }
     expect(IN).toBeLessThan(-0.02);
     expect(MIN_PROUD).toBeGreaterThanOrEqual(0.03);
+  });
+
+  it('runs no fire escape over the mural', () => {
+    let tall = 0;
+    for (const p of plans) {
+      const e = p.escape;
+      for (const sp of p.segments)
+        for (const r of sp.decals) {
+          if (r.y1 <= 2 * 3.4) continue;
+          tall++;
+          if (e !== null && e.face === sp.face) expect(e.b <= r.s0 || e.a >= r.s1).toBe(true);
+        }
+    }
+    expect(tall).toBeGreaterThan(0);
   });
 
   it('puts no relief over the painted pieces and the mural', () => {
