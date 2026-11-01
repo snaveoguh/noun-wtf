@@ -6,7 +6,7 @@ import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Alert, Button, Form } from 'react-bootstrap';
+import { Alert, Form } from 'react-bootstrap';
 import { Link } from 'react-router';
 import { withStepProgress } from 'react-stepz';
 import { filter } from 'remeda';
@@ -281,13 +281,15 @@ const CreateProposalPage = () => {
           </Trans>
         </Alert>
         <div className="d-grid">
-          <Button
-            className={classes.proposalActionButton}
-            variant="dark"
+          {/* plain markup of react-bootstrap's <Button variant="dark">: its polymorphic
+              props hit TS2590 ("union type too complex") here */}
+          <button
+            type="button"
+            className={clsx('btn', 'btn-dark', classes.proposalActionButton)}
             onClick={() => setShowTransactionFormModal(true)}
           >
             <Trans>Add Action</Trans>
-          </Button>
+          </button>
         </div>
         <ProposalTransactions
           proposalTransactions={proposalTransactions}
