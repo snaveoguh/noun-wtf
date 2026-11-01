@@ -732,9 +732,15 @@ const CandidatePage = () => {
       {canSponsor && isWalletConnected && (
         <Row>
           <Col lg={12}>
-            <div className={classes.editCandidate} style={{ borderColor: 'var(--theme-text-link)' }}>
+            <div
+              className={classes.editCandidate}
+              style={{ borderColor: 'var(--theme-text-link)' }}
+            >
               <p>
-                <span className={classes.proposerOptionsHeader} style={{ color: 'var(--theme-text-link)' }}>
+                <span
+                  className={classes.proposerOptionsHeader}
+                  style={{ color: 'var(--theme-text-link)' }}
+                >
                   Sponsor this candidate
                 </span>
                 Add your signature to help this candidate reach the {proposalThreshold} vote
@@ -747,7 +753,11 @@ const CandidatePage = () => {
                   onClick={() => setShowSponsorModal(true)}
                   variant="primary"
                   className={clsx(classes.primaryButton, classes.button)}
-                  style={{ background: 'var(--theme-text-link)', borderColor: 'var(--theme-text-link)', color: '#fff' }}
+                  style={{
+                    background: 'var(--theme-text-link)',
+                    borderColor: 'var(--theme-text-link)',
+                    color: '#fff',
+                  }}
                 >
                   Sponsor
                 </Button>
@@ -758,10 +768,10 @@ const CandidatePage = () => {
       )}
 
       {candidate && (
-        <Row>
+        <Row className={classes.layout}>
           {/* Version timeline slider */}
           {hasVersions && (
-            <Col lg={12}>
+            <Col lg={12} className={classes.full}>
               <CandidateVersionSlider
                 versions={versions!}
                 activeVersion={effectiveVersionIdx}
@@ -770,7 +780,7 @@ const CandidatePage = () => {
             </Col>
           )}
           {!hasVersions && versionsLoading && candidate.versionsCount > 1 && (
-            <Col lg={12}>
+            <Col lg={12} className={classes.full}>
               <div
                 style={{
                   display: 'flex',
@@ -791,15 +801,15 @@ const CandidatePage = () => {
               </div>
             </Col>
           )}
-          <Col lg={12}>
+          <Col lg={12} className={classes.full}>
             <a className={classes.jump} href="#feedback">
               Jump to Sponsored Votes and Feedback
             </a>
           </Col>
-          <Col lg={8} className={clsx(classes.proposal, classes.wrapper)}>
+          <Col className={clsx(classes.proposal, classes.wrapper, classes.main)}>
             <ProposalCandidateContent proposal={displayCandidate} />
           </Col>
-          <Col id="feedback" lg={4} className={classes.sidebar}>
+          <Col id="feedback" className={classes.sidebar}>
             <VoteSignals
               proposalId={candidate.id}
               proposer={candidate.proposer}
