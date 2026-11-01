@@ -47,6 +47,7 @@ import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { LOADER_CSS, WorldLoader } from './ui/WorldLoader';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
+import { BenchUi } from './world/bench/BenchUi';
 import { CampUi } from './world/camp/CampUi';
 import { firstSpawnInCamp } from './world/camp/firstSpawn';
 import { worldPause } from './worldPause';
@@ -478,6 +479,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       )}
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <CampUi game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <BenchUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}

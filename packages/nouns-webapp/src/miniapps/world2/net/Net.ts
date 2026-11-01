@@ -53,6 +53,7 @@ import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
 import { OUTFIT_KEY_RE } from '../character/outfit';
 import { decodeRoom, type RoomKey, type RoomWire } from '../interiors/roomNet';
+import { decodeBench, type BenchWire } from '../world/bench/rules';
 
 import { Voice } from './Voice';
 
@@ -160,6 +161,8 @@ export interface RemotePlayer {
   crew?: string[] | null;
   /** Inside a building (`in`): which room, floor and seat; null = in the street. */
   room?: RoomKey | null;
+  /** Sat on the mural bench (`bn`): which seat (world/bench/rules.ts), null = not. */
+  bench?: number | null;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -241,6 +244,8 @@ export class Net {
   crew: string[] | null = null;
   /** The room I'm in (interiors/roomNet.ts), relayed as `in` while inside. */
   room: RoomWire | null = null;
+  /** My seat on the mural bench (world/bench/rules.ts), relayed as `bn` while sat. */
+  bench: BenchWire | null = null;
 
   connect() {
     if (this.ws) return;
@@ -420,6 +425,7 @@ export class Net {
     rp.ride = decodeRide(blob.rd);
     rp.crew = decodeCrew(blob.ps);
     rp.room = decodeRoom(blob.in);
+    rp.bench = decodeBench(blob.bn);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -517,6 +523,7 @@ export class Net {
       ...(this.ride !== null ? { rd: this.ride } : {}),
       ...(this.crew !== null ? { ps: this.crew } : {}),
       ...(this.room !== null ? { in: this.room } : {}),
+      ...(this.bench !== null ? { bn: this.bench } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

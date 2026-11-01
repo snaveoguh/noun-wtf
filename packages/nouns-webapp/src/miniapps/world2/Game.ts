@@ -109,6 +109,7 @@ import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
 import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
+import { BenchSystem } from './world/bench/BenchSystem';
 import { CampSystem } from './world/camp/CampSystem';
 import { FacadeSystem } from './world/facades/FacadeSystem';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
@@ -369,6 +370,8 @@ export class Game {
   readonly interiors: InteriorSystem = new InteriorSystem(this);
   /** NOUNS CAMP (world/camp/): the condemned penthouse every first spawn wakes up in. */
   readonly camp: CampSystem = new CampSystem(this);
+  /** The mural bench (world/bench/): Pipe, SIT, the cinematic shot of the GIF mural. */
+  readonly bench: BenchSystem = new BenchSystem(this);
   /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
   readonly facades: FacadeSystem = new FacadeSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
@@ -404,7 +407,7 @@ export class Game {
   private fpsAcc = 0;
   private fpsFrames = 0;
   private listeners = new Set<() => void>();
-  private labelLayer: HTMLElement;
+  readonly labelLayer: HTMLElement;
   /** The name-tag DOM layer (hoops/view puts its ballers' tags there). */
   get labelLayerEl(): HTMLElement {
     return this.labelLayer;
@@ -577,6 +580,8 @@ export class Game {
     }
     this.cars.stripBaked(level);
     this.world.build(level.collisionMeshes);
+    // Placed against the static collision only (the same on every client)
+    this.bench.start(level);
     this.player.softBounds = level.softBounds ?? Infinity;
     if (level.mountain !== undefined) this.buildMountain(level);
     const fountain = level.spawns.find(s => /fountain/i.test(s.name ?? ''));
@@ -1143,6 +1148,7 @@ export class Game {
     this.cutscene.tick();
     const input = this.input.poll(now);
     this.mural.tick(dt, input);
+    this.bench.tick(dt, input);
     // Driving the ice cream van: E / R / spray are the van's this frame
     const driving =
       this.van2.preStep(input) || this.cars.preStep(input) || this.dragon.preStep(input);
@@ -1229,6 +1235,7 @@ export class Game {
     perf.lap('missions');
     this.interiors.update(dt);
     this.camp.update(dt);
+    this.bench.update(dt);
     // A pocket room and the Big Drop set their own light: the sky waits
     if (this.todClock.tick(dt, this.interiors.inside || this.missions.ud.active))
       this.cycleTimeOfDay();
@@ -1267,6 +1274,7 @@ export class Game {
       this.nature?.update(dt, this.player.pos);
       this.billboards.update(dt, this.gfx.camera.position);
     }
+    this.bench.camera(dt);
     this.camHook?.(this.gfx.camera, dt);
     perf.lap('nature');
     this.gfx.render(dt);
@@ -2185,6 +2193,7 @@ export class Game {
       this.skydive.remote(id, ch, c.sk, c.mode === 'board', dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       this.interiors.poseRemote(id, ch, rp.room ?? null, dt);
+      this.bench.poseRemote(id, ch, rp.bench ?? null, dt);
       // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
       const show = this.hideseek.labelFor(id);
       if (apart) {
@@ -2548,6 +2557,7 @@ export class Game {
     this.missions.dispose();
     this.interiors.dispose();
     this.camp.dispose();
+    this.bench.dispose();
     this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
