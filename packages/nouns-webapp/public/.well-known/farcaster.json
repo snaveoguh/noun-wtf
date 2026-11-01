@@ -1,0 +1,27 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Noun World",
+    "subtitle": "One link drops you into a city",
+    "description": "Skate, parkour, play pool and breakdance in a city of Nouns. Runs in the app, no download. Share your rider and friends drop in as you.",
+    "tagline": "One link. One city.",
+    "iconUrl": "https://noun.wtf/fc/icon.png",
+    "homeUrl": "https://noun.wtf/world",
+    "imageUrl": "https://noun.wtf/fc/world-card.png",
+    "buttonTitle": "PLAY NOUN WORLD",
+    "splashImageUrl": "https://noun.wtf/fc/splash.png",
+    "splashBackgroundColor": "#0b0b12",
+    "heroImageUrl": "https://noun.wtf/fc/world-og.png",
+    "ogTitle": "Noun World",
+    "ogDescription": "One link drops you into a city of Nouns. Skate, parkour, pool. No download.",
+    "ogImageUrl": "https://noun.wtf/fc/world-og.png",
+    "primaryCategory": "games",
+    "tags": ["nouns", "skate", "multiplayer", "game", "cc0"],
+    "canonicalDomain": "noun.wtf"
+  }
+}

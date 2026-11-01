@@ -441,6 +441,16 @@ AI agents keep Noun World's economy moving while nobody's online. Design: `docs/
 
 `/vote/:id`, `/candidates/:id`, `/noun/:id` and `/v2/noun/:id` go through `netlify/functions/og-proposal.ts` (see `public/_redirects`), which serves the SPA shell with og / twitter tags spliced in. A Noun's card is `/og/noun/:id.png` / `/og/v2/noun/:id.png` (`og-noun-image.ts`): a 1200 × 630 PNG of the Noun big on its own background, standing on the bottom edge, drawn from its seed (`seeds(id)`; `ownerOf` 404s unminted or burned ones) and the bundled trait art, encoded with node's zlib (`netlify/lib/nounOg.ts`, tested). The on-chain renderers (`tokenURI`, `generateSVGImage`) revert over public RPCs (gas caps), so they aren't used. Cached a year (a seed never changes).
 
+### Play-as links, share + Farcaster mini app (growth)
+
+The loop: a moment gets shared, the share unfurls as a playable card, one tap drops the viewer into the game as the sharer's rider. Posting plan: `docs/growth.md`.
+- **Play-as links:** `/world?seed=<key>[&name=]`, the key being the rider's seed key (`seedKey`, `-m` for missingnoun). Pure helpers in `src/miniapps/world2/share/playLink.ts` (`playAsUrl`, strict `parseRiderKey`, `worldShareMeta`, `miniAppEmbed`), shared with the netlify functions.
+- **Cards:** `/og/world/<key>.png` (1200 × 630) and `/og/world/fc/<key>.png` (1200 × 800, Farcaster's 3:2), `netlify/functions/og-rider-image.ts` → `netlify/lib/riderOg.ts` (the rider on a board, PLAY AS ME, a built-in 5 × 7 pixel font; same zlib PNG as nounOg) with the art from `riderGrid.ts` (V1 art like the game; a missingnoun is V2 head 252 + glasses with frozen red/cyan glitch ghosts). Cached a year.
+- **/world goes through og-proposal** (`public/_redirects`): it splices og / twitter tags plus `fc:miniapp` and `fc:frame` into the SPA shell (fetched from the request's own site, so the dev site serves its own shell), varies the cache on `seed|name`, and sends `frame-ancestors` allowing Farcaster's web client. If the shell can't be fetched the fallback page refreshes itself after 3 s.
+- **In game:** `share/ShareUi.tsx` puts a share icon in the HUD's util slot (PLAY-AS LINK, SNAPSHOT) using the missions panel's look; `share/share.ts` routes a link to a cast (mini app) / the share sheet (touch) / the clipboard, and a snapshot (frame drawn then `toBlob`, with a yellow link strip) to the share sheet on phones or a download. One line in World2Page mounts it.
+- **Mini app:** manifest `public/.well-known/farcaster.json` (the `accountAssociation` is empty until the owner signs it, steps in the webapp README); images in `public/fc/` from `netlify/lib/fcAssets.ts` (test checks them; `WRITE_FC=1` redraws). `share/miniApp.ts` imports the SDK from esm.sh only inside a Farcaster client (no npm dependency), sets `--w2-safe-top/right/bottom/left` from the host's insets and calls `ready()`. RingHud, hudStyle, TouchControls and WorldMap read `var(--w2-safe-*, env(safe-area-inset-*))`; other HUDs still use `env()` only.
+- **Clips:** `public/clips/` (vertical 1080 × 1920 + horizontal, webm + mp4 + poster, < 4 MB) from the sizzle pipeline's growth edit lists.
+
 ### Onchain snapshots (NounWorldLedger on Base, /onchain)
 
 Noun World's graffiti and records are kept on Base as an append-only, versioned history. Positions are only saved as part of a snapshot, never live. Full details, costs and the switch-on steps are in `packages/noun-world-chain/README.md`.
@@ -454,7 +464,7 @@ Noun World's graffiti and records are kept on Base as an append-only, versioned 
 
 ### Security headers
 
-`public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.
+`public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it. Exception: `/world` (served by og-proposal) also allows Farcaster's web clients, for the mini app.
 
 ## Image System
 

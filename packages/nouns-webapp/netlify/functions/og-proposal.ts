@@ -23,6 +23,8 @@
  * bundling). Regular functions ship reliably from the same workflow.
  */
 
+import { miniAppEmbed, worldShareMeta } from '../../src/miniapps/world2/share/playLink';
+
 interface HandlerEvent {
   path: string;
   headers?: Record<string, string>;
@@ -35,15 +37,20 @@ interface HandlerEvent {
  * apart only by `?dao=lil` (see VotePageRouter). Without this, a Lil prop
  * link unfurled as the Nouns DAO prop with the same number.
  */
-function isLilNounsRequest(event: HandlerEvent): boolean {
-  let dao = event.queryStringParameters?.dao;
-  if (dao === undefined && event.rawUrl !== undefined) {
+function queryParam(event: HandlerEvent, key: string): string | undefined {
+  let v = event.queryStringParameters?.[key];
+  if (v === undefined && event.rawUrl !== undefined) {
     try {
-      dao = new URL(event.rawUrl).searchParams.get('dao') ?? undefined;
+      v = new URL(event.rawUrl).searchParams.get(key) ?? undefined;
     } catch {
-      // Malformed rawUrl: treat as Nouns DAO.
+      // Malformed rawUrl: no such param.
     }
   }
+  return v;
+}
+
+function isLilNounsRequest(event: HandlerEvent): boolean {
+  const dao = queryParam(event, 'dao');
   const v = (dao ?? '').toLowerCase();
   return v === 'lil' || v === 'lilnouns' || v === 'lil-nouns';
 }
@@ -178,6 +185,8 @@ interface OgMeta {
   description: string;
   image: string;
   url: string;
+  /** Extra tags (the Farcaster mini app embed on /world). */
+  extra?: string[];
 }
 
 function buildMetaTags(meta: OgMeta): string {
@@ -186,6 +195,7 @@ function buildMetaTags(meta: OgMeta): string {
   const i = escapeAttr(meta.image);
   const u = escapeAttr(meta.url);
   return [
+    ...(meta.extra ?? []),
     `<meta property="og:type" content="article" />`,
     `<meta property="og:site_name" content="noun.wtf" />`,
     `<meta property="og:url" content="${u}" />`,
@@ -205,8 +215,8 @@ function buildMetaTags(meta: OgMeta): string {
  * This keeps the page renderable in browsers too (the function is invoked
  * via _redirects rule that matches all UAs, not just bots).
  */
-async function fetchIndexHtml(): Promise<string | null> {
-  const res = await fetchWithTimeout(`${SITE_URL}/index.html`);
+async function fetchIndexHtml(origin = SITE_URL): Promise<string | null> {
+  const res = await fetchWithTimeout(`${origin}/index.html`);
   if (res === null || !res.ok) return null;
   try {
     return await res.text();
@@ -221,9 +231,55 @@ interface RouteData {
   url: string;
   /** A ready-made card image (a Noun's page); else the description's first image. */
   image?: string;
+  extra?: string[];
 }
 
-async function resolveRouteData(path: string, isLil: boolean): Promise<RouteData | null> {
+/**
+ * The Farcaster mini app embed for a /world link: `fc:miniapp`, plus
+ * `fc:frame` (type launch_frame) for clients that only know the old name.
+ */
+export function miniAppTags(imageUrl: string, url: string, button: string): string[] {
+  return [
+    `<meta name="fc:miniapp" content="${escapeAttr(JSON.stringify(miniAppEmbed({ imageUrl, url, button })))}" />`,
+    `<meta name="fc:frame" content="${escapeAttr(JSON.stringify(miniAppEmbed({ imageUrl, url, button }, true)))}" />`,
+  ];
+}
+
+/**
+ * Who may frame /world: Farcaster's web clients open a mini app in an
+ * iframe. Every other page keeps `frame-ancestors 'self'` (public/_headers).
+ */
+export const WORLD_FRAME_ANCESTORS =
+  "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://warpcast.com https://*.warpcast.com";
+
+/** The site the request came to (dev, deploy previews), else noun.wtf. */
+function requestOrigin(event: HandlerEvent): string {
+  if (event.rawUrl === undefined) return SITE_URL;
+  try {
+    const u = new URL(event.rawUrl);
+    if (u.hostname === 'noun.wtf' || u.hostname.endsWith('.netlify.app')) return u.origin;
+  } catch {
+    // fall through
+  }
+  return SITE_URL;
+}
+
+async function resolveRouteData(
+  path: string,
+  isLil: boolean,
+  event: HandlerEvent = { path },
+): Promise<RouteData | null> {
+  // Noun World: a play-as link (?seed=) unfurls as that rider, plain /world as the game
+  if (/^\/world\/?$/.test(path)) {
+    const m = worldShareMeta({ seed: queryParam(event, 'seed'), name: queryParam(event, 'name') });
+    return {
+      description: m.description,
+      title: m.title,
+      url: m.url,
+      image: m.image,
+      extra: miniAppTags(m.fcImage, m.url, m.button),
+    };
+  }
   // A Noun's page unfurls as that Noun, big (og-noun-image draws it)
   const nounMatch = path.match(/^\/(v2\/)?noun\/(\d{1,6})\/?$/);
   if (nounMatch !== null) {
@@ -281,12 +337,20 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     ? 'A Lil Nouns DAO proposal on noun.wtf'
     : 'One Noun, every day, forever.';
   // Nouns and Lil props share a path, so the CDN must key the cache on ?dao.
-  const cacheHeaders = {
+  const isWorld = /^\/world\/?$/.test(inboundPath);
+  const cacheHeaders: Record<string, string> = {
     'Cache-Control': 'public, max-age=60, s-maxage=300',
-    'Netlify-Vary': 'query=dao',
+    // Nouns and Lil props share a path; a play-as link is keyed by its rider
+    'Netlify-Vary': isWorld ? 'query=seed|name' : 'query=dao',
+    ...(isWorld
+      ? { 'Content-Security-Policy': `upgrade-insecure-requests; ${WORLD_FRAME_ANCESTORS}` }
+      : {}),
   };
 
-  const [html, data] = await Promise.all([fetchIndexHtml(), resolveRouteData(inboundPath, isLil)]);
+  const [html, data] = await Promise.all([
+    fetchIndexHtml(requestOrigin(event)),
+    resolveRouteData(inboundPath, isLil, event),
+  ]);
 
   // Couldn't fetch the SPA shell — fall back to a tiny standalone HTML
   // doc so crawlers at least get something with proper meta tags.
@@ -294,10 +358,11 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     const fallbackTitle = siteName;
     const fallbackDesc = siteTagline;
     const meta = buildMetaTags({
-      title: fallbackTitle,
-      description: fallbackDesc,
-      image: FALLBACK_OG_IMAGE,
-      url: `${SITE_URL}${inboundPath}`,
+      title: data?.image !== undefined ? data.title : fallbackTitle,
+      description: data?.image !== undefined ? data.description : fallbackDesc,
+      image: data?.image ?? FALLBACK_OG_IMAGE,
+      url: data?.url ?? `${SITE_URL}${inboundPath}`,
+      extra: data?.extra,
     });
     return {
       statusCode: 200,
@@ -305,7 +370,8 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
         'Content-Type': 'text/html; charset=UTF-8',
         ...cacheHeaders,
       },
-      body: `<!DOCTYPE html><html><head>${meta}<title>${escapeAttr(fallbackTitle)}</title></head><body></body></html>`,
+      // /world is the game itself, not just a card: try the real page again shortly
+      body: `<!DOCTYPE html><html><head>${meta}${isWorld ? '<meta http-equiv="refresh" content="3" />' : ''}<title>${escapeAttr(fallbackTitle)}</title></head><body></body></html>`,
     };
   }
 
@@ -331,6 +397,7 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
     description,
     image,
     url: data?.url ?? `${SITE_URL}${inboundPath}`,
+    extra: data?.extra,
   });
 
   // Splice meta tags right before </head>. If for any reason </head>

@@ -354,20 +354,20 @@ export function WorldMap({
 
 const style = (
   <style>{`
-.w2-minimap{left:calc(16px + env(safe-area-inset-left));bottom:calc(16px + env(safe-area-inset-bottom));width:260px;height:176px;padding:0;border:3px solid #111018;border-radius:10px;overflow:hidden;box-shadow:0 0 0 2px rgba(255,255,255,.55),0 6px 18px rgba(0,0,0,.35);background:#86b86a;cursor:zoom-in}
+.w2-minimap{left:calc(16px + var(--w2-safe-left, env(safe-area-inset-left)));bottom:calc(16px + var(--w2-safe-bottom, env(safe-area-inset-bottom)));width:260px;height:176px;padding:0;border:3px solid #111018;border-radius:10px;overflow:hidden;box-shadow:0 0 0 2px rgba(255,255,255,.55),0 6px 18px rgba(0,0,0,.35);background:#86b86a;cursor:zoom-in}
 .w2-minimap canvas{display:block;width:100%;height:100%}
-.w2-minimap-touch{width:92px;height:92px;border-radius:50%;bottom:calc(10px + env(safe-area-inset-bottom));left:calc(10px + env(safe-area-inset-left));border-width:2px}
+.w2-minimap-touch{width:92px;height:92px;border-radius:50%;bottom:calc(10px + var(--w2-safe-bottom, env(safe-area-inset-bottom)));left:calc(10px + var(--w2-safe-left, env(safe-area-inset-left)));border-width:2px}
 .w2-minimap-key{position:absolute;right:6px;top:5px;font:800 9px ui-sans-serif,system-ui;letter-spacing:.08em;color:#fff;background:rgba(17,16,24,.75);padding:2px 5px;border-radius:4px}
 .w2-map{background:#5f8f52}
 .w2-map canvas{display:block;width:100%;height:100%;cursor:grab}
 .w2-map canvas:active{cursor:grabbing}
-.w2-map-top{position:absolute;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));display:flex;align-items:center;gap:12px;pointer-events:none}
+.w2-map-top{position:absolute;left:12px;right:12px;top:calc(10px + var(--w2-safe-top, env(safe-area-inset-top)));display:flex;align-items:center;gap:12px;pointer-events:none}
 .w2-map-top b{font:900 18px ui-sans-serif,system-ui;letter-spacing:.06em;background:#111018;color:#ffd400;padding:6px 12px;border-radius:6px}
 .w2-map-top span{font:700 12px ui-sans-serif,system-ui;color:#fff;text-shadow:0 1px 2px #000;flex:1}
 .w2-map-x{pointer-events:auto;width:44px;height:44px;border-radius:50%;background:#111018;color:#fff;font:900 18px ui-sans-serif,system-ui;border:2px solid rgba(255,255,255,.6)}
-.w2-map-zoom{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+.w2-map-zoom{position:absolute;right:calc(14px + var(--w2-safe-right, env(safe-area-inset-right)));bottom:calc(16px + var(--w2-safe-bottom, env(safe-area-inset-bottom)));display:flex;flex-direction:column;gap:8px}
 .w2-map-zoom button{width:46px;height:46px;border-radius:10px;background:#111018;color:#fff;font:900 22px ui-sans-serif,system-ui;border:2px solid rgba(255,255,255,.5)}
-.w2-map-legend{position:absolute;left:calc(14px + env(safe-area-inset-left));bottom:calc(16px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100vw - 100px)}
+.w2-map-legend{position:absolute;left:calc(14px + var(--w2-safe-left, env(safe-area-inset-left)));bottom:calc(16px + var(--w2-safe-bottom, env(safe-area-inset-bottom)));display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100vw - 100px)}
 .w2-map-legend button,.w2-map-legend span{display:flex;align-items:center;gap:6px;font:800 12px ui-sans-serif,system-ui;color:#fff;background:rgba(17,16,24,.82);padding:7px 10px;border-radius:8px;border:0}
 .w2-map-legend i{width:11px;height:11px;border-radius:50%;border:2px solid #fff;display:inline-block}
 @media (max-width:640px){.w2-map-top span{display:none}}

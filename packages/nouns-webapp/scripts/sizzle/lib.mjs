@@ -34,8 +34,9 @@ export async function launch() {
   });
 }
 
-export async function newPage(browser, log = console.log) {
-  const p = await browser.newPage({ viewport: { width: W, height: H } });
+/** `size` [w, h] overrides the render size (vertical clips: an edit list's `size`). */
+export async function newPage(browser, log = console.log, size = [W, H]) {
+  const p = await browser.newPage({ viewport: { width: size[0], height: size[1] } });
   p.setDefaultTimeout(900_000);
   p.on('pageerror', e => log('PAGEERROR', String(e).slice(0, 300)));
   return p;
