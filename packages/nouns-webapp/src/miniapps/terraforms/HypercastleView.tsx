@@ -10,7 +10,17 @@
  */
 import type { TerrainData } from './TerrainView';
 
-import { FC, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FC,
+  lazy,
+  RefObject,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
@@ -284,7 +294,9 @@ const TabButton: FC<{
   onClick: () => void;
 }> = ({ label, active, onClick }) => (
   <button
+    type="button"
     onClick={onClick}
+    className="[@media(pointer:coarse)]:min-h-10"
     style={{
       padding: '4px 12px',
       borderRadius: 6,
@@ -517,12 +529,13 @@ const GridView: FC<{
   return (
     <div
       ref={scrollRef}
+      className="@md:pt-20 pt-4"
       style={{
         width: '100%',
-        height: '100vh',
+        height: '100%',
         background: '#050510',
         overflow: 'auto',
-        padding: '80px 0 40px',
+        paddingBottom: 40,
       }}
     >
       <div ref={containerRef} style={{ maxWidth: 1400, margin: '0 auto', padding: '0 20px' }}>
@@ -768,7 +781,31 @@ const HoverPreview: FC<{
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+/** Height that fills the NounOS window body below `root` (null outside one). */
+function useFillHeight(root: RefObject<HTMLElement | null>): number | null {
+  const [h, setH] = useState<number | null>(null);
+  useEffect(() => {
+    const el = root.current;
+    const host = el?.closest('.nos-content');
+    if (!el || !(host instanceof HTMLElement)) return;
+    const measure = () => {
+      const top =
+        el.getBoundingClientRect().top - host.getBoundingClientRect().top + host.scrollTop;
+      setH(Math.max(420, Math.floor(host.clientHeight - top)));
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(host);
+    measure();
+    return () => ro.disconnect();
+  }, [root]);
+  return h;
+}
+
 const HypercastleView: FC = () => {
+  // fill the window, not the viewport: in a NounOS window 100vh ran past the
+  // window's bottom edge and hid the Teleport / Deep Fry controls
+  const rootRef = useRef<HTMLDivElement>(null);
+  const fillH = useFillHeight(rootRef);
   const { parcels, loadedCount, isLoading, total } = useHypercastleData();
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [openParcelId, setOpenParcelId] = useState<number | null>(null);
@@ -797,209 +834,211 @@ const HypercastleView: FC = () => {
 
   return (
     <div
+      ref={rootRef}
+      className="flex flex-col"
       style={{
         width: '100%',
-        height: '100vh',
+        height: fillH ?? '100vh',
         background: '#050510',
         position: 'relative',
         overflow: 'hidden',
       }}
     >
-      {/* Loading overlay */}
-      {(isLoading || terrainLoading) && (
+      {/* Title, view tabs and Random: a bar above the view in narrow windows,
+          floating over it (as before) from md up. */}
+      <div className="@md:pointer-events-none @md:absolute @md:inset-x-0 @md:top-0 @md:flex-nowrap @md:border-0 @md:px-5 @md:pb-0 @md:pt-4 relative z-10 flex shrink-0 flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-white/10 px-4 pb-2 pt-3 [&>*]:pointer-events-auto">
+        {/* Title + View Mode Tabs */}
         <div
           style={{
-            position: 'absolute',
-            top: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 10,
-            background: 'rgba(0,0,0,0.7)',
-            padding: '10px 24px',
-            borderRadius: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            border: '1px solid rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(8px)',
+            fontFamily: "'Londrina Solid', cursive",
           }}
         >
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '1.4rem',
+              color: '#e2e8f0',
+              fontWeight: 400,
+            }}
+          >
+            <span style={{ color: 'var(--theme-text-muted)' }}>&#x25A8;</span> Hypercastle
+          </h1>
+          <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+            <TabButton
+              label="Terrain"
+              active={viewMode === 'terrain'}
+              onClick={() => setViewMode('terrain')}
+            />
+            <TabButton
+              label="Lofi"
+              active={viewMode === 'lofi'}
+              onClick={() => setViewMode('lofi')}
+            />
+            <TabButton
+              label="Grid"
+              active={viewMode === 'grid'}
+              onClick={() => setViewMode('grid')}
+            />
+          </div>
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: '0.75rem',
+              color: 'var(--theme-text-muted)',
+              fontFamily: 'monospace',
+            }}
+          >
+            {loadedCount.toLocaleString()} parcels
+            {terrainData ? `, ${terrainData.count} terrain maps` : ''}
+          </p>
+        </div>
+
+        {/* Random button */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const rand = Math.floor(Math.random() * TOTAL_SUPPLY) + 1;
+              setOpenParcelId(rand);
+            }}
+            className="[@media(pointer:coarse)]:min-h-10"
+            style={{
+              padding: '6px 14px',
+              borderRadius: 8,
+              border: '1px solid var(--theme-divider)',
+              background: 'var(--theme-bg-tertiary)',
+              color: '#e2e8f0',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+            }}
+          >
+            Random Parcel
+          </button>
+        </div>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        {/* Loading overlay */}
+        {(isLoading || terrainLoading) && (
           <div
             style={{
-              width: 120,
-              height: 4,
-              background: 'var(--theme-bg-tertiary)',
-              borderRadius: 2,
-              overflow: 'hidden',
+              position: 'absolute',
+              top: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 10,
+              background: 'rgba(0,0,0,0.7)',
+              padding: '10px 24px',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              border: '1px solid rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(8px)',
             }}
           >
             <div
               style={{
-                width: `${pct}%`,
-                height: '100%',
-                background: '#22c55e',
+                width: 120,
+                height: 4,
+                background: 'var(--theme-bg-tertiary)',
                 borderRadius: 2,
-                transition: 'width 0.3s',
+                overflow: 'hidden',
               }}
-            />
+            >
+              <div
+                style={{
+                  width: `${pct}%`,
+                  height: '100%',
+                  background: '#22c55e',
+                  borderRadius: 2,
+                  transition: 'width 0.3s',
+                }}
+              />
+            </div>
+            <span
+              style={{
+                color: '#94a3b8',
+                fontSize: '0.75rem',
+                fontFamily: 'monospace',
+              }}
+            >
+              {terrainLoading
+                ? 'Loading terrain...'
+                : `${loadedCount.toLocaleString()} / ${total.toLocaleString()} parcels`}
+            </span>
           </div>
-          <span
-            style={{
-              color: '#94a3b8',
-              fontSize: '0.75rem',
-              fontFamily: 'monospace',
-            }}
+        )}
+
+        {/* Bottom-left live NFT preview while hovering (3D modes only) */}
+        {previewId !== null && viewMode !== 'grid' && (
+          <HoverPreview
+            tokenId={previewId}
+            html={previewHtml}
+            loading={previewLoading}
+            parcel={previewParcel}
+            onClick={() => setOpenParcelId(previewId)}
+          />
+        )}
+
+        {/* Parcel modal (overlays current view) */}
+        {openParcelId !== null && <ParcelModal tokenId={openParcelId} onClose={closeModal} />}
+
+        {/* ── Terrain View (default) ── */}
+        {viewMode === 'terrain' && (
+          <Suspense fallback={null}>
+            <TerrainViewCanvas
+              parcels={parcels}
+              terrainData={terrainData}
+              onClickParcel={onClickParcel}
+              hoveredId={hoveredId}
+              setHoveredId={setHoveredId}
+            />
+          </Suspense>
+        )}
+
+        {/* ── Lofi View (colored cubes) ── */}
+        {viewMode === 'lofi' && (
+          <Canvas
+            camera={{ position: [60, 40, 60], fov: 55 }}
+            gl={{ antialias: true, alpha: false }}
+            onCreated={({ gl }) => gl.setClearColor('#050510')}
+            style={{ cursor: hoveredId ? 'pointer' : 'grab' }}
           >
-            {terrainLoading
-              ? 'Loading terrain...'
-              : `${loadedCount.toLocaleString()} / ${total.toLocaleString()} parcels`}
-          </span>
-        </div>
-      )}
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[50, 80, 30]} intensity={0.8} />
+            <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
+            <ParcelInstances
+              parcels={parcels}
+              onClickParcel={onClickParcel}
+              hoveredId={hoveredId}
+              setHoveredId={setHoveredId}
+            />
+            <OrbitControls
+              enableDamping
+              dampingFactor={0.06}
+              autoRotate
+              autoRotateSpeed={0.3}
+              minDistance={10}
+              maxDistance={200}
+              enablePan
+              maxPolarAngle={Math.PI * 0.9}
+            />
+            <gridHelper args={[100, 50, '#111133', '#0a0a22']} position={[0, -20, 0]} />
+          </Canvas>
+        )}
 
-      {/* Title + View Mode Tabs */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 16,
-          left: 20,
-          zIndex: 10,
-          fontFamily: "'Londrina Solid', cursive",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: '1.4rem',
-            color: '#e2e8f0',
-            fontWeight: 400,
-          }}
-        >
-          <span style={{ color: 'var(--theme-text-muted)' }}>&#x25A8;</span> Hypercastle
-        </h1>
-        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-          <TabButton
-            label="Terrain"
-            active={viewMode === 'terrain'}
-            onClick={() => setViewMode('terrain')}
-          />
-          <TabButton
-            label="Lofi"
-            active={viewMode === 'lofi'}
-            onClick={() => setViewMode('lofi')}
-          />
-          <TabButton
-            label="Grid"
-            active={viewMode === 'grid'}
-            onClick={() => setViewMode('grid')}
-          />
-        </div>
-        <p
-          style={{
-            margin: '4px 0 0',
-            fontSize: '0.75rem',
-            color: 'var(--theme-text-muted)',
-            fontFamily: 'monospace',
-          }}
-        >
-          {loadedCount.toLocaleString()} parcels
-          {terrainData ? `, ${terrainData.count} terrain maps` : ''}
-        </p>
+        {/* ── Grid View (2D thumbnails) ── */}
+        {viewMode === 'grid' && (
+          <GridView parcels={parcels} onClickParcel={onClickParcel} terrainData={terrainData} />
+        )}
       </div>
-
-      {/* Random button */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 16,
-          right: 20,
-          zIndex: 10,
-          display: 'flex',
-          gap: 8,
-        }}
-      >
-        <button
-          onClick={() => {
-            const rand = Math.floor(Math.random() * TOTAL_SUPPLY) + 1;
-            setOpenParcelId(rand);
-          }}
-          style={{
-            padding: '6px 14px',
-            borderRadius: 8,
-            border: '1px solid var(--theme-divider)',
-            background: 'var(--theme-bg-tertiary)',
-            color: '#e2e8f0',
-            fontSize: '0.75rem',
-            cursor: 'pointer',
-            fontFamily: 'monospace',
-          }}
-        >
-          Random Parcel
-        </button>
-      </div>
-
-      {/* Bottom-left live NFT preview while hovering (3D modes only) */}
-      {previewId !== null && viewMode !== 'grid' && (
-        <HoverPreview
-          tokenId={previewId}
-          html={previewHtml}
-          loading={previewLoading}
-          parcel={previewParcel}
-          onClick={() => setOpenParcelId(previewId)}
-        />
-      )}
-
-      {/* Parcel modal (overlays current view) */}
-      {openParcelId !== null && <ParcelModal tokenId={openParcelId} onClose={closeModal} />}
-
-      {/* ── Terrain View (default) ── */}
-      {viewMode === 'terrain' && (
-        <Suspense fallback={null}>
-          <TerrainViewCanvas
-            parcels={parcels}
-            terrainData={terrainData}
-            onClickParcel={onClickParcel}
-            hoveredId={hoveredId}
-            setHoveredId={setHoveredId}
-          />
-        </Suspense>
-      )}
-
-      {/* ── Lofi View (colored cubes) ── */}
-      {viewMode === 'lofi' && (
-        <Canvas
-          camera={{ position: [60, 40, 60], fov: 55 }}
-          gl={{ antialias: true, alpha: false }}
-          onCreated={({ gl }) => gl.setClearColor('#050510')}
-          style={{ cursor: hoveredId ? 'pointer' : 'grab' }}
-        >
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[50, 80, 30]} intensity={0.8} />
-          <pointLight position={[0, 50, 0]} intensity={0.3} color="#4466ff" />
-          <ParcelInstances
-            parcels={parcels}
-            onClickParcel={onClickParcel}
-            hoveredId={hoveredId}
-            setHoveredId={setHoveredId}
-          />
-          <OrbitControls
-            enableDamping
-            dampingFactor={0.06}
-            autoRotate
-            autoRotateSpeed={0.3}
-            minDistance={10}
-            maxDistance={200}
-            enablePan
-            maxPolarAngle={Math.PI * 0.9}
-          />
-          <gridHelper args={[100, 50, '#111133', '#0a0a22']} position={[0, -20, 0]} />
-        </Canvas>
-      )}
-
-      {/* ── Grid View (2D thumbnails) ── */}
-      {viewMode === 'grid' && (
-        <GridView parcels={parcels} onClickParcel={onClickParcel} terrainData={terrainData} />
-      )}
     </div>
   );
 };

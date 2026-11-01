@@ -20,8 +20,8 @@ async function fetchPage(offset: number): Promise<{ gifs: GifItem[]; hasNext: bo
       `${API_BASE}/api/pip3-gifs?channel=${CHANNEL_ID}&offset=${offset}&limit=${PAGE_SIZE}`,
     );
     if (!res.ok) return { gifs: [], hasNext: false };
-    const data = await res.json();
-    const results: GifItem[] = (data.results || []).map(
+    const data = (await res.json()) as { results?: unknown[]; next?: unknown };
+    const results: GifItem[] = ((data.results ?? []) as never[]).map(
       (item: {
         id: string;
         images?: {
@@ -33,12 +33,12 @@ async function fetchPage(offset: number): Promise<{ gifs: GifItem[]; hasNext: bo
         const dims = item.images?.source ?? item.images?.original ?? item.images?.fixed_width;
         return {
           id: item.id,
-          w: Number(dims?.width || 480),
-          h: Number(dims?.height || 480),
+          w: Number(dims?.width ?? 480) || 480,
+          h: Number(dims?.height ?? 480) || 480,
         };
       },
     );
-    return { gifs: results, hasNext: !!data.next };
+    return { gifs: results, hasNext: Boolean(data.next) };
   } catch {
     return { gifs: [], hasNext: false };
   }
@@ -115,11 +115,13 @@ const Pip3Page: React.FC = () => {
   }, []);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#000',
-      padding: '0 0 80px',
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#000',
+        padding: '0 0 80px',
+      }}
+    >
       {/* Pip3 @font-face lives in index.css. The pro theme sets Comic Sans on *
           with !important, so this class rule needs [data-theme] + !important
           to out-rank it. */}
@@ -131,24 +133,29 @@ const Pip3Page: React.FC = () => {
         }
       `}</style>
       {/* Header */}
-      <div style={{
-        padding: '48px 20px 32px',
-        textAlign: 'center',
-      }}>
-        <h1 className="pip3-type" style={{
-          fontSize: '3rem',
-          fontWeight: 400,
-          color: '#fff',
-          margin: 0,
-          letterSpacing: '0.02em',
-        }}>
+      <div
+        style={{
+          padding: '48px 20px 32px',
+          textAlign: 'center',
+        }}
+      >
+        <h1
+          className="pip3-type"
+          style={{
+            fontSize: '3rem',
+            fontWeight: 400,
+            color: '#fff',
+            margin: 0,
+            letterSpacing: '0.02em',
+          }}
+        >
           pip3
         </h1>
         <a
           href="https://giphy.com/channel/60r90"
           target="_blank"
           rel="noreferrer"
-          className="pip3-type"
+          className="pip3-type pip3-tap"
           style={{
             fontSize: '0.7rem',
             color: 'rgba(255,255,255,0.55)',
@@ -160,28 +167,54 @@ const Pip3Page: React.FC = () => {
             display: 'inline-block',
             transition: 'color 0.2s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
+          }}
         >
           by 60r90
         </a>
+        {/* Giphy attribution: here in the header, not fixed to the screen
+            corner (inside a NounOS window that corner isn't the page's) */}
+        <div style={{ opacity: 0.75, marginTop: 4 }}>
+          <a
+            href="https://giphy.com/channel/60r90"
+            target="_blank"
+            rel="noreferrer"
+            className="pip3-type pip3-tap"
+            style={{
+              color: 'rgba(255,255,255,0.5)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Powered by GIPHY
+          </a>
+        </div>
       </div>
 
       {/* Initial loading */}
       {initialLoad && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '80px 0',
-        }}>
-          <div style={{
-            width: 32,
-            height: 32,
-            border: '3px solid rgba(255,255,255,0.1)',
-            borderTopColor: 'rgba(255,255,255,0.6)',
-            borderRadius: '50%',
-            animation: 'pip3-spin 0.8s linear infinite',
-          }} />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '80px 0',
+          }}
+        >
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              border: '3px solid rgba(255,255,255,0.1)',
+              borderTopColor: 'rgba(255,255,255,0.6)',
+              borderRadius: '50%',
+              animation: 'pip3-spin 0.8s linear infinite',
+            }}
+          />
           <style>{`@keyframes pip3-spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
@@ -212,14 +245,16 @@ const Pip3Page: React.FC = () => {
               objectFit: 'contain',
             }}
           />
-          <div style={{
-            position: 'absolute',
-            top: 20,
-            right: 24,
-            color: 'rgba(255,255,255,0.4)',
-            fontSize: '1.5rem',
-            fontWeight: 300,
-          }}>
+          <div
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 24,
+              color: 'rgba(255,255,255,0.4)',
+              fontSize: '1.5rem',
+              fontWeight: 300,
+            }}
+          >
             {'\u00D7'}
           </div>
         </div>
@@ -227,11 +262,14 @@ const Pip3Page: React.FC = () => {
 
       {/* Masonry grid */}
       <style>{`
-        @media (max-width: 1600px) { .pip3-grid { column-count: 18 !important; } }
-        @media (max-width: 1200px) { .pip3-grid { column-count: 12 !important; } }
-        @media (max-width: 900px)  { .pip3-grid { column-count: 8 !important; } }
-        @media (max-width: 600px)  { .pip3-grid { column-count: 5 !important; column-gap: 3px !important; padding: 0 3px !important; } }
-        @media (max-width: 400px)  { .pip3-grid { column-count: 4 !important; } }
+        @container page (max-width: 1023.98px) { .pip3-grid { column-count: 18 !important; } }
+        @container page (max-width: 759.98px)  { .pip3-grid { column-count: 12 !important; } }
+        @container page (max-width: 639.98px)  { .pip3-grid { column-count: 8 !important; } }
+        @container page (max-width: 559.98px)  { .pip3-grid { column-count: 5 !important; column-gap: 3px !important; padding: 0 3px !important; } }
+        @container page (max-width: 399.98px)  { .pip3-grid { column-count: 4 !important; } }
+        .pip3-tile { display: block; width: 100%; padding: 0; border: 0; font: inherit; color: inherit; text-align: inherit; }
+        .pip3-tile:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+        @media (pointer: coarse) { .pip3-tap { display: inline-flex !important; align-items: center; min-height: 40px; } }
       `}</style>
       {gifs.length > 0 && (
         <div
@@ -245,8 +283,11 @@ const Pip3Page: React.FC = () => {
           }}
         >
           {gifs.map(gif => (
-            <div
+            <button
+              type="button"
               key={gif.id}
+              className="pip3-tile"
+              aria-label="Open GIF"
               style={{
                 marginBottom: 6,
                 breakInside: 'avoid',
@@ -278,7 +319,7 @@ const Pip3Page: React.FC = () => {
                   objectFit: 'cover',
                 }}
               />
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -288,63 +329,42 @@ const Pip3Page: React.FC = () => {
 
       {/* Loading more indicator */}
       {loading && !initialLoad && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '40px 0',
-        }}>
-          <div style={{
-            width: 24,
-            height: 24,
-            border: '2px solid rgba(255,255,255,0.1)',
-            borderTopColor: 'rgba(255,255,255,0.5)',
-            borderRadius: '50%',
-            animation: 'pip3-spin 0.8s linear infinite',
-          }} />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '40px 0',
+          }}
+        >
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              border: '2px solid rgba(255,255,255,0.1)',
+              borderTopColor: 'rgba(255,255,255,0.5)',
+              borderRadius: '50%',
+              animation: 'pip3-spin 0.8s linear infinite',
+            }}
+          />
         </div>
       )}
 
       {/* End of feed */}
       {!hasMore && gifs.length > 0 && (
-        <div className="pip3-type" style={{
-          textAlign: 'center',
-          padding: '40px 0',
-          color: 'rgba(255,255,255,0.55)',
-          fontSize: '0.7rem',
-          fontWeight: 600,
-          letterSpacing: '0.15em',
-        }}>
+        <div
+          className="pip3-type"
+          style={{
+            textAlign: 'center',
+            padding: '40px 0',
+            color: 'rgba(255,255,255,0.55)',
+            fontSize: '0.7rem',
+            fontWeight: 600,
+            letterSpacing: '0.15em',
+          }}
+        >
           {gifs.length} gifs
         </div>
       )}
-
-      {/* Giphy attribution */}
-      <div style={{
-        position: 'fixed',
-        bottom: 12,
-        right: 12,
-        opacity: 0.75,
-        transition: 'opacity 0.2s',
-        zIndex: 10,
-      }}
-        onMouseEnter={e => { e.currentTarget.style.opacity = '0.6'; }}
-        onMouseLeave={e => { e.currentTarget.style.opacity = '0.75'; }}
-      >
-        <a
-          href="https://giphy.com/channel/60r90"
-          target="_blank"
-          rel="noreferrer"
-          className="pip3-type"
-          style={{
-            color: 'rgba(255,255,255,0.5)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            textDecoration: 'none',
-          }}
-        >
-          Powered by GIPHY
-        </a>
-      </div>
     </div>
   );
 };

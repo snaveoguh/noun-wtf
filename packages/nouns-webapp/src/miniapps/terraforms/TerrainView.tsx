@@ -990,34 +990,34 @@ const TerrainViewCanvas: FC<{
   }, []);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <Canvas
-        camera={{ position: spawnPos, fov: 60 }}
-        gl={{ antialias: true, alpha: false }}
-        onCreated={({ gl, camera }) => {
-          gl.setClearColor('#050510');
-          setLiveCamera(camera);
-        }}
-        style={{ cursor: props.hoveredId ? 'pointer' : 'grab' }}
-      >
-        <TerrainScene {...props} heightScale={s.height} bloomIntensity={s.bloom} />
-        <CameraSync onCamera={setLiveCamera} />
-      </Canvas>
+    <div
+      ref={containerRef}
+      className="flex flex-col"
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+    >
+      <div className="relative min-h-0 flex-1">
+        <Canvas
+          camera={{ position: spawnPos, fov: 60 }}
+          gl={{ antialias: true, alpha: false }}
+          onCreated={({ gl, camera }) => {
+            gl.setClearColor('#050510');
+            setLiveCamera(camera);
+          }}
+          style={{ cursor: props.hoveredId ? 'pointer' : 'grab' }}
+        >
+          <TerrainScene {...props} heightScale={s.height} bloomIntensity={s.bloom} />
+          <CameraSync onCamera={setLiveCamera} />
+        </Canvas>
+      </div>
 
       {/* CSS3D overlay disabled — was causing blue blob + potential rendering issues */}
 
-      {/* Controls */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 20,
-          right: 20,
-          zIndex: 10,
-          display: 'flex',
-          gap: 8,
-        }}
-      >
+      {/* Controls: a bar under the view in narrow windows, floating over
+          its bottom-right corner (as before) from md up */}
+      <div className="@md:absolute @md:bottom-5 @md:right-5 @md:border-0 @md:p-0 z-10 flex shrink-0 justify-end gap-2 border-t border-white/10 px-4 py-2">
         <button
+          type="button"
+          className="[@media(pointer:coarse)]:min-h-10"
           onClick={() => {
             if (liveCamera && props.parcels.length > 0) {
               const { cx, cy, cz, scale } = normalization;
@@ -1044,6 +1044,8 @@ const TerrainViewCanvas: FC<{
           Teleport
         </button>
         <button
+          type="button"
+          className="[@media(pointer:coarse)]:min-h-10"
           onClick={() => setFried(!fried)}
           style={{
             padding: '6px 14px',
