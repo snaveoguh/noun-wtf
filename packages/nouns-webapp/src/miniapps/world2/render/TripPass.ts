@@ -157,7 +157,8 @@ vec3 bw(float asp) {
   vec2 j = vec2(0.0, (hash(vec2(fr, 5.0)) - 0.5) * 0.003 * uAmt);
   float l = luma(toG(tex(vUv + j)));
   // hard contrast
-  l = smoothstep(0.1, 0.82, l);
+  // (lifted first: CAMP's room sits in the tower's shadow and went to soot)
+  l = smoothstep(0.02, 0.78, pow(l, 0.7));
   l = mix(l, l * l * (3.0 - 2.0 * l), 0.6);
   // exposure flutter (small: well under a flash), grain, a scratch now and then
   l *= 1.0 + (hash(vec2(fr, 7.0)) - 0.5) * 0.05;
