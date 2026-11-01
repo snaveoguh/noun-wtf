@@ -561,7 +561,7 @@ function campShot(o) {
       const out = pl.pos.z < face - 0.3;
       k = out ? Math.min(1, k + dt / 0.9) : 0;
       const e = k * k * (3 - 2 * k);
-      const [ox, oy, oz] = o.follow ?? [3.6, 2.6, -6.5];
+      const [ox, oy, oz] = o.follow ?? [2.0, 1.7, -4.0];
       want.set(pl.pos.x + ox, pl.pos.y + oy, pl.pos.z + oz);
       // Down at the street it stops dropping (and keeps its distance)
       want.y = Math.max(want.y, o.floor ?? 2.4);
@@ -570,7 +570,8 @@ function campShot(o) {
       else eye.lerp(want, 1 - Math.exp(-(o.smooth ?? 8) * dt));
       first = false;
       // Looking a little below them as they fall (the street coming up)
-      const fall = Math.min(1, Math.max(0, (-pl.vel.y - 4) / 30));
+      // (less so near the street, so the landing stays in frame)
+      const fall = Math.min(1, Math.max(0, (-pl.vel.y - 4) / 30)) * Math.min(1, Math.max(0, (pl.pos.y - 3) / 25));
       look.copy(pl.pos);
       look.y += 0.9 - (o.lookDown ?? 1.6) * fall * e;
       cam.position.copy(eye);
@@ -721,7 +722,7 @@ export const SHOTS = {
   'camp-jump': camp(270, { kind: 'jump', z: 4 }),
 
   // A missingnoun rider skating the plaza, flip tricks
-  'mn-side': mn(150, { at: [20, -20], yaw: 0, tricks: ['kickflip', 'treflip', 'heelflip'], every: 1.5, first: 0.9, cam: ['side', { side: 3.4, up: 0.7, ahead: 1.2, lead: 2, smooth: 6, fov: 60 }] }),
-  'mn-orbit': mn(120, { at: [-20, 20], yaw: Math.PI / 2, tricks: ['hardflip', 'shuvit', 'kickflip'], every: 1.4, first: 0.8, pre: 0.8, cam: ['orbit', { r: 4.5, h: 1.3, a0: 0.6, w: 0.55 }] }),
-  'mn-chase': mn(120, { at: [20, -20], yaw: 0, tricks: ['treflip', 'kickflip'], every: 1.6, first: 0.5, pre: 1.2, steer: 0.35, cam: null }),
+  'mn-side': mn(150, { at: [20, -20], yaw: 0, tricks: ['kickflip', 'treflip', 'heelflip'], every: 1.5, first: 0.9, cam: ['side', { side: -2.4, up: 0.9, ahead: 1.0, lead: 0.4, lookUp: 1.1, smooth: 6, fov: 50 }] }),
+  'mn-orbit': mn(120, { at: [-20, 20], yaw: Math.PI / 2, tricks: ['kickflip', 'heelflip', 'treflip'], every: 1.4, first: 0.8, pre: 0.8, cam: ['orbit', { r: 2.8, h: 1.4, a0: 0.6, w: 0.55, lookUp: 1.1, fov: 55 }] }),
+  'mn-chase': mn(120, { at: [20, -20], yaw: 0, tricks: ['treflip', 'kickflip'], every: 1.6, first: 0.5, pre: 1.2, steer: 0.3, cam: ['side', { side: 0.6, up: 1.7, ahead: -3.4, lead: 3, lookUp: 0.9, smooth: 5, fov: 58 }] }),
 };
