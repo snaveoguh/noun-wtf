@@ -32,6 +32,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | `/predictions`, `/feed`, `/highway` (explore) | 13/26 → 26/26, 9/26 → 26/26, 0/26 → 26/26 · `claude/responsive-explore` (#231) · the two "squeezed" warnings left were false positives (highway's ASCII noggles in a `<pre>`, a feed cast that is mostly one long URL); the check now skips both. Highway's marquee rows are swipeable scroll boxes (their edge clipping is deliberate: owner to confirm); its ASCII boxes misalign under non-monospace site fonts (not a width issue) |
 | `/v2`, `/crystal-ball`, `/v2/crystal-ball` (auction + crystal ball) | 26/26 → 26/26 (no change needed), 17/26 → 26/26, 7/26 → 26/26, 0 warnings · `claude/responsive-auction` (#234) · measured in the default ASCII view: the V2 missed-blocks reel was live (really measured); the V1 reel and SETTLE were checked with a temporary local force-on. The 2D / 3D views are now reachable with `?view=2d|3d` (ROUTES variants): `/v2/crystal-ball?view=2d` and `?view=3d` are 26/26 each, 0 warnings (sheets in `.claude/responsive-shots/v2-crystal-ball--view-{2d,3d}/after/`) · still open: the nounv2 auction card's white background (theme follow-up, #228) |
 | `/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3` (art) | 10/26 → 26/26, 21/26 → 26/26, 20/26 → 26/26, 0/26 → 26/26, 20/26 → 26/26, 20/26 → 26/26, 0 warnings · `claude/responsive-art` (#235) · for the owner: `/cc0`'s filter bar is sticky again (a root `overflow-x-hidden` had disabled it while hiding an 8 px overflow); `/pip3`'s GIPHY credit moved to the header; Hypercastle's controls get their own bars below md and are `data-responsive-art-ok` from md up. `/terraforms` takes ~45 min a run |
+| `/gas`, `/dashboard`, `/settlers`, `/onchain`, `/nonsense`, `/stats` (stats) | 20/26 → 26/26, 18/26 → 26/26, 20/26 → 26/26, 26/26 → 26/26 (its 3 squeezed warnings gone), 11/26 → 26/26 (live Railway data), 0/26 → 26/26 (after `data-responsive-art-ok` also skipped "clipped"; sheet in `stats/after-artok/`) · `claude/responsive-stats` (#236) · **not measured**: `/onchain`'s version list, search and proof (the ledger contract isn't deployed); `/dashboard`'s traffic and API panels (need `VITE_DASHBOARD_API_KEY`); the `/stats` corridor on touch (it has no touch controls; behaviour kept) |
 
 ## Work units (worst first)
 
@@ -52,7 +53,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 15. ~~`/v2`, `/crystal-ball`, `/v2/crystal-ball`~~ — done (see Done)
 16. ~~`/marketplace`, `/marketplace/1`~~ — done (see Done; listings unmeasured)
 17. ~~`/predictions`, `/feed`, `/highway`~~ — done (see Done)
-18. `/onchain`, `/dashboard`, `/settlers`, `/gas`, `/stats`, `/nonsense` — not measured, viewport code 13 (group: stats)
+18. ~~`/onchain`, `/dashboard`, `/settlers`, `/gas`, `/stats`, `/nonsense`~~ — done (see Done)
 19. `/world/voice`, `/icecreamvan`, `/exchange` — not measured, viewport code 1 (group: world)
 
 ## Routes

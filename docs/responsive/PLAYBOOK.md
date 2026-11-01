@@ -131,7 +131,14 @@ info pages) needed again and again:
 - **Touch targets:** 40 px on touch, not on desktop:
   `[@media(pointer:coarse)]:min-h-10` (Tailwind) or
   `@media (pointer: coarse) { .btn { min-height: 40px } }`. Inline links in a
-  sentence are exempt; a row of links (footer, socials) is not.
+  sentence are exempt; a row of links (footer, socials) is not. Width counts
+  too: a short label ("X", "1h") also needs `min-w-10`.
+- **A 1 px "small tap target"** is usually a real squeeze: a `flex: 1;
+  min-width: 0` sibling crushing it to nothing. Let the row wrap rather than
+  just sizing the button.
+- **A fixed, screen-wide tooltip** (a sheet that replaces hover on phones)
+  belongs under `@media (hover: none)`, not a container query: it's about the
+  device, and it's fixed to the viewport anyway.
 - **Floating buttons:** never `position: fixed` inside a page (it lands at the
   viewport's corner, outside a windowed page and over its controls). Use
   `<PageFab>` (`src/components/responsive/PageFab.tsx`) as the last child of
@@ -157,7 +164,9 @@ info pages) needed again and again:
   window's exact height as a flex column, so `height: 100%` / `flex: 1` resolve.
 - **Deliberate overlay heroes** (copy and buttons on a video by design): mark
   the hero `data-responsive-art-ok` and the harness stops counting "on art"
-  inside it. Only where the overlay is the design; say so in your PR.
+  and "clipped" inside it (so 3D panels sliding off a canvas edge as the
+  camera moves don't count either). Only where the overlay is the design; say
+  so in your PR.
 - **Live data before the baseline:** open the list page (`/vote`,
   `/candidates`, …) and take a real item's URL from it. A made-up id often
   renders a spinner or an empty state that scores clean.
@@ -291,7 +300,7 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
   not checked for being covered, overlapping or on art; text or a control
   partly visible in a scroll box isn't "clipped" (it scrolls into view); art
   painted over by an opaque layer where the control sits isn't "art"; nothing
-  inside `[data-responsive-art-ok]` is "on art". A shot whose in-page
+  inside `[data-responsive-art-ok]` is "on art" or "clipped". A shot whose in-page
   collection fails is reported as an error, never as clean.
 - **Warnings (⚠, never scored):** the log line, `report.json` (`warnings` per
   shot) and the sheet flag a page showing "… not configured" (missing env, so
