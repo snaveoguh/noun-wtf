@@ -221,7 +221,7 @@ function Btn({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`min-h-[36px] min-w-[36px] rounded-xl px-3 text-xs font-bold disabled:opacity-40 ${bg}`}
+      className={`min-h-[36px] min-w-[36px] rounded-xl px-3 text-xs font-bold disabled:opacity-40 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10 ${bg}`}
     >
       {children}
     </button>
@@ -467,10 +467,10 @@ function ShareBox({
             Anyone can report a voice; moderators can remove it. You can stop sharing any time,
             which deletes them from the server.
           </p>
-          <label className="flex items-start gap-2">
+          <label className="flex items-start gap-2 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:items-center">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4"
+              className="mt-0.5 h-4 w-4 shrink-0 [@media(pointer:coarse)]:mt-0 [@media(pointer:coarse)]:h-6 [@media(pointer:coarse)]:w-6"
               checked={agree}
               onChange={e => setAgree(e.target.checked)}
               data-booth-consent=""
@@ -778,7 +778,7 @@ export default function VoiceBooth({
         {onClose !== undefined && (
           <button
             type="button"
-            className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold"
+            className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold [@media(pointer:coarse)]:min-h-10"
             onClick={onClose}
           >
             close
@@ -813,7 +813,7 @@ export default function VoiceBooth({
             aria-selected={tab === t.id}
             disabled={boothRec.st.key !== ''}
             onClick={() => setTab(t.id)}
-            className={`min-h-[34px] flex-1 rounded-xl px-1 text-[10px] font-bold tracking-wide sm:text-xs ${tab === t.id ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
+            className={`@sm:text-xs min-h-[34px] flex-1 rounded-xl px-1 text-[10px] font-bold tracking-wide [@media(pointer:coarse)]:min-h-10 ${tab === t.id ? 'bg-[#ffd400] text-black' : 'bg-white/10'}`}
           >
             {t.label}
           </button>

@@ -163,7 +163,12 @@ export default function Exchange3D({
     );
 
   return (
-    <div className={`gx3d-root ${phone ? 'gx3d-phone' : ''} ${bookOpen ? 'gx3d-book-open' : ''}`}>
+    // data-responsive-art-ok: a game HUD over a full-bleed 3D floor; the
+    // buttons sitting on the canvas are the design (docs/responsive).
+    <div
+      className={`gx3d-root ${phone ? 'gx3d-phone' : ''} ${bookOpen ? 'gx3d-book-open' : ''}`}
+      data-responsive-art-ok=""
+    >
       <div ref={host} className="gx3d-host" />
       <div ref={layer} className="gx3d-labels" aria-hidden="true" />
 
@@ -207,7 +212,9 @@ export default function Exchange3D({
           className={`gx3d-btn ${bookOpen ? 'gx3d-on' : ''}`}
           onClick={() => onBook(!bookOpen)}
         >
-          📈 {phone ? 'BOOK' : 'ORDER BOOK'}
+          <span className="gx3d-ico">📈 </span>
+          {/* phones always say BOOK; a narrow window drops ORDER (CSS) */}
+          {!phone && <span className="gx3d-long">ORDER </span>}BOOK
         </button>
         <button type="button" className="gx3d-btn" onClick={onFlat}>
           FLAT
@@ -218,7 +225,15 @@ export default function Exchange3D({
           data-agent-ledger-btn
           onClick={() => setLedger(o => !o)}
         >
-          🤖 {phone ? 'AGENTS' : 'AGENT LEDGER'}
+          <span className="gx3d-ico">🤖 </span>
+          {phone ? (
+            'AGENTS'
+          ) : (
+            <>
+              <span className="gx3d-long">AGENT LEDGER</span>
+              <span className="gx3d-short">AGENTS</span>
+            </>
+          )}
         </button>
         <button
           type="button"
