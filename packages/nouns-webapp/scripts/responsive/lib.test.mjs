@@ -17,6 +17,7 @@ import {
   routePathsFromApp,
   routeSeverity,
   scoreOf,
+  settleFor,
   slugFor,
   smallTargets,
   tierOf,
@@ -32,7 +33,9 @@ const clean = {
   covered: [],
   overArt: [],
   overlaps: [],
-  controls: [{ selector: 'button.bid', w: 300, h: 48, label: 'Bid', inlineInText: false, hidden: false }],
+  controls: [
+    { selector: 'button.bid', w: 300, h: 48, label: 'Bid', inlineInText: false, hidden: false },
+  ],
 };
 
 describe('tokens', () => {
@@ -92,6 +95,14 @@ describe('routes', () => {
     expect(routeFor('/candidates/a/b/c').path).toBe('candidates/*');
     expect(routeFor('/').kind).toBe('home');
     expect(routeFor('/v2/noun/7').path).toBe('v2/noun/:id');
+  });
+
+  it('keeps query variants and per-route settle times', () => {
+    expect(routeFor('/probe?tab=lils').url).toBe('/probe?tab=lils');
+    expect(routeFor('/probe?tab=nope').url).toBe('/probe');
+    expect(settleFor('/candidates', 6000)).toBe(15000);
+    expect(settleFor('/vote', 6000)).toBe(6000);
+    expect(settleFor('/vote', 20000)).toBe(20000);
   });
 });
 

@@ -342,7 +342,7 @@ const DreamsTab: FC = () => {
               <p className="text-muted-foreground">Loading dreams...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 @sm:grid-cols-3 @md:grid-cols-4 @lg:grid-cols-5 @xl:grid-cols-6">
               {probeDreams.map(dream => (
                 <ProbeDreamCard
                   key={dream.id}
@@ -393,7 +393,7 @@ const DreamsTab: FC = () => {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 @sm:grid-cols-3 @md:grid-cols-4 @lg:grid-cols-5 @xl:grid-cols-6">
               {sortedDrafts.map(dream => (
                 <DreamDraftCard
                   key={dream.id}
@@ -463,7 +463,7 @@ const DreamsTab: FC = () => {
               <p className="text-muted-foreground">Create a dream and propose it to see it here.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 @sm:grid-cols-3 @md:grid-cols-4 @lg:grid-cols-5 @xl:grid-cols-6">
               {onChainDreams.map(dream => (
                 <OnChainDreamCard
                   key={dream.id}
