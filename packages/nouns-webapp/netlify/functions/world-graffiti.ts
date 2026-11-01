@@ -11,6 +11,9 @@ import { MAX_TAG_CHARS, validTag } from '../../src/miniapps/world2/graffiti/stro
 // GET  ?level=plaza            → { walls: string[] }   walls with paint
 // GET  ?level=plaza&ids=[...]  → { walls: { [wallId]: string[] } }
 //                                 tags per wall, oldest first (≤ 40 ids)
+// GET  ?level=plaza&ids=[...]&at=1 → { walls: { [wallId]: { d, at }[] } }
+//                                 the same, with when each tag was first
+//                                 stored (the onchain snapshot job reads this)
 // POST { wallId, data }        → append one tag: `g3:` strokes, a `g3r:`
 //                                 undo, or a legacy `g2:` dab tag
 //
@@ -208,11 +211,13 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
       .filter((id): id is string => typeof id === 'string' && WALL_RE.test(id))
       .filter(id => id.startsWith(`${level}|`))
       .slice(0, MAX_IDS);
-    const walls: Record<string, string[]> = {};
+    const withAt = q.at === '1';
+    const walls: Record<string, string[] | Tag[]> = {};
     await Promise.all(
       want.map(async id => {
         const tags = await readWall(store, id);
-        if (tags.length > 0) walls[id] = tags.map(t => t.d);
+        if (tags.length > 0)
+          walls[id] = withAt ? tags.map(t => ({ d: t.d, at: t.at })) : tags.map(t => t.d);
       }),
     );
     return json(200, { walls });
