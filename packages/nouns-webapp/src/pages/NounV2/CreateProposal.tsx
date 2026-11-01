@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 
 import { CopyIcon } from 'lucide-react';
@@ -11,6 +10,12 @@ import { NOUNV2_TOKEN_ADDRESS, nounV2TokenAbi } from '@/contracts/nounv2-token';
 import { NOUNV2_TREASURY_ADDRESS, nounV2TreasuryAbi } from '@/contracts/nounv2-treasury';
 
 import classes from './NounV2.module.css';
+
+/** wagmi/viem errors carry a short, user-facing `shortMessage`. */
+function shortMessage(e: unknown): string | undefined {
+  const m = (e as { shortMessage?: unknown } | null | undefined)?.shortMessage;
+  return typeof m === 'string' && m !== '' ? m : undefined;
+}
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
@@ -151,8 +156,8 @@ export default function CreateNounV2ProposalPage() {
         ],
       });
       setSubmittedTx(hash);
-    } catch (e: any) {
-      const msg = e?.shortMessage || (e instanceof Error ? e.message : 'Failed to propose');
+    } catch (e: unknown) {
+      const msg = shortMessage(e) ?? (e instanceof Error ? e.message : 'Failed to propose');
       if (!String(msg).includes('User rejected')) toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -221,6 +226,7 @@ export default function CreateNounV2ProposalPage() {
           </a>
           <br />
           <button
+            type="button"
             className={classes.submitBtn}
             onClick={() => navigate('/nounv2')}
             style={{ marginTop: '0.5rem' }}
@@ -267,55 +273,17 @@ export default function CreateNounV2ProposalPage() {
           rows={8}
         />
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            marginTop: '1.25rem',
-            marginBottom: '0.25rem',
-          }}
+        <button
+          type="button"
+          className={classes.advToggle}
+          aria-pressed={advanced}
+          onClick={() => setAdvanced(a => !a)}
         >
-          <button
-            type="button"
-            onClick={() => setAdvanced(a => !a)}
-            style={{
-              position: 'relative',
-              width: 40,
-              height: 22,
-              borderRadius: 11,
-              border: 'none',
-              background: advanced ? '#dc2626' : 'var(--theme-bg-tertiary)',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                position: 'absolute',
-                top: 2,
-                left: advanced ? 20 : 2,
-                width: 18,
-                height: 18,
-                borderRadius: '50%',
-                background: 'var(--theme-bg-card)',
-                transition: 'left 0.2s',
-              }}
-            />
-          </button>
-          <span
-            style={{
-              fontSize: '0.8rem',
-              color: advanced ? '#b91c1c' : '#888',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}
-          >
-            Advanced
+          <span className={classes.advTrack}>
+            <span className={classes.advKnob} />
           </span>
-        </div>
+          <span className={classes.advLabel}>Advanced</span>
+        </button>
 
         <label className={classes.label}>Transactions</label>
         <div
@@ -340,15 +308,8 @@ export default function CreateNounV2ProposalPage() {
               navigator.clipboard.writeText(NOUNV2_TREASURY_ADDRESS);
               toast.success('Address copied');
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0 4px',
-              fontSize: '0.75rem',
-              color: '#7f1d1d',
-              textTransform: 'none',
-            }}
+            className={classes.copyBtn}
+            aria-label="Copy full address"
             title="Copy full address"
           >
             <CopyIcon size={13} />

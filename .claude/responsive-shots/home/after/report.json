@@ -1,0 +1,1364 @@
+{
+  "url": "/",
+  "route": "/",
+  "group": "home",
+  "kind": "home",
+  "label": "after",
+  "generated": "2026-11-01T08:39:04.799Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 13.7,
+    "worst": [
+      "page@768:16",
+      "page@900:16",
+      "page@1024:16"
+    ],
+    "clean": 0,
+    "total": 13,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 5.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 7
+      },
+      "line": "1 clipped · 7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "NOUN 2062 no bids yet 18h 45m",
+            "px": 111
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "w": 111,
+            "h": 22,
+            "label": "⌐◨-◨ NOUN.WTF"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 89,
+            "h": 25,
+            "label": "TERMINAL `"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "w": 211,
+            "h": 30,
+            "label": "NOUN 2062 no bids yet 18h 45m"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 39,
+            "h": 22,
+            "label": "PIP3"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 68,
+            "h": 22,
+            "label": "CONNECT"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "w": 65,
+            "h": 22,
+            "label": "` toggles"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "w": 106,
+            "h": 31,
+            "label": "NOUN FM: our jingles between dee"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 14.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 3,
+        "smallTargets": 7
+      },
+      "line": "2 clipped · 3 overlaps · 7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "no bids yet",
+            "px": 15
+          },
+          {
+            "kind": "control",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "NOUN 2062 no bids yet 18h 45m",
+            "px": 71
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 53
+          },
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 56
+          },
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 32
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "w": 111,
+            "h": 22,
+            "label": "⌐◨-◨ NOUN.WTF"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 89,
+            "h": 25,
+            "label": "TERMINAL `"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "w": 211,
+            "h": 30,
+            "label": "NOUN 2062 no bids yet 18h 45m"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 39,
+            "h": 22,
+            "label": "PIP3"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 68,
+            "h": 22,
+            "label": "CONNECT"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "w": 65,
+            "h": 22,
+            "label": "` toggles"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "w": 106,
+            "h": 31,
+            "label": "NOUN FM: our jingles between dee"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 10.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 1,
+        "smallTargets": 7
+      },
+      "line": "2 clipped · 1 overlaps · 7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "18h 45m",
+            "px": 33
+          },
+          {
+            "kind": "control",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "NOUN 2062 no bids yet 18h 45m",
+            "px": 41
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 96
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "w": 111,
+            "h": 22,
+            "label": "⌐◨-◨ NOUN.WTF"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 89,
+            "h": 25,
+            "label": "TERMINAL `"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "w": 211,
+            "h": 30,
+            "label": "NOUN 2062 no bids yet 18h 45m"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 39,
+            "h": 22,
+            "label": "PIP3"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 68,
+            "h": 22,
+            "label": "CONNECT"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "w": 65,
+            "h": 22,
+            "label": "` toggles"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "w": 106,
+            "h": 31,
+            "label": "NOUN FM: our jingles between dee"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 8.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 3,
+        "smallTargets": 7
+      },
+      "line": "3 overlaps · 7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [
+          {
+            "a": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 68
+          },
+          {
+            "a": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 55
+          },
+          {
+            "a": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 39
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "w": 111,
+            "h": 22,
+            "label": "⌐◨-◨ NOUN.WTF"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 89,
+            "h": 25,
+            "label": "TERMINAL `"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "w": 211,
+            "h": 30,
+            "label": "NOUN 2062 no bids yet 18h 45m"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 39,
+            "h": 22,
+            "label": "PIP3"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 68,
+            "h": 22,
+            "label": "CONNECT"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "w": 65,
+            "h": 22,
+            "label": "` toggles"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "w": 106,
+            "h": 31,
+            "label": "NOUN FM: our jingles between dee"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 13.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 4,
+        "smallTargets": 7
+      },
+      "line": "1 clipped · 4 overlaps · 7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "CONNECT",
+            "px": 21
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 64
+          },
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 36
+          },
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 42
+          },
+          {
+            "a": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 43
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "w": 111,
+            "h": 22,
+            "label": "⌐◨-◨ NOUN.WTF"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 89,
+            "h": 25,
+            "label": "TERMINAL `"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "w": 211,
+            "h": 30,
+            "label": "NOUN 2062 no bids yet 18h 45m"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 39,
+            "h": 22,
+            "label": "PIP3"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 68,
+            "h": 22,
+            "label": "CONNECT"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "w": 65,
+            "h": 22,
+            "label": "` toggles"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "w": 106,
+            "h": 31,
+            "label": "NOUN FM: our jingles between dee"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 15.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 1,
+        "overArt": 0,
+        "overlaps": 3,
+        "smallTargets": 7
+      },
+      "line": "1 clipped · 1 covered · 3 overlaps · 7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > span.nos-clock",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "08:38 AM",
+            "px": 23
+          }
+        ],
+        "covered": [
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "by": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand"
+          }
+        ],
+        "overArt": [],
+        "overlaps": [
+          {
+            "a": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 68
+          },
+          {
+            "a": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 55
+          },
+          {
+            "a": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 38
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "w": 111,
+            "h": 22,
+            "label": "⌐◨-◨ NOUN.WTF"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 89,
+            "h": 25,
+            "label": "TERMINAL `"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "w": 211,
+            "h": 30,
+            "label": "NOUN 2062 no bids yet 18h 45m"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 39,
+            "h": 22,
+            "label": "PIP3"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "w": 68,
+            "h": 22,
+            "label": "CONNECT"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "w": 65,
+            "h": 22,
+            "label": "` toggles"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "w": 106,
+            "h": 31,
+            "label": "NOUN FM: our jingles between dee"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 6,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 6 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Market",
+            "art": "span.nos-auction > span.nos-auction-card > span.nos-auction-img > img.img-fluid"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 95
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 36
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 57
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 88
+          },
+          {
+            "a": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 41
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 6,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 6 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "The DAO",
+            "art": "span.nos-auction > span.nos-auction-card > span.nos-auction-img > img.img-fluid"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 96
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 85
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 57
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 32
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 58
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Market",
+            "art": "span.nos-auction > span.nos-auction-card > span.nos-auction-img > img.img-fluid"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 68
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 98
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 57
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 58
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 29
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 87
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 42
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 45
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 86
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 83
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 71
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 43
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 96
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 6,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 6 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "aardvark",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 74
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 44
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 71
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 86
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 42
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 78
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 42
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 68
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png"
+      ]
+    }
+  ]
+}

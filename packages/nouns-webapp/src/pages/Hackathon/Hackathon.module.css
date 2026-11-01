@@ -26,6 +26,7 @@
     var(--theme-bg-card);
   position: relative;
   overflow: hidden;
+  container: hero / inline-size;
 }
 
 .hero::before {
@@ -39,7 +40,7 @@
 }
 
 .heroTitle {
-  font-size: 2.8rem;
+  font-size: clamp(1.8rem, 8cqi, 2.8rem);
   font-weight: 900;
   color: #fff;
   margin: 0 0 0.25rem;
@@ -64,6 +65,9 @@
 
 .treasuryBadge {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
   align-items: center;
   gap: 1rem;
   padding: 0.5rem 1rem;
@@ -124,7 +128,7 @@
 .heroAscii {
   margin-top: 1.5rem;
   font-family: 'Courier New', monospace;
-  font-size: 0.75rem;
+  font-size: min(0.75rem, 3.3cqi);
   color: var(--theme-text-muted);
   line-height: 1.2;
   white-space: pre;
@@ -426,6 +430,10 @@
   color: #e2e8f0;
 }
 
+.linkRow > div {
+  min-width: 0;
+}
+
 .linkName {
   font-weight: 600;
   display: block;
@@ -443,6 +451,7 @@
   font-size: 0.75rem;
   font-family: monospace;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ─── Code Block ────────────────────────────────────────────── */
@@ -484,12 +493,25 @@
 
 /* ─── Responsive ────────────────────────────────────────────── */
 
-@media (max-width: 640px) {
+/* below md (560): the container, not the viewport */
+@container page (max-width: 559.98px) {
   .heroTitle {
     font-size: 1.8rem;
   }
   .heroSub {
     font-size: 1rem;
+  }
+  .linkRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .linkUrl {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .container {
+    padding: 0 1rem 3rem;
   }
   .contractGrid {
     grid-template-columns: 1fr;
@@ -519,4 +541,14 @@
 .heroCtaFilled {
   border-radius: 999px;
   font-weight: 600;
+}
+
+@media (pointer: coarse) {
+  .treasuryAddr,
+  .ruleText a,
+  .footer a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
 }

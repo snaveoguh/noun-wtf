@@ -9,10 +9,25 @@ export function collect(opts) {
     (win && win.querySelector('.nos-content')) ||
     (o.allowDocument ? document.scrollingElement || document.documentElement : null);
   if (!root) return { error: 'no navigator .nos-content on the page' };
+  // The app's error boundary (or vite reloading mid-load) is a broken shot, not a layout
+  if (
+    /Something went wrong/i.test(root.innerText || '') &&
+    !root.querySelector('button, a[href], input')
+  )
+    return {
+      error: 'error boundary: "Something went wrong" (cold vite? the shot is retried once)',
+    };
   const isDoc = root === document.scrollingElement || root === document.documentElement;
 
   const rr = isDoc
-    ? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight, width: window.innerWidth, height: window.innerHeight }
+    ? {
+        left: 0,
+        top: 0,
+        right: window.innerWidth,
+        bottom: window.innerHeight,
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }
     : root.getBoundingClientRect();
   const scope = win || document.body;
 
@@ -34,7 +49,8 @@ export function collect(opts) {
     }
     return s;
   };
-  const shortClass = c => c.replace(/^_?([A-Za-z0-9]+)_[A-Za-z0-9]{5}$/, '$1').replace(/_[a-z0-9]{5}_\d+$/, '');
+  const shortClass = c =>
+    c.replace(/^_?([A-Za-z0-9]+)_[A-Za-z0-9]{5}$/, '$1').replace(/_[a-z0-9]{5}_\d+$/, '');
   const selector = el => {
     const parts = [];
     let cur = el;
@@ -54,7 +70,8 @@ export function collect(opts) {
   };
   const visible = el => {
     const s = css(el);
-    if (s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse') return false;
+    if (s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse')
+      return false;
     if (parseFloat(s.opacity) < 0.05) return false;
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
@@ -62,14 +79,16 @@ export function collect(opts) {
   const hiddenByAncestor = el => {
     for (let a = el; a && a !== root; a = a.parentElement) {
       const s = css(a);
-      if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity) < 0.05) return true;
+      if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity) < 0.05)
+        return true;
     }
     return false;
   };
   const clips = s => s.overflowX === 'hidden' || s.overflowX === 'clip';
   const clipsY = s => s.overflowY === 'hidden' || s.overflowY === 'clip';
   const srOnly = r => r.width <= 2 || r.height <= 2;
-  const text = el => (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48);
+  const text = el =>
+    (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48);
 
   const all = Array.from(root.querySelectorAll('*'));
 
@@ -107,6 +126,15 @@ export function collect(opts) {
   const clipCheck = (el, rect, label, kind) => {
     for (let a = el.parentElement; a && a !== root; a = a.parentElement) {
       const s = css(a);
+      // Partly visible in a scroll box (a tab strip, the phone tray) is
+      // scrollable into view, not cut off: stop at the first scroller.
+      if (
+        s.overflowX === 'auto' ||
+        s.overflowX === 'scroll' ||
+        s.overflowY === 'auto' ||
+        s.overflowY === 'scroll'
+      )
+        return;
       const cx = clips(s);
       const cy = clipsY(s);
       if (!cx && !cy) continue;
@@ -123,9 +151,18 @@ export function collect(opts) {
       // A box clipping content that sits entirely outside it is a scroller /
       // carousel / reveal, not a cut-off: only partly visible things count.
       const partly =
-        rect.right > ar.left + 1 && rect.left < ar.right - 1 && rect.bottom > ar.top + 1 && rect.top < ar.bottom - 1;
+        rect.right > ar.left + 1 &&
+        rect.left < ar.right - 1 &&
+        rect.bottom > ar.top + 1 &&
+        rect.top < ar.bottom - 1;
       if (partly && !ell && (outX > 2 || outY > 4)) {
-        clipped.push({ kind, selector: selector(el), clipper: selector(a), text: label, px: Math.round(Math.max(outX, outY)) });
+        clipped.push({
+          kind,
+          selector: selector(el),
+          clipper: selector(a),
+          text: label,
+          px: Math.round(Math.max(outX, outY)),
+        });
       }
       return;
     }
@@ -134,6 +171,10 @@ export function collect(opts) {
   const range = document.createRange();
   let n;
   let textCount = 0;
+  // Warnings: reported, never scored. Squeezed = a sentence wrapped to about one
+  // word per line (a float or neighbour crushing its column); the overflow and
+  // clip checks can't see it.
+  const squeezed = [];
   while ((n = walker.nextNode()) && textCount < 4000) {
     const t = n.nodeValue;
     if (!t || !t.trim()) continue;
@@ -143,13 +184,31 @@ export function collect(opts) {
     range.selectNodeContents(n);
     const r = range.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
+    const words = t.trim().split(/\s+/).length;
+    if (words >= 4 && squeezed.length < 12) {
+      const tops = new Set(Array.from(range.getClientRects(), q => Math.round(q.top)));
+      if (tops.size >= 4 && words / tops.size <= 1.5) {
+        squeezed.push({
+          selector: selector(el),
+          text: t.trim().slice(0, 40),
+          lines: tops.size,
+          w: Math.round(r.width),
+        });
+      }
+    }
     // The text's own box clipping it (white-space:nowrap + overflow:hidden, no ellipsis)
     const s = css(el);
     if ((clips(s) || clipsY(s)) && s.textOverflow !== 'ellipsis') {
       const er = el.getBoundingClientRect();
       const outX = clips(s) ? Math.max(er.left - r.left, r.right - er.right) : 0;
       if (outX > 2 && !srOnly(er)) {
-        clipped.push({ kind: 'text', selector: selector(el), clipper: '(self)', text: t.trim().slice(0, 40), px: Math.round(outX) });
+        clipped.push({
+          kind: 'text',
+          selector: selector(el),
+          clipper: '(self)',
+          text: t.trim().slice(0, 40),
+          px: Math.round(outX),
+        });
         continue;
       }
     }
@@ -162,26 +221,106 @@ export function collect(opts) {
   const controls = Array.from(root.querySelectorAll(controlSel)).filter(
     el => visible(el) && !hiddenByAncestor(el) && css(el).pointerEvents !== 'none',
   );
+  // The part of a box you can actually see: clipped by every scrolling /
+  // clipping ancestor that is its containing block chain, and by the viewport.
+  // A control scrolled out of its scroll box has an empty visible rect and is
+  // left out of the covered / overlap / on-art checks (it can't be tapped).
+  const visibleRect = el => {
+    const r = el.getBoundingClientRect();
+    let left = r.left;
+    let top = r.top;
+    let right = r.right;
+    let bottom = r.bottom;
+    let pos = css(el).position;
+    for (
+      let a = el.parentElement;
+      a && a !== document.documentElement && pos !== 'fixed';
+      a = a.parentElement
+    ) {
+      const s = css(a);
+      // an absolutely positioned box escapes non-positioned ancestors' overflow
+      if (pos === 'absolute' && s.position === 'static') continue;
+      if (s.overflowX !== 'visible' || s.overflowY !== 'visible') {
+        const ar = a.getBoundingClientRect();
+        const bl = parseFloat(s.borderLeftWidth) || 0;
+        const bt = parseFloat(s.borderTopWidth) || 0;
+        if (s.overflowX !== 'visible') {
+          left = Math.max(left, ar.left + bl);
+          right = Math.min(right, ar.left + bl + a.clientWidth);
+        }
+        if (s.overflowY !== 'visible') {
+          top = Math.max(top, ar.top + bt);
+          bottom = Math.min(bottom, ar.top + bt + a.clientHeight);
+        }
+      }
+      pos = s.position === 'absolute' || s.position === 'fixed' ? s.position : 'normal';
+    }
+    left = Math.max(left, 0);
+    top = Math.max(top, 0);
+    right = Math.min(right, window.innerWidth);
+    bottom = Math.min(bottom, window.innerHeight);
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top),
+    };
+  };
+  const ART_OK = '[data-responsive-art-ok]';
+  const opaque = el => {
+    const bg = css(el).backgroundColor;
+    const m = bg && bg.match(/rgba?\(([^)]+)\)/);
+    if (!m) return false;
+    const parts = m[1].split(/[,\s/]+/).filter(Boolean);
+    const alpha = parts.length > 3 ? parseFloat(parts[3]) : 1;
+    return alpha >= 0.9 && parseFloat(css(el).opacity) >= 0.9;
+  };
+  // Is the artwork actually on screen at (x, y), or painted over by an opaque
+  // layer (a solid header, a panel) that sits between it and the control?
+  const artShows = (artEl, ctrl, x, y) => {
+    const prev = artEl.style.pointerEvents;
+    artEl.style.pointerEvents = 'auto'; // elementsFromPoint skips pointer-events:none
+    const stack = document.elementsFromPoint(x, y);
+    artEl.style.pointerEvents = prev;
+    const i = stack.findIndex(e => e === artEl || artEl.contains(e));
+    if (i < 0) return false; // not at this point at all
+    for (let k = 0; k < i; k++) {
+      const e = stack[k];
+      if (e === ctrl || ctrl.contains(e) || e.contains(artEl)) continue;
+      if (opaque(e)) return false;
+    }
+    return true;
+  };
+
   const art = Array.from(root.querySelectorAll('img,svg,canvas,video'))
-    .filter(el => !el.closest('button,a,[role=button]') && visible(el))
-    .map(el => ({ el, r: el.getBoundingClientRect() }))
+    .filter(
+      el =>
+        !el.closest('button,a,[role=button]') &&
+        !el.closest(ART_OK) &&
+        visible(el) &&
+        !hiddenByAncestor(el),
+    )
+    .map(el => ({ el, r: visibleRect(el) }))
     .filter(a => a.r.width >= 120 && a.r.height >= 120);
   const inter = (a, b) =>
     Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
     Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
 
-  const vis = {
-    left: Math.max(0, rr.left),
-    top: Math.max(0, rr.top),
-    right: Math.min(window.innerWidth, rr.left + root.clientWidth),
-    bottom: Math.min(window.innerHeight, rr.top + root.clientHeight),
-  };
   const covered = [];
   const overArt = [];
   const ctl = [];
+  const seen = [];
   for (const el of controls.slice(0, 600)) {
     const r = el.getBoundingClientRect();
-    const label = (el.getAttribute('aria-label') || el.getAttribute('title') || text(el) || el.tagName).slice(0, 32);
+    const vr = visibleRect(el);
+    const label = (
+      el.getAttribute('aria-label') ||
+      el.getAttribute('title') ||
+      text(el) ||
+      el.tagName
+    ).slice(0, 32);
     // links inside running text are exempt from the tap-size rule (WCAG 2.5.8)
     const s = css(el);
     const p = el.parentElement;
@@ -190,49 +329,64 @@ export function collect(opts) {
       s.display.startsWith('inline') &&
       !!p &&
       (p.innerText || '').trim().length > (el.innerText || '').trim().length + 12;
-    ctl.push({ selector: selector(el), w: r.width, h: r.height, label, inlineInText, hidden: false });
+    ctl.push({
+      selector: selector(el),
+      w: r.width,
+      h: r.height,
+      label,
+      inlineInText,
+      hidden: false,
+    });
 
     // partly clipped controls
     clipCheck(el, r, label, 'control');
 
-    // covered: sample 5 points inside the visible part of the control
-    const inView = r.left >= vis.left - 1 && r.right <= vis.right + 1 && r.top >= vis.top - 1 && r.bottom <= vis.bottom + 1;
-    if (inView && r.width >= 6 && r.height >= 6) {
-      const pts = [
-        [0.5, 0.5],
-        [0.25, 0.3],
-        [0.75, 0.3],
-        [0.25, 0.7],
-        [0.75, 0.7],
-      ];
-      let hits = 0;
-      let by = null;
-      for (const [fx, fy] of pts) {
-        const h = document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy);
-        if (!h || h === el || el.contains(h) || h.contains(el)) continue;
-        if (!scope.contains(h)) continue; // OS chrome / site widgets outside the window
-        hits++;
-        by = h;
-      }
-      if (hits >= 3 && by) covered.push({ selector: selector(el), label, by: selector(by) });
-    }
+    // Everything below needs the control on screen: one scrolled out of its
+    // scroll box (or out of the window) isn't covered by, or on top of, anything.
+    if (vr.width < 6 || vr.height < 6) continue;
+    seen.push({ el, r: vr });
 
-    // floating on artwork: a positioned control over a big image / canvas
-    const area = r.width * r.height;
-    if (area > 0) {
+    // covered: only for a control wholly on screen (as a user would see it
+    // before tapping); sample 5 points inside it
+    const whole = vr.width >= r.width - 1 && vr.height >= r.height - 1;
+    const pts = [
+      [0.5, 0.5],
+      [0.25, 0.3],
+      [0.75, 0.3],
+      [0.25, 0.7],
+      [0.75, 0.7],
+    ];
+    let hits = 0;
+    let by = null;
+    for (const [fx, fy] of pts) {
+      const h = document.elementFromPoint(vr.left + vr.width * fx, vr.top + vr.height * fy);
+      if (!h || h === el || el.contains(h) || h.contains(el)) continue;
+      if (!scope.contains(h)) continue; // OS chrome / site widgets outside the window
+      hits++;
+      by = h;
+    }
+    if (whole && hits >= 3 && by) covered.push({ selector: selector(el), label, by: selector(by) });
+
+    // floating on artwork: a control over a big image / canvas / video that is
+    // actually showing there (not hidden under an opaque layer), unless a
+    // container opted out with data-responsive-art-ok (a deliberate overlay hero)
+    const area = vr.width * vr.height;
+    if (area > 0 && !el.closest(ART_OK)) {
       for (const a of art) {
         if (a.el.contains(el)) continue;
-        if (inter(r, a.r) >= area * 0.5) {
-          overArt.push({ selector: selector(el), label, art: selector(a.el) });
-          break;
-        }
+        if (inter(vr, a.r) < area * 0.5) continue;
+        const x = (Math.max(vr.left, a.r.left) + Math.min(vr.right, a.r.right)) / 2;
+        const y = (Math.max(vr.top, a.r.top) + Math.min(vr.bottom, a.r.bottom)) / 2;
+        if (!artShows(a.el, el, x, y)) continue;
+        overArt.push({ selector: selector(el), label, art: selector(a.el) });
+        break;
       }
     }
   }
 
-  // controls on top of each other (neither contains the other)
+  // controls on top of each other (neither contains the other), visible parts only
   const overlaps = [];
-  const boxes = controls.slice(0, 400).map(el => ({ el, r: el.getBoundingClientRect() }));
+  const boxes = seen.slice(0, 400);
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
       const a = boxes[i];
@@ -241,7 +395,12 @@ export function collect(opts) {
       const ov = inter(a.r, b.r);
       if (ov <= 0) continue;
       const smaller = Math.min(a.r.width * a.r.height, b.r.width * b.r.height);
-      if (smaller > 0 && ov > smaller * 0.2) overlaps.push({ a: selector(a.el), b: selector(b.el), pct: Math.round((ov / smaller) * 100) });
+      if (smaller > 0 && ov > smaller * 0.2)
+        overlaps.push({
+          a: selector(a.el),
+          b: selector(b.el),
+          pct: Math.round((ov / smaller) * 100),
+        });
     }
   }
 
@@ -251,6 +410,15 @@ export function collect(opts) {
     isDocument: isDoc,
     content,
     overflowOffenders: overflowOffenders.slice(0, 12),
+    warnings: {
+      squeezed,
+      // a page rendering its "… not configured" stub measures as clean: missing VITE_* env?
+      notConfigured: /not configured/i.test(root.innerText || '')
+        ? ((root.innerText || '').match(/[^\n]*not configured[^\n]*/i) || [''])[0]
+            .trim()
+            .slice(0, 80)
+        : null,
+    },
     clipped: clipped.slice(0, 40),
     covered: covered.slice(0, 30),
     overArt: overArt.slice(0, 30),

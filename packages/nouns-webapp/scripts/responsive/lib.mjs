@@ -22,8 +22,19 @@ export function tierOf(width) {
 /** A realistic viewport height for a page-mode width. */
 export function viewportFor(width) {
   const heights = {
-    320: 568, 360: 740, 390: 844, 430: 932, 520: 900, 640: 960, 768: 1024,
-    900: 1000, 1024: 768, 1280: 800, 1440: 900, 1920: 1080, 2560: 1440,
+    320: 568,
+    360: 740,
+    390: 844,
+    430: 932,
+    520: 900,
+    640: 960,
+    768: 1024,
+    900: 1000,
+    1024: 768,
+    1280: 800,
+    1440: 900,
+    1920: 1080,
+    2560: 1440,
   };
   return { width, height: heights[width] ?? Math.round(Math.max(700, width * 0.6)) };
 }
@@ -48,6 +59,9 @@ export function windowRect(width, desktop = desktopFor(width)) {
  * Every route in App.tsx's <SiteRoutes>, with a sample URL. `kind`:
  *   page      opens in the navigator window (both modes)
  *   home      the NounOS homescreen, no window (page mode only)
+ * A route can appear more than once with query variants (`/probe?tab=lils`).
+ * `settle`: the most ms to wait for the network to go quiet after load, for a
+ * route whose data is slow (the harness takes the larger of this and --settle).
  * Redirect-only routes are listed in REDIRECTS; the test checks the two lists
  * cover every `path=` in App.tsx, so a new route can't be forgotten.
  */
@@ -64,8 +78,12 @@ export const ROUTES = [
   { path: 'vote/:id/history', url: '/vote/1000/history', group: 'governance' },
   { path: 'vote/:id/history/:versionNumber', url: '/vote/1000/history/1', group: 'governance' },
   { path: 'vote/:id/edit', url: '/vote/1000/edit', group: 'governance-create' },
-  { path: 'candidates', url: '/candidates', group: 'governance' },
-  { path: 'candidates/*', url: '/candidates/0x0000000000000000000000000000000000000000-sample', group: 'governance' },
+  { path: 'candidates', url: '/candidates', group: 'governance', settle: 15000 },
+  {
+    path: 'candidates/*',
+    url: '/candidates/0x0000000000000000000000000000000000000000-sample',
+    group: 'governance',
+  },
   { path: 'candidates/:id/edit', url: '/candidates/sample/edit', group: 'governance-create' },
   { path: 'playground', url: '/playground', group: 'tools' },
   { path: 'grants', url: '/grants', group: 'grants' },
@@ -80,6 +98,12 @@ export const ROUTES = [
   { path: 'traits', url: '/traits', group: 'art' },
   { path: 'cc0', url: '/cc0', group: 'art' },
   { path: 'probe', url: '/probe', group: 'explore' },
+  // /probe's other tabs (?tab=) render different grids and menus
+  ...['dreams', 'lils', 'borgs', 'bitnouns', 'terraforms', 'v2'].map(tab => ({
+    path: 'probe',
+    url: `/probe?tab=${tab}`,
+    group: 'explore',
+  })),
   { path: 'studio', url: '/studio', group: 'tools' },
   { path: 'settlers', url: '/settlers', group: 'stats' },
   { path: 'gas', url: '/gas', group: 'stats' },
@@ -89,6 +113,20 @@ export const ROUTES = [
   { path: 'onchain', url: '/onchain', group: 'stats' },
   { path: 'explore/wallet', url: '/explore/wallet', group: 'wallet' },
   { path: 'explore/wallet/:identity', url: '/explore/wallet/nouns.eth', group: 'wallet' },
+  // the profile's other tabs, and the owner view (Autopilot) through its fixture
+  ...['votes', 'proposals', 'candidates', 'auctions', 'nouns', 'treasury', 'activity', 'graph'].map(
+    tab => ({
+      path: 'explore/wallet/:identity',
+      url: `/explore/wallet/nouns.eth?tab=${tab}`,
+      group: 'wallet',
+      settle: 15000,
+    }),
+  ),
+  {
+    path: 'explore/wallet/:identity',
+    url: '/explore/wallet/nouns.eth?fixture=1',
+    group: 'wallet',
+  },
   { path: 'gamer', url: '/gamer', group: 'wallet' },
   { path: 'gamer/:identity', url: '/gamer/nouns.eth', group: 'wallet' },
   { path: 'crystal-ball', url: '/crystal-ball', group: 'auction' },
@@ -109,7 +147,14 @@ export const ROUTES = [
 ].map(r => ({ kind: 'page', ...r }));
 
 /** Routes that only redirect (nothing to lay out). */
-export const REDIRECTS = ['auction/:id', 'explore', 'nouns', 'dreams', 'dreams/create', 'memevalue'];
+export const REDIRECTS = [
+  'auction/:id',
+  'explore',
+  'nouns',
+  'dreams',
+  'dreams/create',
+  'memevalue',
+];
 
 /** Route paths declared in App.tsx's SiteRoutes (string literals + the wallet alias array). */
 export function routePathsFromApp(source) {
@@ -126,6 +171,11 @@ export function routePathsFromApp(source) {
   return [...paths];
 }
 
+/** How long to let `url` settle after load: the larger of the CLI default and the route's own. */
+export function settleFor(url, fallback) {
+  return Math.max(fallback, routeFor(url).settle ?? 0);
+}
+
 /** Folder name for a route URL: '/noun/2062?sections=heroTools' → 'noun-2062--sections-heroTools'. */
 export function slugFor(url) {
   const [path, query] = url.split('?');
@@ -137,7 +187,7 @@ export function slugFor(url) {
 /** Which route entry a URL belongs to (exact sample URL, else first path pattern that matches). */
 export function routeFor(url) {
   const path = url.split('?')[0];
-  const exact = ROUTES.find(r => r.url === path);
+  const exact = ROUTES.find(r => r.url === url) ?? ROUTES.find(r => r.url === path);
   if (exact) return exact;
   const segs = path.replace(/^\/+/, '').split('/');
   for (const r of ROUTES) {
@@ -162,7 +212,10 @@ export function analyse(raw, { touch = false } = {}) {
   }
   const c = raw.content;
   const overflowPx = Math.max(0, Math.round(c.scrollWidth - c.clientWidth));
-  const overflow = overflowPx > 1 ? { px: overflowPx, offenders: (raw.overflowOffenders ?? []).slice(0, 8) } : null;
+  const overflow =
+    overflowPx > 1
+      ? { px: overflowPx, offenders: (raw.overflowOffenders ?? []).slice(0, 8) }
+      : null;
 
   const clipped = dedupe(raw.clipped ?? [], x => `${x.selector}|${x.text ?? ''}`);
   const covered = dedupe(raw.covered ?? [], x => x.selector);
@@ -178,9 +231,18 @@ export function analyse(raw, { touch = false } = {}) {
     overlaps: overlaps.length,
     smallTargets: small.length,
   };
+  // Warnings never change the score: look at the sheet when they show up.
+  const w = raw.warnings ?? {};
+  const warnings = [
+    ...(w.notConfigured ? [`not configured: ${w.notConfigured}`] : []),
+    ...(w.squeezed ?? []).map(
+      q => `squeezed (${q.lines} lines, ${q.w}px): ${q.selector} "${q.text}"`,
+    ),
+  ];
   return {
     counts,
     score: scoreOf(counts),
+    warnings,
     issues: { overflow, clipped, covered, overArt, overlaps, smallTargets: small.slice(0, 20) },
   };
 }
@@ -208,9 +270,13 @@ export function scoreOf(k) {
 /** Route severity: the mean shot score, plus the worst shots for context. */
 export function routeSeverity(shots) {
   const ok = shots.filter(s => !s.error);
-  if (ok.length === 0) return { score: 0, worst: [], clean: 0, total: shots.length, errors: shots.length };
+  if (ok.length === 0)
+    return { score: 0, worst: [], clean: 0, total: shots.length, errors: shots.length };
   const mean = ok.reduce((a, s) => a + s.score, 0) / ok.length;
-  const worst = [...ok].sort((a, b) => b.score - a.score).slice(0, 3).map(s => `${s.mode}@${s.width}:${s.score}`);
+  const worst = [...ok]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(s => `${s.mode}@${s.width}:${s.score}`);
   return {
     score: Math.round(mean * 10) / 10,
     worst,

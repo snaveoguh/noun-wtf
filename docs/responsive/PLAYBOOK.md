@@ -123,11 +123,68 @@ Files: `components/Auction/{index.tsx,Auction.module.css}`,
 Result: 0 / 26 clean shots before, 26 / 26 after, for `/noun/2062` with the
 default hero and with hero tools on (`?sections=heroTools`).
 
+## Patterns from wave 1
+
+What the first pages (home, `/probe`, `/studio`, `/vote` + `/candidates`, the
+info pages) needed again and again:
+
+- **Touch targets:** 40 px on touch, not on desktop:
+  `[@media(pointer:coarse)]:min-h-10` (Tailwind) or
+  `@media (pointer: coarse) { .btn { min-height: 40px } }`. Inline links in a
+  sentence are exempt; a row of links (footer, socials) is not.
+- **Floating buttons:** never `position: fixed` inside a page (it lands at the
+  viewport's corner, outside a windowed page and over its controls). Use
+  `<PageFab>` (`src/components/responsive/PageFab.tsx`) as the last child of
+  the page's outer element: sticky to the window's bottom, no layout height.
+  If it repeats something in the header, hide it while the header is in view
+  (`/vote`'s "Latest props").
+- **Dropdowns in a window:** a menu `fixed` below viewport-sm, or `absolute
+  w-64` at any width, overflows a narrow window. Below container-sm make the
+  menu span its bar (the button's wrapper `static`, the bar `relative`, the
+  menu `absolute inset-x-0`); from `@sm:` it's `w-64` under its button
+  (`/probe`'s owner / settler menus).
+- **Scrolling tab rows:** `overflow-x: auto` + `scroll-snap-type: x proximity`
+  + an end fade (`mask-image`) below lg, *and* end padding as wide as the
+  fade, so the last tab isn't faded when everything fits.
+- **`isMobileScreen()` / `innerWidth`** → `useContainerWidth().below('lg')`
+  (`isMobileScreen` is deprecated). Viewport sizing stays only for `fixed`
+  portals (modals, popovers clamped to the screen, full-viewport canvases).
+- **Light panels in the dark theme:** the noir theme forces light text on every
+  input / select with `!important`. Put `data-surface="light"` on a panel that
+  stays light and its fields keep their own colours.
+- **Full-height tools** (editors, canvases): put `data-page-fill` on the page's
+  root element (the direct child of `.nos-page`); `.nos-page` then takes the
+  window's exact height as a flex column, so `height: 100%` / `flex: 1` resolve.
+- **Deliberate overlay heroes** (copy and buttons on a video by design): mark
+  the hero `data-responsive-art-ok` and the harness stops counting "on art"
+  inside it. Only where the overlay is the design; say so in your PR.
+- Shell items (tray, NOUN FM, the OS icon) belong to the foundation: report them
+  under "Foundation requests" rather than working round them in the page.
+
+## Setup
+
+A full `pnpm install` fails here (403 on the contracts' GitHub tarballs).
+Install only what the webapp needs, then build its two workspace deps:
+
+```bash
+pnpm install --frozen-lockfile --filter @nouns/webapp --filter @nouns/sdk --filter @nouns/assets
+(cd packages/nouns-assets && pnpm build) && (cd packages/nouns-sdk && pnpm build)
+```
+
+- **Type-check** with an 8 GB heap (the default runs out of memory):
+  `NODE_OPTIONS=--max-old-space-size=8192 npx tsc --noEmit -p .` in
+  `packages/nouns-webapp`. Errors in sibling packages (`../mesh-editor`,
+  `../nouns-graffiti`, `../voxel-engine`, `../vote-permit`) come from the
+  filtered install; only `src/` errors count.
+- **Scratch files go in your session's scratchpad directory**, not `/tmp`
+  (the vite config below included).
+
 ## Running the harness
 
 ```bash
 # dev server without HMR or the type-checker plugin (see the world-browser-test skill)
-cat > /tmp/nohmr.config.mjs <<'EOF'
+SP=/path/to/your/scratchpad
+cat > $SP/nohmr.config.mjs <<'EOF'
 import base from '/home/user/noun-wtf/packages/nouns-webapp/vite.config.ts';
 export default async env => {
   const cfg = typeof base === 'function' ? await base(env) : base;
@@ -137,13 +194,64 @@ export default async env => {
 };
 EOF
 cd packages/nouns-webapp
-VITE_CHAIN_ID=1 NODE_OPTIONS=--max-old-space-size=4096 npx vite --config /tmp/nohmr.config.mjs &   # restart after every edit
+VITE_CHAIN_ID=1 \
+VITE_MAINNET_SUBGRAPH=https://spirited-flexibility-production-3c30.up.railway.app/graphql \
+VITE_NOUNV2_TOKEN_ADDRESS=0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9 \
+VITE_NOUNV2_AUCTION_HOUSE_ADDRESS=0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc \
+VITE_NOUNV2_TREASURY_ADDRESS=0x2cdeb0d251674710840d9fa990d1de138dfe7c00 \
+NODE_OPTIONS=--max-old-space-size=4096 \
+setsid nohup npx vite --config $SP/nohmr.config.mjs > $SP/vite.log 2>&1 &
+# stop it later by the port it listens on (see below), not by $! or a name
 
 node scripts/responsive/harness.mjs --route /noun/2062                 # 26 shots, ~4 min
 node scripts/responsive/harness.mjs --route /noun/2062 --mode window --widths 390,640
-node scripts/responsive/harness.mjs --group governance --jobs 2
+setsid nohup node scripts/responsive/harness.mjs --route /vote --label after > $SP/vote.log 2>&1 &
 node scripts/responsive/harness.mjs --all --jobs 3                     # the inventory
 ```
+
+- **Restart vite after every source edit** (no HMR and no watcher: it keeps
+  serving what it first transformed). Stop it by the port it listens on:
+  `kill $(lsof -t -iTCP:5196 -sTCP:LISTEN)`, then check `vite.log` for
+  "already in use" before trusting a run.
+- **Never kill by name.** `pkill -f`, `pgrep -f … | xargs kill` and
+  `ps … | grep <pattern> | xargs kill` all match your own shell (its command
+  line contains the pattern) and other sessions' processes: the integrator
+  killed its own shell that way. And `$!` after `setsid nohup … &` is
+  setsid's / npx's PID, not vite's, so `kill $!` leaves vite running.
+- **Never edit the webapp while a run is going**: pages loaded after the edit
+  get half-old modules and the shots are garbage.
+- **One route per process.** A group with `--jobs 2 --scroll 2` can take over
+  10 minutes; start each route as its own `setsid nohup` process and read its
+  log. Each run first loads its route once to warm vite (a cold server
+  optimises deps and reloads mid-shot). A shot whose browser context closes,
+  or whose page shows the error boundary / no window, is retried once in a
+  fresh context; a crashed browser is relaunched and its route re-run once.
+  Parallel runs against a *cold* server still break: start one first.
+- `VITE_MAINNET_SUBGRAPH` gives the governance pages real proposals and
+  candidates (without it `/vote` shows "No proposals found" and the rows are
+  never measured). The `VITE_NOUNV2_*` addresses (copied from
+  `.github/workflows/netlify-deploy.yml`) give `/nounv2*` its real data; without
+  them those pages render a "not configured" stub that scores clean. Slow routes carry their own `settle` in `lib.mjs` ROUTES
+  (`/candidates`: 15 s); `--settle` raises the floor for every route.
+- `/probe`'s tabs and the wallet profile's tabs are their own ROUTES entries
+  (`/probe?tab=lils`, `/explore/wallet/nouns.eth?tab=graph` …), and
+  `/explore/wallet/nouns.eth?fixture=1` is the owner view (fixture data, so
+  Autopilot shows without a wallet). Add a query variant the same way when a
+  page has views its default URL doesn't show. A view that needs a real
+  connected wallet (`/vote/:id/edit` as the proposer) still can't be measured:
+  say so in your PR.
+- **What counts:** a control scrolled out of its scroll box (or the window) is
+  not checked for being covered, overlapping or on art; text or a control
+  partly visible in a scroll box isn't "clipped" (it scrolls into view); art
+  painted over by an opaque layer where the control sits isn't "art"; nothing
+  inside `[data-responsive-art-ok]` is "on art". A shot whose in-page
+  collection fails is reported as an error, never as clean.
+- **Warnings (⚠, never scored):** the log line, `report.json` (`warnings` per
+  shot) and the sheet flag a page showing "… not configured" (missing env, so
+  you measured a stub) and **squeezed** text: a sentence wrapped to about one
+  word per line (≥ 4 lines, ≤ 1.5 words a line), the float-crushes-the-column
+  bug `/nounv2` had while scoring clean. Look at any shot that warns; a clean
+  score with warnings isn't done. Read the sheets either way.
 
 - **Window mode**: a 1440 × 1000 desktop (2600 × 1440 for windows ≥ 1440), the
   navigator resized live through the dev-only `window.__nos` handle, so it also

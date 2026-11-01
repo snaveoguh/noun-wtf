@@ -323,14 +323,18 @@ const LilNounsTab: FC = () => {
     const measure = () => {
       const el = containerRef.current;
       let w = el ? el.getBoundingClientRect().width : 0;
-      if (w <= 0) w = window.innerWidth - 16;
+      // Not laid out yet: fall back to the page container (a NounOS window), then the viewport.
+      if (w <= 0) w = (el?.closest('[data-container]')?.clientWidth ?? window.innerWidth) - 16;
       const cols = Math.max(3, Math.floor(w / (MIN_CELL + GAP)));
       const cellSize = Math.floor((w - GAP * (cols - 1)) / cols);
       setLayout({ cols, cellSize });
     };
     const timer = setTimeout(measure, 50);
     window.addEventListener('resize', measure);
-    return () => { clearTimeout(timer); window.removeEventListener('resize', measure); };
+    // A NounOS window resizes without a window resize event.
+    const ro = containerRef.current ? new ResizeObserver(measure) : null;
+    if (ro && containerRef.current) ro.observe(containerRef.current);
+    return () => { clearTimeout(timer); window.removeEventListener('resize', measure); ro?.disconnect(); };
   }, []);
 
   const rowHeight = layout.cellSize + GAP;
@@ -366,7 +370,7 @@ const LilNounsTab: FC = () => {
   return (
     <>
       {/* Filter bar — matches Nouns tab */}
-      <div className="flex flex-wrap items-center gap-2 py-3">
+      <div className="relative flex flex-wrap items-center gap-2 py-3">
         <input
           type="text"
           placeholder="Search ID..."
@@ -590,7 +594,7 @@ function LilOwnerDropdown({
     : 'Owner';
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative @max-sm:static">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -604,7 +608,7 @@ function LilOwnerDropdown({
         )}
       </button>
       {open && (
-        <div className="fixed left-2 right-2 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl sm:absolute sm:left-0 sm:right-auto sm:w-64">
+        <div className="absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl @sm:right-auto @sm:w-64">
           <input
             type="text"
             placeholder="Search..."

@@ -17,6 +17,7 @@ import {
   routePathsFromApp,
   routeSeverity,
   scoreOf,
+  settleFor,
   slugFor,
   smallTargets,
   tierOf,
@@ -32,7 +33,9 @@ const clean = {
   covered: [],
   overArt: [],
   overlaps: [],
-  controls: [{ selector: 'button.bid', w: 300, h: 48, label: 'Bid', inlineInText: false, hidden: false }],
+  controls: [
+    { selector: 'button.bid', w: 300, h: 48, label: 'Bid', inlineInText: false, hidden: false },
+  ],
 };
 
 describe('tokens', () => {
@@ -93,9 +96,38 @@ describe('routes', () => {
     expect(routeFor('/').kind).toBe('home');
     expect(routeFor('/v2/noun/7').path).toBe('v2/noun/:id');
   });
+
+  it('keeps query variants and per-route settle times', () => {
+    expect(routeFor('/probe?tab=lils').url).toBe('/probe?tab=lils');
+    expect(routeFor('/probe?tab=nope').url).toBe('/probe');
+    expect(settleFor('/candidates', 6000)).toBe(15000);
+    expect(settleFor('/vote', 6000)).toBe(6000);
+    expect(settleFor('/vote', 20000)).toBe(20000);
+  });
 });
 
 describe('analyse', () => {
+  it('reports warnings without scoring them', () => {
+    const r = analyse(
+      {
+        ...clean,
+        warnings: {
+          notConfigured: 'treasury address not configured',
+          squeezed: [{ selector: 'div.card > p', text: 'Fund the thing now', lines: 4, w: 40 }],
+        },
+      },
+      { touch: true },
+    );
+    expect(r.score).toBe(0);
+    expect(r.warnings).toHaveLength(2);
+    expect(r.warnings[0]).toMatch(/not configured/);
+    expect(r.warnings[1]).toMatch(/squeezed \(4 lines/);
+  });
+
+  it('has no warnings on a plain clean shot', () => {
+    expect(analyse(clean).warnings).toEqual([]);
+  });
+
   it('scores a clean shot 0', () => {
     const r = analyse(clean, { touch: true });
     expect(r.score).toBe(0);
