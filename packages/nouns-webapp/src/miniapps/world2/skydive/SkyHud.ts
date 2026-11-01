@@ -28,6 +28,9 @@ const CSS = `
 @keyframes w2skyblink{50%{opacity:.35}}
 .w2sky-btn{position:absolute;right:18px;bottom:40%;width:86px;height:86px;border-radius:50%;border:3px solid #0b0b12;box-shadow:0 0 0 2px #fff,0 4px 0 rgba(0,0,0,.35);background:#ffd400;color:#0b0b12;font:900 18px/1 'Londrina Solid',system-ui,sans-serif;letter-spacing:.04em;pointer-events:auto;touch-action:none;display:none}
 .w2sky.touch.ff .w2sky-btn{display:block}
+.w2sky.offer .w2sky-alt,.w2sky.offer .w2sky-hint{display:none}
+.w2sky.touch.offer .w2sky-btn{display:block;background:#20d6ff;font-size:15px}
+.w2sky-pull.offer{color:#20d6ff}
 .w2sky-btn.ready{background:#ff2f8e;color:#fff}
 @media (max-width:640px){.w2sky-alt{right:12px;top:38%}.w2sky-m{font-size:40px}.w2sky-bar{height:100px}.w2sky-pull{font-size:44px}.w2sky-hint{bottom:auto;top:96px;font-size:11px}}
 @media (prefers-reduced-motion:reduce){.w2sky-pull.on{animation:none}.w2sky-pull{transition:none}}
@@ -45,8 +48,12 @@ export interface SkyHudView {
   /** Where on the bar the canopy stops opening in time (0..1). */
   floor: number;
   hint: string;
-  /** 'pull' | 'low' | '' */
-  prompt: '' | 'pull' | 'low';
+  /** 'pull' | 'low' | 'offer' (a big board air offering a skydive) | '' */
+  prompt: '' | 'pull' | 'low' | 'offer';
+  /** Offering a skydive (not in one): just the prompt and the touch button. */
+  offer: boolean;
+  /** The key that takes the offer. */
+  offerKey: string;
   touch: boolean;
   /** The touch button would pull now. */
   ready: boolean;
@@ -105,10 +112,26 @@ export class SkyHud {
   }
 
   update(v: SkyHudView) {
-    const cls = ['w2sky', v.on ? 'on' : '', v.touch ? 'touch' : '', v.freefall ? 'ff' : '']
+    const offering = v.offer && !v.on;
+    const cls = [
+      'w2sky',
+      v.on || offering ? 'on' : '',
+      offering ? 'offer' : '',
+      v.touch ? 'touch' : '',
+      v.freefall ? 'ff' : '',
+    ]
       .filter(Boolean)
       .join(' ');
     this.set('root', cls, (el, c) => (el.className = c));
+    this.set('btnLabel', offering ? 'SKYDIVE' : 'PULL', (_el, t) => (this.el.btn!.textContent = t));
+    if (offering) {
+      this.set('pull', `offer:${v.offerKey}`, el => {
+        el.className = 'w2sky-num w2sky-pull on offer';
+        el.firstChild!.textContent = 'SKYDIVE?';
+        el.lastChild!.textContent = v.offerKey;
+      });
+      return;
+    }
     if (!v.on) return;
     this.set('m', String(Math.round(v.alt)), (el, t) => (el.textContent = t));
     this.set('v', `${Math.round(v.kmh)} KM/H`, (el, t) => (el.textContent = t));
