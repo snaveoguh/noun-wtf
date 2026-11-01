@@ -4,7 +4,7 @@
   "group": "auction",
   "kind": "page",
   "label": "before",
-  "generated": "2026-11-01T11:46:46.479Z",
+  "generated": "2026-11-01T12:58:30.226Z",
   "widths": [
     320,
     360,
@@ -21,13 +21,13 @@
     2560
   ],
   "severity": {
-    "score": 2.6,
+    "score": 6.4,
     "worst": [
-      "window@390:14.6",
-      "page@320:11.3",
-      "window@320:10"
+      "window@390:29.6",
+      "window@360:24.2",
+      "window@320:16"
     ],
-    "clean": 17,
+    "clean": 7,
     "total": 26,
     "errors": 0
   },
@@ -42,16 +42,17 @@
       "contentWidth": 320,
       "tier": "xs",
       "touch": false,
-      "score": 10,
+      "score": 16,
       "counts": {
         "overflowPx": 50,
-        "clipped": 0,
+        "clipped": 1,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "overflow 50px",
+      "line": "overflow 50px · 1 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": {
           "px": 50,
@@ -59,13 +60,32 @@
             {
               "selector": "div.nos-page > div > div",
               "px": 49,
-              "text": "NOUNV2 NOT DEPLOYED No auction h"
+              "text": "NOUN O'CLOCK ● NOUN #101BLK 2632"
             }
           ]
         },
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 8
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -84,16 +104,17 @@
       "contentWidth": 360,
       "tier": "xs",
       "touch": false,
-      "score": 9.2,
+      "score": 24.2,
       "counts": {
         "overflowPx": 30,
-        "clipped": 0,
+        "clipped": 4,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "overflow 30px",
+      "line": "overflow 30px · 4 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": {
           "px": 30,
@@ -101,13 +122,53 @@
             {
               "selector": "div.nos-page > div > div",
               "px": 29,
-              "text": "NOUNV2 NOT DEPLOYED No auction h"
+              "text": "NOUN O'CLOCK ● NOUN #101BLK 2632"
             }
           ]
         },
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "DREAM",
+            "px": 29
+          },
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "PLAY",
+            "px": 8
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Save this Noun to your dream dra",
+            "px": 31
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 15
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -126,16 +187,17 @@
       "contentWidth": 390,
       "tier": "xs",
       "touch": false,
-      "score": 14.6,
+      "score": 29.6,
       "counts": {
         "overflowPx": 15,
-        "clipped": 0,
+        "clipped": 4,
         "covered": 1,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 1,
         "smallTargets": 0
       },
-      "line": "overflow 15px · 1 covered · 1 overlaps",
+      "line": "overflow 15px · 4 clipped · 1 covered · 2 on art · 1 overlaps",
+      "warnings": [],
       "issues": {
         "overflow": {
           "px": 15,
@@ -143,11 +205,40 @@
             {
               "selector": "div.nos-page > div > div",
               "px": 14,
-              "text": "NOUNV2 NOT DEPLOYED No auction h"
+              "text": "NOUN O'CLOCK ● NOUN #101BLK 2632"
             }
           ]
         },
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "PLAY",
+            "px": 3
+          },
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "DREAM",
+            "px": 10
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 10
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Save this Noun to your dream dra",
+            "px": 12
+          }
+        ],
         "covered": [
           {
             "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
@@ -155,7 +246,18 @@
             "by": "div > div > button > span"
           }
         ],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [
           {
             "a": "div.nos-page > div > div > button",
@@ -180,21 +282,55 @@
       "contentWidth": 430,
       "tier": "sm",
       "touch": false,
-      "score": 0,
+      "score": 12,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 3,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "3 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "DREAM",
+            "px": 35
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Save this Noun to your dream dra",
+            "px": 37
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 33
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -213,21 +349,41 @@
       "contentWidth": 520,
       "tier": "sm",
       "touch": false,
-      "score": 0,
+      "score": 6,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 1,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "1 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 32
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -246,21 +402,62 @@
       "contentWidth": 640,
       "tier": "md",
       "touch": false,
-      "score": 0,
+      "score": 15,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 4,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "4 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "DREAM",
+            "px": 35
+          },
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "PLAY",
+            "px": 5
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Save this Noun to your dream dra",
+            "px": 37
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 11
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -279,21 +476,48 @@
       "contentWidth": 768,
       "tier": "lg",
       "touch": false,
-      "score": 0,
+      "score": 9,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 2,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "2 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "DREAM",
+            "px": 30
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Save this Noun to your dream dra",
+            "px": 32
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -312,21 +536,48 @@
       "contentWidth": 900,
       "tier": "lg",
       "touch": false,
-      "score": 0,
+      "score": 9,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 2,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "2 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "PLAY",
+            "px": 20
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 27
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -345,21 +596,33 @@
       "contentWidth": 1024,
       "tier": "xl",
       "touch": false,
-      "score": 0,
+      "score": 3,
       "counts": {
         "overflowPx": 0,
         "clipped": 0,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -378,21 +641,48 @@
       "contentWidth": 1280,
       "tier": "xl",
       "touch": false,
-      "score": 0,
+      "score": 9,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 2,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "2 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "PLAY",
+            "px": 4
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 11
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -411,21 +701,48 @@
       "contentWidth": 1440,
       "tier": "2xl",
       "touch": false,
-      "score": 0,
+      "score": 9,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 2,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "2 clipped · 2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "PLAY",
+            "px": 10
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 16
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -444,21 +761,33 @@
       "contentWidth": 1920,
       "tier": "2xl",
       "touch": false,
-      "score": 0,
+      "score": 3,
       "counts": {
         "overflowPx": 0,
         "clipped": 0,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 2,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "2 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div.nos-page > div > div > button",
+            "label": "Connect wallet to settle",
+            "art": "section.cbr-wrap > div > div > canvas"
+          },
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -477,21 +806,43 @@
       "contentWidth": 2560,
       "tier": "2xl",
       "touch": false,
-      "score": 0,
+      "score": 7.5,
       "counts": {
         "overflowPx": 0,
-        "clipped": 0,
+        "clipped": 2,
         "covered": 0,
-        "overArt": 0,
+        "overArt": 1,
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "2 clipped · 1 on art",
+      "warnings": [],
       "issues": {
         "overflow": null,
-        "clipped": [],
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "PLAY",
+            "px": 18
+          },
+          {
+            "kind": "control",
+            "selector": "div.cbr-track > div.cbr-slot > div.cbr-btns > button.cbr-btn.cbr-play",
+            "clipper": "div.nos-page > div > section.cbr-wrap",
+            "text": "Noun World plays V1 Nouns for no",
+            "px": 24
+          }
+        ],
         "covered": [],
-        "overArt": [],
+        "overArt": [
+          {
+            "selector": "div > div > div.inline-flex.items-center > button.relative.flex",
+            "label": "V1",
+            "art": "section.cbr-wrap > div > div > canvas"
+          }
+        ],
         "overlaps": [],
         "smallTargets": []
       },
@@ -510,21 +861,19 @@
       "contentWidth": 320,
       "tier": "xs",
       "touch": true,
-      "score": 11.3,
+      "score": 1.5,
       "counts": {
-        "overflowPx": 46,
+        "overflowPx": 0,
         "clipped": 0,
         "covered": 0,
         "overArt": 0,
         "overlaps": 0,
         "smallTargets": 5
       },
-      "line": "overflow 46px · 5 small taps",
+      "line": "5 small taps",
+      "warnings": [],
       "issues": {
-        "overflow": {
-          "px": 46,
-          "offenders": []
-        },
+        "overflow": null,
         "clipped": [],
         "covered": [],
         "overArt": [],
@@ -577,21 +926,19 @@
       "contentWidth": 360,
       "tier": "xs",
       "touch": true,
-      "score": 9.9,
+      "score": 1.5,
       "counts": {
-        "overflowPx": 10,
+        "overflowPx": 0,
         "clipped": 0,
         "covered": 0,
         "overArt": 0,
         "overlaps": 0,
         "smallTargets": 5
       },
-      "line": "overflow 10px · 5 small taps",
+      "line": "5 small taps",
+      "warnings": [],
       "issues": {
-        "overflow": {
-          "px": 10,
-          "offenders": []
-        },
+        "overflow": null,
         "clipped": [],
         "covered": [],
         "overArt": [],
@@ -654,6 +1001,7 @@
         "smallTargets": 5
       },
       "line": "1 covered · 1 overlaps · 5 small taps",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -730,6 +1078,7 @@
         "smallTargets": 5
       },
       "line": "5 small taps",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -794,6 +1143,7 @@
         "smallTargets": 5
       },
       "line": "5 small taps",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -858,6 +1208,7 @@
         "smallTargets": 5
       },
       "line": "5 small taps",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -922,6 +1273,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -955,6 +1307,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -988,6 +1341,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -1021,6 +1375,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -1054,6 +1409,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -1087,6 +1443,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -1120,6 +1477,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
