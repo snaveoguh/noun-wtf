@@ -827,6 +827,14 @@ body[data-mural] [data-spray], body[data-mural] .nos-tray, body[data-mural] [dat
   border: 0; background: #ffc110; color: #111; font: 700 13px ui-monospace, Menlo, monospace;
   letter-spacing: .05em; box-shadow: 0 3px 14px rgba(0,0,0,.4); cursor: pointer; }
 body[data-w2select] .mu-enter, body[data-camp-intro] .mu-enter { display: none; }
+/* Narrow portrait screens (phones): the top centre is the respect meter's,
+   so the chip goes to the left edge, between the top-left buttons and the
+   record / map / spray column. Landscape phones keep the top centre: their
+   chip row ends above it, and the left edge is their icon column */
+@media (max-width: 600px) {
+  .mu-enter { left: calc(var(--w2-safe-left, env(safe-area-inset-left)) + 10px); transform: none;
+    top: 38%; }
+}
 .mu-pop { position: absolute; z-index: 62; left: calc(env(safe-area-inset-left) + 86px); top: 50%;
   transform: translateY(-50%); width: min(300px, calc(100vw - 110px)); max-height: calc(100vh - 120px);
   overflow: auto; background: rgba(20,20,26,.94); border-radius: 18px; padding: 12px;
