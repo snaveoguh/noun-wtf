@@ -262,14 +262,16 @@ const Pip3Page: React.FC = () => {
 
       {/* Masonry grid */}
       <style>{`
-        @container page (max-width: 1023.98px) { .pip3-grid { column-count: 18 !important; } }
-        @container page (max-width: 759.98px)  { .pip3-grid { column-count: 12 !important; } }
-        @container page (max-width: 639.98px)  { .pip3-grid { column-count: 8 !important; } }
+        @container page (max-width: 1023.98px) { .pip3-grid { column-count: 12 !important; } }
+        @container page (max-width: 759.98px)  { .pip3-grid { column-count: 8 !important; } }
         @container page (max-width: 559.98px)  { .pip3-grid { column-count: 5 !important; column-gap: 3px !important; padding: 0 3px !important; } }
         @container page (max-width: 399.98px)  { .pip3-grid { column-count: 4 !important; } }
         .pip3-tile { display: block; width: 100%; padding: 0; border: 0; font: inherit; color: inherit; text-align: inherit; }
         .pip3-tile:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-        @media (pointer: coarse) { .pip3-tap { display: inline-flex !important; align-items: center; min-height: 40px; } }
+        @media (pointer: coarse) {
+          .pip3-tap { display: inline-flex !important; align-items: center; min-height: 40px; }
+          .pip3-tile img { min-height: 40px; }
+        }
       `}</style>
       {gifs.length > 0 && (
         <div

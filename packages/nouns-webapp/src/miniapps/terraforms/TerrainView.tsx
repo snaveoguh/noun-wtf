@@ -1012,9 +1012,10 @@ const TerrainViewCanvas: FC<{
 
       {/* CSS3D overlay disabled — was causing blue blob + potential rendering issues */}
 
-      {/* Controls: a bar under the view in narrow windows, floating over
-          its bottom-right corner (as before) from md up */}
-      <div className="@md:absolute @md:bottom-5 @md:right-5 @md:border-0 @md:p-0 z-10 flex shrink-0 justify-end gap-2 border-t border-white/10 px-4 py-2">
+      {/* Controls: a bar under the view in narrow windows (on the left, clear
+          of the floating NOUN FM chip), floating over its bottom-right corner
+          (as before) from md up */}
+      <div className="@md:absolute @md:bottom-5 @md:right-5 @md:justify-end @md:border-0 @md:p-0 z-10 flex shrink-0 justify-start gap-2 border-t border-white/10 px-4 py-2">
         <button
           type="button"
           className="[@media(pointer:coarse)]:min-h-10"
