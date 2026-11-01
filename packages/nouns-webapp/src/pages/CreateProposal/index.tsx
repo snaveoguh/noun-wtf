@@ -6,7 +6,7 @@ import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Alert, Button, Col, Form } from 'react-bootstrap';
+import { Alert, Button, Form } from 'react-bootstrap';
 import { Link } from 'react-router';
 import { withStepProgress } from 'react-stepz';
 import { filter } from 'remeda';
@@ -80,7 +80,7 @@ const CreateProposalPage = () => {
           transaction.calldata = `0x${transaction.calldata}`;
         }
 
-        if (transaction.usdcValue) {
+        if (transaction.usdcValue !== undefined && Boolean(transaction.usdcValue)) {
           setTotalUSDCPayment(totalUSDCPayment + transaction.usdcValue);
         }
       });
@@ -101,7 +101,7 @@ const CreateProposalPage = () => {
 
   useEffect(() => {
     // only set this once
-    if (latestProposalId !== undefined && !previousProposalId) {
+    if (latestProposalId !== undefined && !Boolean(previousProposalId)) {
       setPreviousProposalId(latestProposalId);
     }
   }, [latestProposalId, previousProposalId]);
@@ -174,7 +174,11 @@ const CreateProposalPage = () => {
   );
 
   const hasEnoughVote = Boolean(
-    availableVotes && proposalThreshold && availableVotes > proposalThreshold,
+    availableVotes != null &&
+      proposalThreshold != null &&
+      availableVotes !== 0 &&
+      proposalThreshold !== 0 &&
+      availableVotes > proposalThreshold,
   );
 
   const handleCreateProposal = async () => {
@@ -250,7 +254,7 @@ const CreateProposalPage = () => {
         onActionAdd={handleAddProposalAction}
       />
 
-      <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+      <div className={classes.createProposalForm}>
         <div className={classes.wrapper}>
           <Link to={'/vote'}>
             <button className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>←</button>
@@ -355,7 +359,7 @@ const CreateProposalPage = () => {
           isFormInvalid={isFormInvalid}
           handleCreateProposal={handleCreateProposal}
         />
-      </Col>
+      </div>
     </Section>
   );
 };

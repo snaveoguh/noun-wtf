@@ -4,7 +4,7 @@ import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Alert, Button, Col, FormControl } from 'react-bootstrap';
+import { Alert, Button, FormControl } from 'react-bootstrap';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { formatEther } from 'viem';
@@ -50,8 +50,7 @@ const EditCandidatePage = () => {
     const content = candidate.version.content;
     const description = content.description ?? '';
     const firstNewline = description.indexOf('\n');
-    const body =
-      firstNewline >= 0 ? description.slice(firstNewline + 1).replace(/^\n+/, '') : '';
+    const body = firstNewline >= 0 ? description.slice(firstNewline + 1).replace(/^\n+/, '') : '';
     setTitleValue(content.title ?? '');
     setBodyValue(body);
     const txs: ProposalTransaction[] = (content.targets ?? []).map((target, i) => ({
@@ -130,11 +129,11 @@ const EditCandidatePage = () => {
   if (candidateLoading) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <div className={classes.createProposalForm}>
           <p>
             <Trans>Loading candidate…</Trans>
           </p>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -142,12 +141,12 @@ const EditCandidatePage = () => {
   if (!candidate) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <div className={classes.createProposalForm}>
           <Alert variant="danger">
             <Trans>Candidate not found.</Trans>
           </Alert>
           <Link to="/candidates">← Back to candidates</Link>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -155,12 +154,12 @@ const EditCandidatePage = () => {
   if (!account) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <div className={classes.createProposalForm}>
           <Alert variant="info">
             <Trans>Connect your wallet to edit this candidate.</Trans>
           </Alert>
           <Link to={`/candidates/${id}`}>← Back to candidate</Link>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -168,12 +167,12 @@ const EditCandidatePage = () => {
   if (!isProposer) {
     return (
       <Section fullWidth={false} className={classes.createProposalPage}>
-        <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+        <div className={classes.createProposalForm}>
           <Alert variant="warning">
             <Trans>Only the original proposer can edit this candidate.</Trans>
           </Alert>
           <Link to={`/candidates/${id}`}>← Back to candidate</Link>
-        </Col>
+        </div>
       </Section>
     );
   }
@@ -186,7 +185,7 @@ const EditCandidatePage = () => {
         onActionAdd={handleAddProposalAction}
       />
 
-      <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+      <div className={classes.createProposalForm}>
         <div className={classes.wrapper}>
           <Link to={`/candidates/${id}`}>
             <button className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>←</button>
@@ -205,7 +204,8 @@ const EditCandidatePage = () => {
           <br />
           <strong>
             <Trans>
-              Edit fee: {updateCandidateCost ? formatEther(updateCandidateCost) : '0'} ETH
+              Edit fee: {updateCandidateCost !== undefined ? formatEther(updateCandidateCost) : '0'}{' '}
+              ETH
             </Trans>
           </strong>
         </Alert>
@@ -261,10 +261,11 @@ const EditCandidatePage = () => {
         </Button>
         <p className={classes.feeNotice}>
           <Trans>
-            {updateCandidateCost ? formatEther(updateCandidateCost) : '0'} ETH fee upon submission
+            {updateCandidateCost !== undefined ? formatEther(updateCandidateCost) : '0'} ETH fee
+            upon submission
           </Trans>
         </p>
-      </Col>
+      </div>
     </Section>
   );
 };
