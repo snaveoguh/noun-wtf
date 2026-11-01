@@ -124,6 +124,9 @@ export function collect(opts) {
   // 2. Text (and controls) cut off by an overflow:hidden ancestor inside the page.
   const clipped = [];
   const clipCheck = (el, rect, label, kind) => {
+    // inside a deliberate overlay on art (data-responsive-art-ok), things
+    // sliding off the art's edge (3D panels, a moving camera) are the design
+    if (el.closest('[data-responsive-art-ok]')) return;
     for (let a = el.parentElement; a && a !== root; a = a.parentElement) {
       const s = css(a);
       // Partly visible in a scroll box (a tab strip, the phone tray) is
@@ -206,7 +209,11 @@ export function collect(opts) {
     }
     // The text's own box clipping it (white-space:nowrap + overflow:hidden, no ellipsis)
     const s = css(el);
-    if ((clips(s) || clipsY(s)) && s.textOverflow !== 'ellipsis') {
+    if (
+      (clips(s) || clipsY(s)) &&
+      s.textOverflow !== 'ellipsis' &&
+      !el.closest('[data-responsive-art-ok]')
+    ) {
       const er = el.getBoundingClientRect();
       const outX = clips(s) ? Math.max(er.left - r.left, r.right - er.right) : 0;
       if (outX > 2 && !srOnly(er)) {
