@@ -70,14 +70,18 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
 
   return (
     <div
-      className="mt-3 cursor-text rounded-xl border border-green-900/60 bg-black px-3 py-2.5 font-mono text-sm shadow-[0_0_12px_rgba(34,197,94,0.15)] sm:px-4"
+      className="mt-3 cursor-text rounded-xl border border-green-900/60 bg-black px-3 py-2.5 font-mono text-sm shadow-[0_0_12px_rgba(34,197,94,0.15)] @sm:px-4 [@media(pointer:coarse)]:py-0"
       onClick={() => inputRef.current?.focus()}
     >
       <div className="flex items-center gap-2">
         <span className="shrink-0 select-none text-green-600">
-          probe@noun.wtf<span className="text-green-800">:~$</span>
+          {/* narrow windows keep just the "~$" so the input has room */}
+          <span className="@max-sm:hidden">probe@noun.wtf</span>
+          <span className="text-green-800">
+            <span className="@max-sm:hidden">:</span>~$
+          </span>
         </span>
-        <div className="relative flex-1">
+        <div className="relative min-w-0 flex-1">
           <input
             ref={inputRef}
             type="text"
@@ -93,12 +97,12 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
             autoCorrect="off"
             autoCapitalize="off"
             aria-label="Search nouns by ID, trait name, or hex colour"
-            className="w-full bg-transparent text-green-400 caret-green-400 placeholder:text-green-900 focus:outline-none"
+            className="w-full bg-transparent text-green-400 [@media(pointer:coarse)]:min-h-10 caret-green-400 placeholder:text-green-900 focus:outline-none"
             style={value === '' ? { paddingLeft: '1.5ch' } : undefined}
             placeholder="search id, traits or hex… try: fox, disco, 1000, #c54e38, nounsweeper"
           />
           {value === '' && (
-            <span className="pointer-events-none absolute left-0 top-0 animate-pulse text-green-500">
+            <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 animate-pulse text-green-500">
               █
             </span>
           )}
@@ -136,7 +140,11 @@ const ProbeTerminal: React.FC<ProbeTerminalProps> = ({
             ? `[${matchCount}/${totalCount}]`
             : seedsReady
               ? `[${totalCount}]`
-              : '[loading traits…]'}
+              : (
+                <>
+                  [<span className="@max-sm:hidden">loading traits</span>…]
+                </>
+              )}
         </span>
       </div>
       {sweeper && (
