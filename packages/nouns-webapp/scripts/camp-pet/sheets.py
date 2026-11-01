@@ -1,7 +1,8 @@
 """Lay the CAMP pet concept frames out as contact sheets.
 
-python3 scripts/camp-pet/sheets.py <framesDir> <outDir>
-(run from packages/nouns-webapp; frames come from render.cjs)
+python3 scripts/camp-pet/sheets.py <framesDir> <outDir> [fridgeDir]
+(run from packages/nouns-webapp; frames come from render.cjs, the fridge
+shots from fridge.cjs)
 """
 import json
 import os
@@ -150,7 +151,36 @@ def overview():
     S.save(os.path.join(OUT, 'overview.png'), optimize=True)
 
 
+def fridge_sheet(fd):
+    """Before you adopt it: up on CAMP's fridge, shot in the live game."""
+    head_h = 190
+    tw = (W - 2 * M - GAP) // 2
+    th = tw * 800 // 1280
+    rows = [('mochi', 'perched, keeping an eye on the room'), ('nub', 'napping (noggles pushed up)'),
+            ('zip', 'watching you'), ('bean', 'napping')]
+    H = head_h + len(rows) * (th + 44) + 50
+    S = Image.new('RGB', (W, H), BG)
+    d = ImageDraw.Draw(S)
+    label(d, M, 26, 'ON THE FRIDGE', font(LON, 92))
+    label(d, M + d.textlength('ON THE FRIDGE', font=font(LON, 92)) + 24, 70, 'before you adopt it', font(LON, 44), ROSE)
+    label(d, M, 128, "Until it's adopted it lives up on CAMP's fridge, out of reach. Talk to it there to adopt it.", font(BOLD, 24))
+    label(d, M, 160, "Shot in the live game (offline) on the fridge already in world/camp/layout.ts (0.75 x 0.7 x 1.8 m, back corner by the kitchen), "
+          'in the room\'s own sunset light.', font(SANS, 19), MUTED)
+    y = head_h
+    for vid, cap in rows:
+        name = next(v['name'] for v in VARIANTS if v['id'] == vid)
+        for i, view in enumerate(['wide', 'close']):
+            im = Image.open(os.path.join(fd, f'fridge-{vid}-{view}.png')).convert('RGB').resize((tw, th), Image.LANCZOS)
+            S.paste(im, (M + i * (tw + GAP), y))
+        label(d, M, y + th + 6, name, font(LON, 30))
+        label(d, M + d.textlength(name, font=font(LON, 30)) + 12, y + th + 12, cap, font(SANS, 20), MUTED)
+        y += th + 44
+    S.save(os.path.join(OUT, 'fridge.png'), optimize=True)
+
+
 for v in VARIANTS:
     variant_sheet(v)
 overview()
+if len(sys.argv) > 3:
+    fridge_sheet(sys.argv[3])
 print('ok')

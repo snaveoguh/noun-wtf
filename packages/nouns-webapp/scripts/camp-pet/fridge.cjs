@@ -41,17 +41,24 @@ const out = path.resolve(process.argv[2] || '.');
     g.running = false;
     for (let i = 0; i < 30; i++) g.step(1 / 60);
   });
-  await p.addStyleTag({
-    content: 'body *{visibility:hidden!important} canvas{visibility:visible!important}',
+  // HUD off; the minimap is a canvas too, so hide every canvas but the game's
+  await p.evaluate(() => {
+    const st = document.createElement('style');
+    st.textContent = 'body *{visibility:hidden!important} canvas{visibility:visible!important}';
+    document.head.appendChild(st);
+    const cvs = [...document.querySelectorAll('canvas')];
+    const main = cvs.reduce((a, c) => (c.width * c.height > a.width * a.height ? c : a));
+    for (const c of cvs) if (c !== main) c.style.setProperty('display', 'none', 'important');
   });
-  // fridge in the room frame (world/camp/layout.ts): x -4.35, z d-0.4, 0.75 x 0.7 x 1.8, yaw PI-0.25
+  // The fridge in the room frame (world/camp/layout.ts): x -4.35, z d-0.4,
+  // 0.75 x 0.7 x 1.8 m. Room x runs right to left seen from the window.
   const shots = [
-    ['mochi', 'perch', 'perched'],
-    ['nub', 'sleep', 'napping'],
-    ['zip', 'idle', 'watching'],
-    ['bean', 'sleep', 'napping'],
+    ['mochi', 'perch'],
+    ['nub', 'sleep'],
+    ['zip', 'idle'],
+    ['bean', 'sleep'],
   ];
-  for (const [id, pose, cap] of shots) {
+  for (const [id, pose] of shots) {
     for (const view of ['wide', 'close']) {
       await p.evaluate(
         async ({ id, pose, view }) => {
@@ -65,30 +72,35 @@ const out = path.resolve(process.argv[2] || '.');
           const top = o.y + 1.8;
           if (window.__pet) window.__pet.parent.remove(window.__pet);
           const pet = await m.petModel(id, pose, 0.25);
-          pet.position.set(fx, top, fz + 0.05);
-          // facing the room (and the window), turned a bit to the camera
-          pet.rotation.y = Math.PI + 0.25 + 0.5;
+          pet.position.set(fx + 0.02, top, fz - 0.02);
+          pet.rotation.y = Math.atan2(3.45, -4.3) - 0.35; // out into the room
           g.gfx.scene.add(pet);
           window.__pet = pet;
-          // the rider stands below, looking up at it
-          g.player.pos.set(fx + 1.05, o.y + 0.05, fz - 1.2);
+          // the rider beside the fridge, looking at it
+          const rx = fx + 1.9;
+          const rz = fz - 1.3;
+          g.player.pos.set(rx, o.y + 0.05, rz);
           g.player.vel.set(0, 0, 0);
-          for (let i = 0; i < 8; i++) g.step(1 / 60);
-          g.me.root.rotation.y = Math.atan2(fx - (fx + 1.05), fz - (fz - 1.2));
-          const look =
-            view === 'wide' ? new V(fx + 0.6, o.y + 1.35, fz - 0.4) : new V(fx, top + 0.25, fz);
-          const pos =
+          g.cam.rig =
             view === 'wide'
-              ? new V(fx + 3.2, o.y + 1.7, fz - 3.6)
-              : new V(fx + 1.0, top + 0.5, fz - 1.25);
-          g.cam.rig = { pos, look, fov: view === 'wide' ? 55 : 40 };
-          for (let i = 0; i < 4; i++) g.step(1 / 60);
+              ? {
+                  pos: new V(fx + 3.45, o.y + 1.45, fz - 4.3),
+                  look: new V(fx + 0.75, o.y + 1.35, fz - 0.5),
+                  fov: 50,
+                }
+              : {
+                  pos: new V(fx + 1.2, o.y + 2.35, fz - 1.5),
+                  look: new V(fx + 0.05, top + 0.22, fz - 0.05),
+                  fov: 42,
+                };
+          for (let i = 0; i < 6; i++) g.step(1 / 60);
+          g.me.root.rotation.y = Math.atan2(fx - rx, fz - rz);
+          g.gfx.composer.render();
         },
         { id, pose, view },
       );
-      await p.waitForTimeout(500);
       await p.screenshot({ path: path.join(out, `fridge-${id}-${view}.png`), timeout: 300000 });
-      console.log('wrote', id, view, cap);
+      console.log('wrote', id, view);
     }
   }
   await b.close();
