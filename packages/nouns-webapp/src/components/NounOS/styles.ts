@@ -192,6 +192,9 @@ export const NOS_CSS = `
 .nos-icon:hover{transform:scale(1.06)}
 .nos-icon svg{width:100%;height:100%;display:block}
 .mode-world .nos-icon{opacity:0;pointer-events:none}
+/* A full-screen phone window would sit under the icon (over its title and
+   back button); the tray's NOUN.WTF chip opens the same directory. */
+.nos-root:has(.nos-win.is-mobile:not(.is-sunk)) .nos-icon{opacity:0;pointer-events:none}
 
 /* ── 3. pond ──────────────────────────────────────────── */
 .nos-water{position:absolute;left:0;bottom:0;width:100vw;z-index:1;pointer-events:none;transition:opacity .7s ease;
