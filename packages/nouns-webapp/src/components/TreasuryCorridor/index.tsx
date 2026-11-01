@@ -13,7 +13,47 @@ import DataPanels from './DataPanels';
 import NounCharacter from './NounCharacter';
 import { useStatsData } from './useStatsData';
 
-// ─── HUD Overlay ────────────────────────────────────────────────────────────
+// ─── HUD ────────────────────────────────────────────────────────────────────
+// The hint and the /nonsense link sit in a bar above the scene, so the canvas
+// stays full-bleed under it with no controls on it; the read-outs (progress,
+// % explored, auto-walk) stay overlaid on the scene's bottom edge.
+
+const HUDBar: FC = () => (
+  <div
+    style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      padding: '8px 12px',
+      background: '#050510',
+      borderBottom: '1px solid var(--theme-divider)',
+      fontFamily: "'PT Root UI', monospace, sans-serif",
+      fontSize: '0.75rem',
+      flex: 'none',
+    }}
+  >
+    <span style={{ color: 'var(--theme-text-muted)', minWidth: 0 }}>
+      WASD / Arrows to move, Click + drag to look, Space for auto-walk
+    </span>
+    {/* The same treasury figures, flat and explained */}
+    <Link
+      to="/nonsense"
+      className="inline-flex items-center [@media(pointer:coarse)]:min-h-10"
+      style={{
+        color: '#d4ff3a',
+        background: 'rgba(0,0,0,0.6)',
+        padding: '4px 10px',
+        borderRadius: 6,
+        border: '1px solid var(--theme-divider)',
+        textDecoration: 'none',
+      }}
+    >
+      treasury in plain numbers: what it holds, where it went →
+    </Link>
+  </div>
+);
 
 const HUD: FC<{ playerZ: number; autoWalk: boolean }> = ({ playerZ, autoWalk }) => {
   const progress = Math.min(100, Math.max(0, (-playerZ / 240) * 100));
@@ -28,52 +68,6 @@ const HUD: FC<{ playerZ: number; autoWalk: boolean }> = ({ playerZ, autoWalk }) 
         fontFamily: "'PT Root UI', monospace, sans-serif",
       }}
     >
-      {/* Controls hint — top center */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 16,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-        }}
-      >
-        <span
-          style={{
-            fontSize: '0.75rem',
-            color: 'var(--theme-text-muted)',
-            background: 'rgba(0,0,0,0.5)',
-            padding: '4px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--theme-divider)',
-          }}
-        >
-          WASD / Arrows to move, Click + drag to look, Space for auto-walk
-        </span>
-      </div>
-
-      {/* The same treasury figures, flat and explained — top left */}
-      <Link
-        to="/nonsense"
-        style={{
-          position: 'absolute',
-          top: 52,
-          left: 16,
-          pointerEvents: 'auto',
-          fontSize: '0.75rem',
-          color: '#d4ff3a',
-          background: 'rgba(0,0,0,0.6)',
-          padding: '4px 10px',
-          borderRadius: 6,
-          border: '1px solid var(--theme-divider)',
-          textDecoration: 'none',
-        }}
-      >
-        treasury in plain numbers: what it holds, where it went →
-      </Link>
-
       {/* Progress bar — bottom */}
       <div
         style={{
@@ -188,39 +182,52 @@ const TreasuryCorridor: FC = () => {
   return (
     <div
       style={{
-        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
         width: '100%',
-        height: '100vh',
+        flex: '1 1 auto',
+        minHeight: 360,
         background: '#050510',
-        overflow: 'hidden',
       }}
       onKeyDown={handleKeyDown}
     >
-      {data.loading && <LoadingScreen />}
-
-      <Canvas
-        camera={{ fov: 70, near: 0.1, far: 300, position: [0, 2.5, 4] }}
-        gl={{
-          antialias: true,
-          toneMapping: 3, // ACESFilmicToneMapping
-          toneMappingExposure: 1.2,
+      <HUDBar />
+      {/* The 3D scene: its in-world panels are art and slide off its edges as you walk. */}
+      <div
+        data-responsive-art-ok
+        style={{
+          position: 'relative',
+          flex: '1 1 auto',
+          minHeight: 0,
+          overflow: 'hidden',
         }}
-        dpr={[1, 1.5]}
-        style={{ background: '#050510' }}
       >
-        <Suspense fallback={null}>
-          <Corridor />
-          <NounCharacter onPositionChange={handlePositionChange} />
-          <DataPanels data={data} playerZ={playerZ} />
+        {data.loading && <LoadingScreen />}
 
-          {/* Post-processing */}
-          <EffectComposer>
-            <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={0.8} />
-          </EffectComposer>
-        </Suspense>
-      </Canvas>
+        <Canvas
+          camera={{ fov: 70, near: 0.1, far: 300, position: [0, 2.5, 4] }}
+          gl={{
+            antialias: true,
+            toneMapping: 3, // ACESFilmicToneMapping
+            toneMappingExposure: 1.2,
+          }}
+          dpr={[1, 1.5]}
+          style={{ background: '#050510' }}
+        >
+          <Suspense fallback={null}>
+            <Corridor />
+            <NounCharacter onPositionChange={handlePositionChange} />
+            <DataPanels data={data} playerZ={playerZ} />
 
-      <HUD playerZ={playerZ} autoWalk={autoWalk} />
+            {/* Post-processing */}
+            <EffectComposer>
+              <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={0.8} />
+            </EffectComposer>
+          </Suspense>
+        </Canvas>
+
+        <HUD playerZ={playerZ} autoWalk={autoWalk} />
+      </div>
     </div>
   );
 };
