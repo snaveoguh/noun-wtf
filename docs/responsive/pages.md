@@ -16,17 +16,19 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | route | status |
 | --- | --- |
 | `/noun/:id`, `/v2/noun/:id` (Auction) | pilot, 26/26 clean in the last --all run · before/after sheets in `.claude/responsive-shots/noun-2062*/` |
-| `/` (homescreen) | severity 21.5 → 13.7, 0/13 clean both runs. Phones' own problems are fixed (hero stacked, tap sizes, jump chips, no clipping in the page); what's left is shell (tray, NOUN FM button) or harness false positives, plus the wide hero kept as designed · `claude/responsive-home`, sheets in `.claude/responsive-shots/home/` |
-| `/studio` | 6/26 → 26/26 clean (branch `claude/responsive-studio`) · before/after sheets in `.claude/responsive-shots/studio/` |
-| `/vote`, `/candidates` (governance lists) | 26/26 clean each (before 12/26 and 22/26, with live indexer data) · sheets in `.claude/responsive-shots/{vote,candidates}/` · PR responsive: governance lists |
+| `/` (homescreen) | 0/13 → 0/13 clean, severity 21.5 → 13.7 (**partial**). Phones' own problems are fixed (hero stacked, tap sizes, jump chips, no clipping in the page); what's left is shell (tray, NOUN FM button) or harness false positives, plus the wide hero kept as designed · `claude/responsive-home` (#220), sheets in `.claude/responsive-shots/home/` |
+| `/probe` | 11/26 → 26/26 clean · `claude/responsive-probe` (#221) |
+| `/studio` | 6/26 → 26/26 clean · `claude/responsive-studio` (#222), sheets in `.claude/responsive-shots/studio/` |
+| `/vote`, `/candidates` (governance lists) | `/vote` 12/26 → 26/26, `/candidates` 22/26 → 26/26 clean (live indexer data) · `claude/responsive-governance` (#223), sheets in `.claude/responsive-shots/{vote,candidates}/` |
+| `/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist` (info) | 82/104 → 104/104 clean · `claude/responsive-info` (#224) |
 
 ## Work units (worst first)
 
-1. `/` — severity 21.5, viewport code 4
-2. `/studio` — severity 12.2, viewport code 0 · **done: 26/26 clean**
-3. `/probe` — severity 10.1, viewport code 65 · **done: 26/26 clean** (branch `claude/responsive-probe`)
-4. `/vote`, `/candidates` — severity 5.9, viewport code 47 (group: governance)
-5. `/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist` — severity 3.7 (1 not measured), viewport code 4 (group: info) — **done**: 82/104 → 104/104 clean
+1. `/` — severity 21.5, viewport code 4 · **partial: severity 13.7** (rest is shell / harness, see Done)
+2. ~~`/studio`~~ — done (see Done)
+3. ~~`/probe`~~ — done (see Done)
+4. ~~`/vote`, `/candidates`~~ — done (see Done)
+5. ~~`/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist`~~ — done (see Done)
 6. `/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3` — severity 3.2 (4 not measured), viewport code 32 (group: art)
 7. `/nounv2/1`, `/nounv2/create`, `/nounv2` — severity 0.7, viewport code 48 (group: nounv2)
 8. `/playground` — severity 0.4, viewport code 9
