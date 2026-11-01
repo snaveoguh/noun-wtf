@@ -6,8 +6,11 @@
 //   pen        paints, always. Once a pen has been seen, fingers never paint
 //              (penOnly): one finger pans, two pan + pinch-zoom.
 //   palm       while a pen is down, or within PALM_MS of it lifting, new
-//              touches are ignored until they lift; so is any touch with a
-//              big contact patch (the side of a hand).
+//              touches are ignored until they lift; once a pen has been
+//              used, so is a contact patch wider than PALM_PX (the side of
+//              a hand). Without a pen, size never rejects a touch: iPadOS
+//              reports an ordinary fingertip as 40–70 px (2 × its contact
+//              radius), and a 48 px cutoff threw every finger away.
 //   fingers    without a pen: in 'paint' one finger paints, in 'move' it
 //              pans; two fingers always navigate. A second finger landing
 //              within CANCEL_MS of the first cancels the stroke it started
@@ -50,7 +53,7 @@ export interface GestureOut {
 }
 
 export const PALM_MS = 500;
-export const PALM_PX = 48;
+export const PALM_PX = 100;
 export const CANCEL_MS = 260;
 export const TAP_MS = 320;
 export const TAP_SLOP = 14;
@@ -137,7 +140,7 @@ export class GestureClassifier {
     const palm =
       this.penDown ||
       s.t - this.penUpAt < PALM_MS ||
-      Math.max(s.w, s.h) > PALM_PX ||
+      (this.penOnly && Math.max(s.w, s.h) > PALM_PX) ||
       this.painter?.type === 'pen';
     this.touches.set(s.id, { id: s.id, x: s.x, y: s.y, x0: s.x, y0: s.y, palm });
     if (palm) return;

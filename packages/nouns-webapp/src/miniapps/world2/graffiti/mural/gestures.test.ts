@@ -76,11 +76,38 @@ describe('pen paints, fingers navigate', () => {
     expect(log).toEqual(['start:pen:9', 'end:9']);
   });
 
-  it('palm: a big contact patch never counts', () => {
-    g.down(S({ id: 2, w: 80, h: 70 }));
-    g.move(S({ id: 2, x: 300 }));
-    expect(log).toEqual([]);
+  it('palm: with a pen around, a big contact patch never counts', () => {
+    g.down(S({ id: 9, type: 'pen' }));
+    g.up(S({ id: 9, type: 'pen', t: 10 }));
+    g.down(S({ id: 2, w: 130, h: 110, t: 2000 }));
+    g.move(S({ id: 2, x: 300, t: 2010 }));
+    expect(log).toEqual(['start:pen:9', 'end:9']);
     expect(pans).toEqual([]);
+  });
+
+  // iPadOS reports a finger's PointerEvent width as 2 × its contact radius:
+  // 40–70 px is an ordinary fingertip there (the owner's "didn't paint anything")
+  it('iPad fingers (52–70 px contacts) paint with no pen', () => {
+    g.down(S({ id: 1, w: 52, h: 52 }));
+    g.move(S({ id: 1, x: 150, w: 58, h: 58, t: 20 }));
+    g.up(S({ id: 1, x: 150, w: 58, h: 58, t: 400 }));
+    g.down(S({ id: 2, w: 70, h: 64, t: 1000 }));
+    g.up(S({ id: 2, w: 70, h: 64, t: 1300 }));
+    expect(log).toEqual(['start:touch:1', 'move:1', 'end:1', 'start:touch:2', 'end:2']);
+  });
+
+  it('iPad fingers still pan and pinch once a pen has been used', () => {
+    g.down(S({ id: 9, type: 'pen' }));
+    g.up(S({ id: 9, type: 'pen', t: 10 }));
+    g.down(S({ id: 1, x: 100, w: 60, h: 60, t: 2000 }));
+    g.down(S({ id: 2, x: 200, w: 60, h: 60, t: 2010 }));
+    g.move(S({ id: 2, x: 300, w: 60, h: 60, t: 2040 }));
+    expect(zooms[0]).toBeCloseTo(2);
+  });
+
+  it('without a pen, size never rejects a touch (fingers are the brush)', () => {
+    g.down(S({ id: 1, w: 120, h: 120 }));
+    expect(log).toEqual(['start:touch:1']);
   });
 
   it('a hand already resting when the pen lands is ignored', () => {
