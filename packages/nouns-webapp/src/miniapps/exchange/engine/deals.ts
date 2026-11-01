@@ -29,6 +29,7 @@ import type {
 import { account, feeOf, MAX_PRICE, record } from './book';
 import { BOT_BY_ID, isBot } from './bots/roster';
 import { fairValue, isGood } from './goods';
+import { AGENT_ID_RE, isAgent, shopTakes } from './shops';
 import { pushFloor, riderAccount } from './sim';
 
 /** An offer lapses after this long. */
@@ -64,7 +65,10 @@ const TAG_RE = /^r:[\da-z]{1,12}$/;
 
 /** Is this a well-formed deal target? */
 export function isTarget(to: unknown): to is string {
-  return typeof to === 'string' && (TAG_RE.test(to) || (isBot(to) && BOT_BY_ID[to] !== undefined));
+  return (
+    typeof to === 'string' &&
+    (TAG_RE.test(to) || (isBot(to) && BOT_BY_ID[to] !== undefined) || AGENT_ID_RE.test(to))
+  );
 }
 
 /** Validate a deal action's shape (not funds). Returns null when fine. */
@@ -226,7 +230,7 @@ export function dealsView(s: ExchangeState, viewer: string, now: number, tagOf: 
 function ownerOfTag(s: ExchangeState, tag: string, tagOf: TagOf): string | null | 'ambiguous' {
   let found: string | null = null;
   for (const owner of Object.keys(s.accounts)) {
-    if (isBot(owner) || tagOf(owner) !== tag) continue;
+    if (isBot(owner) || isAgent(owner) || tagOf(owner) !== tag) continue;
     if (found !== null) return 'ambiguous';
     found = owner;
   }
@@ -240,7 +244,7 @@ export function dealAct(
   now: number,
   tagOf: TagOf,
 ): DealResult {
-  if (isBot(owner)) return { ok: false, reason: 'reserved', fills: [] };
+  if (isBot(owner) || isAgent(owner)) return { ok: false, reason: 'reserved', fills: [] };
   const bad = checkDeal(a);
   if (bad !== null) return { ok: false, reason: bad, fills: [] };
   riderAccount(s, owner, now);
@@ -259,6 +263,15 @@ export function dealAct(
     if (isBot(a.to)) {
       const botSide: Side = a.side === 'buy' ? 'sell' : 'buy';
       const take = botTakes(s, a.to, botSide, a.good, a.qty, a.price, now);
+      if (!take.ok) return { ok: false, reason: take.reason, fills: [] };
+      const buyer = a.side === 'buy' ? owner : a.to;
+      const seller = a.side === 'buy' ? a.to : owner;
+      return { ok: true, fills: [settle(s, buyer, seller, a.good, a.qty, a.price, now)] };
+    }
+    if (isAgent(a.to)) {
+      // An agent's shop: answered at once, at its posted price (shops.ts)
+      const agentSide: Side = a.side === 'buy' ? 'sell' : 'buy';
+      const take = shopTakes(s, a.to, agentSide, a.good, a.qty, a.price, now);
       if (!take.ok) return { ok: false, reason: take.reason, fills: [] };
       const buyer = a.side === 'buy' ? owner : a.to;
       const seller = a.side === 'buy' ? a.to : owner;
