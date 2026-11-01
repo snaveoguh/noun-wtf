@@ -1298,6 +1298,9 @@ export class Graffiti {
     if (l.rs !== null) {
       // Pen: keep the taper, then cut into runs of radius (old clients draw
       // the runs stepped, new ones join them back up: mural/runs.ts)
+      const np = s.pts.length / 2;
+      while (l.rs.length < np) l.rs.push(l.rs[l.rs.length - 1] ?? l.r);
+      l.rs.length = np;
       let lo = Infinity;
       for (const r of l.rs) lo = Math.min(lo, r);
       const sv = simplifyVar(s.pts, l.rs, simplifyEps(lo));
@@ -1337,7 +1340,11 @@ export class Graffiti {
       // Crossing into the next cell: carry the stroke over the seam
       const samePlane = l.cell.plane === cell.plane;
       const bridge = this.toLocal(l.cell, point);
-      if (samePlane && l.anchor === null && this.inRange(bridge)) l.stroke.pts.push(...bridge);
+      if (samePlane && l.anchor === null && this.inRange(bridge)) {
+        l.stroke.pts.push(...bridge);
+        // Pen strokes: one radius per point, always (simplifyVar / runs need it)
+        if (l.rs !== null) l.rs.push(pen ?? l.r);
+      }
       const prev = this.prevWorld;
       this.finishStroke();
       if (samePlane && prev !== null) {

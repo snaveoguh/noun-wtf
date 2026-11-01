@@ -43,12 +43,13 @@ export const MURAL_FOV = 40;
 export const FIT_VIEW: MuralView = { panU: 0, panV: 0, zoom: 1 };
 
 /**
- * Visible wall height at zoom 1: a 5 m × 3 m patch fits either way round
- * (landscape shows ~3 m tall, portrait as much as it needs for 5 m across).
+ * Visible wall height at zoom 1: landscape fits a 5 m × 3.2 m patch; portrait
+ * shows at least 3.2 m across and never more than 4.6 m up, so the wall
+ * stays big enough to paint on a tall screen.
  */
 export function fitHeight(aspect: number): number {
   const a = aspect > 0 ? aspect : 1;
-  return Math.min(8, Math.max(3.2, 5 / a));
+  return a >= 1 ? Math.max(3.2, 5 / a) : Math.min(4.6, Math.max(3.2, 3.2 / a));
 }
 
 export function halfSize(view: MuralView, aspect: number, fitH: number) {
@@ -168,4 +169,16 @@ export function gridLines(lo: number, hi: number, step: number, max = 200): numb
   for (let x = Math.ceil(lo / step) * step; x <= hi && out.length < max; x += step)
     out.push(Math.round(x * 1000) / 1000);
   return out;
+}
+
+/**
+ * How far along a ray (origin o, unit direction d) to skip so it starts
+ * `lead` metres in front of the plane n·x = planeD. 0 if the ray doesn't
+ * head into the plane or already starts within `lead` of it.
+ */
+export function skipTo(o: V3, d: V3, n: V3, planeD: number, lead: number): number {
+  const dn = d.x * n.x + d.y * n.y + d.z * n.z;
+  if (dn > -1e-4) return 0;
+  const t = (planeD - (o.x * n.x + o.y * n.y + o.z * n.z)) / dn;
+  return Math.max(0, t - lead / -dn);
 }

@@ -446,7 +446,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       </style>
       <HudPrefsStyle />
       <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
-      <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
+      <div ref={labelsRef} className="pointer-events-none absolute inset-0" data-w2labels />
       {game && started && !hoopsOn && !replaying && (
         <RingHud
           game={game}

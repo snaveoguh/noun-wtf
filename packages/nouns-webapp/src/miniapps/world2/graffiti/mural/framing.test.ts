@@ -12,6 +12,7 @@ import {
   panBy,
   screenOf,
   seatCentre,
+  skipTo,
   toNdc,
   viewPose,
   wallAt,
@@ -31,13 +32,15 @@ const H = 820;
 const A = W / H;
 
 describe('mural framing', () => {
-  it('fits a 5 × 3 m patch landscape and portrait', () => {
+  it('fits a 5 × 3.2 m patch landscape; portrait keeps the wall big', () => {
     const land = fitHeight(1180 / 820);
     expect(land).toBeGreaterThanOrEqual(3.2);
     expect(land * (1180 / 820)).toBeGreaterThanOrEqual(5 - 1e-9);
     const port = fitHeight(820 / 1180);
-    expect(port * (820 / 1180)).toBeGreaterThanOrEqual(5 - 1e-9);
-    expect(port).toBeLessThanOrEqual(8);
+    expect(port * (820 / 1180)).toBeGreaterThanOrEqual(3.1);
+    expect(port).toBeLessThanOrEqual(4.6 + 1e-9);
+    // A phone held upright: still no taller than 4.6 m
+    expect(fitHeight(390 / 844)).toBeLessThanOrEqual(4.6 + 1e-9);
   });
 
   it('the camera sits on the wall normal, looking flat-on, at the distance that fits', () => {
@@ -115,6 +118,20 @@ describe('mural framing', () => {
     expect(seatCentre(0.4, 0, 3.2, true)).toBeCloseTo(1.35);
     expect(seatCentre(4, 0, 3.2, true)).toBe(4);
     expect(seatCentre(0.4, 0, 3.2, false)).toBe(0.4);
+  });
+
+  it('skipTo starts a paint ray just in front of the wall', () => {
+    const n = { x: 0, y: 0, z: 1 };
+    // Wall plane z = -5 (n·x = -5); camera 4 m out, looking straight in
+    const t = skipTo({ x: 0, y: 1, z: -1 }, { x: 0, y: 0, z: -1 }, n, -5, 0.6);
+    expect(t).toBeCloseTo(3.4);
+    // At an angle: still lands 0.6 m off the plane (measured along n)
+    const d = { x: Math.SQRT1_2, y: 0, z: -Math.SQRT1_2 };
+    const t2 = skipTo({ x: 0, y: 1, z: -1 }, d, n, -5, 0.6);
+    expect(-1 + d.z * t2).toBeCloseTo(-4.4);
+    // Already close, or looking away: no skip
+    expect(skipTo({ x: 0, y: 1, z: -4.8 }, { x: 0, y: 0, z: -1 }, n, -5, 0.6)).toBe(0);
+    expect(skipTo({ x: 0, y: 1, z: -1 }, { x: 0, y: 0, z: 1 }, n, -5, 0.6)).toBe(0);
   });
 
   it('grid lines on round metres inside the range', () => {

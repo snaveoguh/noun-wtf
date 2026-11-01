@@ -23,6 +23,7 @@ import {
   type MuralView,
   panBy,
   seatCentre,
+  skipTo,
   viewPose,
   type WallFrame,
   zoomAbout,
@@ -33,6 +34,8 @@ const EASE_IN = 0.55;
 const EASE_FIT = 0.3;
 /** How far a wall may be from you to open on it (m). */
 const REACH = 6;
+/** Paint rays start this far (m) in front of the framed wall. */
+const LEAD = 0.6;
 
 export interface MuralState {
   active: boolean;
@@ -304,6 +307,15 @@ export class MuralMode {
     const cam = this.game.gfx.camera;
     cam.updateMatrixWorld();
     _ray.setFromCamera(_ndc, cam);
+    // Start the ray just in front of the framed wall: a lamp post, a bench
+    // or an invisible collider between the camera and the wall never takes
+    // the paint (you paint the wall you framed)
+    const f = this.frame;
+    if (f !== null) {
+      const ray = _ray.ray;
+      const t = skipTo(ray.origin, ray.direction, f.n, this.planeD, LEAD);
+      if (t > 0) ray.origin.addScaledVector(ray.direction, t);
+    }
     return _ray.ray;
   }
 

@@ -772,7 +772,7 @@ export function MuralUi({ game }: { game: Game }) {
 const CSS = `
 body[data-mural] [data-hud], body[data-mural] [data-w2hud], body[data-mural] .w2-tside,
 body[data-mural] .w2-tpad, body[data-mural] .w2-thint, body[data-mural] .w2-tbtn,
-body[data-mural] [data-spray], body[data-mural] .nos-tray { visibility: hidden !important; }
+body[data-mural] [data-spray], body[data-mural] .nos-tray, body[data-mural] [data-w2labels] { visibility: hidden !important; }
 .mu-root { position: absolute; inset: 0; z-index: 60; touch-action: none; user-select: none;
   -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none;
   font: 600 12px/1.1 ui-monospace, Menlo, monospace; color: #fff; cursor: crosshair; }
@@ -811,15 +811,15 @@ body[data-mural] [data-spray], body[data-mural] .nos-tray { visibility: hidden !
 .mu-cap { min-width: 52px; padding: 0 6px; font-size: 10px; }
 .mu-brushes { position: absolute; left: 50%; transform: translateX(-50%);
   bottom: calc(env(safe-area-inset-bottom) + 10px); display: flex; gap: 6px; flex-wrap: wrap;
-  justify-content: center; max-width: calc(100vw - 150px); }
+  justify-content: center; width: max-content; max-width: calc(100vw - 150px); }
 .mu-brush { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .mu-brush i { display: inline-block; border-radius: 50%; }
-.mu-toast { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + 66px);
+.mu-toast { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + 112px);
   transform: translateX(-50%); background: rgba(20,20,26,.85); color: #fff; padding: 8px 14px;
   border-radius: 12px; font: 600 12px ui-monospace, Menlo, monospace; pointer-events: none; z-index: 61;
   white-space: nowrap; }
 .mu-hint { position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: calc(env(safe-area-inset-bottom) + 64px); font-size: 11px; opacity: .8;
+  top: calc(env(safe-area-inset-top) + 66px); font-size: 11px; opacity: .8;
   background: rgba(0,0,0,.45); padding: 6px 10px; border-radius: 10px; pointer-events: none;
   text-align: center; max-width: calc(100vw - 160px); }
 .mu-enter { position: absolute; left: 50%; transform: translateX(-50%); z-index: 40;
