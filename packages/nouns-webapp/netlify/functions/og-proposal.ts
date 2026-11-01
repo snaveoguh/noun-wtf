@@ -1,5 +1,7 @@
 /**
- * Server-rendered HTML for /vote/:id and /candidates/:id share unfurls.
+ * Server-rendered HTML for /vote/:id, /candidates/:id and /noun/:id
+ * (+ /v2/noun/:id) share unfurls. A Noun's card image is drawn by
+ * og-noun-image.
  *
  * Crawlers (Slack, Twitter, Farcaster, iMessage, Discord) don't run JS,
  * so the SPA's index.html — which has no og:image — gives them nothing
@@ -217,9 +219,25 @@ interface RouteData {
   description: string;
   title: string;
   url: string;
+  /** A ready-made card image (a Noun's page); else the description's first image. */
+  image?: string;
 }
 
 async function resolveRouteData(path: string, isLil: boolean): Promise<RouteData | null> {
+  // A Noun's page unfurls as that Noun, big (og-noun-image draws it)
+  const nounMatch = path.match(/^\/(v2\/)?noun\/(\d{1,6})\/?$/);
+  if (nounMatch !== null) {
+    const v2 = nounMatch[1] !== undefined;
+    const id = nounMatch[2]!;
+    return {
+      description: v2
+        ? `NounV2 ${id} on noun.wtf.`
+        : `Noun ${id} on noun.wtf. One Noun, every day, forever.`,
+      title: v2 ? `NounV2 ${id}` : `Noun ${id}`,
+      url: `${SITE_URL}/${v2 ? 'v2/' : ''}noun/${id}`,
+      image: `${SITE_URL}/og/${v2 ? 'v2/' : ''}noun/${id}.png`,
+    };
+  }
   const voteMatch = path.match(/^\/vote\/([^#/?]+)/);
   if (voteMatch !== null && isLil) {
     const proposal = await fetchLilProposal(voteMatch[1]);
@@ -295,7 +313,11 @@ export async function handler(event: HandlerEvent): Promise<HandlerResponse> {
   let description = siteTagline;
   let image = FALLBACK_OG_IMAGE;
 
-  if (data !== null) {
+  if (data !== null && data.image !== undefined) {
+    title = data.title;
+    description = data.description;
+    image = data.image;
+  } else if (data !== null) {
     const firstImage = extractFirstImage(data.description);
     const extractedTitle = extractTitle(data.description, data.title);
     title = extractedTitle.length > 0 ? extractedTitle : data.title;

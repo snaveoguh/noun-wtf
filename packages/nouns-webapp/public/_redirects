@@ -20,6 +20,12 @@ https://www.probe.wtf/*  https://noun.wtf/probe  301!
 # request to the function and let it serve everyone.
 /vote/:id        /.netlify/functions/og-proposal  200
 /candidates/:id  /.netlify/functions/og-proposal  200
+# A Noun's page unfurls as that Noun: og-proposal adds the tags, and
+# og-noun-image draws the 1200 x 630 PNG they point at.
+/noun/:id        /.netlify/functions/og-proposal  200
+/v2/noun/:id     /.netlify/functions/og-proposal  200
+/og/noun/:file     /.netlify/functions/og-noun-image  200
+/og/v2/noun/:file  /.netlify/functions/og-noun-image  200
 
 # Read-only proxy to the pooter.world trading bot API for the terminal's
 # TRADING tab (TradingPanel.tsx). Same-origin so the browser needs no CORS.
