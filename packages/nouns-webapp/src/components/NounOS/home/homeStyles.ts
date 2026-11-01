@@ -20,7 +20,7 @@ const MONO = "'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace";
 
 export const HOME_CSS = `
 .nh{--bg:#07070a;--tx:#f4f2ea;--dim:#9b998f;--acid:#d4ff3a;--pink:#ff2f8e;--cyan:#20d6ff;--ink:#0b0b0f;
-  --gut:clamp(16px,4vw,56px);--cw:clamp(148px,13.6vw,204px);--hh:68px;
+  --gut:clamp(16px,4cqi,56px);--cw:clamp(148px,13.6cqi,204px);--hh:68px;
   position:absolute;inset:0;z-index:2;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
   background:var(--bg);color:var(--tx);scrollbar-width:thin;scrollbar-color:#2a2a30 transparent;
   transition:opacity .5s ease}
@@ -40,7 +40,7 @@ export const HOME_CSS = `
   padding:0 var(--gut) 0 72px;background:linear-gradient(180deg,rgba(0,0,0,.72),rgba(0,0,0,0));transition:background .35s ease,box-shadow .35s}
 .nh.is-scrolled .nh-head{background:rgba(7,7,10,.88);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);
   box-shadow:0 1px 0 rgba(255,255,255,.06),0 12px 30px rgba(0,0,0,.4)}
-.nh-brand{display:flex;align-items:baseline;gap:9px;color:var(--tx);text-decoration:none;flex-shrink:0}
+.nh-brand{display:flex;align-items:center;min-height:40px;gap:9px;color:var(--tx);text-decoration:none;flex-shrink:0}
 /* Quiet lockup: dark grey letters; a light band sweeps across on hover */
 .nh-wordmark{font-size:14px;line-height:1;letter-spacing:${WORDMARK_TRACKING};text-shadow:none;color:${WORDMARK_INK};
   background:${WORDMARK_SHIMMER} 100% 0/${WORDMARK_SHIMMER_SIZE} no-repeat;
@@ -51,10 +51,10 @@ export const HOME_CSS = `
 .nh-nav button{border:0;background:none;padding:8px 10px;border-radius:8px;font-size:14px;font-weight:600;color:rgba(244,242,234,.78);cursor:pointer;white-space:nowrap;transition:color .15s,background .15s}
 .nh-nav button:hover{color:#fff;background:rgba(255,255,255,.08)}
 .nh :focus-visible{outline:3px solid var(--acid);outline-offset:3px;border-radius:8px}
-@media (max-width:1180px){.nh-nav{display:none}.nh-head{justify-content:space-between}}
+@container page (max-width:1179.98px){.nh-nav{display:none}.nh-head{justify-content:space-between}}
 
 /* ask bar */
-.nh-ask{position:relative;margin-left:auto;width:min(380px,34vw);flex-shrink:0}
+.nh-ask{position:relative;margin-left:auto;width:min(380px,34cqi);flex-shrink:0}
 .nh-ask-toggle{display:none}
 .nh-ask-form{display:flex;align-items:center;gap:9px;height:42px;padding:0 10px 0 13px;border-radius:999px;
   background:rgba(12,12,16,.62);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:box-shadow .2s,background .2s}
@@ -67,7 +67,7 @@ export const HOME_CSS = `
 .nh-ask-form:focus-within .nh-ask-icon{color:var(--acid)}
 .nh kbd{font-size:11px;color:var(--dim);border:1px solid rgba(255,255,255,.18);border-radius:5px;padding:1px 6px;line-height:1.4}
 .nh-ask-form:focus-within kbd{display:none}
-.nh-drop{position:absolute;right:0;top:calc(100% + 8px);width:max(100%,420px);max-width:calc(100vw - 24px);padding:6px;border-radius:16px;
+.nh-drop{position:absolute;right:0;top:calc(100% + 8px);width:max(100%,420px);max-width:calc(100cqi - 24px);padding:6px;border-radius:16px;
   background:rgba(16,16,21,.97);box-shadow:0 0 0 1px rgba(255,255,255,.1),0 30px 70px rgba(0,0,0,.65);z-index:5;animation:nh-in .16s ease-out}
 .nh-drop>button{display:grid;grid-template-columns:1fr auto;gap:1px 12px;width:100%;text-align:left;border:0;background:none;padding:9px 12px;border-radius:10px;cursor:pointer}
 .nh-drop>button b{font-size:14px;font-weight:700;color:#fff}
@@ -81,7 +81,7 @@ export const HOME_CSS = `
 .nh-sugg{display:flex;flex-wrap:wrap;gap:6px}
 .nh-sugg button{border:0;border-radius:999px;padding:7px 12px;font-size:13px;background:rgba(255,255,255,.07);cursor:pointer}
 .nh-sugg button:hover{background:rgba(212,255,58,.9);color:#000}
-.nh-agent{position:absolute;right:0;top:calc(100% + 8px);width:min(460px,calc(100vw - 24px));max-height:min(60vh,520px);display:flex;flex-direction:column;
+.nh-agent{position:absolute;right:0;top:calc(100% + 8px);width:min(460px,calc(100cqi - 24px));max-height:min(60vh,520px);display:flex;flex-direction:column;
   border-radius:18px;background:rgba(12,12,16,.97);box-shadow:0 0 0 1px rgba(255,255,255,.1),0 30px 80px rgba(0,0,0,.7);z-index:4;overflow:hidden;animation:nh-in .2s ease-out}
 .nh-agent-head{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
 .nh-agent-head b{flex:1;font-size:13px;color:var(--acid)}
@@ -95,8 +95,8 @@ export const HOME_CSS = `
 .nh-agent-action{margin:6px 0 10px}
 .nh-agent-prompt{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid rgba(255,255,255,.07);color:var(--acid)}
 .nh-agent-prompt input{flex:1;background:none;border:0;outline:none;color:#fff;font-size:13px}
-@media (max-width:760px){
-  .nh{--hh:60px;--cw:clamp(118px,33vw,150px)}
+@container page (max-width:759.98px){
+  .nh{--hh:60px;--cw:clamp(118px,33cqi,150px)}
   .nh-head{padding:0 12px 0 72px;gap:10px}
   /* phones: the dark-grey lockup disappears on small screens; quiet white instead */
   .nh-wordmark{font-size:12px;background:none;-webkit-text-fill-color:rgba(255,255,255,.5);color:rgba(255,255,255,.5)}
@@ -135,13 +135,13 @@ export const HOME_CSS = `
 .nh-eyebrow b{color:#ff3b3b;letter-spacing:-.04em}
 .nh-eyebrow span{color:var(--dim);font-weight:500;margin-left:4px}
 .nh-hero h1{margin:14px 0 18px;line-height:1}
-.nh-gtitle{display:inline-flex;flex-direction:column;font-size:clamp(52px,6.8vw,108px);line-height:.84;color:#fff;transform:rotate(-3deg);transform-origin:0 100%;
+.nh-gtitle{display:inline-flex;flex-direction:column;font-size:clamp(52px,6.8cqi,108px);line-height:.84;color:#fff;transform:rotate(-3deg);transform-origin:0 100%;
   -webkit-text-stroke:.07em var(--ink);paint-order:stroke fill;
   text-shadow:.045em .045em 0 var(--pink),.09em .09em 0 var(--cyan),.13em .13em 0 var(--ink)}
 .nh-gtitle .is-acc{color:var(--acc,#ffd400);margin-left:.08em}
 .nh-strapline{display:inline-block;font-size:12.5px;font-weight:800;letter-spacing:.16em !important;color:var(--acc,var(--acid));
   background:var(--ink);padding:6px 12px 5px;box-shadow:4px 4px 0 var(--pink);margin-bottom:14px}
-.nh-hero-copy p{margin:0 0 24px;font-size:clamp(15px,1.25vw,17.5px);line-height:1.5;color:rgba(244,242,234,.9);text-shadow:0 1px 18px rgba(0,0,0,.8);max-width:500px}
+.nh-hero-copy p{margin:0 0 24px;font-size:clamp(15px,1.25cqi,17.5px);line-height:1.5;color:rgba(244,242,234,.9);text-shadow:0 1px 18px rgba(0,0,0,.8);max-width:500px}
 .nh-hero-cta{display:flex;gap:12px;flex-wrap:wrap}
 .nh .nh-play,body .nh-modal .nh-play{display:inline-flex;align-items:center;gap:10px;border:0;border-radius:10px;padding:13px 26px 13px 22px;
   background:#fff;color:#000;font-size:16px;font-weight:800;letter-spacing:.06em;cursor:pointer;
@@ -168,18 +168,38 @@ export const HOME_CSS = `
 .nh-hero.is-paused .nh-pips button.is-on i::after{animation:none;transform:none}
 @keyframes nh-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes nh-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-@media (max-width:760px){
-  .nh-hero-frame{height:min(80vh,600px);min-height:500px}
-  .nh-hero-shade{background:linear-gradient(0deg,var(--bg) 0%,rgba(7,7,10,.92) 30%,rgba(7,7,10,.35) 55%,rgba(7,7,10,0) 72%),
-    linear-gradient(180deg,rgba(7,7,10,.6) 0%,rgba(7,7,10,0) 20%)}
-  .nh-hero-copy{bottom:58px}
-  .nh-gtitle{font-size:clamp(52px,15vw,72px)}
-  .nh-hero-copy p{font-size:14.5px;margin-bottom:18px}
-  .nh-play,.nh-more{padding:11px 18px;font-size:15px}
-  .nh-hero-side{right:16px;bottom:auto;top:calc(var(--hh) + 10px)}
+/* lg–xl: the copy and the sound/CC0 side share the bottom row, so keep them apart */
+@container page (min-width:760px) and (max-width:1023.98px){
+  .nh-hero-copy{width:min(460px,calc(100% - 2 * var(--gut)))}
   .nh-hero-side::after{display:none}
-  .nh-sound{width:40px;height:40px}
-  .nh-pips{left:var(--gut);right:auto;bottom:24px}
+}
+/* Below lg the hero stacks: a solid header, the clip as a 16:9 band, then the
+   pips + sound, then the copy and buttons on the page background (nothing
+   sits on the video). */
+@container page (max-width:759.98px){
+  .nh-head{background:rgba(7,7,10,.96)}
+  .nh-hero{padding-top:var(--hh)}
+  .nh-hero-frame{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:12px;overflow:visible;background:var(--bg)}
+  .nh-hero-frame::after{bottom:auto;aspect-ratio:16/9;width:100%}
+  .nh-hero-slide{position:relative;inset:auto;grid-area:1/1/2/3;aspect-ratio:16/9;overflow:hidden;background:#000}
+  .nh-hero-shade{position:relative;inset:auto;grid-area:1/1/2/3;align-self:stretch;
+    background:linear-gradient(0deg,var(--bg) 0%,rgba(7,7,10,0) 26%)}
+  .nh-pips{position:static;grid-area:2/1/3/2;margin:4px 0 0 var(--gut);display:flex;gap:6px}
+  .nh-pips button{flex:1 1 0;min-width:40px;height:40px;padding:0;display:grid;align-content:center}
+  .nh-hero-side{display:contents}
+  .nh-sound{grid-area:2/2/3/3;margin:4px var(--gut) 0 0;width:40px;height:40px}
+  .nh-tap-hint{grid-area:3/1/4/3;justify-self:end;margin:2px var(--gut) 0}
+  .nh-hero-side::after{display:none}
+  .nh-hero-copy{position:static;grid-area:4/1/5/3;width:auto;max-width:560px;margin:10px var(--gut) 0}
+  .nh-gtitle{font-size:clamp(52px,15cqi,72px)}
+  .nh-hero-copy p{font-size:14.5px;margin-bottom:18px}
+  .nh-play,.nh-more{padding:11px 18px;font-size:15px;min-height:44px}
+}
+/* phones: nine pips don't fit one row at a 40 px tap size */
+@container page (max-width:559.98px){
+  .nh-pips{display:grid;grid-template-columns:repeat(5,minmax(40px,1fr));gap:0 6px}
+  .nh-hero-cta{flex-direction:column;align-items:stretch}
+  .nh-hero-cta button{justify-content:center}
 }
 
 /* ── manifesto strip + jump chips ───────────────────── */
@@ -191,23 +211,28 @@ export const HOME_CSS = `
 .nh-manifesto-links button{border:0;border-radius:999px;padding:7px 13px;font-size:12px;font-weight:800;letter-spacing:.08em;background:rgba(255,255,255,.08);cursor:pointer}
 .nh-manifesto-links button:hover{background:#fff;color:#000}
 .nh-jumps{display:none}
-@media (max-width:1180px){
-  .nh-jumps{display:flex;gap:6px;overflow-x:auto;padding:2px var(--gut) 6px;scrollbar-width:none;position:relative;z-index:3}
+@container page (max-width:1179.98px){
+  .nh-jumps{display:flex;flex-wrap:wrap;gap:6px;padding:2px var(--gut) 6px;position:relative;z-index:3}
   .nh-jumps::-webkit-scrollbar{display:none}
   .nh-jumps button{flex-shrink:0;border:0;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:700;background:rgba(255,255,255,.08);cursor:pointer}
 }
-@media (max-width:760px){.nh-manifesto{margin:4px 16px 14px;padding:12px 14px;gap:10px}.nh-manifesto p{min-width:0;flex-basis:100%;font-size:13px}}
+@media (pointer:coarse){.nh-manifesto-links button,.nh-jumps button{min-height:40px}.nh-foot button{min-height:40px;padding:0 4px}}
+/* Phones: the home stops above the tray bar (46 px, as .nos-win.is-mobile), so cards never sit under it */
+@container page (max-width:759.98px){.nh{bottom:calc(46px + env(safe-area-inset-bottom))}}
+/* The desk pond is always behind the opaque home in desk mode; hide it so it never shows through the tray band */
+.nos-root.mode-desk:has(> .nh) > canvas.nos-water{visibility:hidden}
+@container page (max-width:759.98px){.nh-manifesto{margin:4px 16px 14px;padding:12px 14px;gap:10px}.nh-manifesto p{min-width:0;flex-basis:100%;font-size:13px}}
 
 /* ── shelves ─────────────────────────────────────────── */
 .nh-rows{position:relative;z-index:2;padding-bottom:150px}
 .nh-shelf{margin:8px 0 10px;scroll-margin-top:calc(var(--hh) + 8px)}
 .nh-shelf-head{display:flex;align-items:baseline;gap:14px;padding:0 var(--gut);flex-wrap:wrap}
-.nh-shelf-head h2{margin:0;display:flex;align-items:center;gap:10px;font-size:clamp(24px,2.3vw,32px);font-weight:900;line-height:1;letter-spacing:.01em;color:#fff;text-transform:uppercase}
+.nh-shelf-head h2{margin:0;display:flex;align-items:center;gap:10px;font-size:clamp(24px,2.3cqi,32px);font-weight:900;line-height:1;letter-spacing:.01em;color:#fff;text-transform:uppercase}
 .nh-shelf-head h2 i{width:10px;height:10px;border-radius:2px;background:var(--acc);box-shadow:0 0 14px var(--acc);transform:rotate(45deg)}
 .nh-shelf-head p{margin:0;font-size:14px;color:var(--dim)}
 .nh-count{font-size:11px;color:rgba(155,153,143,.7);margin-left:auto;letter-spacing:.08em}
 .nh-strip-wrap{position:relative}
-.nh-strip{display:flex;gap:clamp(10px,1.1vw,16px);overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-padding-inline:var(--gut);
+.nh-strip{display:flex;gap:clamp(10px,1.1cqi,16px);overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-padding-inline:var(--gut);
   padding:16px var(--gut) 30px;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 .nh-strip::-webkit-scrollbar{display:none}
 .nh-slot{flex:0 0 var(--cw);scroll-snap-align:start;position:relative}
@@ -219,7 +244,8 @@ export const HOME_CSS = `
 .nh-strip-wrap:hover .nh-arrow{opacity:1}
 .nh-arrow:hover{color:var(--acc)}
 .nh-arrow[hidden]{display:none}
-@media (hover:none),(max-width:760px){.nh-arrow{display:none}}
+@media (hover:none){.nh-arrow{display:none}}
+@container page (max-width:759.98px){.nh-arrow{display:none}}
 
 /* card */
 .nh-card{display:block;position:relative;width:100%;aspect-ratio:2/3;padding:0;border:0;border-radius:12px;background:#15151a;color:#fff;text-decoration:none;
@@ -387,6 +413,7 @@ body .nh-form-done h2{margin:0 0 10px;font-size:44px !important;font-weight:900;
 body .nh-form-done p{margin:0 auto 22px;max-width:380px}
 @keyframes nh-fade{from{opacity:0}to{opacity:1}}
 @keyframes nh-pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+/* dialogs are fixed portals on <body>, outside the page container: the viewport is right here */
 @media (max-width:640px){body .nh-sheet.is-game{grid-template-columns:1fr}body .nh-sheet-art{min-height:0;aspect-ratio:5/4}}
 
 /* ── intro (portal on body) ─────────────────────────── */
