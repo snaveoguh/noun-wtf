@@ -9,17 +9,7 @@ import {
 } from '@nouns/assets';
 import { buildSVG, EncodedImage, PNGCollectionEncoder } from '@nouns/sdk';
 import { PNG } from 'pngjs';
-import {
-  Button,
-  Col,
-  Container,
-  FloatingLabel,
-  Form,
-  Image,
-  OverlayTrigger,
-  Popover,
-  Row,
-} from 'react-bootstrap';
+import { Button, FloatingLabel, Form, Image, OverlayTrigger, Popover } from 'react-bootstrap';
 
 import InfoIcon from '@/assets/icons/Info.svg';
 import Noun from '@/components/LegacyNoun';
@@ -295,27 +285,25 @@ const Playground: React.FC = () => {
         />
       )}
 
-      <Container fluid="lg">
-        <Row>
-          <Col lg={10} className={classes.headerRow}>
-            <span>
-              <Trans>Explore</Trans>
-            </span>
-            <h1>
-              <Trans>Playground</Trans>
-            </h1>
-            <p>
-              <Trans>
-                The playground was built using the {nounsProtocolLink}. Noun&apos;s traits are
-                determined by the Noun Seed. The seed was generated using {nounsAssetsLink} and
-                rendered using the {nounsSDKLink}.
-              </Trans>
-            </p>
-          </Col>
-        </Row>
-        <Row>
-          <Col lg={3}>
-            <Col lg={12}>
+      <div className={classes.page}>
+        <div className={classes.headerRow}>
+          <span>
+            <Trans>Explore</Trans>
+          </span>
+          <h1>
+            <Trans>Playground</Trans>
+          </h1>
+          <p>
+            <Trans>
+              The playground was built using the {nounsProtocolLink}. Noun&apos;s traits are
+              determined by the Noun Seed. The seed was generated using {nounsAssetsLink} and
+              rendered using the {nounsSDKLink}.
+            </Trans>
+          </p>
+        </div>
+        <div className={classes.layout}>
+          <div className={classes.sidebar}>
+            <div>
               <PlainButton
                 onClick={() => {
                   generateNounSvg();
@@ -324,12 +312,12 @@ const Playground: React.FC = () => {
               >
                 <Trans>Generate Nouns</Trans>
               </PlainButton>
-            </Col>
-            <Row>
+            </div>
+            <div className={classes.traitGrid}>
               {traits &&
                 traits.map((trait, index) => {
                   return (
-                    <Col lg={12} xs={6} key={trait.title}>
+                    <div key={trait.title}>
                       <Form className={classes.traitForm}>
                         <FloatingLabel
                           controlId="floatingSelect"
@@ -354,10 +342,10 @@ const Playground: React.FC = () => {
                           </Form.Select>
                         </FloatingLabel>
                       </Form>
-                    </Col>
+                    </div>
                   );
                 })}
-            </Row>
+            </div>
             <label style={{ margin: '1rem 0 .25rem 0' }} htmlFor="custom-trait-upload">
               <Trans>Upload Custom Trait</Trans>
               <OverlayTrigger
@@ -417,14 +405,17 @@ const Playground: React.FC = () => {
                 worth of Nouns
               </Trans>
             </p>
-          </Col>
-          <Col lg={9}>
-            <Row>
+          </div>
+          <div>
+            <div className={classes.nounGrid}>
               {nounSvgs &&
                 nounSvgs.map((svg, i) => {
                   return (
-                    <Col xs={4} lg={3} key={i}>
-                      <div
+                    <div key={i}>
+                      <button
+                        type="button"
+                        className={classes.nounButton}
+                        aria-label="View noun"
                         onClick={() => {
                           setIndexOfNounToDisplay(i);
                           setDisplayNoun(true);
@@ -436,14 +427,14 @@ const Playground: React.FC = () => {
                           className={classes.nounImg}
                           wrapperClassName={classes.nounWrapper}
                         />
-                      </div>
-                    </Col>
+                      </button>
+                    </div>
                   );
                 })}
-            </Row>
-          </Col>
-        </Row>
-      </Container>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 };

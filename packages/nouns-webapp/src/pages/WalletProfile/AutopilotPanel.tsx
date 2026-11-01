@@ -657,7 +657,7 @@ const AutoSetupCard: FC<{
             <span className="wp-mono" title={relayerAddr}>
               {relayerAddr}
             </span>{' '}
-           , balance{' '}
+            , balance{' '}
             <span className={`wp-mono ${relayerLow ? 'wp-neg' : ''}`}>
               {relayerBalance != null ? `${relayerBalance.toFixed(4)} ETH` : '—'}
             </span>
@@ -1043,8 +1043,8 @@ export const AutopilotPanel: FC<{
           <span className="flex items-center gap-2">
             <SparklesIcon size={12} /> Autopilot
             {q.data?.updatedAt != null && (
-              <span className="hidden normal-case opacity-60 sm:inline">
-               , saved {relTime(q.data.updatedAt)}
+              <span className="@md:inline hidden normal-case opacity-60">
+                , saved {relTime(q.data.updatedAt)}
               </span>
             )}
           </span>
@@ -1107,8 +1107,8 @@ export const AutopilotPanel: FC<{
         <AutoSetupCard address={address} relayer={q.data?.relayer} delegations={delegations} />
       )}
 
-      <div className="grid gap-3 lg:grid-cols-5">
-        <Card className="lg:col-span-3" title="Preferences">
+      <div className="@lg:grid-cols-5 grid gap-3">
+        <Card className="@lg:col-span-3" title="Preferences">
           {q.isLoading ? (
             <div className="grid gap-2">
               <Skeleton h={80} />
@@ -1129,7 +1129,7 @@ export const AutopilotPanel: FC<{
 
               <div>
                 <div className="wp-h">Stances</div>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="@md:grid-cols-2 grid gap-2">
                   {STANCE_KEYS.map(k => {
                     const v = prefs.stances[k] ?? 0;
                     return (
@@ -1162,7 +1162,7 @@ export const AutopilotPanel: FC<{
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="@md:grid-cols-3 grid gap-3">
                 <div>
                   <div className="wp-h">Max ask (ETH)</div>
                   <input
@@ -1210,7 +1210,7 @@ export const AutopilotPanel: FC<{
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="@md:grid-cols-2 grid gap-3">
                 <div>
                   <div className="wp-h">Blocked proposers</div>
                   <input
@@ -1243,7 +1243,7 @@ export const AutopilotPanel: FC<{
                   style={{ borderColor: 'var(--theme-border)' }}
                 >
                   <div className="wp-h !mb-0">Auto-vote rules</div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="@md:grid-cols-2 grid gap-3">
                     <div>
                       <div className="wp-muted mb-1 text-xs">DAOs to auto-vote</div>
                       <div className="flex flex-wrap gap-3">
@@ -1329,7 +1329,7 @@ export const AutopilotPanel: FC<{
           )}
         </Card>
 
-        <Card className="lg:col-span-2" title={`Recommendations, ${recs.length}`}>
+        <Card className="@lg:col-span-2" title={`Recommendations, ${recs.length}`}>
           {q.isLoading && (
             <div className="grid gap-2">
               <Skeleton h={60} />

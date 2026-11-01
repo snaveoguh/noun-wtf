@@ -113,6 +113,20 @@ export const ROUTES = [
   { path: 'onchain', url: '/onchain', group: 'stats' },
   { path: 'explore/wallet', url: '/explore/wallet', group: 'wallet' },
   { path: 'explore/wallet/:identity', url: '/explore/wallet/nouns.eth', group: 'wallet' },
+  // the profile's other tabs, and the owner view (Autopilot) through its fixture
+  ...['votes', 'proposals', 'candidates', 'auctions', 'nouns', 'treasury', 'activity', 'graph'].map(
+    tab => ({
+      path: 'explore/wallet/:identity',
+      url: `/explore/wallet/nouns.eth?tab=${tab}`,
+      group: 'wallet',
+      settle: 15000,
+    }),
+  ),
+  {
+    path: 'explore/wallet/:identity',
+    url: '/explore/wallet/nouns.eth?fixture=1',
+    group: 'wallet',
+  },
   { path: 'gamer', url: '/gamer', group: 'wallet' },
   { path: 'gamer/:identity', url: '/gamer/nouns.eth', group: 'wallet' },
   { path: 'crystal-ball', url: '/crystal-ball', group: 'auction' },
@@ -217,9 +231,18 @@ export function analyse(raw, { touch = false } = {}) {
     overlaps: overlaps.length,
     smallTargets: small.length,
   };
+  // Warnings never change the score: look at the sheet when they show up.
+  const w = raw.warnings ?? {};
+  const warnings = [
+    ...(w.notConfigured ? [`not configured: ${w.notConfigured}`] : []),
+    ...(w.squeezed ?? []).map(
+      q => `squeezed (${q.lines} lines, ${q.w}px): ${q.selector} "${q.text}"`,
+    ),
+  ];
   return {
     counts,
     score: scoreOf(counts),
+    warnings,
     issues: { overflow, clipped, covered, overArt, overlaps, smallTargets: small.slice(0, 20) },
   };
 }

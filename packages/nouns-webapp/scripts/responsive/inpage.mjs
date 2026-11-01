@@ -9,6 +9,14 @@ export function collect(opts) {
     (win && win.querySelector('.nos-content')) ||
     (o.allowDocument ? document.scrollingElement || document.documentElement : null);
   if (!root) return { error: 'no navigator .nos-content on the page' };
+  // The app's error boundary (or vite reloading mid-load) is a broken shot, not a layout
+  if (
+    /Something went wrong/i.test(root.innerText || '') &&
+    !root.querySelector('button, a[href], input')
+  )
+    return {
+      error: 'error boundary: "Something went wrong" (cold vite? the shot is retried once)',
+    };
   const isDoc = root === document.scrollingElement || root === document.documentElement;
 
   const rr = isDoc
@@ -163,6 +171,10 @@ export function collect(opts) {
   const range = document.createRange();
   let n;
   let textCount = 0;
+  // Warnings: reported, never scored. Squeezed = a sentence wrapped to about one
+  // word per line (a float or neighbour crushing its column); the overflow and
+  // clip checks can't see it.
+  const squeezed = [];
   while ((n = walker.nextNode()) && textCount < 4000) {
     const t = n.nodeValue;
     if (!t || !t.trim()) continue;
@@ -172,6 +184,18 @@ export function collect(opts) {
     range.selectNodeContents(n);
     const r = range.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
+    const words = t.trim().split(/\s+/).length;
+    if (words >= 4 && squeezed.length < 12) {
+      const tops = new Set(Array.from(range.getClientRects(), q => Math.round(q.top)));
+      if (tops.size >= 4 && words / tops.size <= 1.5) {
+        squeezed.push({
+          selector: selector(el),
+          text: t.trim().slice(0, 40),
+          lines: tops.size,
+          w: Math.round(r.width),
+        });
+      }
+    }
     // The text's own box clipping it (white-space:nowrap + overflow:hidden, no ellipsis)
     const s = css(el);
     if ((clips(s) || clipsY(s)) && s.textOverflow !== 'ellipsis') {
@@ -386,6 +410,15 @@ export function collect(opts) {
     isDocument: isDoc,
     content,
     overflowOffenders: overflowOffenders.slice(0, 12),
+    warnings: {
+      squeezed,
+      // a page rendering its "… not configured" stub measures as clean: missing VITE_* env?
+      notConfigured: /not configured/i.test(root.innerText || '')
+        ? ((root.innerText || '').match(/[^\n]*not configured[^\n]*/i) || [''])[0]
+            .trim()
+            .slice(0, 80)
+        : null,
+    },
     clipped: clipped.slice(0, 40),
     covered: covered.slice(0, 30),
     overArt: overArt.slice(0, 30),
