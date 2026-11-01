@@ -102,6 +102,7 @@ import { AudioMixer } from './settings/mixer';
 import { settings } from './settings/store';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
+import { SkydiveSystem } from './skydive/SkydiveSystem';
 import { townsDecorator } from './towns/build';
 import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
@@ -373,6 +374,8 @@ export class Game {
   readonly breaks: BreakMode = new BreakMode(this);
   /** Parkour (parkour/): wall runs, ledges, poles… on foot, and NOUN PARKOUR's routes. */
   readonly parkour: ParkourSystem = new ParkourSystem(this);
+  /** Skydiving (skydive/): long falls become freefall, with a parachute. */
+  readonly skydive: SkydiveSystem = new SkydiveSystem(this);
   /** Noun Pool (pool/net/PoolMode.ts, PoolApi): bar tables + the pool hall; owns the frame. */
   readonly pool: PoolMode = new PoolMode(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
@@ -1179,6 +1182,7 @@ export class Game {
       this.cam.update(dt, this.player, input.lookX, input.lookY, now);
       this.updateMyCharacter(dt);
       this.parkour.frame(dt, input);
+      this.skydive.frame(dt, input);
     }
     perf.lap('character');
     this.updateAudio(dt);
@@ -2028,6 +2032,7 @@ export class Game {
     r.pointer?.remove();
     this.remotes.delete(id);
     this.parkour.dropRemote(id);
+    this.skydive.dropRemote(id);
   }
 
   /** How a sound at `pos` reaches the listener (the camera): distance gain + stereo pan. */
@@ -2127,6 +2132,7 @@ export class Game {
         car: this.cars.netKey,
         lc: this.cars.leftKey,
         pk: this.parkour.netKey(),
+        sk: this.skydive.netKey(),
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
@@ -2168,6 +2174,7 @@ export class Game {
         riding: c.mode === 'board' && !c.anim.includes('bail'),
       });
       this.parkour.remote(id, ch, c.pk, dt);
+      this.skydive.remote(id, ch, c.sk, c.mode === 'board', dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       this.interiors.poseRemote(id, ch, rp.room ?? null, dt);
       // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
@@ -2537,6 +2544,7 @@ export class Game {
     this.hoops.dispose();
     this.breaks.dispose();
     this.parkour.dispose();
+    this.skydive.dispose();
     this.pool.dispose();
     this.freestyle.dispose();
     this.hideseek.dispose();

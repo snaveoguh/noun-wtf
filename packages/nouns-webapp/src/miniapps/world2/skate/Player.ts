@@ -336,6 +336,18 @@ export class Player {
     busy(): boolean;
   } | null = null;
 
+  /**
+   * Skydiving (skydive/): called first in every step (on foot, before
+   * parkour; on the board, unless a set piece drives the rider). It only
+   * shapes `vel` (drag, tracking, the canopy) and the heading; this step's
+   * own gravity, collision and landing still run. While `active`, on-foot
+   * air control and the board's air spin are its, not the Player's.
+   */
+  sky: {
+    step(dt: number, input: InputFrame): void;
+    readonly active: boolean;
+  } | null = null;
+
   /** Bumped on every spawn / rescue, so the ride recorder can start afresh. */
   respawns = 0;
 
@@ -398,6 +410,7 @@ export class Player {
     }
 
     if (this.mode === 'foot') {
+      this.sky?.step(dt, input);
       if (this.parkour !== null && this.parkour.step(dt, input, camYaw)) {
         // parkour moved the rider
       } else if (this.climb !== null) this.updateClimb(dt, input);
@@ -411,6 +424,7 @@ export class Player {
 
     // A set piece may be driving the rider (see `ride`)
     const driven = this.ride !== null && this.ride(dt);
+    if (!driven) this.sky?.step(dt, input);
     if (!driven)
       switch (this.state) {
         case 'ground':
@@ -615,10 +629,16 @@ export class Player {
     const t = this.tuning;
     const mag = Math.min(1, Math.hypot(input.moveX, input.moveY));
     const target = _v.set(0, 0, 0);
+    // Skydiving steers the body itself (skydive/): no air control here, but
+    // tracking into a wall still reads as pushing into it (grab it)
+    const sky = this.sky?.active === true && !this.footGrounded;
     // Keyboard walks like the board rides: A/D turn, W/S forward/back, and
     // the camera swings in behind the heading. Sticks stay camera-relative.
     this.footTank = input.mode === 'keyboard';
-    if (this.footTank) {
+    if (sky) {
+      if (input.moveY > 0.3)
+        target.set(Math.sin(this.footYaw), 0, Math.cos(this.footYaw)).multiplyScalar(input.moveY);
+    } else if (this.footTank) {
       if (Math.abs(input.moveX) > 0.05) this.footYaw -= input.moveX * FOOT_TURN_RATE * dt;
       const fwdIn = input.moveY;
       if (Math.abs(fwdIn) > 0.05) {
@@ -643,7 +663,7 @@ export class Player {
     const accel = this.footGrounded ? 18 : 5;
     const hv = _v2.set(this.vel.x, 0, this.vel.z);
     // Airborne with no stick input keeps its momentum (wall jumps carry)
-    if (this.footGrounded || mag > 0.05) hv.lerp(target, 1 - Math.exp(-accel * dt * 0.6));
+    if (!sky && (this.footGrounded || mag > 0.05)) hv.lerp(target, 1 - Math.exp(-accel * dt * 0.6));
     this.vel.x = hv.x;
     this.vel.z = hv.z;
 
@@ -1525,8 +1545,8 @@ export class Player {
       else if (this.queuedFlips.length < 8) this.queuedFlips.push(tr);
     }
 
-    // Spin with the left stick
-    const spinRate = 6.2;
+    // Spin with the left stick (skydiving turns the board itself)
+    const spinRate = this.sky?.active === true ? 0 : 6.2;
     const spin = -input.moveX * spinRate * dt;
     if (Math.abs(spin) > 0) {
       _q.setFromAxisAngle(this.vertLip ? this.up : UP, spin);

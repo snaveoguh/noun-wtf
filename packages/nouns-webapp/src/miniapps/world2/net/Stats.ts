@@ -442,6 +442,11 @@ export class StatsTracker {
   private airStartClock = 0;
   private airMaxY = 0;
   private airT = 0;
+  /**
+   * This air had a skydive in it (skydive/: drag, a canopy): it doesn't fall
+   * at the game's gravity, so no air / hang record comes out of it.
+   */
+  private airVoid = false;
   private grindM = 0;
   private lastBankedAt = -1;
   // Run proofs
@@ -705,11 +710,13 @@ export class StatsTracker {
         this.airStartClock = this.clock;
         this.airMaxY = p.pos.y;
         this.airT = 0;
+        this.airVoid = false;
       }
+      if (p.sky?.active === true) this.airVoid = true;
       this.airT += dt;
       this.airMaxY = Math.max(this.airMaxY, p.pos.y);
     } else if (this.airStartY !== null) {
-      if (p.state !== 'bail' && this.trace !== null) {
+      if (p.state !== 'bail' && this.trace !== null && !this.airVoid) {
         // The ride up to this landing proves the jump (kept at full rate)
         const t0 = this.trace.t0;
         const jump: [number, number] = [this.airStartClock - t0 - 0.5, this.clock - t0 + 0.1];

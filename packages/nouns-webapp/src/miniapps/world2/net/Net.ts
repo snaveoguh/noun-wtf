@@ -21,6 +21,8 @@
 // noggles badge on their name tag; cosmetic, not checked by the server).
 // Parkour (parkour/net/pk.ts): `pk: [code, phase, side, amt]` only while a
 // parkour pose shows (wall run, ledge hang, pole…), so others see it.
+// Skydiving (skydive/net/sk.ts): `sk: [phase, posture, open, steer]` only
+// while freefalling or under canopy, so others see the dive and the chute.
 // Freestyle (breakdance/freestyle/wire.ts): `fs: [move, seq, beat, n, bpm]`
 // only while the rider is breakdancing on the spot.
 // Outfit (character/outfit.ts): `of`, four base-36 chars (trousers, their
@@ -80,6 +82,8 @@ export interface NetPose {
   vehicle?: Vehicle;
   /** Parkour pose key (parkour/net/pk.ts), raw: decoded where it's drawn. */
   pk?: unknown;
+  /** Skydive pose key (skydive/net/sk.ts), raw: decoded where it's drawn. */
+  sk?: unknown;
   /** Driving a car (cars/netCar.ts): its id + flags, e.g. "toro.2.0". */
   car?: string;
   /** The car this rider got out of, parked (cars/netCar.ts `lc`), raw: decoded where it's drawn. */
@@ -368,6 +372,7 @@ export class Net {
     pose.weight = Math.max(-1, Math.min(1, Number(blob.w) || 0));
     pose.vehicle = parseVehicle(blob.vh);
     pose.pk = Array.isArray(blob.pk) ? blob.pk : undefined;
+    pose.sk = Array.isArray(blob.sk) ? blob.sk : undefined;
     if (typeof blob.cr === 'string') pose.car = blob.cr.slice(0, 20);
     pose.lc = Array.isArray(blob.lc) && blob.lc.length === 5 ? blob.lc : undefined;
     pose.seedKey = String(d.seedKey ?? '0-0-0-0-0');
@@ -463,6 +468,7 @@ export class Net {
       c.seedKey = b.pose.seedKey;
       c.vehicle = b.pose.vehicle;
       c.pk = b.pose.pk;
+      c.sk = b.pose.sk;
       c.car = b.pose.car;
       c.lc = b.pose.lc;
     }
@@ -505,6 +511,7 @@ export class Net {
       ...(this.ownChat ? { mv: 1 } : {}),
       ...(this.respectBadge !== '' ? { rs: this.respectBadge } : {}),
       ...(pose.pk !== undefined ? { pk: pose.pk } : {}),
+      ...(pose.sk !== undefined ? { sk: pose.sk } : {}),
       ...(this.freestyle !== null ? { fs: this.freestyle } : {}),
       ...(this.outfit !== '' ? { of: this.outfit } : {}),
       ...(this.ride !== null ? { rd: this.ride } : {}),
