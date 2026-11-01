@@ -4,9 +4,13 @@
 // through Giphy's MP4 rendition as a VideoTexture (smooth, cheap, CORS-safe),
 // swapping to the next one every few seconds.
 
+import type { CollisionWorld } from '../physics/Collision';
+
 import * as THREE from 'three';
 
 import { textureDiet } from '../render/textureDiet';
+
+import { MuralBillboard, type MuralBillboardOpts } from './MuralBillboard';
 
 const CHANNEL_ID = '19207767'; // 60r90 — same as src/pages/Pip3Page
 const API_BASE =
@@ -49,6 +53,8 @@ interface Screen {
   next: number;
   /** World centres of the meshes showing it. */
   at: THREE.Vector3[];
+  /** The mural: a framed screen sized to each clip (null: a stretched decal). */
+  board: MuralBillboard | null;
 }
 
 export class PipBillboards {
@@ -60,8 +66,16 @@ export class PipBillboards {
   /** Off: every video paused (the game is backgrounded). */
   private active = true;
 
-  /** Find screen materials under the level root and start the feed. */
-  async attach(levelRoot: THREE.Object3D) {
+  /**
+   * Find screen materials under the level root and start the feed. The
+   * mural becomes a framed billboard (MuralBillboard) when its decal is
+   * found; `opts.world` lets it measure the wall and adds the frame's
+   * collider.
+   */
+  async attach(
+    levelRoot: THREE.Object3D,
+    opts: { world?: CollisionWorld; toon?: boolean; shadows?: boolean } = {},
+  ) {
     // Screens are swapped to unlit materials: the GIFs are black line art on
     // white and should read exactly like that — no sun, no shadow, no toon band.
     const mats = new Map<string, THREE.MeshBasicMaterial>();
@@ -92,8 +106,24 @@ export class PipBillboards {
       [ids[i], ids[j]] = [ids[j], ids[i]];
     }
     this.ids = ids;
+    // The mural (the first decal using it) becomes a billboard; its decal
+    // keeps its baked art until the first clip's size is known
+    const boards = new Map<string, MuralBillboard>();
+    const boardOpts: MuralBillboardOpts = opts;
     for (const t of targets) {
       const m = mats.get(t.key)!;
+      // (plaza.glb has one mural quad; a second would keep its baked art)
+      if (/^mural__/i.test(this.nameOf(t.mesh, t.index))) {
+        let b = boards.get(t.key) ?? null;
+        if (b === null) {
+          b = MuralBillboard.create(t.mesh, t.index, m, boardOpts);
+          if (b !== null) {
+            boards.set(t.key, b);
+            levelRoot.add(b.group);
+          }
+        }
+        if (b !== null) continue;
+      }
       if (Array.isArray(t.mesh.material)) t.mesh.material[t.index] = m;
       else t.mesh.material = m;
     }
@@ -115,6 +145,8 @@ export class PipBillboards {
       video.playsInline = true;
       video.autoplay = true;
       const texture = new THREE.VideoTexture(video);
+      // Uploaded at the clip's own size (no mipmaps: they'd be rebuilt every
+      // frame); a weak phone's upload cap still applies
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.flipY = false; // glTF UV convention
       texture.minFilter = THREE.LinearFilter;
@@ -122,17 +154,31 @@ export class PipBillboards {
       texture.generateMipmaps = false;
       material.map = texture;
       material.needsUpdate = true;
+      const board = boards.get(key) ?? null;
       const screen: Screen = {
         material,
         video,
         texture,
         next: (k * 3) % CYCLE_SECONDS,
-        at: centres.get(key) ?? [],
+        at: board !== null ? [board.centre()] : (centres.get(key) ?? []),
+        board,
       };
+      if (board !== null) {
+        // Every clip change: fit the screen to the clip's own aspect, once
+        // its first frame is in (so the last clip never shows resized)
+        video.addEventListener('loadeddata', () => {
+          if (this.disposed || video.videoWidth === 0 || video.videoHeight === 0) return;
+          board.fit(video.videoWidth / video.videoHeight);
+        });
+      }
       this.screens.push(screen);
       this.load(screen);
       k++;
     }
+  }
+
+  private nameOf(mesh: THREE.Mesh, index: number): string {
+    return (Array.isArray(mesh.material) ? mesh.material[index] : mesh.material).name;
   }
 
   private load(s: Screen) {
@@ -181,6 +227,7 @@ export class PipBillboards {
       s.video.removeAttribute('src');
       s.video.load();
       s.texture.dispose();
+      s.board?.dispose();
     }
     this.screens = [];
   }

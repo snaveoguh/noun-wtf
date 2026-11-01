@@ -17,6 +17,7 @@ import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { DragonHud } from './dragon/DragonHud';
 import { Game } from './Game';
+import { PLAZA_CENTRE, prefetchWalls } from './graffiti/storeLoad';
 import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
 import { HUD_CSS } from './hud/hudStyle';
@@ -62,6 +63,12 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   const gameRef = useRef<Game | null>(null);
   const [game, setGame] = useState<Game | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  // The graffiti downloads while the level loads (the homepage may already
+  // have started it: graffiti/storeLoad.ts); not offline (tests, no store)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('offline') === '1') return;
+    prefetchWalls('plaza', PLAZA_CENTRE);
+  }, []);
   // Installable as an app on /world: Noun World's manifest + offline worker
   useEffect(() => {
     registerWorldSw(window.location.pathname);

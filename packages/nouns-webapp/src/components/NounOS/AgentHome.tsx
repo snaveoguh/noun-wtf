@@ -196,6 +196,22 @@ export default function AgentHome({
     [play, onOpen, onNavigate],
   );
 
+  // Noun World's graffiti starts downloading once the home is idle, so the
+  // walls are mostly in memory before anyone presses play (storeLoad.ts)
+  useEffect(() => {
+    if (intro) return;
+    const start = () =>
+      void import('@/miniapps/world2/graffiti/storeLoad').then(m => {
+        if (m.prefetchAllowed()) m.prefetchWalls('plaza', m.PLAZA_CENTRE);
+      });
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(start, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = setTimeout(start, 1500);
+    return () => clearTimeout(t);
+  }, [intro]);
+
   // Sound is on by default (the visitor can mute). Browsers won't play audio
   // before a gesture, so the first click, tap or key anywhere unlocks it.
   useEffect(() => {

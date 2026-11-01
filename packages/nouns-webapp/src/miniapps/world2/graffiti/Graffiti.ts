@@ -26,8 +26,19 @@ import type { CollisionWorld } from '../physics/Collision';
 import * as THREE from 'three';
 
 import { type DrawItem, SprayHistory, WallLog, type Outgoing } from './history';
-import { inParallel, nearestFirst, retry } from './loadOrder';
+import { inParallel, nearestFirst, retry, wallCentre } from './loadOrder';
 import { FAR_W, type LodCell, lodChanges } from './lod';
+import {
+  CELL_H,
+  CELL_W,
+  STORE_BATCH,
+  STORE_PARALLEL,
+  STORE_TRIES,
+  STORE_URL,
+  storeGet,
+  storeWait,
+  takePrefetched,
+} from './storeLoad';
 import { postTag, type QueuedTag, StoreQueue } from './storeQueue';
 import {
   CELL_H_MM,
@@ -90,18 +101,9 @@ export const NOZZLES = [
   { r: 160, label: 'XXL' },
 ] as const;
 
-const CELL_W = CELL_W_MM / 1000;
-const CELL_H = CELL_H_MM / 1000;
 const TIER_W = [512, 1024, 2048];
 const INDEX_BUCKETS = 8;
 const RANGE = 7;
-const STORE_URL = '/.netlify/functions/world-graffiti';
-const STORE_BATCH = 40;
-/** Store batches in flight at once while loading. */
-const STORE_PARALLEL = 4;
-/** Goes at each store read, and the first wait between them (doubling). */
-const STORE_TRIES = 4;
-const STORE_RETRY_MS = 1_000;
 /** Walls the store still owes us are asked for again after this long. */
 const STORE_AGAIN_MS = 30_000;
 /** How often cells are re-sorted by distance, and how many change size each time. */
@@ -475,6 +477,21 @@ export class Graffiti {
     return { done: total - (this.storeTodo?.size ?? 0), total };
   }
 
+  /**
+   * Every stored wall within `r` m of `p` is painted (false until the
+   * store's index is in). The world loader waits on the walls round the
+   * rider, so nothing pops in on screen; the far ones finish behind.
+   */
+  loadedAround(p: { x: number; y: number; z: number }, r: number): boolean {
+    if (this.net === null) return true;
+    if (this.storeTodo === null) return false;
+    for (const id of this.storeTodo) {
+      const c = wallCentre(id, CELL_W, CELL_H);
+      if (c !== null && Math.hypot(c.x - p.x, c.y - p.y, c.z - p.z) < r) return false;
+    }
+    return true;
+  }
+
   // ── Tools ─────────────────────────────────────────────────────────────
 
   get tools(): SprayTools {
@@ -686,11 +703,9 @@ export class Graffiti {
   }
 
   private async loadStored() {
-    const wait = (n: number) => new Promise<void>(r => setTimeout(r, STORE_RETRY_MS * 2 ** n));
-    const get = async <T>(query: string) => {
-      const r = await fetch(`${STORE_URL}?level=${this.levelKey}${query}`, { cache: 'no-store' });
-      return r.ok ? ((await r.json()) as T) : null;
-    };
+    const wait = storeWait;
+    const get = <T>(query: string) => storeGet<T>(this.levelKey, query);
+    if (this.storeTodo === null) await this.takePrefetch();
     if (this.storeTodo === null) {
       const index = await retry(() => get<{ walls: string[] }>(''), STORE_TRIES, wait);
       if (index === null || !Array.isArray(index.walls)) return;
@@ -722,6 +737,45 @@ export class Graffiti {
             false,
           );
     });
+  }
+
+  /**
+   * Use the walls the homepage already downloaded (storeLoad.ts): its index,
+   * then every wall it has, painted nearest the rider first, a batch at a
+   * time with a breath between so the loader keeps animating. Whatever it
+   * couldn't get stays in `storeTodo` for the normal fetch.
+   */
+  private async takePrefetch() {
+    const pre = takePrefetched(this.levelKey);
+    if (pre === null) return;
+    const ids = await pre.index;
+    if (ids === null || this.disposed) return;
+    for (const id of ids) this.indexed.add(id);
+    this.storeTodo = new Set(ids);
+    this.storeTotal = ids.length;
+    const order = nearestFirst(
+      ids.filter(id => pre.walls.has(id)),
+      this.near?.() ?? null,
+      CELL_W,
+      CELL_H,
+    );
+    for (let i = 0; i < order.length; i += STORE_BATCH) {
+      const batch = order.slice(i, i + STORE_BATCH);
+      const got = await Promise.all(batch.map(id => pre.walls.get(id)!));
+      if (this.disposed) return;
+      batch.forEach((id, k) => {
+        const w = got[k];
+        if (w === null || w === undefined) return;
+        this.storeTodo?.delete(id);
+        if (w.tags.length > 0)
+          this.paintTags(
+            id,
+            w.tags.map(d => ({ imageData: d })),
+            false,
+          );
+      });
+      await new Promise<void>(r => setTimeout(r, 0));
+    }
   }
 
   private offlineKey() {

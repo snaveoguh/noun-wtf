@@ -1,85 +1,69 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  flickVariants,
   GRAFFITI_CAP_MS,
   GRAFFITI_STALL_MS,
-  loadTarget,
-  stepShimmer,
+  PIP3_VARIANTS,
   worldLoaded,
   type WorldLoadState,
 } from './worldLoad';
 
 const base: WorldLoadState = {
   levelReady: false,
-  graffiti: null,
-  graffitiArrived: false,
-  elapsedMs: 0,
+  nearWallsUp: false,
   sinceLevelMs: 0,
   stalledMs: 0,
 };
 
-describe('world loader readiness', () => {
-  it('waits for the level, then for every graffiti piece', () => {
-    expect(worldLoaded(base)).toBe(false);
-    // graffiti done but the level isn't: still loading
-    expect(worldLoaded({ ...base, graffitiArrived: true })).toBe(false);
-    const level = { ...base, levelReady: true, graffiti: { done: 10, total: 200 } };
-    expect(worldLoaded(level)).toBe(false);
-    expect(worldLoaded({ ...level, graffitiArrived: true })).toBe(true);
+describe('the loader hands over', () => {
+  it('once the level is in and the walls round the rider are painted', () => {
+    expect(worldLoaded({ ...base, nearWallsUp: true })).toBe(false);
+    expect(worldLoaded({ ...base, levelReady: true })).toBe(false);
+    expect(worldLoaded({ ...base, levelReady: true, nearWallsUp: true })).toBe(true);
   });
 
-  it('slow but moving graffiti is waited for: only a stall or the cap lets go', () => {
-    const slow = {
-      ...base,
-      levelReady: true,
-      graffiti: { done: 1360, total: 3393 },
-      elapsedMs: 9e4,
-    };
-    // half a minute in and still coming: keep waiting
-    expect(worldLoaded({ ...slow, sinceLevelMs: 30_000, stalledMs: 400 })).toBe(false);
-    // nothing new for the stall window: the endpoint is stuck, go
-    expect(worldLoaded({ ...slow, sinceLevelMs: 30_000, stalledMs: GRAFFITI_STALL_MS - 1 })).toBe(
+  it('never waits on a dead graffiti store for ever', () => {
+    const lv = { ...base, levelReady: true };
+    expect(worldLoaded({ ...lv, stalledMs: GRAFFITI_STALL_MS - 1, sinceLevelMs: 20_000 })).toBe(
       false,
     );
-    expect(worldLoaded({ ...slow, sinceLevelMs: 30_000, stalledMs: GRAFFITI_STALL_MS })).toBe(true);
-    // a dead endpoint (no index ever) goes after the stall too
-    const dead = { ...base, levelReady: true, graffiti: { done: 0, total: null } };
-    expect(
-      worldLoaded({ ...dead, sinceLevelMs: GRAFFITI_STALL_MS, stalledMs: GRAFFITI_STALL_MS }),
-    ).toBe(true);
-    // a trickle never holds play past the cap
-    expect(worldLoaded({ ...slow, sinceLevelMs: GRAFFITI_CAP_MS, stalledMs: 10 })).toBe(true);
-    // the waits count from the level, not the page: a slow level doesn't eat them
-    expect(worldLoaded({ ...base, elapsedMs: 10 * GRAFFITI_CAP_MS })).toBe(false);
+    expect(worldLoaded({ ...lv, stalledMs: GRAFFITI_STALL_MS })).toBe(true);
+    expect(worldLoaded({ ...lv, stalledMs: 10, sinceLevelMs: GRAFFITI_CAP_MS })).toBe(true);
   });
+});
 
-  it('the band follows the walls fetched and only reaches the end when loaded', () => {
-    const t0 = loadTarget({ ...base, elapsedMs: 0 });
-    const t1 = loadTarget({ ...base, elapsedMs: 4000 });
-    expect(t0).toBe(0);
-    expect(t1).toBeGreaterThan(t0);
-    const lv = { ...base, levelReady: true, elapsedMs: 8000 };
-    const a = loadTarget({ ...lv, graffiti: { done: 0, total: null } });
-    const b = loadTarget({ ...lv, graffiti: { done: 50, total: 100 } });
-    const c = loadTarget({ ...lv, graffiti: { done: 100, total: 100 } });
-    expect(a).toBeGreaterThanOrEqual(t1);
-    expect(b).toBeGreaterThan(a);
-    expect(c).toBeGreaterThan(b);
-    expect(c).toBeLessThan(1);
-    expect(loadTarget({ ...lv, graffitiArrived: true })).toBe(1);
-  });
-
-  it('the shimmer never runs backwards and finishes once loaded', () => {
-    let s = 0.5;
-    s = stepShimmer(s, 0.2, 16, false);
-    expect(s).toBe(0.5);
-    let frames = 0;
-    while (s < 1 && frames < 1000) {
-      s = stepShimmer(s, 1, 16, true);
-      frames++;
+describe('the loader wordmark', () => {
+  it('pops letters to another of their Pip3 versions', () => {
+    let r = 7;
+    const rand = () => (r = (r * 16807) % 2147483647) / 2147483647;
+    let v = [1, 1, 1, 1, 1, 1, 1, 1];
+    const seen = new Set<number>();
+    for (let k = 0; k < 200; k++) {
+      const next = flickVariants(v, rand);
+      const changed = next.filter((x, i) => x !== v[i]).length;
+      expect(changed).toBe(2);
+      for (const x of next) {
+        expect(x).toBeGreaterThanOrEqual(1);
+        expect(x).toBeLessThanOrEqual(PIP3_VARIANTS);
+        seen.add(x);
+      }
+      v = next;
     }
-    expect(s).toBe(1);
-    // the last stretch is quick: well under a second
-    expect(frames * 16).toBeLessThan(600);
+    // every drawing turns up
+    expect(seen.size).toBe(PIP3_VARIANTS);
+    // never more flicks than letters
+    expect(flickVariants([3], rand, 4)).not.toEqual([3]);
+  });
+
+  it('pops one letter at a time when asked', () => {
+    let r = 11;
+    const rand = () => (r = (r * 16807) % 2147483647) / 2147483647;
+    let v = [1, 2, 3, 4, 5, 1, 2, 3];
+    for (let k = 0; k < 50; k++) {
+      const next = flickVariants(v, rand, 1);
+      expect(next.filter((x, i) => x !== v[i])).toHaveLength(1);
+      v = next;
+    }
   });
 });
