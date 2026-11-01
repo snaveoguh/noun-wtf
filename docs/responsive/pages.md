@@ -30,6 +30,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | `/vote/:id`, `/candidates/*` (governance detail) | `/vote/1000` 13/26 → 26/26; a real candidate (`/candidates/0xc7cc…-unwrap-stake-treasury-weth`) 18/26 → 26/26 · `claude/responsive-govdetail` (#233) · the old `-sample` candidate URL never loads (its count meant nothing; ROUTES now uses the real one). The vote buttons were checked by hand at 320 (no proposal was active). Yellow Collective's vote page now shares the container grid |
 | `/vote/:id/history`, `/vote/:id/history/:n`, `/delegate` (history + delegate) | `/vote/1000/history` 23/26 → 26/26; `/vote/1000/history/1` 0/26 → 26/26 (it **crashed**: error boundary, "reading 'description'"; fixed); `/delegate` 26/26 → 26/26 (no change: a viewport-centred modal); `/candidates/sample/edit` 26/26 (govcreate's version kept) · `claude/responsive-history` (#232) · **diff view not checked against real data**: the indexer returns no proposal versions, so it was checked by hand with an uncommitted local mock at 360 / 640 / 1440 / 1920. Left: unchanged diff lines are light text on react-diff-viewer's white (theme); `/delegate`'s modal can land partly outside a narrow window (viewport modal, allowed) |
 | `/predictions`, `/feed`, `/highway` (explore) | 13/26 → 26/26, 9/26 → 26/26, 0/26 → 26/26 · `claude/responsive-explore` (#231) · the two "squeezed" warnings left were false positives (highway's ASCII noggles in a `<pre>`, a feed cast that is mostly one long URL); the check now skips both. Highway's marquee rows are swipeable scroll boxes (their edge clipping is deliberate: owner to confirm); its ASCII boxes misalign under non-monospace site fonts (not a width issue) |
+| `/v2`, `/crystal-ball`, `/v2/crystal-ball` (auction + crystal ball) | 26/26 → 26/26 (no change needed), 17/26 → 26/26, 7/26 → 26/26, 0 warnings · `claude/responsive-auction` (#234) · measured in the default ASCII view: the V2 missed-blocks reel was live (really measured); the V1 reel and SETTLE were checked with a temporary local force-on. The 2D / 3D views are now reachable with `?view=2d|3d` (ROUTES variants): `/v2/crystal-ball?view=2d` and `?view=3d` are 26/26 each, 0 warnings (sheets in `.claude/responsive-shots/v2-crystal-ball--view-{2d,3d}/after/`) · still open: the nounv2 auction card's white background (theme follow-up, #228) |
 
 ## Work units (worst first)
 
@@ -47,7 +48,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 12. ~~`/candidates/*`, `/vote/1000`~~ — done (see Done)
 13. ~~`/vote/1000/history`, `/vote/1000/history/1`, `/delegate`~~ — done (see Done)
 14. ~~`/candidates/sample/edit`~~ — done with governance create (see Done)
-15. `/v2`, `/crystal-ball`, `/v2/crystal-ball` — severity 0 (2 not measured), viewport code 37 (group: auction)
+15. ~~`/v2`, `/crystal-ball`, `/v2/crystal-ball`~~ — done (see Done)
 16. ~~`/marketplace`, `/marketplace/1`~~ — done (see Done; listings unmeasured)
 17. ~~`/predictions`, `/feed`, `/highway`~~ — done (see Done)
 18. `/onchain`, `/dashboard`, `/settlers`, `/gas`, `/stats`, `/nonsense` — not measured, viewport code 13 (group: stats)
