@@ -78,7 +78,7 @@ function BeatsScreenInner({
         </div>
         <div
           ref={ref}
-          className="overflow-hidden rounded bg-black"
+          className="w2-yt overflow-hidden rounded bg-black"
           style={{ width: Math.max(YT_MIN_PX, 220), height: Math.max(YT_MIN_PX, 220) }}
         />
       </div>

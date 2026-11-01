@@ -1,7 +1,7 @@
 // ── The first spawn: inside NOUNS CAMP (pure, tested) ─────────────────────
 //
 // A plain /world load wakes every rider up in CAMP (CampSystem.spawnInside,
-// once per page load, after PRESS START / the character select). Deep
+// once per page load, after the loader / the character select). Deep
 // links and modes that put you somewhere themselves skip it, and
 // `?spawn=plaza` keeps the old plaza spawn (the perf harness uses it so
 // its numbers stay comparable).

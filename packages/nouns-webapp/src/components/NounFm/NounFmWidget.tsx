@@ -49,7 +49,7 @@ export default function NounFmWidget() {
     <div
       // box-content: the border sits outside the 200px, or the video slot
       // ends up 198px and YouTubeDeck refuses to play (YouTube's minimum)
-      className="fixed bottom-[72px] right-3 z-[9000] box-content flex flex-col overflow-hidden rounded-md border border-white/20 bg-black/90 text-white shadow-xl"
+      className="group fixed bottom-[72px] right-3 z-[9000] box-content flex flex-col overflow-hidden rounded-md border border-white/20 bg-black/90 text-white shadow-xl"
       style={{ width: TILE }}
       data-nounfm={v.phase}
     >
@@ -103,10 +103,13 @@ export default function NounFmWidget() {
         <div className="absolute inset-0 flex items-center justify-center text-center text-[11px] font-black italic text-[#ffd400]">
           {v.phase === 'track' || v.phase === 'blocked' ? '' : 'NOUN FM'}
         </div>
+        {/* YouTube needs a visible player: it stays on the page, at 10% until
+            the widget is hovered or focused (full while it needs a click to start) */}
         <div
           ref={host}
-          className="absolute inset-0"
+          className={`absolute inset-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 ${v.phase === 'blocked' ? 'opacity-100' : 'opacity-10'}`}
           style={{ visibility: v.screen && !held ? 'visible' : 'hidden' }}
+          data-nounfm-video=""
         />
       </div>
       {strip && !held && (

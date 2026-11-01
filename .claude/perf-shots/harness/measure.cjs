@@ -80,7 +80,6 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
   const url = `${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1&spawn=plaza&camintro=0`;
   log('goto', url);
   await p.goto(url, { timeout: 600000 });
-  await p.getByText('PRESS START').first().click({ force: true, timeout: 600000 }).catch(e => log('no start', e.message));
   await p.waitForFunction(() => window.__w2 && window.__w2.me && window.__w2.running, null, {
     timeout: 900000,
     polling: 2000,

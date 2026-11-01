@@ -47,7 +47,8 @@ const p = await b.newPage({ viewport: { width: 1280, height: 800 } });          
 - **Noun World:** `http://127.0.0.1:5196/world?offline=1&skip=1&q=low&bday=0`
   - `offline=1` is mandatory, so the run never joins the live PartyKit room or posts stats.
   - `skip=1` skips intros, `q=low|high` sets quality, `bday=0` turns off birthday balloons.
-  - Then click `PRESS START`: `p.getByText('PRESS START').first().click({ force: true })`.
+  - There's no PRESS START any more: the noun.wtf loader holds until the level and every graffiti piece are in, then opens the character select (or, with `skip=1`, the game). Wait for it: `p.waitForFunction(() => !document.querySelector('[data-w2loader]') && window.__w2?.me, null, { timeout: 600000 })`. The select shows while `document.body` has `data-w2select`.
+  - Audio unlocks on the first click / key after that (`p.keyboard.press('ArrowDown')` will do).
 - **Noun Hoops:** add `&play=hoops&mode=1|2|3|5` (spawns on the Noun Jersey court, lobby opens).
 - **Noun Warfare:** `/warfare`. Dev builds and webdriver stay offline unless `?online=1` or `VITE_PARTYKIT_HOST` is set.
 - **Homescreen:** `/`. The game deck is `.nos-poster-card`, the chips are `.nos-game-tabs`.

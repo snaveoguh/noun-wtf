@@ -381,6 +381,18 @@ export class Graffiti {
   /** Walls the store listed that haven't come back from it yet (null: no list yet). */
   private storeTodo: Set<string> | null = null;
   private storeAgain: ReturnType<typeof setTimeout> | null = null;
+  /** Walls the store's index listed on arrival (null: no index yet). */
+  private storeTotal: number | null = null;
+  private arrivedResolve: () => void = () => undefined;
+  /**
+   * Resolves once the arrival load has finished: every wall the permanent
+   * store listed has been fetched and painted (or its reads gave up), or the
+   * offline copy is on the walls. The world loader waits on it, so the
+   * character select and CAMP's opening shot open with every piece up.
+   */
+  readonly arrived: Promise<void> = new Promise(r => {
+    this.arrivedResolve = r;
+  });
   private disposed = false;
   /** Where the rider is (Game sets it): stored walls load nearest-first. */
   near: (() => { x: number; y: number; z: number } | null) | null = null;
@@ -448,8 +460,19 @@ export class Graffiti {
 
     // The store loads on arrival: it used to wait for PartyKit's socket to
     // open, so a slow or failed connection left every wall bare
-    if (net === null) queueMicrotask(() => this.loadOffline());
+    if (net === null)
+      queueMicrotask(() => {
+        this.loadOffline();
+        this.arrivedResolve();
+      });
     else queueMicrotask(() => void this.loadStore());
+  }
+
+  /** The arrival load so far: walls fetched of those the store listed (total null until it answers). */
+  get loadProgress(): { done: number; total: number | null } {
+    const total = this.storeTotal;
+    if (total === null) return { done: 0, total: this.net === null ? 0 : null };
+    return { done: total - (this.storeTodo?.size ?? 0), total };
   }
 
   // ── Tools ─────────────────────────────────────────────────────────────
@@ -644,6 +667,7 @@ export class Graffiti {
     this.stored ??= this.loadStored().finally(() => {
       this.storedDone = true;
       this.stored = null;
+      this.arrivedResolve();
       const owed = this.storeTodo === null || this.storeTodo.size > 0;
       if (owed && !this.disposed && this.storeAgain === null)
         this.storeAgain = setTimeout(() => {
@@ -672,6 +696,7 @@ export class Graffiti {
       if (index === null || !Array.isArray(index.walls)) return;
       for (const id of index.walls) this.indexed.add(id);
       this.storeTodo = new Set(index.walls);
+      this.storeTotal = this.storeTodo.size;
     }
     // The walls round the rider first, a few batches at once (loadOrder.ts)
     const order = nearestFirst([...this.storeTodo], this.near?.() ?? null, CELL_W, CELL_H);
@@ -1271,6 +1296,7 @@ export class Graffiti {
 
   dispose() {
     this.disposed = true;
+    this.arrivedResolve();
     if (this.storeAgain !== null) clearTimeout(this.storeAgain);
     this.flush();
     for (const c of this.cells.values()) {
