@@ -86,6 +86,7 @@ export const ROUTES = [
   { path: 'stats', url: '/stats', group: 'stats' },
   { path: 'dashboard', url: '/dashboard', group: 'stats' },
   { path: 'nonsense', url: '/nonsense', group: 'stats' },
+  { path: 'onchain', url: '/onchain', group: 'stats' },
   { path: 'explore/wallet', url: '/explore/wallet', group: 'wallet' },
   { path: 'explore/wallet/:identity', url: '/explore/wallet/nouns.eth', group: 'wallet' },
   { path: 'gamer', url: '/gamer', group: 'wallet' },

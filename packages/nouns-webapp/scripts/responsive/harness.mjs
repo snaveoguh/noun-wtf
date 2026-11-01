@@ -334,7 +334,8 @@ const reports = [];
 const started = Date.now();
 await Promise.all(
   Array.from({ length: Math.min(opt.jobs, queue.length) }, async (_, j) => {
-    const b = j === 0 ? browser : await chromium.launch(LAUNCH);
+    let b = j === 0 ? browser : await chromium.launch(LAUNCH);
+    const retried = new Set();
     while (queue.length) {
       const url = queue.shift();
       const lines = [];
@@ -344,12 +345,21 @@ await Promise.all(
       } catch (e) {
         log(`✘ ${url}: ${e.message.split('\n')[0]}`);
       }
+      // A crashed browser would fail every route after it: start a new one
+      // and give the route that took it down one more go.
+      if (!b.isConnected()) {
+        b = await chromium.launch(LAUNCH);
+        if (!retried.has(url)) {
+          retried.add(url);
+          queue.push(url);
+        }
+      }
       if (lines.length) console.log(lines.join('\n'));
     }
-    if (b !== browser) await b.close();
+    if (b !== browser) await b.close().catch(() => {});
   }),
 );
-await browser.close();
+await browser.close().catch(() => {});
 
 if (urls.length > 1) {
   const idxFile = path.join(outRoot, opt.label ? `index-${opt.label}.json` : 'index.json');

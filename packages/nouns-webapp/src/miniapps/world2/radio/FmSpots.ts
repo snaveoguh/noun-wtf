@@ -51,7 +51,7 @@ export function setIntroEnabled(on: boolean) {
 }
 
 /**
- * Should the intro play on PRESS START? Once per page load, when the rider
+ * Should the intro play on the first gesture after the loader? Once per page load, when the rider
  * hasn't switched it off, on NOUN FM, not in a replay; never in offline
  * test runs unless `?fmintro=1` forces it.
  */

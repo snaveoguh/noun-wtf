@@ -13,6 +13,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { nounSvgDataUri } from '@/lib/marketplace/nouns-svg';
 
+import { AgentLedger } from '../../agents/ui/AgentLedger';
+import { AgentShop } from '../../agents/ui/AgentShop';
 import { isMobile, readDevice } from '../../world2/render/deviceTier';
 import { FloorScene, type HudState } from '../render/FloorScene';
 import { budgetFor } from '../sim/lod';
@@ -92,6 +94,7 @@ export default function Exchange3D({
   const [hud, setHud] = useState<HudState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [helpOpen, setHelp] = useState(false);
+  const [ledgerOpen, setLedger] = useState(false);
   const phone = useMemo(() => isMobile(readDevice()), []);
 
   useEffect(() => {
@@ -211,6 +214,14 @@ export default function Exchange3D({
         </button>
         <button
           type="button"
+          className={`gx3d-btn ${ledgerOpen ? 'gx3d-on' : ''}`}
+          data-agent-ledger-btn
+          onClick={() => setLedger(o => !o)}
+        >
+          🤖 {phone ? 'AGENTS' : 'AGENT LEDGER'}
+        </button>
+        <button
+          type="button"
           className="gx3d-btn"
           aria-label="help"
           onClick={() => setHelp(h => !h)}
@@ -253,13 +264,15 @@ export default function Exchange3D({
                 {f.name}
               </div>
               <div className="gx3d-muted">
-                {f.kind === 'bot'
-                  ? 'exchange bot · real Noun'
-                  : f.kind === 'rider'
-                    ? 'a rider on the exchange'
-                    : f.kind === 'you'
-                      ? 'you'
-                      : 'simulated trader'}
+                {f.kind === 'bot' && f.id.startsWith('agent:')
+                  ? 'agent · runs a shop, trades while you’re away'
+                  : f.kind === 'bot'
+                    ? 'exchange bot · real Noun'
+                    : f.kind === 'rider'
+                      ? 'a rider on the exchange'
+                      : f.kind === 'you'
+                        ? 'you'
+                        : 'simulated trader'}
               </div>
             </div>
             <button
@@ -297,7 +310,46 @@ export default function Exchange3D({
         </aside>
       )}
 
-      {hud?.target != null && s !== null && (
+      {hud?.target?.kind === 'agent' && s !== null && (
+        <div className="gx3d-agent-shop">
+          {(() => {
+            const id = (hud.target as { agent: string }).agent;
+            const a = hud.agents.find(x => x.id === id);
+            return a === undefined ? (
+              <div className="gx3d-trade">
+                {hud.target.name}: their shop board hasn&apos;t loaded yet.{' '}
+                <button type="button" className="gx3d-x" onClick={() => s.setTarget(null)}>
+                  ×
+                </button>
+              </div>
+            ) : (
+              <AgentShop
+                key={a.id}
+                agent={a}
+                you={hud.you}
+                onTrade={(side, good, qty, price) =>
+                  s.act({ t: 'offer', to: a.id, side, good, qty, price })
+                }
+                onClose={() => s.setTarget(null)}
+              />
+            );
+          })()}
+        </div>
+      )}
+
+      {ledgerOpen && hud !== null && (
+        <div className="gx3d-agent-ledger">
+          <AgentLedger
+            agents={hud.agents}
+            ledger={hud.ledger}
+            now={hud.now}
+            nameOf={t => s?.nameOf(t) ?? t}
+            onClose={() => setLedger(false)}
+          />
+        </div>
+      )}
+
+      {hud?.target != null && hud.target.kind !== 'agent' && s !== null && (
         <TradePanel
           key={hud.target.key}
           target={hud.target}

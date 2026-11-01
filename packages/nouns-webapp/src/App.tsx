@@ -25,6 +25,7 @@ import { usePageviewBeacon } from '@/hooks/usePageviewBeacon';
 const AuctionPage = lazy(() => import('@/pages/Auction'));
 const CandidatePage = lazy(() => import('@/pages/Candidate'));
 const Cc0LibraryPage = lazy(() => import('@/pages/Cc0Library'));
+const OnchainPage = lazy(() => import('@/pages/Onchain'));
 const IceCreamVanPage = lazy(() => import('@/pages/IceCreamVan'));
 const ExchangePage = lazy(() => import('@/pages/Exchange'));
 const CreateCandidatePage = lazy(() => import('@/pages/CreateCandidate'));
@@ -169,6 +170,14 @@ function SiteRoutes() {
         }
       />
       <Route path="nonsense" element={<NonsensePage />} />
+      <Route
+        path="onchain"
+        element={
+          <Suspense fallback={<GenericSkeleton />}>
+            <OnchainPage />
+          </Suspense>
+        }
+      />
       {/* Wallet gamer profile — /gamer is the canonical alias, /explore/wallet kept for old links */}
       {['explore/wallet', 'explore/wallet/:identity', 'gamer', 'gamer/:identity'].map(path => (
         <Route

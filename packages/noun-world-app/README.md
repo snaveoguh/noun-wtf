@@ -63,7 +63,7 @@ Without the variable, the build points at production.
 - **Audio:**
   - iOS: the `.playback` session means the radio and SFX play with the ring switch on silent.
   - Android: Capacitor's WebView already lets media play without a tap.
-  - The game still starts audio on PRESS START, as on the web.
+  - The game still starts audio on the first tap or key after its loader, as on the web.
 - **Mic:** voice chat is optional. The OS asks the first time a rider turns their mic on.
 - **External links** (wallets, YouTube "watch on", the site): `allowNavigation` only lists noun.wtf, so other hosts open in the system browser rather than inside the app.
 - **Before submitting, read STORE.md.** On iOS some web features must be hidden in the app (wallet, on-chain cash-out, NFT-gated perks), and chat needs report and block tools.

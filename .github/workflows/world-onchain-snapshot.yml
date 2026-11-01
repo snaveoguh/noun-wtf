@@ -1,0 +1,63 @@
+name: Noun World onchain snapshot
+
+# Once a day: snapshot Noun World's graffiti and records, upload them
+# (IPFS via Pinata or Arweave via Irys) and commit each root to
+# NounWorldLedger on Base. With no secrets set it's a dry run: it builds the
+# snapshots, logs their roots and keeps the files as a workflow artifact.
+# See packages/noun-world-chain/README.md ("Turning it on").
+#
+# Secrets: PINATA_JWT or IRYS_KEY, LEDGER_COMMITTER_KEY
+# Variables: LEDGER_ADDRESS, LEDGER_CHAIN_ID (84532 | 8453), SNAPSHOT_STORAGE, LEDGER_RPC
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: world-onchain-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install webapp dependencies
+        run: pnpm install --frozen-lockfile --filter @nouns/webapp
+
+      - name: Snapshot
+        working-directory: packages/nouns-webapp
+        env:
+          SNAPSHOT_SITE: https://noun.wtf
+          SNAPSHOT_OUT: ${{ runner.temp }}/snapshot
+          SNAPSHOT_STORAGE: ${{ vars.SNAPSHOT_STORAGE }}
+          PINATA_JWT: ${{ secrets.PINATA_JWT }}
+          IRYS_KEY: ${{ secrets.IRYS_KEY }}
+          LEDGER_COMMITTER_KEY: ${{ secrets.LEDGER_COMMITTER_KEY }}
+          LEDGER_ADDRESS: ${{ vars.LEDGER_ADDRESS }}
+          LEDGER_CHAIN_ID: ${{ vars.LEDGER_CHAIN_ID }}
+          LEDGER_RPC: ${{ vars.LEDGER_RPC }}
+        run: pnpm dlx tsx@4.20.3 scripts/onchain/snapshot.ts
+
+      - name: Keep the snapshot files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: noun-world-snapshot
+          path: ${{ runner.temp }}/snapshot
+          retention-days: 14
+          if-no-files-found: ignore

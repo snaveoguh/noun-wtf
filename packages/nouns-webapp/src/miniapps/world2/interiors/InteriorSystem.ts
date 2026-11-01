@@ -28,6 +28,7 @@ import type { LevelData } from '../world/Level';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import { withAgent } from '../../agents/rooms';
 import { seedVoice } from '../audio/voice/cast';
 import { prefetchGlbHead } from '../character/GlbHead';
 import { NounCharacter } from '../character/NounCharacter';
@@ -131,6 +132,8 @@ export interface InteriorsView {
   eating: { name: string; icon: string } | null;
   /** The Prop Museum: the prop you're reading. */
   exhibit: ExhibitView | null;
+  /** An agent (src/miniapps/agents) runs this room: their shop opens from the HUD. */
+  agent?: { id: string; name: string } | null;
 }
 
 export interface ExhibitView {
@@ -639,7 +642,8 @@ export class InteriorSystem implements InteriorsApi {
     const tBuild = performance.now();
     // Residents
     const rnd = mulberry32(hash32(`${door.id}:${Date.now()}`));
-    const defs = residentsFor(door.id, layout, tier);
+    // An agent may run the place (agents/rooms.ts): they take the owner's spot
+    const defs = withAgent(residentsFor(door.id, layout, tier), door.id, kind);
     // Their 3D head models load over the network (the head stays hidden
     // until then): start now, so they're there by the time they're built
     for (const d of defs) prefetchGlbHead(d.seed[3], d.seed[4]);
@@ -1740,7 +1744,9 @@ export class InteriorSystem implements InteriorsApi {
       L.level > 0 && L.floors[L.level]!.layout.use !== undefined
         ? ` · ${USE_LABEL[L.floors[L.level]!.layout.use!].toUpperCase()}`
         : '';
+    const agentF = L.level === 0 ? L.folk.find(f => f.def.agent !== undefined) : undefined;
     this.setView({
+      agent: agentF !== undefined ? { id: agentF.def.agent!, name: agentF.def.name } : null,
       prompt:
         atDoor && this.phase === 'inside' && !pool
           ? { text: 'LEAVE', kind: 'leave' }
@@ -1820,7 +1826,8 @@ export class InteriorSystem implements InteriorsApi {
       f.bubbleKey = key;
       const icon = s.icon !== undefined ? `<b>${s.icon}</b>` : '';
       const text = s.text !== '' ? `<span>${escapeHtml(s.text)}</span>` : '';
-      b.innerHTML = `<div class="ni-b ni-${s.tone}">${icon}${text}</div><i>${escapeHtml(f.def.name)}</i>`;
+      const tag = f.def.agent !== undefined ? ' <b class="ni-agent">🤖 AGENT</b>' : '';
+      b.innerHTML = `<div class="ni-b ni-${s.tone}">${icon}${text}</div><i>${escapeHtml(f.def.name)}${tag}</i>`;
     }
   }
 
@@ -2336,6 +2343,7 @@ function injectCss() {
 .ni-sad{box-shadow:3px 3px 0 #555}
 .ni-plain{box-shadow:3px 3px 0 #888}
 .ni-fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:40}
+.ni-bubble i .ni-agent{display:inline-block;background:#ffd400;color:#000;font-size:9px;padding:0 3px;margin-left:3px;text-shadow:none}
 `;
   document.head.appendChild(s);
 }
