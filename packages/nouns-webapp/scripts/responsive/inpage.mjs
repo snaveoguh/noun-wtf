@@ -344,10 +344,15 @@ export function collect(opts) {
       s.display.startsWith('inline') &&
       !!p &&
       (p.innerText || '').trim().length > (el.innerText || '').trim().length + 12;
+    // a checkbox / radio inside its <label> is tapped through the whole label
+    const tapBox =
+      el.tagName === 'INPUT' && /^(checkbox|radio)$/.test(el.type) && el.closest('label')
+        ? el.closest('label').getBoundingClientRect()
+        : r;
     ctl.push({
       selector: selector(el),
-      w: r.width,
-      h: r.height,
+      w: tapBox.width,
+      h: tapBox.height,
       label,
       inlineInText,
       hidden: false,

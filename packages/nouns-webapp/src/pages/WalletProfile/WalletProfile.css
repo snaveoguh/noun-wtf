@@ -391,6 +391,18 @@
     justify-content: center;
     min-width: 40px;
   }
+  .wp-slider,
+  .wp label:has(> .wp-checkbox) {
+    min-height: 40px;
+  }
+  /* a Noun card's "#id" link and an activity row's "view" / "tx ↗" */
+  .wp .mt-1.flex > .wp-link,
+  .wp-row .wp-muted > .wp-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    min-width: 40px;
+  }
   .wp-card-head > .wp-link,
   .wp-tap {
     display: inline-flex;
@@ -432,6 +444,10 @@
 .wp-seg button.active {
   background: var(--theme-text-primary);
   color: var(--theme-bg-primary);
+}
+/* a step's body can carry a raw address or calldata: let it break */
+.wp-step .min-w-0 > .text-xs {
+  overflow-wrap: anywhere;
 }
 .wp-step {
   display: grid;

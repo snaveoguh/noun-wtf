@@ -1472,7 +1472,8 @@ export default function CrystalBallPage() {
                 gap: 4,
               }}
             >
-              <div style={{ position: 'relative' }}>
+              {/* The twin carousel's chevrons sit on the orb by design. */}
+              <div style={{ position: 'relative' }} data-responsive-art-ok>
                 <SeedVisual
                   seed={visibleSeed}
                   mode={viewMode}
@@ -1488,13 +1489,12 @@ export default function CrystalBallPage() {
                       type="button"
                       aria-label="Previous"
                       onClick={() => setCarouselIndex(i => (i === 0 ? 1 : 0))}
+                      className="h-8 w-8 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10"
                       style={{
                         position: 'absolute',
                         top: '50%',
                         left: -8,
                         transform: 'translateY(-50%)',
-                        width: 32,
-                        height: 32,
                         borderRadius: '50%',
                         border: '1px solid rgba(255,255,255,0.18)',
                         background: 'rgba(20,20,30,0.7)',
@@ -1510,13 +1510,12 @@ export default function CrystalBallPage() {
                       type="button"
                       aria-label="Next"
                       onClick={() => setCarouselIndex(i => (i === 0 ? 1 : 0))}
+                      className="h-8 w-8 [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10"
                       style={{
                         position: 'absolute',
                         top: '50%',
                         right: -8,
                         transform: 'translateY(-50%)',
-                        width: 32,
-                        height: 32,
                         borderRadius: '50%',
                         border: '1px solid rgba(255,255,255,0.18)',
                         background: 'rgba(20,20,30,0.7)',
@@ -1537,26 +1536,37 @@ export default function CrystalBallPage() {
                         right: 0,
                         display: 'flex',
                         justifyContent: 'center',
-                        gap: 6,
                       }}
                     >
+                      {/* 12 px boxes (the old 6 px dots + 6 px gap); 40 px on touch. */}
                       {[0, 1].map(i => (
                         <button
                           key={i}
                           type="button"
                           aria-label={i === 0 ? 'Predicted' : 'Twin'}
                           onClick={() => setCarouselIndex(i)}
+                          className="flex h-3 w-3 items-center justify-center [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10"
                           style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
                             border: 'none',
                             padding: 0,
-                            background:
-                              carouselIndex === i ? (i === 0 ? '#aaccff' : CRYSTAL_PURPLE) : '#333',
+                            background: 'none',
                             cursor: 'pointer',
                           }}
-                        />
+                        >
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              background:
+                                carouselIndex === i
+                                  ? i === 0
+                                    ? '#aaccff'
+                                    : CRYSTAL_PURPLE
+                                  : '#333',
+                            }}
+                          />
+                        </button>
                       ))}
                     </div>
                   </>
