@@ -166,11 +166,12 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
 
   return (
     <div className="min-w-0 border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
-      <div className="mb-3 flex items-start gap-3">
+      {/* The badge drops under the title when the card is too narrow for all three. */}
+      <div className="mb-3 flex flex-wrap items-start gap-3">
         <div className="h-16 w-16 shrink-0 overflow-hidden border border-[var(--rule-light)]">
           <Noun nounId={nounId} className="h-full w-full" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[min(100%,10rem)] flex-1">
           <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
             Auction, Noun #{nounId.toString()}
           </p>

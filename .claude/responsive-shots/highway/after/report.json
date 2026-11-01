@@ -4,7 +4,7 @@
   "group": "explore",
   "kind": "page",
   "label": "after",
-  "generated": "2026-11-01T12:19:03.140Z",
+  "generated": "2026-11-01T12:36:38.965Z",
   "widths": [
     320,
     360,
@@ -51,7 +51,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -83,7 +86,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -115,7 +121,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -147,7 +156,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -179,7 +191,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -211,7 +226,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -243,7 +261,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -275,7 +296,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -307,7 +331,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -339,7 +366,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -371,7 +401,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -403,7 +436,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -435,7 +471,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -467,7 +506,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -499,7 +541,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -531,7 +576,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -563,7 +611,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -595,7 +646,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -627,7 +681,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -659,7 +716,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -691,7 +751,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -723,7 +786,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -755,7 +821,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -787,7 +856,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -819,7 +891,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -851,7 +926,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 132px): div.nos-page > div.flex.flex-col > div.border-b.border-green-800 > pre.text-center.text-xs \"██████████████\n    ██░░░░██░░░░██\n    ██\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],

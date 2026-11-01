@@ -4,7 +4,7 @@
   "group": "explore",
   "kind": "page",
   "label": "after",
-  "generated": "2026-11-01T12:19:55.534Z",
+  "generated": "2026-11-01T12:37:03.031Z",
   "widths": [
     320,
     360,
@@ -51,7 +51,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (7 lines, 220px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -83,7 +86,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 256px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -115,7 +121,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 291px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -147,7 +156,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (5 lines, 325px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -179,7 +191,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (4 lines, 421px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -212,6 +227,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -244,6 +260,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -276,6 +293,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -308,6 +326,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -340,6 +359,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -372,6 +392,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -404,6 +425,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -436,6 +458,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -467,7 +490,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (7 lines, 220px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -499,7 +525,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 256px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -531,7 +560,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (6 lines, 291px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -563,7 +595,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (5 lines, 325px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -595,7 +630,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (4 lines, 421px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -628,6 +666,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -659,7 +698,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (4 lines, 409px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -691,7 +733,10 @@
         "overlaps": 0,
         "smallTargets": 0
       },
-      "line": "clean",
+      "line": "clean · ⚠ 1",
+      "warnings": [
+        "squeezed (4 lines, 490px): div.mx-auto.max-w-2xl > div.flex.flex-col > div.min-w-0.rounded-lg > p.text-sm.[overflow-wrap:anywhere] \"/yellow Yellow Taxi Prop Draft \nhttps://\""
+      ],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -724,6 +769,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -756,6 +802,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -788,6 +835,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -820,6 +868,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],
@@ -852,6 +901,7 @@
         "smallTargets": 0
       },
       "line": "clean",
+      "warnings": [],
       "issues": {
         "overflow": null,
         "clipped": [],

@@ -112,8 +112,9 @@ export function MarketCard({
   return (
     <div className="min-w-0 border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
       {/* Header */}
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
+      {/* The badge drops under the title when the card is too narrow for both. */}
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-[min(100%,14rem)] flex-1">
           <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
             {dao} &bull; #{proposalId}
           </p>

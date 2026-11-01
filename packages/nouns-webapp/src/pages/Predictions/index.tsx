@@ -46,7 +46,7 @@ export default function PredictionsPage() {
           <h2 className="mb-3 font-mono text-xs font-bold uppercase leading-snug tracking-widest">
             Resolved Markets ({resolved.length})
           </h2>
-          <div className="@md:grid-cols-2 grid gap-4">
+          <div className="@lg:grid-cols-2 grid gap-4">
             {resolved.map(p => (
               <MarketCard
                 key={`${p.dao}-${p.proposalId}`}
