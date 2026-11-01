@@ -10,11 +10,16 @@ import { PoseDriver } from '../../breakdance/view/rig';
 
 import { skyPose } from './poses';
 
+/** Seconds to blend the skydive pose in over the clip, and back out. */
+export const FADE_IN = 0.5;
+const FADE_OUT = 0.3;
+
 export class SkyRig {
   private driver: PoseDriver | null = null;
   private head: unknown = undefined;
   private t = 0;
   w = 0;
+  private ramp = 0;
 
   constructor(readonly ch: NounCharacter) {}
 
@@ -32,8 +37,13 @@ export class SkyRig {
     if (!this.driver.ok) return;
     this.t += dt;
     const pose = skyPose(a, board, this.t);
-    const target = pose !== null ? 1 : 0;
-    this.w += (target - this.w) * (1 - Math.exp(-(pose !== null ? 6 : 12) * dt));
+    // In: a steady ~0.5 s ramp, eased, out of whatever the fall clip shows
+    // (the arms-spread air pose), never a snap; out: quicker
+    this.ramp = Math.max(
+      0,
+      Math.min(1, this.ramp + (pose !== null ? dt / FADE_IN : -dt / FADE_OUT)),
+    );
+    this.w = this.ramp * this.ramp * (3 - 2 * this.ramp);
     if (pose === null) {
       if (this.w < 0.01) {
         this.w = 0;

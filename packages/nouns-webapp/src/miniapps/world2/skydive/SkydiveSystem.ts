@@ -152,13 +152,15 @@ export class SkydiveSystem {
     // Camera
     const c = this.cam;
     const on = s.phase !== 'off';
-    c.k += ((on ? 1 : 0) - c.k) * (1 - Math.exp(-(on ? 2.5 : 4) * dt));
+    c.k += ((on ? 1 : 0) - c.k) * (1 - Math.exp(-(on ? 2 : 4) * dt));
     if (on) {
       c.yaw = yaw;
       if (s.phase === 'freefall') {
-        c.dist = 7.5;
-        c.pitch = 0.6;
-        c.lift = 0.6;
+        // Behind and a little above, like the fall camera today: the city
+        // and the tower stay in the frame, the ground below too
+        c.dist = 6.5;
+        c.pitch = 0.4;
+        c.lift = 0.5;
         c.fov = Math.min(20, fall * 0.26);
       } else {
         c.dist = 8.5;
