@@ -196,6 +196,9 @@ EOF
 cd packages/nouns-webapp
 VITE_CHAIN_ID=1 \
 VITE_MAINNET_SUBGRAPH=https://spirited-flexibility-production-3c30.up.railway.app/graphql \
+VITE_NOUNV2_TOKEN_ADDRESS=0xb1d6bdf9326dd09183c2e9d25af5e22c637293b9 \
+VITE_NOUNV2_AUCTION_HOUSE_ADDRESS=0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc \
+VITE_NOUNV2_TREASURY_ADDRESS=0x2cdeb0d251674710840d9fa990d1de138dfe7c00 \
 NODE_OPTIONS=--max-old-space-size=4096 \
 setsid nohup npx vite --config $SP/nohmr.config.mjs > $SP/vite.log 2>&1 &
 echo $! > $SP/vite.pid
@@ -214,20 +217,36 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
   get half-old modules and the shots are garbage.
 - **One route per process.** A group with `--jobs 2 --scroll 2` can take over
   10 minutes; start each route as its own `setsid nohup` process and read its
-  log. A shot whose browser context closes under it is retried once; a crashed
-  browser is relaunched and its route re-run once.
+  log. Each run first loads its route once to warm vite (a cold server
+  optimises deps and reloads mid-shot). A shot whose browser context closes,
+  or whose page shows the error boundary / no window, is retried once in a
+  fresh context; a crashed browser is relaunched and its route re-run once.
+  Parallel runs against a *cold* server still break: start one first.
 - `VITE_MAINNET_SUBGRAPH` gives the governance pages real proposals and
   candidates (without it `/vote` shows "No proposals found" and the rows are
-  never measured). Slow routes carry their own `settle` in `lib.mjs` ROUTES
+  never measured). The `VITE_NOUNV2_*` addresses (copied from
+  `.github/workflows/netlify-deploy.yml`) give `/nounv2*` its real data; without
+  them those pages render a "not configured" stub that scores clean. Slow routes carry their own `settle` in `lib.mjs` ROUTES
   (`/candidates`: 15 s); `--settle` raises the floor for every route.
-- `/probe`'s tabs are their own ROUTES entries (`/probe?tab=lils` …). Add a
-  query variant the same way when a page has views its default URL doesn't show.
+- `/probe`'s tabs and the wallet profile's tabs are their own ROUTES entries
+  (`/probe?tab=lils`, `/explore/wallet/nouns.eth?tab=graph` …), and
+  `/explore/wallet/nouns.eth?fixture=1` is the owner view (fixture data, so
+  Autopilot shows without a wallet). Add a query variant the same way when a
+  page has views its default URL doesn't show. A view that needs a real
+  connected wallet (`/vote/:id/edit` as the proposer) still can't be measured:
+  say so in your PR.
 - **What counts:** a control scrolled out of its scroll box (or the window) is
   not checked for being covered, overlapping or on art; text or a control
   partly visible in a scroll box isn't "clipped" (it scrolls into view); art
   painted over by an opaque layer where the control sits isn't "art"; nothing
   inside `[data-responsive-art-ok]` is "on art". A shot whose in-page
   collection fails is reported as an error, never as clean.
+- **Warnings (⚠, never scored):** the log line, `report.json` (`warnings` per
+  shot) and the sheet flag a page showing "… not configured" (missing env, so
+  you measured a stub) and **squeezed** text: a sentence wrapped to about one
+  word per line (≥ 4 lines, ≤ 1.5 words a line), the float-crushes-the-column
+  bug `/nounv2` had while scoring clean. Look at any shot that warns; a clean
+  score with warnings isn't done. Read the sheets either way.
 
 - **Window mode**: a 1440 × 1000 desktop (2600 × 1440 for windows ≥ 1440), the
   navigator resized live through the dev-only `window.__nos` handle, so it also
