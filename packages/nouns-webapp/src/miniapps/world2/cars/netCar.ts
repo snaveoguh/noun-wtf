@@ -138,3 +138,29 @@ export function decodeParked(v: unknown): NetParked | null {
     yaw: yaw as number,
   };
 }
+
+/** Same car as `lc` + inside this (m) of where it was left = someone drove off in it. */
+export const TAKEN_RADIUS = 3.5;
+/** …and only a car that appeared under someone that recently (s), not one driving past. */
+export const TAKEN_WINDOW = 1.5;
+
+/** The key a parked car is claimed under (`lc` changes → a new claim). */
+export function parkedKey(p: NetParked): string {
+  return `${p.id}.${p.paint}@${p.x},${p.y},${p.z}`;
+}
+
+/**
+ * Did another rider just get into the car you left (`p`)? They took it when
+ * a car of the same model and paint appeared under them within
+ * `TAKEN_RADIUS` of it in the last `TAKEN_WINDOW` seconds.
+ */
+export function takenFrom(
+  p: Pick<NetParked, 'id' | 'paint' | 'x' | 'z'>,
+  cars: Iterable<{ id: CarId; paint: number; x: number; z: number; age: number }>,
+): boolean {
+  for (const c of cars) {
+    if (c.id !== p.id || c.paint !== p.paint || c.age > TAKEN_WINDOW) continue;
+    if (Math.hypot(c.x - p.x, c.z - p.z) <= TAKEN_RADIUS) return true;
+  }
+  return false;
+}

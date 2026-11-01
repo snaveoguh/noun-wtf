@@ -51,6 +51,7 @@ import {
   nearestS,
   parkSpot,
   planTraffic,
+  type TrafficPlan,
   PARK_SPOTS,
   ROAD_Y,
   wrapAngle,
@@ -64,6 +65,9 @@ import {
   encodeCrew,
   encodeParked,
   encodeRide,
+  type NetParked,
+  parkedKey,
+  takenFrom,
   type NetCar,
 } from './netCar';
 import { leaveSeat, poseInSeat } from './seatPose';
@@ -188,6 +192,8 @@ interface TCar {
   colYaw: number;
   colPos: THREE.Vector3;
   spin: number;
+  /** Where it lives in the traffic plan (it goes back there if another rider takes it). */
+  home: TrafficPlan | null;
 }
 
 interface Hopper {
@@ -206,6 +212,14 @@ interface RemoteCar {
   car: NetCar;
   /** Smoothed velocity (m/s) from the interpolated pose. */
   vel: THREE.Vector3;
+  /** Seconds since this car appeared under them. */
+  age: number;
+}
+
+interface ParkedRemote {
+  key: string;
+  model: CarModel;
+  p: NetParked;
 }
 
 /** Me in someone else's car. */
@@ -267,7 +281,9 @@ export class CarSystem {
   private hoppers: Hopper[] = [];
   private remotes = new Map<string, RemoteCar>();
   /** Cars other riders got out of (their `lc`), parked where they left them. */
-  private parkedRemotes = new Map<string, { key: string; model: CarModel }>();
+  private parkedRemotes = new Map<string, ParkedRemote>();
+  /** Parked cars of other riders that I drove off in, by owner: their `lc` key then. */
+  private claimed = new Map<string, string>();
   /** The car you last got out of, while it stays parked (your `lc`). */
   private left: TCar | null = null;
   private remotePool = new Map<string, CarModel[]>();
@@ -414,28 +430,33 @@ export class CarSystem {
         paints: id => CARS[id].paints.length,
       });
       for (const p of plan) {
-        const spec = CARS[p.car];
-        const t = this.spawn(spec, p.paint);
-        if (p.kind === 'parked') {
-          const sp = parkSpot(p.spot);
-          t.pos.set(sp.x, this.groundY(sp.x, sp.z, ROAD_Y), sp.z);
-          t.yaw = sp.yaw;
-          this.park(t);
-        } else {
-          t.mode = 'cruise';
-          t.ai = true;
-          t.lane = p.lane;
-          t.s = p.s;
-          t.base = p.speed;
-          t.v = p.speed;
-          t.model.driver.visible = true;
-          this.placeOnLane(t);
-          t.model.group.visible = true;
-          this.setCollider(t, true);
-        }
+        const t = this.spawn(CARS[p.car], p.paint);
+        t.home = p;
+        this.placeHome(t, p);
       }
       console.info('[cars] fleet out', plan.length);
     });
+  }
+
+  /** Put a fleet car where the traffic plan has it: at its kerb spot, or cruising its lane. */
+  private placeHome(t: TCar, p: TrafficPlan) {
+    if (p.kind === 'parked') {
+      const sp = parkSpot(p.spot);
+      t.pos.set(sp.x, this.groundY(sp.x, sp.z, ROAD_Y), sp.z);
+      t.yaw = sp.yaw;
+      this.park(t);
+    } else {
+      t.mode = 'cruise';
+      t.ai = true;
+      t.lane = p.lane;
+      t.s = p.s;
+      t.base = p.speed;
+      t.v = p.speed;
+      t.model.driver.visible = true;
+      this.placeOnLane(t);
+      t.model.group.visible = !this.hidden;
+      this.setCollider(t, !this.hidden);
+    }
   }
 
   private spawn(spec: CarSpec, paint: number): TCar {
@@ -466,6 +487,7 @@ export class CarSystem {
       colYaw: NaN,
       colPos: new THREE.Vector3(),
       spin: 0,
+      home: null,
     };
     this.fleet.push(t);
     return t;
@@ -642,13 +664,17 @@ export class CarSystem {
         // Someone's free seat beats an empty car (each client parks its own
         // fleet, so the car they took may still sit at the kerb here)
         const r = this.nearestRide();
-        const t = r === null ? this.nearestTakeable() : null;
+        const pick = r === null ? this.nearestCar() : null;
+        const t = pick?.t ?? null;
         if (r !== null) {
           input.boardTogglePressed = false;
           this.joinRide(r.driver, r.seat);
           return true;
         }
-        if (t !== null) {
+        if (pick?.parked !== undefined) {
+          input.boardTogglePressed = false;
+          this.takeParked(pick.parked.owner);
+        } else if (t !== null) {
           input.boardTogglePressed = false;
           this.enter(t);
         }
@@ -696,34 +722,134 @@ export class CarSystem {
 
   /** The car you'd take with E right now (on foot / slow board, beside it), or null. */
   nearestTakeable(): TCar | null {
+    return this.nearestCar()?.t ?? null;
+  }
+
+  /** Could the rider get into a car at all right now (on foot / slow board, nothing else on)? */
+  private canTake(): boolean {
     const g = this.game;
     const p = g.player;
-    if (this.driving || this.hidden || g.hoops.active || g.replay.active || g.showroom) return null;
-    if (g.van2.driving || g.dragon.riding) return null;
-    if (p.climb !== null || p.vault !== null) return null;
-    if (p.mode === 'board' && (p.speed > 6 || p.state !== 'ground')) return null;
-    let best: TCar | null = null;
+    if (this.driving || this.hidden || g.hoops.active || g.replay.active || g.showroom)
+      return false;
+    if (g.van2.driving || g.dragon.riding) return false;
+    if (p.climb !== null || p.vault !== null) return false;
+    if (p.mode === 'board' && (p.speed > 6 || p.state !== 'ground')) return false;
+    return true;
+  }
+
+  /** How far the rider is from a car's side at this pose (its frame), or null if not beside it. */
+  private besideAt(x: number, y: number, z: number, yaw: number, spec: CarSpec): number | null {
+    const p = this.game.player;
+    const dx = p.pos.x - x;
+    const dz = p.pos.z - z;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    // into the car's frame (+X left, +Z forward)
+    const lx = dx * c - dz * s;
+    const lz = dx * s + dz * c;
+    const g2 = spec.geo;
+    if (Math.abs(lx) > g2.width / 2 + 1.5 || Math.abs(lz) > g2.length / 2 + 0.9) return null;
+    if (Math.abs(p.pos.y - y) > g2.height + 1.2) return null;
+    return Math.hypot(lx, lz);
+  }
+
+  /**
+   * The car E would take: one of the fleet, or one another rider got out of
+   * (their `lc`, which we only draw: taking it drives our fleet's copy of
+   * that model off from its spot, in its paint). Nearest wins.
+   */
+  private nearestCar(): { t: TCar | null; parked?: { owner: string; spec: CarSpec } } | null {
+    if (!this.canTake()) return null;
+    let best: { t: TCar | null; parked?: { owner: string; spec: CarSpec } } | null = null;
     let bestD = Infinity;
     for (const t of this.fleet) {
       if (t.mode === 'driven') continue;
       if (t.mode === 'cruise' && t.v > TAKE_SPEED) continue;
-      const dx = p.pos.x - t.pos.x;
-      const dz = p.pos.z - t.pos.z;
-      const c = Math.cos(t.yaw);
-      const s = Math.sin(t.yaw);
-      // into the car's frame (+X left, +Z forward)
-      const lx = dx * c - dz * s;
-      const lz = dx * s + dz * c;
-      const g2 = t.spec.geo;
-      if (Math.abs(lx) > g2.width / 2 + 1.5 || Math.abs(lz) > g2.length / 2 + 0.9) continue;
-      if (Math.abs(p.pos.y - t.pos.y) > g2.height + 1.2) continue;
-      const d = Math.hypot(lx, lz);
-      if (d < bestD) {
+      const d = this.besideAt(t.pos.x, t.pos.y, t.pos.z, t.yaw, t.spec);
+      if (d !== null && d < bestD) {
         bestD = d;
-        best = t;
+        best = { t };
+      }
+    }
+    for (const [owner, pr] of this.parkedRemotes) {
+      const p = pr.p;
+      const spec = CARS[p.id];
+      if (!this.fleet.some(t => t.spec.id === p.id)) continue;
+      const d = this.besideAt(p.x, p.y, p.z, p.yaw, spec);
+      if (d !== null && d < bestD) {
+        bestD = d;
+        best = { t: null, parked: { owner, spec } };
       }
     }
     return best;
+  }
+
+  /** Get into the car `owner` left parked: our copy of it goes there, in their paint, and we drive. */
+  private takeParked(owner: string) {
+    const pr = this.parkedRemotes.get(owner);
+    if (pr === undefined) return;
+    const p = pr.p;
+    const t =
+      this.fleet.find(x => x.spec.id === p.id && x.mode === 'parked') ??
+      this.fleet.find(x => x.spec.id === p.id && x.mode !== 'driven');
+    if (t === undefined) return;
+    if (t.paint !== p.paint) this.repaint(t, p.paint);
+    if (t.ai) {
+      // its cruising driver just isn't there any more (it's somewhere else now)
+      t.ai = false;
+      t.model.driver.visible = false;
+    }
+    t.mode = 'parked';
+    t.v = 0;
+    t.pos.set(p.x, p.y, p.z);
+    t.yaw = p.yaw;
+    this.claimed.set(owner, parkedKey(p));
+    this.releaseRemote(pr);
+    this.parkedRemotes.delete(owner);
+    this.enter(t);
+  }
+
+  /** Rebuild a fleet car in another paint. */
+  private repaint(t: TCar, paint: number) {
+    const g = this.game;
+    g.gfx.scene.remove(t.model.group);
+    const model = buildAnyCar(t.spec, paint);
+    if (g.gfx.toon) toonify(model.group);
+    model.group.visible = false;
+    g.gfx.scene.add(model.group);
+    t.model = model;
+    t.paint = paint;
+    if (t.still !== null) {
+      g.gfx.scene.remove(t.still);
+      t.still = null;
+    }
+  }
+
+  /**
+   * The car I left parked: once another rider drives off in it (their copy
+   * of it turns up right where it stood), mine goes back home so there
+   * aren't two of it, and my `lc` stops.
+   */
+  private checkLeftTaken() {
+    const t = this.left;
+    if (t === null || this.driven !== null || t.mode !== 'parked') return;
+    for (const [id, rc] of this.remotes) {
+      const pos = rc.model.group.position;
+      const one = [{ id: rc.car.id, paint: rc.car.paint, x: pos.x, z: pos.z, age: rc.age }];
+      if (!takenFrom({ id: t.spec.id, paint: t.paint, x: t.pos.x, z: t.pos.z }, one)) continue;
+      this.left = null;
+      this.rehome(t);
+      const who = this.game.net.players.get(id)?.name || 'SOMEONE';
+      this.say(`${who.toUpperCase()} TOOK YOUR ${t.spec.name.toUpperCase()}`);
+      return;
+    }
+  }
+
+  /** Back to its place in the traffic plan (or just off the road, if it never had one). */
+  private rehome(t: TCar) {
+    if (t.home === null) return;
+    if (t.home.kind === 'cruise' && t.still !== null) t.still.visible = false;
+    this.placeHome(t, t.home);
   }
 
   // ── Riding in someone else's car ──
@@ -1438,15 +1564,16 @@ export class CarSystem {
     }
     if (t === null || sim === null) {
       const nr = this.nearestRide();
-      const n = nr === null ? this.nearestTakeable() : null;
+      const pick = nr === null ? this.nearestCar() : null;
+      const n = pick?.t?.spec ?? pick?.parked?.spec ?? null;
       const near =
         n === null
           ? null
           : {
-              id: n.spec.id,
-              name: n.spec.name,
-              tagline: n.spec.tagline,
-              credit: carCredit(n.spec),
+              id: n.id,
+              name: n.name,
+              tagline: n.tagline,
+              credit: carCredit(n),
             };
       const rc = nr !== null ? this.remotes.get(nr.driver) : undefined;
       const nearRide =
@@ -1551,10 +1678,12 @@ export class CarSystem {
           spin: 0,
           car: nc,
           vel: new THREE.Vector3(),
+          age: 0,
         };
         this.remotes.set(id, rc);
       }
       rc.car = nc;
+      rc.age += dt;
       const m = rc.model;
       const grp = m.group;
       grp.position.copy(c.pos);
@@ -1627,6 +1756,7 @@ export class CarSystem {
       this.remotes.delete(id);
     }
     this.updateParkedRemotes(hideAll);
+    this.checkLeftTaken();
   }
 
   /** Cars other riders got out of stay where they left them (`lc`), doors shut, wheels down. */
@@ -1634,7 +1764,13 @@ export class CarSystem {
     const g = this.game;
     for (const [id, rp] of g.net.players) {
       const c = rp.current;
-      const p = hideAll || c.vehicle === 'car' ? null : decodeParked(c.lc);
+      let p = hideAll || c.vehicle === 'car' ? null : decodeParked(c.lc);
+      // The one I drove off in: theirs stops drawing once their client sees it gone
+      const claim = this.claimed.get(id);
+      if (claim !== undefined) {
+        if (p !== null && parkedKey(p) === claim) p = null;
+        else if (!hideAll) this.claimed.delete(id);
+      }
       const key = p !== null ? `${p.id}:${p.paint}` : '';
       let pr = this.parkedRemotes.get(id);
       if (pr !== undefined && pr.key !== key) {
@@ -1654,9 +1790,10 @@ export class CarSystem {
         if (m.thrusters !== null) m.thrusters.visible = false;
         poseDoors(m, 0);
         m.driver.visible = false;
-        pr = { key, model: m };
+        pr = { key, model: m, p };
         this.parkedRemotes.set(id, pr);
       }
+      pr.p = p;
       const grp = pr.model.group;
       if (grp.position.x !== p.x || grp.position.y !== p.y || grp.position.z !== p.z) {
         grp.position.set(p.x, p.y, p.z);
@@ -1669,6 +1806,7 @@ export class CarSystem {
       this.releaseRemote(pr);
       this.parkedRemotes.delete(id);
     }
+    for (const id of this.claimed.keys()) if (!g.net.players.has(id)) this.claimed.delete(id);
   }
 
   private takeRemote(id: CarId, paint: number): CarModel {
