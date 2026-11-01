@@ -97,8 +97,8 @@ export const OverviewTab: FC<{
   const hasV2 = v2 != null && (num(v2.votes) > 0 || num(v2.auctionsWon) > 0 || num(v2.bids) > 0);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
-      <div className="grid gap-3 lg:col-span-2">
+    <div className="@lg:grid-cols-3 grid gap-3">
+      <div className="@lg:col-span-2 grid gap-3">
         <Card
           title="Recent votes"
           right={
@@ -119,11 +119,7 @@ export const OverviewTab: FC<{
         <Card
           title="Authored proposals"
           right={
-            <button
-              type="button"
-              className="wp-link text-xs"
-              onClick={() => onTab('proposals')}
-            >
+            <button type="button" className="wp-link text-xs" onClick={() => onTab('proposals')}>
               all {authored.length} →
             </button>
           }
@@ -170,7 +166,7 @@ export const OverviewTab: FC<{
           {nouns.length === 0 ? (
             <Empty>Holds no Nouns right now.</Empty>
           ) : (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-3">
+            <div className="@md:grid-cols-5 @lg:grid-cols-3 grid grid-cols-4 gap-2">
               {nouns.slice(0, 12).map(n => (
                 <NounLink key={String(n.nounId)} nounId={n.nounId}>
                   <NounSeedImage nounId={n.nounId} seed={n.seed} title={`Noun ${n.nounId}`} />

@@ -358,10 +358,34 @@
 .wp-row > .flex > .wp-link.wp-ellipsis {
   flex: 1 1 0;
 }
-@media (max-width: 640px) {
+@container page (max-width: 559.98px) {
   .wp-row > .flex {
     flex-wrap: wrap;
     row-gap: 4px;
+  }
+}
+
+/* Touch: 40 px tap targets. Buttons, tabs and inputs grow; header links and
+   card-header links ("all →", "detail →") become inline-flex boxes. */
+@media (pointer: coarse) {
+  .wp-btn,
+  .wp-tab,
+  .wp-seg button,
+  .wp-input,
+  .wp-select {
+    min-height: 40px;
+  }
+  .wp-btn {
+    justify-content: center;
+    min-width: 40px;
+  }
+  .wp-card-head > .wp-link,
+  .wp-tap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 40px;
+    min-width: 40px;
   }
 }
 
