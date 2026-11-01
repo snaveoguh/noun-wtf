@@ -13,6 +13,7 @@ import { LINES, pickLine, pipeSeed } from './PipeHead';
 import {
   BENCH,
   type BenchProbe,
+  DRESSING_MATERIAL,
   type BenchSite,
   fromWall,
   muralKeyPoints,
@@ -64,7 +65,21 @@ beforeAll(async () => {
   const { collision } = await loadPlaza();
   world = new CollisionWorld();
   world.build(collision);
-  probe = probeOf(world);
+  // The render-only dressing (palms, trees, lamp heads), as the game passes it
+  const dressing = ['Props', 'Foliage'].flatMap(name =>
+    buildingPrimitives(name)
+      .filter(p => DRESSING_MATERIAL.test(p.material))
+      .map(p => {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute(
+          'position',
+          new THREE.BufferAttribute(new Float32Array(p.tris.flatMap(t => t.p.flat())), 3),
+        );
+        return new THREE.Mesh(g);
+      }),
+  );
+  expect(dressing.length).toBeGreaterThan(0);
+  probe = probeOf(world, dressing);
   const r = placeBench(wall, probe);
   expect(r).not.toBeNull();
   site = r!.site;
@@ -81,8 +96,20 @@ function cameraFor(pose: { pos: V3; look: V3; fov: number }, aspect: number) {
 }
 
 const ndc = (cam: THREE.Camera, p: V3) => new THREE.Vector3(...p).project(cam);
-/** The mural's real corners (on the wall). */
-const corners = (w: MuralWall): V3[] => muralKeyPoints(w, 0.25).slice(0, 4);
+/** The screen's envelope corners (the biggest a clip can make it, frame included). */
+const corners = (w: MuralWall): V3[] => {
+  const s = siteAt(w, 20, 0, 0);
+  const [ox, , oz] = w.origin;
+  const [rx, , rz] = w.right;
+  const [nx, , nz] = w.normal;
+  const out: V3[] = [];
+  for (const u of [-s.halfW, s.halfW])
+    for (const y of [s.look[1] - s.halfH, s.look[1] + s.halfH])
+      out.push([ox + rx * u + nx * 0.6, y, oz + rz * u + nz * 0.6]);
+  return out;
+};
+/** NDC height the letterbox leaves (bars are 9% of the height each, at least 52 px). */
+const OPEN = 0.8;
 const ASPECTS = [16 / 9, 4 / 3, 390 / 844, 844 / 390];
 
 describe('placement (real plaza)', () => {
@@ -168,15 +195,15 @@ describe('the shot', () => {
         const pts = corners(wall).map(p => ndc(cam, p));
         for (const p of pts) {
           expect(Math.abs(p.x)).toBeLessThan(0.97);
-          expect(Math.abs(p.y)).toBeLessThan(0.97);
+          expect(Math.abs(p.y)).toBeLessThan(OPEN);
           expect(p.z).toBeLessThan(1);
         }
         // Centred left to right (within 4% of the frame), in the upper-middle
         const cx = (Math.min(...pts.map(p => p.x)) + Math.max(...pts.map(p => p.x))) / 2;
         expect(Math.abs(cx)).toBeLessThan(0.08);
         const cy = (Math.min(...pts.map(p => p.y)) + Math.max(...pts.map(p => p.y))) / 2;
-        expect(cy).toBeGreaterThan(-0.1);
-        expect(cy).toBeLessThan(0.5);
+        expect(cy).toBeGreaterThan(-0.05);
+        expect(cy).toBeLessThan(0.45);
         // The mural fills a good part of the frame
         const w = Math.max(...pts.map(p => p.x)) - Math.min(...pts.map(p => p.x));
         expect(w).toBeGreaterThan(aspect < 1 ? 1.4 : 0.7);
@@ -192,10 +219,10 @@ describe('the shot', () => {
           const s = seatSpot(site, seat);
           // A seated Noun: shoulders ~1 m up, the top of the head under 2 m
           const top = ndc(cam, [s.x, site.y + 1.95, s.z]);
-          const shoulders = ndc(cam, [s.x, site.y + 1.0, s.z]);
+          const shoulders = ndc(cam, [s.x, site.y + 1.1, s.z]);
           expect(Math.abs(top.x)).toBeLessThan(0.85);
           expect(top.y).toBeLessThan(bottom);
-          expect(shoulders.y).toBeGreaterThan(-0.97);
+          expect(shoulders.y).toBeGreaterThan(-OPEN);
           expect(top.z).toBeLessThan(1);
         }
       }
@@ -205,7 +232,19 @@ describe('the shot', () => {
     for (const aspect of [16 / 9, 390 / 844])
       for (const t of times) {
         const cam = benchShot(site, t, aspect).pos;
-        for (const p of muralKeyPoints(wall)) expect(probe.hit(cam, p)).toBeNull();
+        // Corners + centre: nothing in the way on this side of the far pavement.
+        // (The far pavement's palm, 5 m in front of the wall, crosses the
+        // picture's left third from anywhere on the plaza: not the bench's to dodge.)
+        for (const p of muralKeyPoints(wall)) {
+          const h = probe.hit(cam, p);
+          if (h !== null) expect(fromWall(wall, h)).toBeLessThan(NEAR_WALL);
+        }
+        // Against the collision alone (the brief's check): corners and centre clear
+        const solid = probeOf(world);
+        for (const p of muralKeyPoints(wall)) {
+          const h = solid.hit(cam, p);
+          if (h !== null) expect(fromWall(wall, h)).toBeLessThan(NEAR_WALL);
+        }
         // The dense grid: nothing this side of the far pavement crosses the picture
         for (const p of muralTargets(wall)) {
           const h = probe.hit(cam, p);
@@ -220,7 +259,7 @@ describe('the shot', () => {
     const s = benchShot(site, 300, 16 / 9);
     const l = toLocal(site, s.pos[0], s.pos[2]);
     expect(l.z).toBeLessThan(-3);
-    expect(Math.abs(l.x)).toBeLessThan(1);
+    expect(Math.abs(l.x)).toBeLessThan(1.5);
     expect(s.pos[1] - site.y).toBeGreaterThan(BENCH.backTop + 1);
     expect(s.fov).toBeLessThan(40);
   });

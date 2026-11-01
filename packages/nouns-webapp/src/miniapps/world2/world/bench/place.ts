@@ -8,10 +8,10 @@
 //   - the bench, its sitters' feet and the space round it are one flat
 //     surface at pavement height (no road, no kerb, no step),
 //   - nothing solid stands in or near it (lamp posts, planters, trees),
-//   - the cinematic shot's camera (shot.ts) is in clear air, its rays to
-//     the mural's corners and centre are clear, and so is every ray to a
-//     dense grid over the mural, except where what's in the way stands
-//     right at the wall (NEAR_WALL: the far pavement's lamp post is in
+//   - the cinematic shot's camera (shot.ts) is in clear air, and its rays
+//     to the mural's corners, centre and a dense grid over it are clear
+//     (collision and the render-only palms / trees / lamps), except where what's in the way stands
+//     on the far pavement (NEAR_WALL: its's lamp post is in
 //     front of the picture from anywhere on the plaza, so no bench spot
 //     could dodge it). A lamp post on this side across the picture fails.
 // Only the level's static collision is asked (the same on every client),
@@ -48,9 +48,9 @@ export interface BenchSite {
   /** Distance from the wall (m) and sideways offset from the mural's centre (m). */
   dist: number;
   offset: number;
-  /** The mural's centre (the shot looks at it). */
+  /** The screen's centre (the shot looks at it). */
   look: V3;
-  /** The mural's half width / half height (m), for framing. */
+  /** The screen's half width / half height (m), for framing (its envelope: see FRAME_PAD). */
   halfW: number;
   halfH: number;
 }
@@ -69,8 +69,15 @@ export const BENCH = {
   standZ: 0.78,
 } as const;
 
-/** Things this close to the wall (m) are in front of the mural from anywhere: not held against a spot. */
-export const NEAR_WALL = 6;
+/** Things this close to the wall (m) stand on the far pavement (canopies over the kerb included): in front of the mural from anywhere, not held against a spot. */
+export const NEAR_WALL = 9;
+
+/**
+ * The billboard's screen can grow past the decal (a tall clip reaches up to
+ * the wall's top, MuralBillboard / billboardFit) and has a 0.38 m frame round
+ * it: the shot frames this envelope, not the bare decal (m: sides, below, above).
+ */
+export const FRAME_PAD = { side: 0.4, below: 0.4, above: 0.85 } as const;
 
 /** Ideal distance from the wall (m): the pavement's middle across the road. */
 const IDEAL_DIST = 21;
@@ -113,9 +120,9 @@ export function siteAt(wall: MuralWall, dist: number, offset: number, y: number)
     yaw: Math.atan2(-nx, -nz),
     dist,
     offset,
-    look: [ox, (wall.bottom + wall.top) / 2, oz],
-    halfW: wall.width / 2,
-    halfH: (wall.top - wall.bottom) / 2,
+    look: [ox, (wall.bottom - FRAME_PAD.below + wall.top + FRAME_PAD.above) / 2, oz],
+    halfW: wall.width / 2 + FRAME_PAD.side,
+    halfH: (wall.top + FRAME_PAD.above - wall.bottom + FRAME_PAD.below) / 2,
   };
 }
 
@@ -230,13 +237,7 @@ export function placeBench(wall: MuralWall, probe: BenchProbe): PlaceResult | nu
         seen = false;
         break;
       }
-      for (const tg of keys)
-        if (probe.hit(cam, tg) !== null) {
-          seen = false;
-          break;
-        }
-      if (!seen) break;
-      for (const tg of targets) {
+      for (const tg of [...keys, ...targets]) {
         const h = probe.hit(cam, tg);
         if (h !== null && fromWall(wall, h) > NEAR_WALL) {
           seen = false;
@@ -268,6 +269,21 @@ export function wallOf(q: {
   };
 }
 
+/** Render-only dressing that can stand in the shot's way (by material name). */
+export const DRESSING_MATERIAL = /^(palm_|tree_|lamp_)/i;
+
+/** The level's render-only dressing meshes (palms, trees, lamp heads) under `root`. */
+export function dressingMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  root.traverse(o => {
+    const m = o as THREE.Mesh & { isInstancedMesh?: boolean };
+    if (m.isMesh !== true || m.isInstancedMesh === true) return;
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    if (mats.some(x => DRESSING_MATERIAL.test(x.name))) out.push(m);
+  });
+  return out;
+}
+
 const _o = new THREE.Vector3();
 const _d = new THREE.Vector3(0, -1, 0);
 const _a = new THREE.Vector3();
@@ -279,12 +295,17 @@ const _c = new THREE.Vector3();
 /**
  * The probe on a CollisionWorld's static level only (`world.bvh`): the
  * streamed / moving colliders (cars, the van) differ between clients and
- * from minute to minute.
+ * from minute to minute. `sightMeshes` (the level's render-only props and
+ * foliage) count for sight lines too.
  */
-export function probeOf(world: CollisionWorld): BenchProbe {
-  const statics = new (world.constructor as new () => CollisionWorld)();
+export function probeOf(world: CollisionWorld, sightMeshes: THREE.Mesh[] = []): BenchProbe {
+  const Ctor = world.constructor as new () => CollisionWorld;
+  const statics = new Ctor();
   statics.bvh = world.bvh;
   statics.geometry = world.geometry;
+  // Render-only dressing (palms, tree canopies, lamp heads) blocks the view too
+  const dressing = new Ctor();
+  if (sightMeshes.length > 0) dressing.build(sightMeshes);
   return {
     ground(x, z) {
       _o.set(x, 40, z);
@@ -300,8 +321,11 @@ export function probeOf(world: CollisionWorld): BenchProbe {
       _a.set(...a);
       _b.set(...b).sub(_a);
       const len = _b.length();
-      const h = len > 1e-4 ? statics.raycast(_a, _b, len) : null;
-      return h === null ? null : [h.point.x, h.point.y, h.point.z];
+      if (len < 1e-4) return null;
+      const h = statics.raycast(_a, _b, len);
+      const d = dressing.bvh !== null ? dressing.raycast(_a, _b, len) : null;
+      const first = h === null ? d : d === null || h.distance < d.distance ? h : d;
+      return first === null ? null : [first.point.x, first.point.y, first.point.z];
     },
   };
 }

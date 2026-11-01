@@ -4,9 +4,9 @@
 // on the line from the mural's centre through the bench (so the bench sits
 // centred under the picture), and holds there on a slow push-in with a
 // gentle sideways drift: the sitters' heads and shoulders along the bottom
-// of the frame, the GIF mural centred above them. A long lens (31° → 33°
-// vertical, the game's on-foot camera is 62°); on a portrait screen it opens just enough to keep the
-// mural's whole width in frame.
+// of the frame, the GIF mural centred above them. A long lens (34.5° → 35.5° vertical;
+// the game's on-foot camera is 62°), framed for the letterbox; on a portrait
+// screen it opens just enough to keep the mural's whole width in frame.
 
 import type { BenchSite, V3 } from './place';
 
@@ -24,22 +24,22 @@ const PUSH = 20;
 
 export const SHOT = {
   /** Behind the bench (m): start → end of the push-in. */
-  back0: 8.2,
-  back1: 7,
+  back0: 10.6,
+  back1: 9.6,
   /** Camera height over the ground (m): just over the sitters' heads. */
-  h0: 2.35,
+  h0: 2.3,
   h1: 2.15,
   /** Vertical FOV (°): long lens, opening a touch as it pushes in to hold the framing. */
-  fov0: 31,
-  fov1: 33,
-  /** The look sits this far under the mural's centre (m): sitters along the frame's bottom. */
-  drop: 3,
+  fov0: 34.5,
+  fov1: 35.5,
+  /** The look sits this far under the screen's centre (m): sitters along the frame's bottom. */
+  drop: 2.35,
   /** Sideways drift (m) and its period (s). */
   drift: 0.4,
   driftPeriod: 46,
   /** Horizontal room kept either side of the mural on a narrow screen (m). */
-  sideRoom: 1.6,
-  maxFov: 74,
+  sideRoom: 1.2,
+  maxFov: 78,
 } as const;
 
 /** Ease out (cubic). */

@@ -23,7 +23,7 @@ import { findMuralDecal, quadOf } from '../MuralBillboard';
 
 import { benchCollider, buildBench } from './build';
 import { PipeHead } from './PipeHead';
-import { BENCH, type BenchSite, placeBench, probeOf, wallOf } from './place';
+import { BENCH, type BenchSite, dressingMeshes, placeBench, probeOf, wallOf } from './place';
 import { encodeBench, offerSeat, remoteSeat, seatSpot, standSpot, wantsStand } from './rules';
 import { benchShot, blendPose, GLIDE_IN, GLIDE_OUT, type ShotPose, smooth } from './shot';
 
@@ -31,6 +31,8 @@ const COLLIDER_ID = 'bench:mural';
 /** Easing onto / off the seat (s). */
 const SIT_S = 0.55;
 const STAND_S = 0.4;
+/** How far the glide in arcs up over the bench (m, at its middle). */
+const GLIDE_LIFT = 1.4;
 /** Offers are rechecked this often (s). */
 const OFFER_EVERY = 0.15;
 
@@ -57,6 +59,8 @@ export class BenchSystem {
   private seat = -1;
   private offer: number | null = null;
   private offerClock = 0;
+  /** Off after standing up until the rider leaves the bench's reach. */
+  private rearmed = true;
   /** Since sitting (the shot's clock). */
   private t = 0;
   /** Sit blend 0…1 and its clock. */
@@ -103,7 +107,7 @@ export class BenchSystem {
     const quad = decal !== null ? quadOf(decal) : null;
     if (quad === null) return;
     const t0 = performance.now();
-    const placed = placeBench(wallOf(quad), probeOf(g.world));
+    const placed = placeBench(wallOf(quad), probeOf(g.world, dressingMeshes(level.root)));
     if (placed === null) {
       console.warn('[bench] no clear spot facing the mural');
       return;
@@ -176,6 +180,9 @@ export class BenchSystem {
     const me = g.me;
     if (s === null || me === null || !this.allowed()) return;
     const p = g.player;
+    if (p.mode === 'board') p.toggleBoard();
+    p.mode = 'foot';
+    p.footGrounded = true;
     this.from = { x: me.root.position.x, z: me.root.position.z, yaw: p.footYaw };
     // The rider's own position: in front of the seat, facing the mural
     const st = standSpot(s, seat);
@@ -246,12 +253,18 @@ export class BenchSystem {
       if (this.offerClock <= 0) {
         this.offerClock = OFFER_EVERY;
         this.offer = offerSeat(s, {
-          free: this.allowed() && p.mode === 'foot' && p.footGrounded && p.climb === null,
+          // On foot, or rolling up slow on a board (sitting steps off it)
+          free:
+            this.allowed() &&
+            (p.mode === 'foot' ? p.footGrounded && p.climb === null : p.state === 'ground'),
           speed: p.speed,
           x: p.pos.x,
           z: p.pos.z,
           taken: this.takenSeats(),
         });
+        // Just stood up: no SIT again until you've stepped out of reach once
+        if (this.offer === null) this.rearmed = true;
+        else if (!this.rearmed) this.offer = null;
         this.set({ prompt: this.offer !== null });
       }
       return;
@@ -278,7 +291,8 @@ export class BenchSystem {
     this.seat = -1;
     this.k = 0;
     this.game.net.bench = null;
-    this.offerClock = 0.6;
+    this.offerClock = 0.3;
+    this.rearmed = false;
   }
 
   /** Ease the rider from where they were onto the seat (k 0…1), sat. */
@@ -306,6 +320,8 @@ export class BenchSystem {
     const shot = benchShot(s, this.t, cam.aspect);
     const k = smooth(this.t / GLIDE_IN);
     const pose = k < 1 ? blendPose(this.camFrom, shot, k) : shot;
+    // Arc up over the bench on the way (from in front of it, a straight line ran through the heads)
+    if (k < 1) pose.pos[1] += GLIDE_LIFT * Math.sin(Math.PI * k);
     this.rig.pos.set(...pose.pos);
     this.rig.look.set(...pose.look);
     this.rig.fov = pose.fov;
