@@ -22,7 +22,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 
 1. `/` — severity 21.5, viewport code 4
 2. `/studio` — severity 12.2, viewport code 0
-3. `/probe` — severity 10.1, viewport code 65
+3. `/probe` — severity 10.1, viewport code 65 · **done: 26/26 clean** (branch `claude/responsive-probe`)
 4. `/vote`, `/candidates` — severity 5.9, viewport code 47 (group: governance)
 5. `/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist` — severity 3.7 (1 not measured), viewport code 4 (group: info)
 6. `/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3` — severity 3.2 (4 not measured), viewport code 32 (group: art)
@@ -78,6 +78,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 
 ### `/probe` — severity 10.1
 
+- **status: done, 11/26 → 26/26 clean** (`claude/responsive-probe`). Tab pills scroll sideways (snap, end fade below lg) instead of overflowing; padding/type `sm:`/`lg:` → `@sm:`/`@lg:`; Dreams grids `@sm:`…`@xl:`; owner/settler/curated menus follow the container (span the filter bar below sm) instead of going `fixed` to the viewport; the terminal prompt shortens to `~$` below sm; 40 px controls on `(pointer: coarse)`; Lils/Borgs grids re-measure on container resize. Left viewport-based on purpose: fixed popovers clamped to `innerWidth`, the fixed 3D overlay canvas, and modals (`DialogContent sm:max-w-*`, `DreamCreatePanel md:flex-row`).
 - route `probe` · navigator window · group explore
 - element `ProbePage` in `src/pages/Probe/ProbePage.tsx` (58 files scanned)
 - components: `BorgDetailPopover`, `BuilderTokenHoverCard`, `DreamDetailPopover`, `LilNounDetailPopover`, `Noun`, `Noun3DCell`, `NounDetailPopover`, `ProbeTerminal`, `Skeleton`, `StandaloneNoun`, `TraitFilterPanel`, `ui`
