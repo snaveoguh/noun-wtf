@@ -31,6 +31,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | `/vote/:id/history`, `/vote/:id/history/:n`, `/delegate` (history + delegate) | `/vote/1000/history` 23/26 → 26/26; `/vote/1000/history/1` 0/26 → 26/26 (it **crashed**: error boundary, "reading 'description'"; fixed); `/delegate` 26/26 → 26/26 (no change: a viewport-centred modal); `/candidates/sample/edit` 26/26 (govcreate's version kept) · `claude/responsive-history` (#232) · **diff view not checked against real data**: the indexer returns no proposal versions, so it was checked by hand with an uncommitted local mock at 360 / 640 / 1440 / 1920. Left: unchanged diff lines are light text on react-diff-viewer's white (theme); `/delegate`'s modal can land partly outside a narrow window (viewport modal, allowed) |
 | `/predictions`, `/feed`, `/highway` (explore) | 13/26 → 26/26, 9/26 → 26/26, 0/26 → 26/26 · `claude/responsive-explore` (#231) · the two "squeezed" warnings left were false positives (highway's ASCII noggles in a `<pre>`, a feed cast that is mostly one long URL); the check now skips both. Highway's marquee rows are swipeable scroll boxes (their edge clipping is deliberate: owner to confirm); its ASCII boxes misalign under non-monospace site fonts (not a width issue) |
 | `/v2`, `/crystal-ball`, `/v2/crystal-ball` (auction + crystal ball) | 26/26 → 26/26 (no change needed), 17/26 → 26/26, 7/26 → 26/26, 0 warnings · `claude/responsive-auction` (#234) · measured in the default ASCII view: the V2 missed-blocks reel was live (really measured); the V1 reel and SETTLE were checked with a temporary local force-on. The 2D / 3D views are now reachable with `?view=2d|3d` (ROUTES variants): `/v2/crystal-ball?view=2d` and `?view=3d` are 26/26 each, 0 warnings (sheets in `.claude/responsive-shots/v2-crystal-ball--view-{2d,3d}/after/`) · still open: the nounv2 auction card's white background (theme follow-up, #228) |
+| `/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3` (art) | 10/26 → 26/26, 21/26 → 26/26, 20/26 → 26/26, 0/26 → 26/26, 20/26 → 26/26, 20/26 → 26/26, 0 warnings · `claude/responsive-art` (#235) · for the owner: `/cc0`'s filter bar is sticky again (a root `overflow-x-hidden` had disabled it while hiding an 8 px overflow); `/pip3`'s GIPHY credit moved to the header; Hypercastle's controls get their own bars below md and are `data-responsive-art-ok` from md up. `/terraforms` takes ~45 min a run |
 
 ## Work units (worst first)
 
@@ -39,7 +40,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 3. ~~`/probe`~~ — done (see Done)
 4. ~~`/vote`, `/candidates`~~ — done (see Done)
 5. ~~`/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist`~~ — done (see Done)
-6. `/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3` — severity 3.2 (4 not measured), viewport code 32 (group: art)
+6. ~~`/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3`~~ — done (see Done)
 7. ~~`/nounv2/1`, `/nounv2/create`, `/nounv2`~~ — done (see Done)
 8. ~~`/playground`~~ — done (see Done)
 9. ~~`/create-proposal`, `/vote/1000/edit`, `/create-candidate`~~ — done (see Done; `/vote/1000/edit` unmeasured)

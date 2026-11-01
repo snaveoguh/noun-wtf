@@ -180,6 +180,16 @@ info pages) needed again and again:
   (`[container-type:inline-size]`) and show the word only when it fits
   (`hidden [@container(min-width:4.5rem)]:inline`), with the % always there
   (`/predictions`' odds bars).
+- **Removing an ancestor's `overflow-x: hidden`** can reveal overflow it was
+  hiding, and re-enable `position: sticky` below it (hidden overflow makes the
+  ancestor the sticky box): measure again after removing one (`/cc0`).
+- **Negative margins that cancel padding:** pair them with the same arbitrary
+  value (`px-[24px] -mx-[24px]`). A theme or plugin can resize the padding
+  utility but not its negative twin (`px-8` came out 24 px while `-mx-8` stayed
+  32 px).
+- **40 px touch box on a short link in a byline:** `inline-block`,
+  `padding: 13px 0; margin: -13px 0` on `(pointer: coarse)`: a bigger hit
+  area, same line height.
 - **Before a `sed` on class names:** prettier's Tailwind plugin reorders
   classes (the `@`-variants move to the front), so grep the file for the exact
   string first; a pattern copied from memory often doesn't match.
@@ -243,10 +253,13 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
   check nothing still listens (`lsof -iTCP:5196 -sTCP:LISTEN` prints nothing):
   a run against a stale vite measures the old code. Then check `vite.log` for
   "already in use".
+- **Slow routes:** `/terraforms` takes ~45 min a run; run it on its own.
 - **Stopping a harness run:** find its PID with `ps -o pid,args -C node` and
   read the args yourself (don't pipe a pattern into kill). A plain `kill` may
   not stop it; use `kill -9 <pid>` and check `ps` again before re-running the
   route, or the old run keeps writing into the same `after/` folder as the new one.
+  If a script of yours launched it, stop that runner too: it's the harness's
+  parent (`ps -o ppid= -p <harness pid>`), otherwise it starts the next route.
 - **Never kill by name.** `pkill -f`, `pgrep -f … | xargs kill` and
   `ps … | grep <pattern> | xargs kill` all match your own shell (its command
   line contains the pattern) and other sessions' processes: the integrator
