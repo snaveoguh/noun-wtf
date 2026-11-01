@@ -158,6 +158,21 @@ info pages) needed again and again:
 - **Deliberate overlay heroes** (copy and buttons on a video by design): mark
   the hero `data-responsive-art-ok` and the harness stops counting "on art"
   inside it. Only where the overlay is the design; say so in your PR.
+- **Live data before the baseline:** open the list page (`/vote`,
+  `/candidates`, …) and take a real item's URL from it. A made-up id often
+  renders a spinner or an empty state that scores clean.
+- **Inactive UI** (vote buttons with no active proposal, owner-only panels):
+  a temporary local force-on to check it is fine; never commit it, and say in
+  the PR that it was checked by hand.
+- **Divider under a scrolling tab row:** draw it with an inset box-shadow on
+  the row (`box-shadow: inset 0 -1px 0 …`). A `-2px` underline hung below the
+  tabs gets clipped by the scroller.
+- **Bootstrap `Col` inside a container grid:** drop its `lg=` / `md=` props,
+  let it span the full width and zero its auto margins; the grid decides the
+  columns now.
+- **Side columns in the default navigator:** the window opens ~950 px wide
+  (lg), so step a side column (300 px from lg, 340 px from xl) rather than
+  dropping to one column below xl.
 - Shell items (tray, NOUN FM, the OS icon) belong to the foundation: report them
   under "Foundation requests" rather than working round them in the page.
 
