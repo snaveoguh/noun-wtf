@@ -16,7 +16,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | route | status |
 | --- | --- |
 | `/noun/:id`, `/v2/noun/:id` (Auction) | pilot, 26/26 clean in the last --all run · before/after sheets in `.claude/responsive-shots/noun-2062*/` |
-| `/` (homescreen) | 0/13 → 0/13 clean, severity 21.5 → 13.7 (**partial**). Phones' own problems are fixed (hero stacked, tap sizes, jump chips, no clipping in the page); what's left is shell (tray, NOUN FM button) or harness false positives, plus the wide hero kept as designed · `claude/responsive-home` (#220), sheets in `.claude/responsive-shots/home/` |
+| `/` (homescreen) | 0/13 → 0/13 clean, severity 21.5 → 13.7 (**partial**) · `claude/responsive-home` (#220), sheets in `.claude/responsive-shots/home/` · after the foundation's shell + harness fixes: **6/13, severity 8** (every phone width clean; `home/after-shell/`). Left at 768+: the full-bleed hero's controls on video (as designed; `data-responsive-art-ok` is the owner's call) and shelf cards under the floating desktop tray |
 | `/probe` | 11/26 → 26/26 clean · `claude/responsive-probe` (#221) |
 | `/studio` | 6/26 → 26/26 clean · `claude/responsive-studio` (#222), sheets in `.claude/responsive-shots/studio/` |
 | `/vote`, `/candidates` (governance lists) | `/vote` 12/26 → 26/26, `/candidates` 22/26 → 26/26 clean (live indexer data) · `claude/responsive-governance` (#223), sheets in `.claude/responsive-shots/{vote,candidates}/` |
@@ -24,7 +24,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 
 ## Work units (worst first)
 
-1. `/` — severity 21.5, viewport code 4 · **partial: severity 13.7** (rest is shell / harness, see Done)
+1. `/` — severity 21.5, viewport code 4 · **partial: 6/13, severity 8** (phones clean; see Done)
 2. ~~`/studio`~~ — done (see Done)
 3. ~~`/probe`~~ — done (see Done)
 4. ~~`/vote`, `/candidates`~~ — done (see Done)
