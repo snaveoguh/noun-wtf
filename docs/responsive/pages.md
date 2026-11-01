@@ -17,11 +17,12 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | --- | --- |
 | `/noun/:id`, `/v2/noun/:id` (Auction) | pilot, 26/26 clean in the last --all run · before/after sheets in `.claude/responsive-shots/noun-2062*/` |
 | `/` (homescreen) | severity 21.5 → 13.7, 0/13 clean both runs. Phones' own problems are fixed (hero stacked, tap sizes, jump chips, no clipping in the page); what's left is shell (tray, NOUN FM button) or harness false positives, plus the wide hero kept as designed · `claude/responsive-home`, sheets in `.claude/responsive-shots/home/` |
+| `/studio` | 6/26 → 26/26 clean (branch `claude/responsive-studio`) · before/after sheets in `.claude/responsive-shots/studio/` |
 
 ## Work units (worst first)
 
 1. `/` — severity 21.5, viewport code 4
-2. `/studio` — severity 12.2, viewport code 0
+2. `/studio` — severity 12.2, viewport code 0 · **done: 26/26 clean**
 3. `/probe` — severity 10.1, viewport code 65 · **done: 26/26 clean** (branch `claude/responsive-probe`)
 4. `/vote`, `/candidates` — severity 5.9, viewport code 47 (group: governance)
 5. `/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist` — severity 3.7 (1 not measured), viewport code 4 (group: info)
@@ -65,6 +66,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 - element `StudioPage` in `src/pages/StudioPage.tsx` (3 files scanned)
 - components: `Studio`
 - viewport code: 0 (none)
+- **done:** 26/26 clean after (6/26 before). Stacked column below md, trait panel + preview side by side at md, canvas + sidebar at lg, the original floating layout from 1100 px; the canvas fits its column below 1100; pointer events (touch drawing); 40 px targets and a two-row scrolling palette on touch.
 - clean 6/26; worst page@320:35.5, page@360:28.5, page@390:24.5
 - w: 320:16 360:13 390:16 430:16 520:15 640:13 768:14 900:2 1024:2 1280:2 1440:✓ 1920:✓ 2560:✓
 - p: 320:36 360:29 390:25 430:25 520:23 640:22 768:15 900:13 1024:17 1280:11 1440:✓ 1920:✓ 2560:✓
