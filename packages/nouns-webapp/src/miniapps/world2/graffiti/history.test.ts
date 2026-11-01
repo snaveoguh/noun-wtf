@@ -160,3 +160,66 @@ describe('SprayHistory undo', () => {
     expect(log.items()).toHaveLength(30);
   });
 });
+
+describe('SprayHistory redo', () => {
+  const W = 'plaza|0.00,0.00,1.00|1.00|0|0';
+  const replay = (out: { wallId: string; data: string }[], log: WallLog) => {
+    for (const o of out) log.add(o.data);
+  };
+
+  it('puts back an undone stroke that was never sent', () => {
+    const h = new SprayHistory();
+    h.beginGesture();
+    h.addStroke(W, stroke(5));
+    h.endGesture();
+    h.undo();
+    expect(h.pendingOn(W)).toHaveLength(0);
+    expect(h.canRedo).toBe(true);
+    h.redo();
+    expect(h.pendingOn(W).map(s => s.stroke.color)).toEqual([5]);
+    expect(h.canRedo).toBe(false);
+    expect(h.canUndo).toBe(true);
+  });
+
+  it('a sent stroke comes back as a new tag everyone sees', () => {
+    const h = new SprayHistory();
+    const log = new WallLog();
+    h.beginGesture();
+    h.addStroke(W, stroke(7));
+    h.endGesture();
+    replay(h.flush(), log);
+    replay(h.undo().out, log);
+    expect(colours(log)).toEqual([]);
+    h.redo();
+    replay(h.flush(), log);
+    expect(colours(log)).toEqual([7]);
+    // …and undo takes the redone one down again
+    replay(h.undo().out, log);
+    expect(colours(log)).toEqual([]);
+  });
+
+  it('redo walks back through several undos, newest first; a new stroke clears it', () => {
+    const h = new SprayHistory();
+    for (const c of [1, 2, 3]) {
+      h.beginGesture();
+      h.addStroke(W, stroke(c));
+      h.endGesture();
+    }
+    h.undo();
+    h.undo();
+    h.redo();
+    expect(h.pendingOn(W).map(s => s.stroke.color)).toEqual([1, 2]);
+    h.beginGesture();
+    h.addStroke(W, stroke(9));
+    h.endGesture();
+    expect(h.canRedo).toBe(false);
+  });
+
+  it('an unredoable undo (a cancelled pinch stroke) leaves redo alone', () => {
+    const h = new SprayHistory();
+    h.beginGesture();
+    h.addStroke(W, stroke(4));
+    h.undo(false);
+    expect(h.canRedo).toBe(false);
+  });
+});

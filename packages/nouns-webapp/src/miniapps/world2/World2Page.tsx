@@ -17,6 +17,7 @@ import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { DragonHud } from './dragon/DragonHud';
 import { Game } from './Game';
+import { MuralUi } from './graffiti/mural/MuralUi';
 import { PLAZA_CENTRE, prefetchWalls } from './graffiti/storeLoad';
 import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
@@ -447,7 +448,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       </style>
       <HudPrefsStyle />
       <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
-      <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
+      <div ref={labelsRef} className="pointer-events-none absolute inset-0" data-w2labels />
       {game && started && !hoopsOn && !replaying && (
         <RingHud
           game={game}
@@ -481,6 +482,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}
       {game && started && <PoolUi game={game} />}
+      {game && started && !hoopsOn && !replaying && <MuralUi game={game} />}
       {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <HideSeekUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && (
