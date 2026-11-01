@@ -1,0 +1,1200 @@
+{
+  "url": "/candidates/0xc7ccec521eed20fcddff8f95424816ac421c7d87-unwrap-stake-treasury-weth",
+  "route": "candidates/*",
+  "group": "governance",
+  "kind": "page",
+  "label": "before",
+  "generated": "2026-11-01T12:00:17.500Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 1,
+    "worst": [
+      "window@320:6",
+      "window@360:6",
+      "page@430:2.7"
+    ],
+    "clean": 18,
+    "total": 26,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "window",
+      "width": 320,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "2 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full > p.m-0.w-full",
+            "clipper": "div.row > div#feedback._sidebar.col-lg-4 > div.relative.top-0 > div.flex.flex-col",
+            "text": "Against",
+            "px": 19
+          },
+          {
+            "kind": "text",
+            "selector": "div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full > p.m-0.w-full",
+            "clipper": "div.row > div#feedback._sidebar.col-lg-4 > div.relative.top-0 > div.flex.flex-col",
+            "text": "Abstain",
+            "px": 19
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-320.png",
+        "window-320-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 360,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "2 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full > p.m-0.w-full",
+            "clipper": "div.row > div#feedback._sidebar.col-lg-4 > div.relative.top-0 > div.flex.flex-col",
+            "text": "Against",
+            "px": 6
+          },
+          {
+            "kind": "text",
+            "selector": "div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full > p.m-0.w-full",
+            "clipper": "div.row > div#feedback._sidebar.col-lg-4 > div.relative.top-0 > div.flex.flex-col",
+            "text": "Abstain",
+            "px": 6
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-360.png",
+        "window-360-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 390,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-390.png",
+        "window-390-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 430,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-430.png",
+        "window-430-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 520,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-520.png",
+        "window-520-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 640,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-640.png",
+        "window-640-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 768,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-768.png",
+        "window-768-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 900,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-900.png",
+        "window-900-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1024,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1024.png",
+        "window-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1280,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1280.png",
+        "window-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1440,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1440.png",
+        "window-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1920,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1920.png",
+        "window-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 2560,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-2560.png",
+        "window-2560-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 1.8,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 6
+      },
+      "line": "6 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._byLineContentWrapper > div > h3 > a._proposerLinkJp",
+            "w": 129,
+            "h": 22,
+            "label": "stripymofo.eth"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 270,
+            "h": 38,
+            "label": "0x000000000000000000000000000000"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 268,
+            "h": 38,
+            "label": "0x7f39C581F595B53c5cb19bD0b3f8dA"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 222,
+            "h": 18,
+            "label": "0 For"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 222,
+            "h": 18,
+            "label": "0 Against"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 222,
+            "h": 18,
+            "label": "0 Abstain"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png",
+        "page-320-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 2.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 7
+      },
+      "line": "7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._byLineContentWrapper > div > h3 > a._proposerLinkJp",
+            "w": 129,
+            "h": 22,
+            "label": "stripymofo.eth"
+          },
+          {
+            "selector": "div.align-items-center.row > div.row > div.col-lg-12 > a._jump",
+            "w": 312,
+            "h": 39,
+            "label": "Jump to Sponsored Votes and Feed"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 306,
+            "h": 38,
+            "label": "0x000000000000000000000000000000"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 311,
+            "h": 38,
+            "label": "0x7f39C581F595B53c5cb19bD0b3f8dA"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 262,
+            "h": 18,
+            "label": "0 For"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 262,
+            "h": 18,
+            "label": "0 Against"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 262,
+            "h": 18,
+            "label": "0 Abstain"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png",
+        "page-360-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 2.1,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 7
+      },
+      "line": "7 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._byLineContentWrapper > div > h3 > a._proposerLinkJp",
+            "w": 129,
+            "h": 22,
+            "label": "stripymofo.eth"
+          },
+          {
+            "selector": "div.align-items-center.row > div.row > div.col-lg-12 > a._jump",
+            "w": 342,
+            "h": 39,
+            "label": "Jump to Sponsored Votes and Feed"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 333,
+            "h": 38,
+            "label": "0x000000000000000000000000000000"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 338,
+            "h": 38,
+            "label": "0x7f39C581F595B53c5cb19bD0b3f8dA"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 292,
+            "h": 18,
+            "label": "0 For"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 292,
+            "h": 18,
+            "label": "0 Against"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 292,
+            "h": 18,
+            "label": "0 Abstain"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png",
+        "page-390-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 2.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 9
+      },
+      "line": "9 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.align-items-center.row > div._wrapper.col-lg-12 > div._backButtonWrapper > a",
+            "w": 48,
+            "h": 17,
+            "label": "←"
+          },
+          {
+            "selector": "div._wrapper.col-lg-12 > div._backButtonWrapper > a > button._backButton._whiteInfo",
+            "w": 32,
+            "h": 32,
+            "label": "←"
+          },
+          {
+            "selector": "div._byLineContentWrapper > div > h3 > a._proposerLinkJp",
+            "w": 129,
+            "h": 22,
+            "label": "stripymofo.eth"
+          },
+          {
+            "selector": "div.align-items-center.row > div.row > div.col-lg-12 > a._jump",
+            "w": 382,
+            "h": 39,
+            "label": "Jump to Sponsored Votes and Feed"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 378,
+            "h": 17,
+            "label": "0x000000000000000000000000000000"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 355,
+            "h": 17,
+            "label": "0x7f39C581F595B53c5cb19bD0b3f8dA"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 332,
+            "h": 18,
+            "label": "0 For"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 332,
+            "h": 18,
+            "label": "0 Against"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 332,
+            "h": 18,
+            "label": "0 Abstain"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png",
+        "page-430-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 2.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 8
+      },
+      "line": "8 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.align-items-center.row > div._wrapper.col-lg-12 > div._backButtonWrapper > a",
+            "w": 48,
+            "h": 19,
+            "label": "←"
+          },
+          {
+            "selector": "div._wrapper.col-lg-12 > div._backButtonWrapper > a > button._backButton._whiteInfo",
+            "w": 32,
+            "h": 32,
+            "label": "←"
+          },
+          {
+            "selector": "div._byLineContentWrapper > div > h3 > a._proposerLinkJp",
+            "w": 129,
+            "h": 22,
+            "label": "stripymofo.eth"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 405,
+            "h": 19,
+            "label": "0x000000000000000000000000000000"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 380,
+            "h": 19,
+            "label": "0x7f39C581F595B53c5cb19bD0b3f8dA"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 422,
+            "h": 18,
+            "label": "0 For"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 422,
+            "h": 18,
+            "label": "0 Against"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 422,
+            "h": 18,
+            "label": "0 Abstain"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png",
+        "page-520-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 2.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 8
+      },
+      "line": "8 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.align-items-center.row > div._wrapper.col-lg-12 > div._backButtonWrapper > a",
+            "w": 48,
+            "h": 19,
+            "label": "←"
+          },
+          {
+            "selector": "div._wrapper.col-lg-12 > div._backButtonWrapper > a > button._backButton._whiteInfo",
+            "w": 32,
+            "h": 32,
+            "label": "←"
+          },
+          {
+            "selector": "div._byLineContentWrapper > div > h3 > a._proposerLinkJp",
+            "w": 129,
+            "h": 22,
+            "label": "stripymofo.eth"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 405,
+            "h": 19,
+            "label": "0x000000000000000000000000000000"
+          },
+          {
+            "selector": "ol > li.m-0 > span > a",
+            "w": 380,
+            "h": 19,
+            "label": "0x7f39C581F595B53c5cb19bD0b3f8dA"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 542,
+            "h": 18,
+            "label": "0 For"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 542,
+            "h": 18,
+            "label": "0 Against"
+          },
+          {
+            "selector": "div.flex.flex-col > div.w-full.px-4 > div.border-b.border-[#e6e6e6] > button.flex.w-full",
+            "w": 542,
+            "h": 18,
+            "label": "0 Abstain"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png",
+        "page-640-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 507,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png",
+        "page-768-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 594,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png",
+        "page-900-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 676,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png",
+        "page-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 845,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png",
+        "page-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 950,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png",
+        "page-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1267,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png",
+        "page-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 1690,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png",
+        "page-2560-s2.png"
+      ]
+    }
+  ]
+}
