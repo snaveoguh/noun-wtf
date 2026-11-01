@@ -16,6 +16,10 @@ import {
   SnapshotVote,
 } from '@/lib/snapshot';
 
+// Same container-based proposal grid as the Nouns vote page (content + sticky
+// vote column from lg, one column below with the vote panel first).
+import voteLayout from './VotePage.module.css';
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function choiceLabel(choice: number, choices: string[]): string {
@@ -222,7 +226,7 @@ const YellowCollectiveVotePage: FC = () => {
       </div>
 
       {/* Two-column: votes + voting panel */}
-      <div className="vote-page-grid">
+      <div className={voteLayout.grid}>
         {/* Left: Vote overview + activity */}
         <div>
           {/* Vote overview bars */}
@@ -394,7 +398,7 @@ const YellowCollectiveVotePage: FC = () => {
         </div>
 
         {/* Right: Voting panel (sticky) */}
-        <div className="vote-page-side">
+        <div className={voteLayout.side}>
           <div
             style={{
               padding: 20,
