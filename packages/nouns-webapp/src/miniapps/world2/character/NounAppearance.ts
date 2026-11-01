@@ -13,6 +13,7 @@ import { MINOR_CAP, textureDiet } from '../render/textureDiet';
 import { toonify } from '../render/Toon';
 
 import { glbHeadNow, headHasModel, loadGlbHead, type GlbHeadModel } from './GlbHead';
+import { buildMissingNounHead } from './missingNoun';
 import { buildSmoothHead, headProfile, type SmoothHead } from './SmoothHead';
 
 export interface NounSeed {
@@ -21,12 +22,20 @@ export interface NounSeed {
   accessory: number;
   head: number;
   glasses: number;
+  /**
+   * The missingnoun rider (character/missingNoun.ts): just a glitching
+   * missingnoun head and these glasses, no body. `head` keeps a normal V1
+   * head, which older clients show instead (they can't read the key's `-m`).
+   */
+  missingnoun?: boolean;
 }
 
 const HEAD_VIS: LayerVisibility = { body: false, accessory: false, head: true, glasses: true };
 
+/** `bg-body-acc-head-glasses`, plus `-m` for a missingnoun rider. */
 export function seedKey(s: NounSeed) {
-  return `${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}`;
+  const k = `${s.background}-${s.body}-${s.accessory}-${s.head}-${s.glasses}`;
+  return s.missingnoun === true ? `${k}-m` : k;
 }
 
 export function randomSeed(): NounSeed {
@@ -41,9 +50,20 @@ export function randomSeed(): NounSeed {
 
 export function parseSeedKey(k: string | null | undefined): NounSeed | null {
   if (!k) return null;
-  const p = k.split('-').map(Number);
+  const parts = k.split('-');
+  const missingnoun = parts.length === 6 && parts[5] === 'm';
+  if (missingnoun) parts.pop();
+  const p = parts.map(Number);
   if (p.length !== 5 || p.some(n => !Number.isFinite(n))) return null;
-  return { background: p[0], body: p[1], accessory: p[2], head: p[3], glasses: p[4] };
+  const seed: NounSeed = {
+    background: p[0],
+    body: p[1],
+    accessory: p[2],
+    head: p[3],
+    glasses: p[4],
+  };
+  if (missingnoun) seed.missingnoun = true;
+  return seed;
 }
 
 interface HeadBuild {
@@ -66,6 +86,12 @@ const headGeoCache = new Map<
  * wide with its bottom-centre at the group origin, facing +Z.
  */
 export function buildNounHead(seed: NounSeed, width = 0.62): HeadBuild {
+  if (seed.missingnoun === true) {
+    // Glitching voxel head, no model; the character ticks it (userData.tick)
+    const mn = buildMissingNounHead(seed.glasses, width);
+    mn.group.userData.tick = mn.tick;
+    return { group: mn.group, skin: mn.skin };
+  }
   const key = `${seed.head}-${seed.glasses}`;
   const headName = (ImageData.images.heads as { filename: string }[])[seed.head]?.filename ?? '';
   const profile = headProfile(headName);

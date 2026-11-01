@@ -288,6 +288,10 @@ NOUNS CAMP is a condemned penthouse on top of the tallest tower (Skyline `TOWERS
 - **Camera:** SkateCamera's "keep above the ground" probe ignores a hit more than 1.5 m over the rider's head (it used to find CAMP's roof and lift the camera through the ceiling).
 - **Controls card:** never opens by default; the help icon pulses with an H until it's been opened once (`RingHud` `helpHint`).
 
+### Missingnoun rider
+
+`head-missingnoun` is a V2 head (V2 art index 252; V1's 252 is shrimp tempura). In Noun World's character select it's the extra head stop after the last V1 head (`stepHead`). A missingnoun rider (`NounSeed.missingnoun`) is only the glitching voxel head plus its noggles, built from the V2 art (`character/missingNoun.ts`; the glasses are the same 23 in both sets). `NounCharacter` hides every rig mesh except the head and skips the outfit, but keeps the rig, so the head still rides, jumps and tricks on its bone. The glitch (`glitchAt`, pure, tested) holds still, then bursts every ~1.4 s: sideways jumps, squashes, red/cyan ghosts and a torn, smeared slice. On the wire the seed key gains `-m` (`bg-body-acc-head-glasses-m`). Older clients reject a six-part key and draw a random Noun instead of crashing, and `head` always keeps a real V1 head.
+
 ### Cars (roadster, leaving a car)
 
 - The roadster (`roadstar` in `cars/specs.ts`) tops out at 500 km/h, 580 boosting, on the road and in the air (its flight `maxSpeed` / `boostSpeed` match).

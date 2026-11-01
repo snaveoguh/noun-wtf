@@ -124,6 +124,35 @@ function traitName(row: TraitRow, i: number) {
 const pad3 = (n: number) => String(n).padStart(3, '0');
 const wrap = (i: number, n: number) => ((i % n) + n) % n;
 
+/**
+ * The head row has one more stop than the art: missingnoun, after the last
+ * head (character/missingNoun.ts). `head` keeps the last real head, so the
+ * seed stays valid for older clients and the stops either side work.
+ */
+export function stepHead(s: NounSeed, dir: number): NounSeed {
+  const n = traitCount('head');
+  const at = s.missingnoun === true ? n : s.head;
+  const next = wrap(at + dir, n + 1);
+  if (next === n) return { ...s, missingnoun: true };
+  const { missingnoun: _drop, ...rest } = s;
+  void _drop;
+  return { ...rest, head: next };
+}
+
+/** Number shown on a trait row (missingnoun counts as the extra head stop). */
+function traitNum(r: TraitRow, s: NounSeed): number {
+  return r === 'head' && s.missingnoun === true ? traitCount('head') : s[r];
+}
+
+/** Name shown on a trait row: missingnoun has no body or accessory. */
+function traitLabel(r: TraitRow, s: NounSeed): string {
+  if (s.missingnoun === true) {
+    if (r === 'head') return 'MISSINGNOUN';
+    if (r === 'body' || r === 'accessory') return '—';
+  }
+  return traitName(r, s[r]);
+}
+
 // ── Little pictograms for the style chips (tinted with the current colour) ──
 
 const PANTS_ICON: Record<PantsStyle, string> = {
@@ -291,7 +320,7 @@ export function CharacterSelect({
   const cycleTrait = useCallback(
     (r: TraitRow, dir: number) => {
       const n = traitCount(r);
-      setSeed(s => ({ ...s, [r]: wrap(s[r] + dir, n) }));
+      setSeed(s => (r === 'head' ? stepHead(s, dir) : { ...s, [r]: wrap(s[r] + dir, n) }));
       bump();
     },
     [setSeed],
@@ -300,7 +329,11 @@ export function CharacterSelect({
   const randomTrait = useCallback(
     (r: TraitRow) => {
       const n = traitCount(r);
-      setSeed(s => ({ ...s, [r]: Math.floor(Math.random() * n) }));
+      setSeed(s =>
+        r === 'head'
+          ? stepHead({ ...s, missingnoun: undefined, head: 0 }, Math.floor(Math.random() * (n + 1)))
+          : { ...s, [r]: Math.floor(Math.random() * n) },
+      );
       bump();
     },
     [setSeed],
@@ -558,11 +591,11 @@ export function CharacterSelect({
                     <button type="button" className="cs-arrow" onClick={() => cycle(r, -1)}>
                       ◀
                     </button>
-                    <div className="cs-trait" key={`${r}-${seed[r]}-${flash}`}>
+                    <div className="cs-trait" key={`${r}-${traitNum(r, seed)}-${flash}`}>
                       <span className="cs-num">
-                        {pad3(seed[r])}/{pad3(traitCount(r) - 1)}
+                        {pad3(traitNum(r, seed))}/{pad3(traitCount(r) - (r === 'head' ? 0 : 1))}
                       </span>
-                      <span className="cs-tname">{traitName(r, seed[r])}</span>
+                      <span className="cs-tname">{traitLabel(r, seed)}</span>
                     </div>
                     <button type="button" className="cs-arrow" onClick={() => cycle(r, 1)}>
                       ▶
