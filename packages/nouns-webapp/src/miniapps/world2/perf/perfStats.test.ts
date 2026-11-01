@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { percentile, Ring, summarize, summarizeBuckets } from './perfStats';
+import {
+  isHitch,
+  percentile,
+  Ring,
+  summarize,
+  summarizeBuckets,
+  topSystems,
+} from './perfStats';
 
 describe('Ring', () => {
   it('keeps the last `size` samples, oldest first', () => {
@@ -53,5 +60,37 @@ describe('summarizeBuckets', () => {
     expect(out.map(x => x.name)).toEqual(['b', 'a']);
     expect(out[0].mean).toBe(2);
     expect(out[0].max).toBe(4);
+  });
+});
+
+describe('isHitch', () => {
+  it('flags a frame whose own work took over 50 ms', () => {
+    expect(isHitch(16, 60, 16.7)).toBe(true);
+    expect(isHitch(16, 40, 16.7)).toBe(false);
+  });
+  it('flags a gap far longer than usual (something outside the step held the thread)', () => {
+    expect(isHitch(120, 5, 16.7)).toBe(true);
+    expect(isHitch(90, 5, 16.7)).toBe(false); // under 100 ms
+  });
+  it('judges the gap against the running median on a slow device', () => {
+    expect(isHitch(250, 10, 120)).toBe(false);
+    expect(isHitch(400, 10, 120)).toBe(true);
+  });
+});
+
+describe('topSystems', () => {
+  it('names the systems over 2 ms, biggest first', () => {
+    const acc = new Map([
+      ['render', 30.04],
+      ['input', 0.5],
+      ['mountain', 41.26],
+      ['hud', 2],
+    ]);
+    expect(topSystems(acc)).toEqual([
+      ['mountain', 41.3],
+      ['render', 30],
+      ['hud', 2],
+    ]);
+    expect(topSystems(acc, 1)).toEqual([['mountain', 41.3]]);
   });
 });
