@@ -192,6 +192,8 @@
   padding-top: 16px;
   border-top: 1px solid #111;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 24px;
   color: var(--theme-text-primary);
   font-size: 12px;
@@ -199,7 +201,8 @@
 
 /* ── responsive ──────────────────────────────────── */
 
-@media (max-width: 640px) {
+/* below md (560): the container, not the viewport */
+@container page (max-width: 559.98px) {
   .root {
     font-size: 12px;
     padding: 0 10px 60px;
@@ -216,5 +219,16 @@
 
   .table {
     font-size: 12px;
+  }
+}
+
+/* touch: footer links get a 40px hit area */
+@media (pointer: coarse) {
+  .footer .link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    min-width: 40px;
   }
 }

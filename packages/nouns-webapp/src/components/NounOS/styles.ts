@@ -76,6 +76,11 @@ export const NOS_CSS = `
 .nos-resize{position:absolute;right:4px;bottom:4px;width:14px;height:14px;cursor:nwse-resize;z-index:5;border-radius:0 0 10px 0;
   border-right:2px solid rgba(255,255,255,.35);border-bottom:2px solid rgba(255,255,255,.35)}
 .nos-page{min-height:100%}
+/* Full-height tool pages (editors, canvases): a page whose root carries
+   data-page-fill gets the window's exact height, so height:100% / flex:1
+   inside it resolve and it never scrolls the window as a whole. */
+.nos-page:has(> [data-page-fill]){height:100%;min-height:0;display:flex;flex-direction:column}
+.nos-page > [data-page-fill]{flex:1 1 auto;min-height:0}
 .nos-loading{display:flex;height:100%;min-height:200px;align-items:center;justify-content:center;color:var(--dim);font-size:12px;letter-spacing:.2em}
 
 .nos-navbar{display:flex;gap:6px;align-items:center;padding:6px 10px;background:transparent;flex-shrink:0}
@@ -206,7 +211,15 @@ export const NOS_CSS = `
   .mode-world .nos-tray{top:52px;bottom:auto;left:8px;right:8px;border-width:1px;padding:4px;gap:4px}
   .nos-tray .nos-chip{padding:5px 8px;font-size:10px;flex-shrink:0}
   .nos-auction-card{display:none !important}
-  .nos-win.is-mobile{bottom:46px}
+  .nos-win.is-mobile{bottom:var(--nos-tray-h)}
+}
+/* The phone tray bar's height: windows and the home stop above it. On touch
+   its chips are 40 px tap targets, so the bar is taller. */
+.nos-root{--nos-tray-h:46px}
+@media (max-width:760px) and (pointer:coarse){
+  .nos-root{--nos-tray-h:54px}
+  .nos-root:not(.mode-world) .nos-tray .nos-chip{min-height:40px;padding:0 12px;font-size:11px}
+  .nos-root:not(.mode-world) .nos-tray .nos-auction-thumb{width:24px;height:24px}
 }
 /* Phones and tablets in the game: the tray shrinks to the brand + DESK
    chips in the bottom-left corner, clear of the touch buttons (bottom
@@ -230,6 +243,8 @@ export const NOS_CSS = `
 .nos-chip.is-mode{background:var(--acid);color:#000;border-color:var(--acid);font-weight:800}
 .nos-key{font-size:10px;border:1px solid currentColor;border-radius:4px;padding:0 4px;line-height:1.3}
 .nos-clock{font-size:11px;color:var(--dim);padding:0 6px}
+/* On the desk, NOUN FM's off pill lives in the tray (NounFmTrayChip), not floating over pages */
+body:has(.nos-root.mode-desk) [data-nounfm="off"]{display:none!important}
 
 .nos-auction{position:relative;display:inline-flex}
 .nos-auction-thumb{width:20px;height:20px;border-radius:6px;display:inline-block;overflow:hidden;image-rendering:pixelated;background:#d5d7e1}

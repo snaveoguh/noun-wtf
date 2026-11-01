@@ -19,21 +19,48 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.headerWrapper {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
+.section .column {
+  /* A child of the Section's bootstrap .row: full width, 10/12 from lg (was Col lg=10). */
+  width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
 
+@container page (min-width: 760px) {
+  .section .column {
+    width: 83.333333%;
+  }
+}
+
+.headerWrapper {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  column-gap: 1rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Tabs scroll sideways rather than push the page wider. */
 .tabs {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
-  justify-content: space-between;
   gap: 10px;
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  padding-top: 2px;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -44,9 +71,12 @@
   border-bottom-right-radius: 0;
   font-family: 'Londrina Solid';
   padding: 10px 14px 6px;
-  font-size: 32px;
+  font-size: clamp(22px, 7cqi, 32px);
   line-height: 1;
   color: var(--theme-text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 .activeTab {
@@ -114,7 +144,7 @@
   box-sizing: border-box;
   border-radius: 16px;
   background: var(--theme-bg-card);
-  font-size: 22px;
+  font-size: clamp(17px, 4.6cqi, 22px);
   font-family: 'PT Root UI';
   font-weight: bold;
   text-decoration: none;
@@ -165,10 +195,6 @@
   color: var(--brand-gray-light-text);
   font-size: 16px;
   line-height: 22.4px;
-  @media (max-width: 992px) {
-    text-align: center;
-    margin: 0;
-  }
 }
 
 .mobileCountdownWrapper {
@@ -193,7 +219,8 @@
   margin-right: auto;
 }
 
-@media (max-width: 992px) {
+/* Below lg (was a viewport < 992 rule): countdown under the title, actions in their own row. */
+@container page (max-width: 759.98px) {
   .headerWrapper {
     display: flex;
     flex-direction: column;
@@ -218,7 +245,25 @@
 
   .proposalTitle {
     max-width: 100%;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Primary actions share the row, full width (Propose / Delegate). */
+  .mobileActions .nounInWalletBtnWrapper {
+    gap: 0.5rem;
+  }
+
+  .mobileActions .submitProposalButtonWrapper,
+  .mobileActions .delegateBtnWrapper {
+    flex: 1 1 0;
+    padding-left: 0;
+  }
+
+  .mobileActions .generateBtn,
+  .mobileActions .generateBtnDisabled,
+  .mobileActions .changeDelegateBtn {
+    width: 100%;
+    max-width: none;
   }
 
   .nounInWalletBtnWrapper {
@@ -273,6 +318,25 @@
 
 .nullStateSubmitProposalBtnWrapper {
   text-align: right;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nullStateSubmitProposalBtnWrapper .nullStateCopy {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.candidatesGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+@container page (min-width: 760px) {
+  .candidatesGrid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  }
 }
 
 .votePillWrapper {
@@ -406,9 +470,13 @@
 }
 
 .jumpToBottomBtn {
-  position: fixed;
+  /* Sticky inside the page's own scroller, so it stays in the window (fixed put it
+     at the viewport corner, outside a NounOS window and over its controls). */
+  position: sticky;
   bottom: 2.5rem;
-  right: 2rem;
+  align-self: flex-end;
+  margin-right: 2rem;
+  margin-top: -2.5rem;
   z-index: 100;
   background: linear-gradient(135deg, #e40536, #d63c5e, #e40536, #ff6b6b, #e40536);
   background-size: 300% 300%;
@@ -447,15 +515,42 @@
   pointer-events: none;
 }
 
+.jumpInlineRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.jumpInlineBtn {
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  min-height: 2rem;
+  font-family: 'PT Root UI';
+  font-weight: bold;
+  font-size: 14px;
+  color: var(--theme-text-muted);
+  cursor: pointer;
+}
+
+.jumpInlineBtn:hover {
+  color: var(--theme-text-primary);
+}
+
+@media (pointer: coarse) {
+  .jumpInlineBtn {
+    min-height: 40px;
+  }
+}
+
 .jumpToBottomArrow {
   font-size: 16px;
   line-height: 1;
 }
 
-@media (max-width: 992px) {
+@container page (max-width: 759.98px) {
   .jumpToBottomBtn {
     bottom: 1.25rem;
-    right: 1.25rem;
+    margin-right: 1.25rem;
     padding: 0.5rem 0.75rem;
     font-size: 13px;
   }

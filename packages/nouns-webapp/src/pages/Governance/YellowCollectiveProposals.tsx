@@ -228,9 +228,11 @@ const YellowCollectiveProposals: FC = () => {
       </div>
 
       {/* Sub-tabs: YC Proposals / Nouns Votes */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
         <button
+          type="button"
           onClick={() => setTab('yc')}
+          className="[@media(pointer:coarse)]:min-h-10"
           style={{
             padding: '6px 16px',
             borderRadius: 16,
@@ -245,7 +247,9 @@ const YellowCollectiveProposals: FC = () => {
           YC Proposals ({ycProposals.length})
         </button>
         <button
+          type="button"
           onClick={() => setTab('nouns')}
+          className="[@media(pointer:coarse)]:min-h-10"
           style={{
             padding: '6px 16px',
             borderRadius: 16,
