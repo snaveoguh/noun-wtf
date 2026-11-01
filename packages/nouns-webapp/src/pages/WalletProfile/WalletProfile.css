@@ -111,6 +111,18 @@
 .wp-tabs::-webkit-scrollbar {
   display: none;
 }
+/* Below lg the tab row snaps and fades at its end; the end padding is as wide
+   as the fade, so the last tab isn't faded when everything fits. */
+@container page (max-width: 759.98px) {
+  .wp-tabs {
+    scroll-snap-type: x proximity;
+    padding-right: 24px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  .wp-tab {
+    scroll-snap-align: start;
+  }
+}
 .wp-tab {
   flex-shrink: 0;
   padding: 5px 12px;
