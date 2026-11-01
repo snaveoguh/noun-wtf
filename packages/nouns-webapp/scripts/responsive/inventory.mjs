@@ -233,7 +233,9 @@ units.forEach((u, i) => {
   const names = u.routes.map(r => `\`${r.url}\``).join(', ');
   const s = Math.max(...u.routes.map(sev));
   const e = [...new Map(u.routes.map(r => [r.entry, effort(r)])).values()].reduce((a, x) => a + x, 0);
-  md += `${i + 1}. ${names} — severity ${s}, viewport code ${e}${u.routes.length > 1 ? ` (group: ${u.routes[0].group})` : ''}\n`;
+  const unmeasured = u.routes.filter(r => !r.severity).length;
+  const sevText = unmeasured === u.routes.length ? 'not measured' : `severity ${s}${unmeasured ? ` (${unmeasured} not measured)` : ''}`;
+  md += `${i + 1}. ${names} — ${sevText}, viewport code ${e}${u.routes.length > 1 ? ` (group: ${u.routes[0].group})` : ''}\n`;
 });
 
 md += `\n## Routes\n`;
