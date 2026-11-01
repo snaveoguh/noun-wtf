@@ -201,7 +201,7 @@ VITE_NOUNV2_AUCTION_HOUSE_ADDRESS=0x9a6ddb16e23967d5482e5bfd7444a04a5d5145fc \
 VITE_NOUNV2_TREASURY_ADDRESS=0x2cdeb0d251674710840d9fa990d1de138dfe7c00 \
 NODE_OPTIONS=--max-old-space-size=4096 \
 setsid nohup npx vite --config $SP/nohmr.config.mjs > $SP/vite.log 2>&1 &
-echo $! > $SP/vite.pid
+# stop it later by the port it listens on (see below), not by $! or a name
 
 node scripts/responsive/harness.mjs --route /noun/2062                 # 26 shots, ~4 min
 node scripts/responsive/harness.mjs --route /noun/2062 --mode window --widths 390,640
@@ -210,9 +210,14 @@ node scripts/responsive/harness.mjs --all --jobs 3                     # the inv
 ```
 
 - **Restart vite after every source edit** (no HMR and no watcher: it keeps
-  serving what it first transformed). Kill it by its PID
-  (`kill $(cat $SP/vite.pid)`), never `pkill -f` (it matches other sessions'
-  processes), then check `vite.log` for "already in use" before trusting a run.
+  serving what it first transformed). Stop it by the port it listens on:
+  `kill $(lsof -t -iTCP:5196 -sTCP:LISTEN)`, then check `vite.log` for
+  "already in use" before trusting a run.
+- **Never kill by name.** `pkill -f`, `pgrep -f … | xargs kill` and
+  `ps … | grep <pattern> | xargs kill` all match your own shell (its command
+  line contains the pattern) and other sessions' processes: the integrator
+  killed its own shell that way. And `$!` after `setsid nohup … &` is
+  setsid's / npx's PID, not vite's, so `kill $!` leaves vite running.
 - **Never edit the webapp while a run is going**: pages loaded after the edit
   get half-old modules and the shots are garbage.
 - **One route per process.** A group with `--jobs 2 --scroll 2` can take over

@@ -26,6 +26,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | `/create-proposal`, `/create-candidate`, `/vote/1000/edit`, `/candidates/sample/edit` (governance create) | 20/26 → 26/26, 20/26 → 26/26, 26/26 → 26/26, 26/26 → 26/26 · `claude/responsive-govcreate` (#229) · `/vote/1000/edit` is **not really measured**: it renders nothing unless the connected wallet is the proposer (its form shares the fixed stylesheet). The draft window's split editor is untouched |
 | `/grants`, `/grants/1`, `/grants/create` | 26/26 → 26/26, 20/26 → 26/26, 20/26 → 26/26 · `claude/responsive-grants` (#226) |
 | `/explore/wallet`, `/explore/wallet/nouns.eth`, `/gamer`, `/gamer/nouns.eth` (wallet) | 20/26 → 26/26, 15/26 → 26/26, 20/26 → 26/26, 15/26 → 26/26 · `claude/responsive-wallet` (#227) · **not measured**: the Identity graph tab (only for wallets with 4+ Nouns; shared `TreasuryFlow/Scene` left alone) and the owner-only Autopilot panel (needs a connected wallet) |
+| `/marketplace`, `/marketplace/1` | 20/26 → 26/26, 20/26 → 26/26, 0 warnings · `claude/responsive-marketplace` (#230), sheets in `.claude/responsive-shots/marketplace{,-1}/` · **measured as empty states only**: vite doesn't serve `/api/nouns/*`, so the listing cards, Buy and Your Nouns (needs a wallet) weren't measured live. Left for the owner: two "Nouns Marketplace" h1s on `/marketplace`; `NounCard` links to `/nouns/:id` (looks dead) |
 
 ## Work units (worst first)
 
@@ -44,7 +45,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 13. `/vote/1000/history`, `/vote/1000/history/1`, `/delegate` — severity 0, viewport code 18 (group: governance)
 14. ~~`/candidates/sample/edit`~~ — done with governance create (see Done)
 15. `/v2`, `/crystal-ball`, `/v2/crystal-ball` — severity 0 (2 not measured), viewport code 37 (group: auction)
-16. `/marketplace`, `/marketplace/1` — not measured, viewport code 28 (group: marketplace)
+16. ~~`/marketplace`, `/marketplace/1`~~ — done (see Done; listings unmeasured)
 17. `/predictions`, `/feed`, `/highway` — not measured, viewport code 13 (group: explore)
 18. `/onchain`, `/dashboard`, `/settlers`, `/gas`, `/stats`, `/nonsense` — not measured, viewport code 13 (group: stats)
 19. `/world/voice`, `/icecreamvan`, `/exchange` — not measured, viewport code 1 (group: world)
