@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 
 import { Link, useParams } from 'react-router';
@@ -22,6 +21,12 @@ import {
 } from '@/contracts/nounv2-treasury';
 
 import classes from './NounV2.module.css';
+
+/** wagmi/viem errors carry a short, user-facing `shortMessage`. */
+function shortMessage(e: unknown): string | undefined {
+  const m = (e as { shortMessage?: unknown } | null | undefined)?.shortMessage;
+  return typeof m === 'string' && m !== '' ? m : undefined;
+}
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
@@ -148,16 +153,7 @@ export default function NounV2DetailPage() {
     boolean,
     boolean,
   ];
-  const [
-    proposer,
-    _snapshotBlock,
-    _startBlock,
-    endBlock,
-    eta,
-    forVotes,
-    againstVotes,
-    abstainVotes,
-  ] = prop;
+  const [proposer, , , endBlock, eta, forVotes, againstVotes, abstainVotes] = prop;
 
   const description = descRes?.status === 'success' ? (descRes.result as string) : '';
   const actions =
@@ -218,8 +214,8 @@ export default function NounV2DetailPage() {
         });
       }
       toast.success('Vote submitted');
-    } catch (e: any) {
-      toast.error(e?.shortMessage || 'Vote failed');
+    } catch (e: unknown) {
+      toast.error(shortMessage(e) ?? 'Vote failed');
     }
   }
 
@@ -232,8 +228,8 @@ export default function NounV2DetailPage() {
         args: [BigInt(proposalId)],
       });
       toast.success('Queue submitted');
-    } catch (e: any) {
-      toast.error(e?.shortMessage || 'Queue failed');
+    } catch (e: unknown) {
+      toast.error(shortMessage(e) ?? 'Queue failed');
     }
   }
 
@@ -246,8 +242,8 @@ export default function NounV2DetailPage() {
         args: [BigInt(proposalId)],
       });
       toast.success('Execute submitted');
-    } catch (e: any) {
-      toast.error(e?.shortMessage || 'Execute failed');
+    } catch (e: unknown) {
+      toast.error(shortMessage(e) ?? 'Execute failed');
     }
   }
 
@@ -260,8 +256,8 @@ export default function NounV2DetailPage() {
         args: [BigInt(proposalId)],
       });
       toast.success('Cancelled');
-    } catch (e: any) {
-      toast.error(e?.shortMessage || 'Cancel failed');
+    } catch (e: unknown) {
+      toast.error(shortMessage(e) ?? 'Cancel failed');
     }
   }
 
@@ -304,26 +300,12 @@ export default function NounV2DetailPage() {
         <div className={classes.description} style={{ marginTop: '1.5rem', paddingTop: '1rem' }}>
           <h3>Requested Funds — {totalEth} ETH</h3>
           {grantTransactions.map((tx, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0.5rem 0',
-                borderBottom: '1px solid var(--theme-divider)',
-                fontSize: '0.85rem',
-              }}
-            >
-              <span style={{ fontFamily: 'monospace', color: 'var(--theme-text-muted)' }}>
-                → {tx.target.slice(0, 6)}...{tx.target.slice(-4)}
-                {tx.signature && (
-                  <span style={{ marginLeft: 8, color: 'var(--theme-text-muted)' }}>
-                    {tx.signature}
-                  </span>
-                )}
+            <div key={i} className={classes.fundsRow}>
+              <span className={classes.fundsTarget}>
+                →&nbsp;{tx.target.slice(0, 6)}...{tx.target.slice(-4)}
+                {tx.signature && <span className={classes.fundsSig}>{tx.signature}</span>}
               </span>
-              <span style={{ fontWeight: 700 }}>{formatEther(tx.value)} ETH</span>
+              <span className={classes.fundsValue}>{formatEther(tx.value)} ETH</span>
             </div>
           ))}
         </div>
@@ -335,6 +317,7 @@ export default function NounV2DetailPage() {
             <div className={classes.voteButtons}>
               {[1, 0, 2].map(s => (
                 <button
+                  type="button"
                   key={s}
                   className={classes.voteBtn}
                   style={
@@ -354,6 +337,7 @@ export default function NounV2DetailPage() {
               rows={2}
             />
             <button
+              type="button"
               className={classes.submitVote}
               disabled={support === null || isPending || txMining}
               onClick={handleVote}
@@ -362,23 +346,38 @@ export default function NounV2DetailPage() {
             </button>
           </div>
         )}
-        {hasVoted && receipt && (
+        {hasVoted && receipt != null && (
           <p className={classes.voted}>
             You voted {supportLabel(receipt.support)} with {Number(receipt.votes)} votes.
           </p>
         )}
         {isSucceeded && (
-          <button className={classes.actionBtn} onClick={handleQueue} disabled={isPending}>
+          <button
+            type="button"
+            className={classes.actionBtn}
+            onClick={handleQueue}
+            disabled={isPending}
+          >
             Queue for Execution
           </button>
         )}
         {canExecute && (
-          <button className={classes.actionBtn} onClick={handleExecute} disabled={isPending}>
+          <button
+            type="button"
+            className={classes.actionBtn}
+            onClick={handleExecute}
+            disabled={isPending}
+          >
             Execute Proposal
           </button>
         )}
         {canCancel && (
-          <button className={classes.cancelBtn} onClick={handleCancel} disabled={isPending}>
+          <button
+            type="button"
+            className={classes.cancelBtn}
+            onClick={handleCancel}
+            disabled={isPending}
+          >
             Cancel
           </button>
         )}

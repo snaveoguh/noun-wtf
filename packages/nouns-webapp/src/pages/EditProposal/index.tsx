@@ -4,7 +4,7 @@ import { t } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
-import { Alert, Button, Col, FormControl, InputGroup } from 'react-bootstrap';
+import { Alert, Button, FormControl, InputGroup } from 'react-bootstrap';
 import { Link, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { useAccount } from 'wagmi';
@@ -72,7 +72,11 @@ const EditProposalPage: React.FC<EditProposalProps> = () => {
   const availableVotes = useUserVotes();
   const createCandidateCost = useGetCreateCandidateCost();
   const hasEnoughVote = Boolean(
-    availableVotes && proposalThreshold && availableVotes > proposalThreshold,
+    availableVotes != null &&
+      proposalThreshold != null &&
+      availableVotes !== 0 &&
+      proposalThreshold !== 0 &&
+      availableVotes > proposalThreshold,
   );
   const chainId = defaultChain.id;
   const ethNeeded = useEthNeeded(
@@ -109,7 +113,7 @@ const EditProposalPage: React.FC<EditProposalProps> = () => {
           transaction.calldata = `0x${transaction.calldata}`;
         }
 
-        if (transaction.usdcValue) {
+        if (transaction.usdcValue !== undefined && Boolean(transaction.usdcValue)) {
           setTotalUSDCPayment(totalUSDCPayment + transaction.usdcValue);
         }
       });
@@ -440,7 +444,7 @@ const EditProposalPage: React.FC<EditProposalProps> = () => {
         show={showTransactionFormModal}
         onActionAdd={handleAddProposalAction}
       />
-      <Col lg={{ span: 8, offset: 2 }} className={classes.createProposalForm}>
+      <div className={classes.createProposalForm}>
         <div className={classes.wrapper}>
           <Link to={`/vote/${id}`}>
             <button
@@ -524,7 +528,7 @@ const EditProposalPage: React.FC<EditProposalProps> = () => {
             isProposedBySigners ? handleCreateNewCandidate : handleUpdateProposal
           }
         />
-      </Col>
+      </div>
     </Section>
   );
 };
