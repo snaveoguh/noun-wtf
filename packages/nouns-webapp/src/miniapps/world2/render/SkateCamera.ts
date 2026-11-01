@@ -98,6 +98,20 @@ export class SkateCamera {
     oz: number;
   } | null = null;
 
+  /**
+   * Skydiving's camera (skydive/SkydiveSystem.ts sets it every frame, null
+   * when off): blends (k) into a chase pulled back and above the rider,
+   * settling behind their heading, with extra FOV at speed.
+   */
+  skyCam: {
+    k: number;
+    yaw: number;
+    dist: number;
+    pitch: number;
+    lift: number;
+    fov: number;
+  } | null = null;
+
   /** 0 turns camera shake off (reduce motion). */
   shakeScale = 1;
 
@@ -173,6 +187,11 @@ export class SkateCamera {
         this.yaw = lerpAngle(this.yaw, p.footYaw, 1 - Math.exp(-4 * dt));
       }
     }
+    const sky = this.skyCam;
+    const sk = sky?.k ?? 0;
+    // Skydiving: settle in behind the heading unless the player is looking round
+    if (sky !== null && now - this.lastInputAt > 700)
+      this.yaw = lerpAngle(this.yaw, sky.yaw, 1 - Math.exp(-2.5 * sk * dt));
     const climbing = p.climb !== null || (!onBoard && (this.pkCam?.climb ?? 0) > 0.5);
     this.climbK = THREE.MathUtils.lerp(
       this.climbK,
@@ -190,17 +209,22 @@ export class SkateCamera {
           ? { d: 5.6, h: 2.0, la: 1.0 }
           : { d: 3.3, h: 1.05, la: 0.95 };
     const speedPull = onBoard ? Math.min(1.2, p.speed * 0.045) : 0;
-    const dist =
+    let dist =
       (onBoard ? preset.d * this.zoom : THREE.MathUtils.lerp(3.6, 6.8, ck)) +
       speedPull +
       (pk?.dist ?? 0);
     // Climbing pulls the camera below the climber, looking up the facade
-    const pitch = onBoard ? 0.1 + this.orbitPitch : THREE.MathUtils.lerp(this.pitch, -0.3, ck);
+    let pitch = onBoard ? 0.1 + this.orbitPitch : THREE.MathUtils.lerp(this.pitch, -0.3, ck);
+    if (sky !== null) {
+      dist = THREE.MathUtils.lerp(dist, sky.dist, sk);
+      pitch = THREE.MathUtils.lerp(pitch, sky.pitch + (onBoard ? this.orbitPitch : 0), sk);
+    }
 
     const target = _target.copy(p.pos);
     // On vert, frame the ramp + rider instead of chasing straight up
     if (onBoard && p.state === 'air' && p.vertLip) target.y = Math.min(target.y, this.look.y + 0.5);
     target.y += onBoard ? preset.la : 1.25 + ck * 0.9 + (pk?.lift ?? 0);
+    if (sky !== null) target.y += sky.lift * sk;
 
     const back = _back.set(-Math.sin(yaw), 0, -Math.cos(yaw));
     const desired = _desired
@@ -254,8 +278,9 @@ export class SkateCamera {
     if (this.hasLastRider && this.initialized) {
       const moved = _moved.subVectors(p.pos, this.lastRider);
       if (moved.lengthSq() > 60 * 60) this.initialized = false;
-      else if (onBoard) {
-        const k = THREE.MathUtils.smoothstep(p.speed, 17, 35);
+      else if (onBoard || sk > 0) {
+        // (and falling: at 55 m/s the spring alone trails ~10 m behind)
+        const k = Math.max(onBoard ? THREE.MathUtils.smoothstep(p.speed, 17, 35) : 0, sk);
         this.pos.addScaledVector(moved, k);
         this.look.addScaledVector(moved, k);
       }
@@ -300,6 +325,8 @@ export class SkateCamera {
       ? 68 + Math.min(14, p.speed * 0.9) + 28 * (1 - Math.exp(-fast / 45))
       : 62 + (pk?.fov ?? 0);
     if (onBoard) targetFov += this.fovKick;
+    // Skydiving has its own speed FOV (the board's would open to ~100° at terminal)
+    if (sky !== null) targetFov = THREE.MathUtils.lerp(targetFov, 64 + sky.fov, sk);
     // These are vertical FOVs tuned on landscape screens. On a portrait phone
     // the same vertical FOV leaves a sliver of the world either side, so
     // keep at least the horizontal view a 1.4:1 screen would get (capped)
