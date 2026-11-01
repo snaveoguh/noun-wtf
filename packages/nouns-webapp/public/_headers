@@ -21,3 +21,9 @@
 /world-app/manifest.webmanifest
   Content-Type: application/manifest+json
   Cache-Control: public, max-age=3600
+
+# Farcaster mini app manifest (README "Farcaster mini app")
+/.well-known/farcaster.json
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300

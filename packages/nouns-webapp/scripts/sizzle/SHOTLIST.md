@@ -51,6 +51,23 @@ it and the reels that use it. ✅ = checked frame by frame in a contact sheet;
 | `w-cafe` ⚠️ | 60 | In through a cafe or bar door, orbit in the room. | — |
 | `w-fountain` ⚠️ | 84 | Down the Noggles Fountain into the Grand Exchange. Last in its scene. | — |
 
+## NOUNS CAMP (`camp`, a plain `/world` load with `?camintro=0`; shots replay the opening seeded)
+
+The rider is `CAMP_RIDER` in `scenes.mjs` (head 138).
+
+| Shot | Frames | What | Used in |
+| --- | --- | --- | --- |
+| `camp-intro` ✅ | 450 | The game's whole opening (seed 3): fly-in over the plaza at sunset, in through the window, into the rider's eyes, five MEME VALUE spreads, the pull-out and the toss. The pull-out (from ~11.8 s) goes through the rider's head (dark frames) and ends behind it, so clips stop before it. A frame or two going into the face (~6.4 s) are mostly the back of the book. | camp-flyin |
+| `camp-jump` ✅ | 270 | In through the window at the rider running at it, the leap, the camera dropping with them down the tower, the roll on the plaza (~6.3 s). | camp-jump |
+
+## Missingnoun (`missingnoun`, the plaza, `?seed=1-13-31-138-7-m`)
+
+| Shot | Frames | What | Used in |
+| --- | --- | --- | --- |
+| `mn-side` ✅ | 150 | Side-on and close, pushing north up the plaza, kickflip / treflip / heelflip. Two trees pass the lens (~0.3 s, ~3.4 s). | missingnoun-skate |
+| `mn-orbit` ✅ | 120 | A close orbit round the glitching head and noggles, flips. | missingnoun-skate |
+| `mn-chase` ✅ | 120 | Behind, carving, a treflip. Bails at ~3.4 s: cut before. | missingnoun-skate |
+
 ## Noun Pool (`pool`, `/world?play=pool`, the hall)
 
 | Shot | Frames | What | Used in |
@@ -121,6 +138,11 @@ above → the cut into the corner → the 8 into the called pocket.
 the facade climb → wall run / wall jump / wall run → the tower climb →
 pole to pole → over the alley → post to post → the ghost → slide, vault,
 finish.
+
+### Social clips (`public/clips/`, vertical + horizontal)
+- **camp-flyin** (11.4 s): the fly-in through CAMP's window into the rider's eyes, then MEME VALUE.
+- **camp-jump** (8.4 s): out of the window, down the tower, the roll.
+- **missingnoun-skate** (9.7 s): side → orbit → chase.
 
 ### hero-sizzle-gameplay (26.28 s, not rendered or wired yet)
 Cuts on the VO's pauses (see README). Pool (0:13.2, `pl-break`) and parkour
