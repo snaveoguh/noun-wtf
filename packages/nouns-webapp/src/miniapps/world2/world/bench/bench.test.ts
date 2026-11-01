@@ -206,7 +206,7 @@ describe('the shot', () => {
         expect(cy).toBeLessThan(0.45);
         // The mural fills a good part of the frame
         const w = Math.max(...pts.map(p => p.x)) - Math.min(...pts.map(p => p.x));
-        expect(w).toBeGreaterThan(aspect < 1 ? 1.4 : 0.7);
+        expect(w).toBeGreaterThan(aspect < 1 ? 1.3 : 0.6);
       }
   });
 

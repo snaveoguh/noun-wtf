@@ -4,7 +4,7 @@
 // on the line from the mural's centre through the bench (so the bench sits
 // centred under the picture), and holds there on a slow push-in with a
 // gentle sideways drift: the sitters' heads and shoulders along the bottom
-// of the frame, the GIF mural centred above them. A long lens (34.5° → 35.5° vertical;
+// of the frame, the GIF mural centred above them. A long lens (38.5° → 39.5° vertical;
 // the game's on-foot camera is 62°), framed for the letterbox; on a portrait
 // screen it opens just enough to keep the mural's whole width in frame.
 
@@ -30,10 +30,10 @@ export const SHOT = {
   h0: 2.3,
   h1: 2.15,
   /** Vertical FOV (°): long lens, opening a touch as it pushes in to hold the framing. */
-  fov0: 34.5,
-  fov1: 35.5,
+  fov0: 38.5,
+  fov1: 39.5,
   /** The look sits this far under the screen's centre (m): sitters along the frame's bottom. */
-  drop: 2.35,
+  drop: 2.5,
   /** Sideways drift (m) and its period (s). */
   drift: 0.4,
   driftPeriod: 46,
