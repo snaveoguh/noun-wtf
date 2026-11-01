@@ -21,7 +21,8 @@
 //   --mode both|window|page   (default both)
 //   --widths a,b,c     subset of the 13 widths
 //   --label <name>     subfolder, e.g. before / after
-//   --settle <ms>      max wait for the network to go quiet after load (default 6000)
+//   --settle <ms>      max wait for the network to go quiet after load (default 6000;
+//                      a route's own `settle` in lib.mjs wins when it is longer)
 //   --scroll <n>       screens per shot, stacked on the sheet (default 1)
 //   --jobs <n>         routes in parallel (default 1; each job has its own browser contexts)
 //   --base <url>       dev server
@@ -43,6 +44,7 @@ import {
   issueLine,
   routeFor,
   routeSeverity,
+  settleFor,
   slugFor,
   tierOf,
   viewportFor,
@@ -57,7 +59,15 @@ const { chromium } = require('playwright');
 
 // ── args ────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
-const opt = { routes: [], mode: 'both', settle: 6000, scroll: 1, jobs: 1, base: 'http://127.0.0.1:5196', sheet: true };
+const opt = {
+  routes: [],
+  mode: 'both',
+  settle: 6000,
+  scroll: 1,
+  jobs: 1,
+  base: 'http://127.0.0.1:5196',
+  sheet: true,
+};
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   const next = () => argv[++i];
@@ -75,7 +85,13 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--no-sheet') opt.sheet = false;
   else if (a === '--fail-on-issues') opt.failOnIssues = true;
   else if (a === '--help' || a === '-h') {
-    console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 32).join('\n'));
+    console.log(
+      fs
+        .readFileSync(fileURLToPath(import.meta.url), 'utf8')
+        .split('\n')
+        .slice(1, 32)
+        .join('\n'),
+    );
     process.exit(0);
   } else {
     console.error(`unknown option ${a}`);
@@ -93,8 +109,15 @@ if (urls.length === 0) {
 }
 
 const LAUNCH = {
-  executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-dev-shm-usage'],
+  executablePath: fs.existsSync('/opt/pw-browsers/chromium')
+    ? '/opt/pw-browsers/chromium'
+    : undefined,
+  args: [
+    '--use-gl=angle',
+    '--use-angle=swiftshader',
+    '--enable-unsafe-swiftshader',
+    '--disable-dev-shm-usage',
+  ],
 };
 
 // First load of every page in a context: wipe storage once, then seed what a
@@ -138,18 +161,20 @@ async function settle(page, max) {
   page.off('requestfinished', off);
   page.off('requestfailed', off);
   await page.evaluate(() => document.fonts?.ready).catch(() => {});
-  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.evaluate(
+    () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
 }
 
 async function load(page, url) {
   await page.goto(opt.base + url, { waitUntil: 'domcontentloaded', timeout: 300000 });
-  await page
-    .waitForSelector('.nos-root', { timeout: 120000 })
-    .catch(() => {});
+  await page.waitForSelector('.nos-root', { timeout: 120000 }).catch(() => {});
   if (routeFor(url).kind === 'page') {
-    await page.waitForSelector('.nos-win[data-nos-win="navigator"] .nos-content', { timeout: 120000 });
+    await page.waitForSelector('.nos-win[data-nos-win="navigator"] .nos-content', {
+      timeout: 120000,
+    });
   }
-  await settle(page, opt.settle);
+  await settle(page, settleFor(url, opt.settle));
 }
 
 async function screens(page, file, clipEl) {
@@ -157,7 +182,9 @@ async function screens(page, file, clipEl) {
   for (let i = 0; i < opt.scroll; i++) {
     if (i > 0) {
       const moved = await page.evaluate(() => {
-        const c = document.querySelector('.nos-win[data-nos-win="navigator"] .nos-content') || document.scrollingElement;
+        const c =
+          document.querySelector('.nos-win[data-nos-win="navigator"] .nos-content') ||
+          document.scrollingElement;
         const before = c.scrollTop;
         c.scrollTop = before + c.clientHeight * 0.9;
         return c.scrollTop !== before;
@@ -171,7 +198,9 @@ async function screens(page, file, clipEl) {
     files.push(path.basename(f));
   }
   await page.evaluate(() => {
-    const c = document.querySelector('.nos-win[data-nos-win="navigator"] .nos-content') || document.scrollingElement;
+    const c =
+      document.querySelector('.nos-win[data-nos-win="navigator"] .nos-content') ||
+      document.scrollingElement;
     c.scrollTop = 0;
   });
   return files;
@@ -193,12 +222,18 @@ async function shoot(page, { url, mode, width, dir, touch }) {
     touch,
     score: result.score,
     counts: result.counts,
-    line: issueLine(result.counts),
+    line: result.error ? `error: ${result.error}` : issueLine(result.counts),
     issues: result.issues,
     error: result.error,
     shots,
   };
 }
+
+// A context (or its page) closing under a shot is usually the machine, not the
+// page: the shot is retried once in a fresh context. A dead browser is
+// rethrown, so the route is requeued on a new browser (see the job loop).
+const closedError = e => /closed|crashed|disconnected/i.test(e?.message ?? '');
+const retryable = (browser, e, attempt) => attempt === 0 && closedError(e) && browser.isConnected();
 
 async function runWindowMode(browser, url, dir, log) {
   const out = [];
@@ -211,58 +246,82 @@ async function runWindowMode(browser, url, dir, log) {
     if (!groups.has(k)) groups.set(k, { desktop: d, widths: [] });
     groups.get(k).widths.push(w);
   }
-  for (const { desktop, widths: gw } of groups.values()) {
-    const ctx = await browser.newContext({ viewport: desktop, deviceScaleFactor: 1 });
-    await ctx.addInitScript(seedScript, { rect: windowRect(gw[0], desktop) });
-    const page = await ctx.newPage();
-    try {
-      await load(page, url);
-      for (const w of gw) {
-        const rect = windowRect(w, desktop);
-        await page.evaluate(r => {
-          const nos = window.__nos;
-          if (!nos) throw new Error('window.__nos missing: run against a dev build');
-          nos.focus('navigator');
-          nos.move('navigator', r);
-        }, rect);
-        await page.waitForTimeout(500);
-        await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
-        const s = await shoot(page, { url, mode: 'window', width: w, dir, touch: false });
-        log(`  window ${String(w).padStart(4)} content ${s.contentWidth} ${s.tier} → ${s.line}`);
-        out.push(s);
+  for (const { desktop, widths: all } of groups.values()) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const gw = all.filter(w => !out.find(s => s.width === w));
+      if (gw.length === 0) break;
+      let ctx;
+      try {
+        ctx = await browser.newContext({ viewport: desktop, deviceScaleFactor: 1 });
+        await ctx.addInitScript(seedScript, { rect: windowRect(gw[0], desktop) });
+        const page = await ctx.newPage();
+        await load(page, url);
+        for (const w of gw) {
+          const rect = windowRect(w, desktop);
+          await page.evaluate(r => {
+            const nos = window.__nos;
+            if (!nos) throw new Error('window.__nos missing: run against a dev build');
+            nos.focus('navigator');
+            nos.move('navigator', r);
+          }, rect);
+          await page.waitForTimeout(500);
+          await page.evaluate(
+            () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))),
+          );
+          const s = await shoot(page, { url, mode: 'window', width: w, dir, touch: false });
+          log(`  window ${String(w).padStart(4)} content ${s.contentWidth} ${s.tier} → ${s.line}`);
+          out.push(s);
+        }
+      } catch (e) {
+        if (!browser.isConnected()) throw e;
+        if (retryable(browser, e, attempt)) {
+          log(`  window ${gw.join(',')}: ${e.message.split('\n')[0]} (retrying)`);
+          continue;
+        }
+        log(`  window ${gw.join(',')}: ${e.message.split('\n')[0]}`);
+        for (const w of gw)
+          if (!out.find(s => s.width === w))
+            out.push({ mode: 'window', width: w, error: e.message.split('\n')[0], score: 0 });
+      } finally {
+        await ctx?.close().catch(() => {});
       }
-    } catch (e) {
-      log(`  window ${gw.join(',')}: ${e.message.split('\n')[0]}`);
-      for (const w of gw) if (!out.find(s => s.width === w)) out.push({ mode: 'window', width: w, error: e.message.split('\n')[0], score: 0 });
-    } finally {
-      await ctx.close();
+      break;
     }
   }
-  return out;
+  return out.sort((a, b) => a.width - b.width);
 }
 
 async function runPageMode(browser, url, dir, log) {
   const out = [];
   for (const w of widths) {
     const touch = w < TOUCH_BELOW;
-    const ctx = await browser.newContext({
-      viewport: viewportFor(w),
-      deviceScaleFactor: 1,
-      isMobile: touch,
-      hasTouch: touch,
-    });
-    await ctx.addInitScript(seedScript, { rect: null });
-    const page = await ctx.newPage();
-    try {
-      await load(page, url);
-      const s = await shoot(page, { url, mode: 'page', width: w, dir, touch });
-      log(`  page   ${String(w).padStart(4)} content ${s.contentWidth} ${s.tier} → ${s.line}`);
-      out.push(s);
-    } catch (e) {
-      log(`  page   ${w}: ${e.message.split('\n')[0]}`);
-      out.push({ mode: 'page', width: w, error: e.message.split('\n')[0], score: 0 });
-    } finally {
-      await ctx.close();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let ctx;
+      try {
+        ctx = await browser.newContext({
+          viewport: viewportFor(w),
+          deviceScaleFactor: 1,
+          isMobile: touch,
+          hasTouch: touch,
+        });
+        await ctx.addInitScript(seedScript, { rect: null });
+        const page = await ctx.newPage();
+        await load(page, url);
+        const s = await shoot(page, { url, mode: 'page', width: w, dir, touch });
+        log(`  page   ${String(w).padStart(4)} content ${s.contentWidth} ${s.tier} → ${s.line}`);
+        out.push(s);
+      } catch (e) {
+        if (!browser.isConnected()) throw e;
+        if (retryable(browser, e, attempt)) {
+          log(`  page   ${w}: ${e.message.split('\n')[0]} (retrying)`);
+          continue;
+        }
+        log(`  page   ${w}: ${e.message.split('\n')[0]}`);
+        out.push({ mode: 'page', width: w, error: e.message.split('\n')[0], score: 0 });
+      } finally {
+        await ctx?.close().catch(() => {});
+      }
+      break;
     }
   }
   return out;
@@ -298,7 +357,12 @@ async function contactSheet(browser, dir, report) {
   const page = await ctx.newPage();
   await page.goto('file://' + sheetHtml);
   await page.waitForLoadState('load');
-  await page.screenshot({ path: path.join(dir, 'contact-sheet.jpg'), fullPage: true, type: 'jpeg', quality: 72 });
+  await page.screenshot({
+    path: path.join(dir, 'contact-sheet.jpg'),
+    fullPage: true,
+    type: 'jpeg',
+    quality: 72,
+  });
   await ctx.close();
 }
 
@@ -309,7 +373,8 @@ async function runRoute(browser, url, log) {
   const route = routeFor(url);
   log(`▶ ${url} (${route.kind}) → ${path.relative(repo, dir)}`);
   const shots = [];
-  if (opt.mode !== 'page' && route.kind === 'page') shots.push(...(await runWindowMode(browser, url, dir, log)));
+  if (opt.mode !== 'page' && route.kind === 'page')
+    shots.push(...(await runWindowMode(browser, url, dir, log)));
   if (opt.mode !== 'window') shots.push(...(await runPageMode(browser, url, dir, log)));
   const report = {
     url,
@@ -324,7 +389,9 @@ async function runRoute(browser, url, log) {
   };
   fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(report, null, 2));
   if (opt.sheet) await contactSheet(browser, dir, report).catch(e => log(`  sheet: ${e.message}`));
-  log(`✔ ${url}: severity ${report.severity.score}, clean ${report.severity.clean}/${report.severity.total}`);
+  log(
+    `✔ ${url}: severity ${report.severity.score}, clean ${report.severity.clean}/${report.severity.total}`,
+  );
   return report;
 }
 
@@ -363,7 +430,9 @@ await browser.close().catch(() => {});
 
 if (urls.length > 1) {
   const idxFile = path.join(outRoot, opt.label ? `index-${opt.label}.json` : 'index.json');
-  const prev = fs.existsSync(idxFile) ? JSON.parse(fs.readFileSync(idxFile, 'utf8')) : { routes: [] };
+  const prev = fs.existsSync(idxFile)
+    ? JSON.parse(fs.readFileSync(idxFile, 'utf8'))
+    : { routes: [] };
   const byUrl = new Map(prev.routes.map(r => [r.url, r]));
   for (const r of reports) {
     byUrl.set(r.url, {
@@ -372,12 +441,23 @@ if (urls.length > 1) {
       group: r.group,
       kind: r.kind,
       severity: r.severity,
-      shots: r.shots.map(s => ({ mode: s.mode, width: s.width, contentWidth: s.contentWidth, score: s.score, counts: s.counts, error: s.error })),
+      shots: r.shots.map(s => ({
+        mode: s.mode,
+        width: s.width,
+        contentWidth: s.contentWidth,
+        score: s.score,
+        counts: s.counts,
+        error: s.error,
+      })),
     });
   }
   const routes = [...byUrl.values()].sort((a, b) => b.severity.score - a.severity.score);
-  fs.writeFileSync(idxFile, JSON.stringify({ generated: new Date().toISOString(), widths, routes }, null, 2));
+  fs.writeFileSync(
+    idxFile,
+    JSON.stringify({ generated: new Date().toISOString(), widths, routes }, null, 2),
+  );
   console.log(`index → ${path.relative(repo, idxFile)}`);
 }
 console.log(`done: ${reports.length} route(s) in ${Math.round((Date.now() - started) / 1000)} s`);
-if (opt.failOnIssues && reports.some(r => r.shots.some(s => s.error || s.score > 0))) process.exit(1);
+if (opt.failOnIssues && reports.some(r => r.shots.some(s => s.error || s.score > 0)))
+  process.exit(1);

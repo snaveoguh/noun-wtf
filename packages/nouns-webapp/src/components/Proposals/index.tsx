@@ -26,11 +26,11 @@ import ProposalStatus from '@/components/ProposalStatus';
 import config from '@/config';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useActiveLocale } from '@/hooks/useActivateLocale';
+import { useContainerWidth } from '@/hooks/useContainerWidth';
 import { SUPPORTED_LOCALE_TO_DAYSJS_LOCALE, SupportedLocale } from '@/i18n/locales';
 import Section from '@/layout/Section';
 import { setCandidates } from '@/state/slices/candidates';
 import { AVERAGE_BLOCK_TIME_IN_SECS } from '@/utils/constants';
-import { isMobileScreen } from '@/utils/isMobile';
 import { isProposalUpdatable } from '@/utils/proposals';
 import {
   PartialProposal,
@@ -121,7 +121,7 @@ function MobileProposalActions({
   const btnClass = hasEnoughVotesToPropose ? classes.generateBtn : classes.generateBtnDisabled;
   return (
     <Container>
-      <div className="w-100">
+      <div className={clsx('w-100', classes.mobileActions)}>
         <Row>
           <Col>
             <div className={classes.nullStateCopy}>{nullStateCopy}</div>
@@ -168,7 +168,9 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
   const dispatch = useAppDispatch();
   const candidates = useAppSelector(state => state.candidates.data);
   const connectedAccountNounVotes = useUserVotes() ?? 0;
-  const isMobile = isMobileScreen();
+  // Layout follows the NounOS window (page container), not the viewport.
+  const { ref: widthRef, below } = useContainerWidth<HTMLDivElement>();
+  const isMobile = below('lg');
   const activeLocale = useActiveLocale();
   const threshold = (useProposalThreshold() ?? 0) + 1;
   const hasEnoughVotesToPropose = account !== undefined && connectedAccountNounVotes >= threshold;
@@ -178,6 +180,20 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
   const { hash } = useLocation();
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(false);
+  // While the header is on screen the jump button sits in the flow under it; it
+  // only floats once the header has scrolled away, so it never lands on the tabs.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerInView, setHeaderInView] = useState(true);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const observer = new IntersectionObserver(([entry]) => setHeaderInView(entry.isIntersecting), {
+      threshold: 0,
+    });
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const sentinel = bottomSentinelRef.current;
@@ -235,14 +251,13 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
   };
 
   return (
-    <div className={classes.proposals}>
+    <div className={classes.proposals} ref={widthRef}>
       {showDelegateModal && <DelegationModal onDismiss={() => setShowDelegateModal(false)} />}
-      <div className={classes.sectionWrapper}>
+      <div className={classes.sectionWrapper} ref={headerRef}>
         <Section fullWidth={false} className={classes.section}>
-          <Col
-            xs={12}
-            lg={10}
+          <div
             className={clsx(
+              classes.column,
               classes.headerWrapper,
               !hasEnoughVotesToPropose ? classes.forceFlexRow : '',
             )}
@@ -309,7 +324,7 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
                 )}
               </div>
             )}
-          </Col>
+          </div>
         </Section>
       </div>
 
@@ -324,7 +339,19 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
       )}
       <Section fullWidth={false} className={classes.section}>
         {activeTab === 0 && (
-          <Col xs={12} lg={10} className={classes.proposalsList}>
+          <div className={clsx(classes.column, classes.proposalsList)}>
+            {proposals && proposals.length > 0 && (
+              <div className={classes.jumpInlineRow}>
+                <button
+                  type="button"
+                  className={classes.jumpInlineBtn}
+                  onClick={handleJumpToBottom}
+                  tabIndex={headerInView ? 0 : -1}
+                >
+                  Latest props <span aria-hidden="true">&darr;</span>
+                </button>
+              </div>
+            )}
             {proposals && proposals.length > 0 ? (
               proposals
                 .slice(0)
@@ -397,12 +424,12 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
               </Alert>
             )}
             <div ref={bottomSentinelRef} />
-          </Col>
+          </div>
         )}
         {activeTab === 1 && (
-          <Col xs={12} lg={10} className={classes.proposalsList}>
-            <Row>
-              <Col lg={9}>
+          <div className={clsx(classes.column, classes.proposalsList)}>
+            <div className={classes.candidatesGrid}>
+              <div>
                 {nounsRequired !== undefined && candidates && candidates.length > 0 ? (
                   candidates
                     .slice(0)
@@ -449,8 +476,8 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
                     )}
                   </>
                 )}
-              </Col>
-              <Col lg={3} className={classes.candidatesSidebar}>
+              </div>
+              <div className={classes.candidatesSidebar}>
                 <h4>
                   <strong>
                     <Trans>About Proposal Candidates</Trans>
@@ -465,16 +492,20 @@ const Proposals = ({ proposals, nounsRequired }: ProposalsProps) => {
                 <Link to="/create-candidate" className={clsx(classes.button)}>
                   Create a candidate
                 </Link>
-              </Col>
-            </Row>
-          </Col>
+              </div>
+            </div>
+          </div>
         )}
       </Section>
 
       {activeTab === 0 && proposals && proposals.length > 0 && (
         <button
           type="button"
-          className={clsx(classes.jumpToBottomBtn, isNearBottom && classes.jumpToBottomBtnHidden)}
+          className={clsx(
+            classes.jumpToBottomBtn,
+            (isNearBottom || headerInView) && classes.jumpToBottomBtnHidden,
+          )}
+          tabIndex={isNearBottom || headerInView ? -1 : 0}
           onClick={handleJumpToBottom}
           aria-label="Jump to latest proposals"
         >

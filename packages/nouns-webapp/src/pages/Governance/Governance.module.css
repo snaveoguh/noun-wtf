@@ -5,6 +5,7 @@
 }
 
 .headerRow span {
+  display: block;
   color: var(--theme-text-muted);
   font-size: 24px;
   font-family: 'Londrina Solid';
@@ -12,7 +13,7 @@
 
 .headerRow h1 {
   color: var(--theme-text-primary);
-  font-size: 56px;
+  font-size: clamp(40px, 11cqi, 56px);
   font-family: 'Londrina Solid';
 }
 
@@ -32,29 +33,94 @@ p {
   padding-top: 1rem;
 }
 
-@media (max-width: 992px) {
+/* Below lg the section gets a small gutter (it was a viewport < 992 rule). */
+@container page (max-width: 759.98px) {
   .section {
     margin-left: 0.5rem;
     margin-right: 0.5rem;
+    width: auto;
   }
 }
 
-.wrapper {
+/* A child of the Section's bootstrap .row: full width, 10/12 from lg (was Col lg=10). */
+.section .wrapper {
   margin-left: auto;
   margin-right: auto;
+  width: 100%;
+}
+
+@container page (min-width: 760px) {
+  .section .wrapper {
+    width: 83.333333%;
+  }
+}
+
+/* DAO switcher: wraps, 40 px tall on touch. */
+.daoTabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 16px 16px 0;
+  flex-wrap: wrap;
+}
+
+.daoTab {
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: 'PT Root UI', sans-serif;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.daoTabRound {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+@media (pointer: coarse) {
+  .daoTab {
+    min-height: 40px;
+  }
+  .daoTabRound {
+    width: 40px;
+    height: 40px;
+  }
+  .treasuryHeading .treasuryLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
 }
 
 .treasuryInfoCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   margin-bottom: 3rem;
   border-radius: 20px;
   border: 1px solid transparent;
 }
 
 .treasuryAmtWrapper {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  padding-left: 2rem;
-  padding-right: 2rem;
+  padding: 1rem clamp(0.75rem, 5cqi, 2rem);
+}
+
+.treasuryAmts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 1rem;
 }
 
 .usdTreasuryAmt {
@@ -66,15 +132,16 @@ p {
   height: 3rem;
   min-width: 9rem;
   padding-top: 0.2rem;
+  padding-right: 1rem;
 }
 
 .ethTreasuryAmt h1 {
-  font-size: 36px;
+  font-size: clamp(28px, 8cqi, 36px);
   font-family: 'Londrina Solid';
 }
 
 .usdBalance {
-  font-size: 36px;
+  font-size: clamp(28px, 8cqi, 36px);
   font-family: 'Londrina Solid';
 }
 
@@ -99,15 +166,17 @@ p {
 }
 
 .treasuryInfoText {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  padding-left: 2rem;
-  padding-right: 2rem;
+  padding: 1rem clamp(0.75rem, 5cqi, 2rem);
   font-family: 'PT Root UI';
   font-weight: 500;
 }
 
-@media (min-width: 992px) {
+/* From lg: amount (2/3) beside the blurb (1/3), as Col lg=8 did. */
+@container page (min-width: 760px) {
+  .treasuryInfoCard {
+    grid-template-columns: 2fr 1fr;
+  }
+
   .treasuryAmtWrapper {
     border-right: 2px solid var(--theme-divider);
   }
