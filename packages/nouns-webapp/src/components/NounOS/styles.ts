@@ -67,7 +67,10 @@ export const NOS_CSS = `
   color:rgba(255,255,255,.8);font-size:12px;line-height:1;padding:0;transition:background .15s,transform .15s}
 .nos-ctrls button:hover{background:rgba(255,255,255,.22);transform:scale(1.08)}
 .nos-ctrls button:last-child:hover{background:var(--red);color:#fff;border-color:var(--red)}
-.nos-content{flex:1;overflow:auto;position:relative;background:transparent;color:var(--paper);overscroll-behavior:contain}
+/* Every window's content is a size container named "page": pages lay out from
+   the window's width, not the viewport's (src/lib/responsive, docs/responsive). */
+.nos-content{flex:1;overflow:auto;position:relative;background:transparent;color:var(--paper);overscroll-behavior:contain;
+  container:page/inline-size}
 .is-dark>.nos-content{background:transparent;color:var(--paper)}
 .nos-haze{position:absolute;inset:0;background:#020304;pointer-events:none;transition:opacity .5s ease;z-index:4}
 .nos-resize{position:absolute;right:4px;bottom:4px;width:14px;height:14px;cursor:nwse-resize;z-index:5;border-radius:0 0 10px 0;

@@ -465,7 +465,11 @@ function App() {
   }, []);
 
   return (
-    <div className={`${classes.wrapper}`} style={torchMode ? { cursor: 'none' } : undefined}>
+    <div
+      className={`${classes.wrapper}`}
+      data-container="page"
+      style={torchMode ? { cursor: 'none' } : undefined}
+    >
       <BrowserRouter>
         <AppRouter />
       </BrowserRouter>

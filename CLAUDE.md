@@ -391,6 +391,16 @@ The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,
 
 `/vote/:id`, `/candidates/:id`, `/noun/:id` and `/v2/noun/:id` go through `netlify/functions/og-proposal.ts` (see `public/_redirects`), which serves the SPA shell with og / twitter tags spliced in. A Noun's card is `/og/noun/:id.png` / `/og/v2/noun/:id.png` (`og-noun-image.ts`): a 1200 × 630 PNG of the Noun big on its own background, standing on the bottom edge, drawn from its seed (`seeds(id)`; `ownerOf` 404s unminted or burned ones) and the bundled trait art, encoded with node's zlib (`netlify/lib/nounOg.ts`, tested). The on-chain renderers (`tokenURI`, `generateSVGImage`) revert over public RPCs (gas caps), so they aren't used. Cached a year (a seed never changes).
 
+### Responsive (container queries)
+
+Every page renders in a NounOS window, and a window can be phone-width on a 2560 px desktop, so pages lay out from their **container**, never the viewport. `.nos-content` (each window's content) and the app shell (`App.module.css .wrapper`) are size containers named `page` (`data-container="page"`); `container-type` doesn't capture `position: fixed` children, so modals are unaffected.
+- **Tokens** (`src/lib/responsive/breakpoints.ts`, band lower edges): xs < 400, sm 400, md 560, lg 760, xl 1024, 2xl 1440.
+- **Tailwind:** `@sm:` … `@2xl:` (from that tier up), `@max-sm:` … (below it), `@container` (make a container); a local plugin in `tailwind.config.ts`. Viewport `sm:`/`md:` stay for the OS chrome only.
+- **CSS modules:** `@container page (min-width: 760px) { … }` / `(max-width: 559.98px)` with the literal values; fluid type with `clamp(min, Ncqi, max)`.
+- **JS:** `useContainerWidth()` (`src/hooks/useContainerWidth.ts`: `{ ref, width, tier, atLeast, below }`, ResizeObserver on the nearest `[data-container]`, viewport fallback) instead of `window.innerWidth`. Touch / hover choices use `(pointer: coarse)` / `(hover: none)`, not a width. `osStore.isMobile()` stays viewport-based: it's the window manager deciding full-screen windows.
+- **Harness:** `node scripts/responsive/harness.mjs --route /noun/2062` (from `packages/nouns-webapp`, against a no-HMR dev server with `VITE_CHAIN_ID=1`): 13 widths (320 … 2560) in a navigator window (resized live via the dev-only `window.__nos`) and full-page, checks horizontal overflow, clipped text / controls, covered controls, controls on artwork, overlapping controls and tap targets < 40 px on touch; `report.json` + `contact-sheet.jpg` in `.claude/responsive-shots/<slug>/`. `--all --jobs 3` refreshes `index.json`; `--fail-on-issues` for a green check. New routes must be added to `ROUTES` in `scripts/responsive/lib.mjs` (a test fails otherwise).
+- **Rules:** no new viewport media queries / `innerWidth` in page code; a page is done when the harness is clean at all 26 shots and wide layouts look as before. Inventory and work units: `docs/responsive/pages.md`; step by step with the Noun page as the worked example: `docs/responsive/PLAYBOOK.md`.
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.
