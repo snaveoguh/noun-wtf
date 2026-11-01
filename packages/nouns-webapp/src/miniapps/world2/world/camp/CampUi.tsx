@@ -21,7 +21,6 @@ export function CampUi({ game, touch }: { game: Game; touch: boolean }) {
     return (
       <div className="pointer-events-none absolute inset-0 z-50 select-none" data-camp="intro">
         <style>{INTRO_CSS}</style>
-        <div className="camp-fade absolute inset-0 bg-black" />
         <div className="camp-bar absolute inset-x-0 top-0 h-[11vh] bg-black" />
         <div className="camp-bar absolute inset-x-0 bottom-0 flex h-[11vh] items-center justify-between bg-black px-6">
           <span className="camp-title text-xl font-black italic tracking-wide text-[#ffd400] sm:text-3xl">
@@ -56,12 +55,15 @@ export function CampUi({ game, touch }: { game: Game; touch: boolean }) {
   );
 }
 
-/** Fade up from black; the bars slide in; the title arrives late. */
-const INTRO_CSS = `
-[data-camp=intro] .camp-fade { animation: camp-fade 1.1s ease-out forwards; }
+/**
+ * The bars slide in; the title arrives late. No fade up from black: the
+ * overlay mounts after the game has already drawn the shot (and the plaza
+ * after RIDE), so a black layer starting at full opacity read as the
+ * picture blinking to black every time (2026-11-01).
+ */
+export const INTRO_CSS = `
 [data-camp=intro] .camp-bar { animation: camp-bar 0.9s ease-out both; }
 [data-camp=intro] .camp-title { animation: camp-title 1.2s 3.2s ease-out both; }
-@keyframes camp-fade { from { opacity: 1 } to { opacity: 0 } }
 @keyframes camp-bar { from { transform: scaleY(0) } to { transform: scaleY(1) } }
 @keyframes camp-title { from { opacity: 0; transform: translateX(-12px) } to { opacity: 1; transform: none } }
 body[data-camp-intro] [data-hud], body[data-camp-intro] [data-w2hud] { visibility: hidden !important; }
