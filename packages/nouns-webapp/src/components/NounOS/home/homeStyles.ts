@@ -217,8 +217,8 @@ export const HOME_CSS = `
   .nh-jumps button{flex-shrink:0;border:0;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:700;background:rgba(255,255,255,.08);cursor:pointer}
 }
 @media (pointer:coarse){.nh-manifesto-links button,.nh-jumps button{min-height:40px}.nh-foot button{min-height:40px;padding:0 4px}}
-/* Phones: the home stops above the tray bar (46 px, as .nos-win.is-mobile), so cards never sit under it */
-@container page (max-width:759.98px){.nh{bottom:calc(46px + env(safe-area-inset-bottom))}}
+/* Phones: the home stops above the tray bar (--nos-tray-h, as .nos-win.is-mobile), so cards never sit under it */
+@container page (max-width:759.98px){.nh{bottom:calc(var(--nos-tray-h, 46px) + env(safe-area-inset-bottom))}}
 /* The desk pond is always behind the opaque home in desk mode; hide it so it never shows through the tray band */
 .nos-root.mode-desk:has(> .nh) > canvas.nos-water{visibility:hidden}
 @container page (max-width:759.98px){.nh-manifesto{margin:4px 16px 14px;padding:12px 14px;gap:10px}.nh-manifesto p{min-width:0;flex-basis:100%;font-size:13px}}
