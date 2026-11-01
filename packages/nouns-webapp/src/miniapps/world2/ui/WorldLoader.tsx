@@ -1,11 +1,13 @@
-// ── Noun World's loader: the noun.wtf wordmark, one shimmer, then the game ──
+// ── Noun World's loader: the noun.wtf wordmark, shimmering, then the game ──
 //
 // The site header's wordmark (components/NounOS/home/wordmark.ts, same ink,
-// same band) centred on dark. Its one shimmer pass IS the progress: the band
-// crosses as the level loads and the graffiti's arrival load fetches walls
-// (worldLoad.ts), and only finishes once every piece is on the walls (or the
-// graffiti store stops answering). Then it hands over to CREATE YOUR RIDER.
-// Reduced motion: no shimmer, just the wordmark.
+// same band), small and centred on dark. The shimmer loops at a steady speed
+// (a band crawling with the load read as stuck), and the letters flick
+// between Pip3's five versions of each, one letter at a time. It hands over
+// to CREATE YOUR RIDER once the level is in and the graffiti round the rider
+// is painted (worldLoad.ts); the far walls finish behind the select.
+// Reduced motion: no shimmer, no flicking, just the wordmark. `?loader=hold`
+// keeps it on screen.
 
 import type { Game } from '../Game';
 
@@ -20,10 +22,16 @@ import {
   WORDMARK_TRACKING,
 } from '@/components/NounOS/home/wordmark';
 
-import { loadTarget, stepShimmer, worldLoaded, type WorldLoadState } from './worldLoad';
+import { flickVariants, NEAR_WALLS_M, worldLoaded } from './worldLoad';
 
 /** The fade into the character select. */
 const FADE_MS = 280;
+/** One letter pops to another of its Pip3 versions this often (ms). */
+const FLICK_MS = 140;
+/** One shimmer pass (ms). */
+const SWEEP_MS = 1400;
+/** Each letter's sweep starts this much after the one before (the band crosses the word). */
+const STAGGER_MS = 70;
 
 function reducedMotion(): boolean {
   try {
@@ -33,67 +41,58 @@ function reducedMotion(): boolean {
   }
 }
 
+/**
+ * CSS for one of Pip3's five versions of a letter: its `rand` feature lists
+ * [base, alt1..alt4], and a value picks by position. The base is the feature
+ * off (a bare "rand" / "rand" 1 can mean "pick at random").
+ */
+function pip3Version(v: number): string {
+  return v <= 1 ? 'normal' : `"rand" ${v}`;
+}
+
 export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () => void }) {
-  const markRef = useRef<HTMLSpanElement>(null);
   const gameRef = useRef(game);
   gameRef.current = game;
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
   const [leaving, setLeaving] = useState(false);
   const [still] = useState(reducedMotion);
+  // Pip3 drawing per letter (its `rand` feature, 1–5)
+  const [variants, setVariants] = useState(() => [...WORDMARK_TEXT].map(() => 1));
+  useEffect(() => {
+    if (still || leaving) return;
+    const id = setInterval(() => setVariants(v => flickVariants(v, Math.random, 1)), FLICK_MS);
+    return () => clearInterval(id);
+  }, [still, leaving]);
 
   useEffect(() => {
+    // ?loader=hold keeps it up (for looking at it)
+    const hold = new URLSearchParams(window.location.search).get('loader') === 'hold';
     const t0 = performance.now();
     let levelAt: number | null = null;
     let lastWallAt = 0;
     let lastDone = -1;
-    let arrived = false;
-    let watched: Game['graffiti'] = null;
-    let shown = 0;
-    let last = t0;
     let raf = 0;
     let handOver: ReturnType<typeof setTimeout> | undefined;
-    let finished = false;
     const frame = (now: number) => {
       const g = gameRef.current;
-      const levelReady = g !== null && g.hud.loading === null && g.graffiti !== null;
-      if (levelReady && levelAt === null) levelAt = now;
       const gr = g?.graffiti ?? null;
-      if (gr !== null && gr !== watched) {
-        watched = gr;
-        void gr.arrived.then(() => {
-          if (watched === gr) arrived = true;
-        });
-      }
-      const progress = gr?.loadProgress ?? null;
-      const done = progress === null ? -1 : progress.done + (progress.total === null ? 0 : 1e6);
+      const levelReady = g !== null && g.hud.loading === null && gr !== null;
+      if (levelReady && levelAt === null) levelAt = now;
+      const done = gr?.loadProgress.done ?? -1;
       if (done !== lastDone) {
         lastDone = done;
         lastWallAt = now;
       }
-      const s: WorldLoadState = {
+      const ready = worldLoaded({
         levelReady,
-        graffiti: progress,
-        graffitiArrived: arrived,
-        elapsedMs: now - t0,
+        nearWallsUp: g !== null && gr !== null && gr.loadedAround(g.player.pos, NEAR_WALLS_M),
         sinceLevelMs: levelAt === null ? 0 : now - levelAt,
         stalledMs: levelAt === null ? 0 : now - Math.max(levelAt, lastWallAt),
-      };
-      const loaded = worldLoaded(s);
-      shown = still ? (loaded ? 1 : 0) : stepShimmer(shown, loadTarget(s), now - last, loaded);
-      last = now;
-      const el = markRef.current;
-      if (el !== null && !still) el.style.backgroundPosition = `${(1 - shown) * 100}% 0`;
-      if (loaded && shown >= 1 && !finished) {
-        finished = true;
+      });
+      if (ready && !hold) {
         if (import.meta.env.DEV)
-          console.info(
-            '[world] loaded in',
-            Math.round(now - t0),
-            'ms; graffiti',
-            arrived ? 'all in' : 'stalled / capped, going anyway',
-            s.graffiti,
-          );
+          console.info('[world] loaded in', Math.round(now - t0), 'ms; walls', gr?.loadProgress);
         setLeaving(true);
         handOver = setTimeout(() => doneRef.current(), still ? 0 : FADE_MS);
         return;
@@ -115,8 +114,26 @@ export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () =>
       aria-label="loading Noun World"
       style={{ opacity: leaving && !still ? 0 : 1 }}
     >
-      <span ref={markRef} className="w2-loader-mark" data-keep-font>
-        {WORDMARK_TEXT}
+      <span className="w2-loader-mark" data-keep-font>
+        {[...WORDMARK_TEXT].map((ch, i) => {
+          const v = variants[i] ?? 1;
+          // Keyed by version: a changed letter remounts, which replays its pop
+          // Each letter carries its own sweep (a pop's transform would drop it
+          // from a word-wide clip), staggered and in phase with the clock so
+          // a remounted letter picks the sweep up where it was
+          const delay = i * STAGGER_MS - (performance.now() % SWEEP_MS);
+          return (
+            <span
+              key={`${i}:${v}`}
+              style={{
+                fontFeatureSettings: pip3Version(v),
+                animationDelay: `${Math.round(delay)}ms, 0ms`,
+              }}
+            >
+              {ch}
+            </span>
+          );
+        })}
       </span>
     </div>
   );
@@ -125,7 +142,11 @@ export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () =>
 export const LOADER_CSS = `
 .w2-loader{background:#07070a;transition:opacity ${FADE_MS}ms ease}
 .w2-loader .w2-loader-mark,.w2-loader .w2-loader-mark *{font-family:${WORDMARK_FONT} !important;text-transform:uppercase !important}
-.w2-loader-mark{font-size:clamp(30px,7vw,72px);line-height:1;letter-spacing:${WORDMARK_TRACKING};color:${WORDMARK_INK};font-weight:400;font-style:normal;
-  background:${WORDMARK_SHIMMER} 100% 0/${WORDMARK_SHIMMER_SIZE} no-repeat;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-@media (prefers-reduced-motion:reduce){.w2-loader-mark{background:none;-webkit-text-fill-color:#9b998f;color:#9b998f}}
+.w2-loader-mark{font-size:clamp(13px,1.3vw,18px);line-height:1;letter-spacing:${WORDMARK_TRACKING};color:${WORDMARK_INK};font-weight:400;font-style:normal}
+.w2-loader-mark span{display:inline-block;
+  background:${WORDMARK_SHIMMER} 100% 0/${WORDMARK_SHIMMER_SIZE} no-repeat;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:w2-loader-sweep ${SWEEP_MS}ms linear infinite,w2-loader-pop 180ms ease-out}
+@keyframes w2-loader-pop{from{transform:scale(1.35)}to{transform:scale(1)}}
+@keyframes w2-loader-sweep{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.w2-loader-mark span{animation:none;background:none;-webkit-text-fill-color:#9b998f;color:#9b998f}}
 `;

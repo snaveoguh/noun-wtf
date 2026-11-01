@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Graffiti, type GraffitiNet } from './Graffiti';
 import { FAR_W } from './lod';
+import { prefetchWalls } from './storeLoad';
 import { encodeStrokes, type Stroke } from './strokes';
 
 // What a visitor sees on arrival: the permanent store's copy of a wall
@@ -150,6 +151,51 @@ describe('Graffiti: loading a wall on arrival', () => {
     // ...and by then the paint is on the walls (the world loader relies on it)
     expect(g.cells.get(WALL)?.log.count).toBe(1);
     expect(g.cells.get(OTHER)?.log.count).toBe(2);
+    g.dispose();
+  });
+
+  it('paints the walls the homepage already downloaded, without fetching them again', async () => {
+    const OTHER = 'plaza|0.00,0.00,-1.00|-38.75|-2|0';
+    const store = fakeStore({ [WALL]: [tag(0)], [OTHER]: [tag(1), tag(2)] }, []);
+    vi.stubGlobal('fetch', store);
+    prefetchWalls('plaza', { x: 0, y: 0, z: 0 });
+    await flushAsync();
+    const before = store.mock.calls.length;
+    const g = new Graffiti({} as CollisionWorld, 'plaza', {
+      save: () => undefined,
+      load: () => undefined,
+    });
+    await flushAsync();
+    expect(store.mock.calls.length).toBe(before);
+    expect(g.loadProgress).toEqual({ done: 2, total: 2 });
+    expect(g.cells.get(WALL)?.log.count).toBe(1);
+    expect(g.cells.get(OTHER)?.log.count).toBe(2);
+    // and the loader's question: the walls round here are all up
+    expect(g.loadedAround({ x: 0, y: 0, z: 0 }, 1e6)).toBe(true);
+    g.dispose();
+  });
+
+  it('knows when the walls round the rider are up', async () => {
+    let answer: (r: Response) => void = () => undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const q = new URL(url, 'http://x').searchParams;
+        if (q.get('ids') === null) return Response.json({ walls: [WALL] });
+        return new Promise<Response>(r => (answer = r));
+      }),
+    );
+    const g = new Graffiti({} as CollisionWorld, 'plaza', {
+      save: () => undefined,
+      load: () => undefined,
+    });
+    expect(g.loadedAround({ x: 0, y: 0, z: 0 }, 1e6)).toBe(false); // no index yet
+    await flushAsync();
+    expect(g.loadedAround({ x: 0, y: 0, z: 0 }, 1e6)).toBe(false); // the wall's batch is out
+    expect(g.loadedAround({ x: 5000, y: 0, z: 0 }, 10)).toBe(true); // nothing owed out here
+    answer(Response.json({ walls: { [WALL]: [tag(0)] } }));
+    await flushAsync();
+    expect(g.loadedAround({ x: 0, y: 0, z: 0 }, 1e6)).toBe(true);
     g.dispose();
   });
 
