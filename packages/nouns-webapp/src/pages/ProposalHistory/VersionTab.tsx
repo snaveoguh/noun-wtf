@@ -4,13 +4,13 @@ import { Trans } from '@lingui/react/macro';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
 import { Link } from 'react-router';
+import { useBlockNumber } from 'wagmi';
 
 import classes from './Vote.module.css';
-import { useBlockNumber } from 'wagmi';
 
 type Props = {
   isActive: boolean;
-  setActiveVersion: Function;
+  setActiveVersion: (version: number) => void;
   id: string; // slug for candidate
   createdAt: number;
   versionNumber: number;
@@ -23,15 +23,16 @@ const VersionTab = (props: Props) => {
   const { data: currentBlock } = useBlockNumber();
 
   useEffect(() => {
-    if (currentBlock) {
+    if (currentBlock !== undefined) {
       const date = new Date(+props.createdAt * 1000);
       setUpdatedTimestamp(date);
     }
   }, [currentBlock, props.createdAt]);
 
-  const versionLink = props.isCandidate
-    ? `/candidates/${props.id}/history/${props.versionNumber}`
-    : `/vote/${props.id}/history/${props.versionNumber}`;
+  const versionLink =
+    props.isCandidate === true
+      ? `/candidates/${props.id}/history/${props.versionNumber}`
+      : `/vote/${props.id}/history/${props.versionNumber}`;
 
   return (
     <>

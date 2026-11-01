@@ -81,8 +81,10 @@ export const ROUTES = [
   { path: 'candidates', url: '/candidates', group: 'governance', settle: 15000 },
   {
     path: 'candidates/*',
-    url: '/candidates/0x0000000000000000000000000000000000000000-sample',
+    // a real candidate: a made-up slug never loads, so it measured a spinner
+    url: '/candidates/0xc7ccec521eed20fcddff8f95424816ac421c7d87-unwrap-stake-treasury-weth',
     group: 'governance',
+    settle: 15000,
   },
   { path: 'candidates/:id/edit', url: '/candidates/sample/edit', group: 'governance-create' },
   { path: 'playground', url: '/playground', group: 'tools' },
