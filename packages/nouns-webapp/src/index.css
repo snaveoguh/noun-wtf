@@ -817,6 +817,16 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] h4 { font-size: 0.95rem !important; }
 [data-theme='abacus'] h5 { font-size: 0.85rem !important; }
 [data-theme='abacus'] h6 { font-size: 0.75rem !important; }
+/* Those sizes beat a heading's Tailwind size class, but its fixed line-height
+   (text-xs 1rem, text-sm 1.25rem, …) stays: an h2.text-xs is 22.4px type in a
+   16px line, so a wrapped heading's lines overlap. Only the combinations where
+   the line is shorter than the type get a line just taller than it (1.05, so
+   one-line headings barely move); an explicit leading-* class still wins. */
+[data-theme='abacus'] h1:is(.text-xs, .text-sm, .text-base, .text-lg, .text-xl):not([class*='leading-']),
+[data-theme='abacus'] h2:is(.text-xs, .text-sm):not([class*='leading-']),
+[data-theme='abacus'] h3.text-xs:not([class*='leading-']) {
+  line-height: 1.05;
+}
 
 /* Single-weight font — normalise weight so nothing renders synthetic-bold smears. */
 [data-theme='abacus'] *,
