@@ -374,6 +374,15 @@ The Noggle Bowl's deepest door (it used to open the Upside Down) opens onto a 1,
 - **Trading** (`ui/TradePanel.tsx`, logic `sim/tradeForm.ts`): click / tap a player, rider or bot for a direct deal (`engine/deals.ts`: offer / accept / decline, 90 s); a simulated trader gets a limit order on the real book. Targets are masked tags only; the server resolves a tag to its account when offered (`toOwner`, never sent out) and only that account can accept. Accounts are opened (`join`) only once another player is in the room or you trade.
 - **Crowd**: instanced low-poly Nouns with swinging legs; trouser / shoe colours come from Noun World's `outfitFromSeed` (`sim/outfit.ts` `outfitFor`), the outfit a rig dresses itself in, so the LOD swap never changes clothes. A far LOD (one trouser block) in VAST and the hall copies. Your rider wears your saved outfit and sends it to other players as `of` (Net.ts's key).
 
+### Crystal ball (/crystal-ball, /v2/crystal-ball)
+
+- Every read (auction, latest block, descriptor counts) and the settle tx use the Nouns chain (`NOUNS_CHAIN` = `defaultChain.id`), never the wallet's: wagmi's config also carries Polygon, and with a wallet on Polygon the page fell back to a cached "still live" prediction at Noun O'Clock (2026-11-01). The settle button judges "ended" from the end time against the clock. The terminal feed's indexer health and chain fallbacks had the same bug (`indexerHealth.ts`, `v1/v2ChainFallback.ts`, `grantsChainFallback.ts`).
+- **Missed blocks** (`MissedBlocks.tsx`, `useMissedBlocks`): once the auction has ended, a reel along the bottom shows every block since as the Noun it would have minted (block hash + next Noun ID through `predictSeed`), latest 24 backfilled four at a time, plus the count since it ended. Each card is a small character-select tile on the Noun's own background, a 3D voxel Noun turning with an idle bob, in the Noun World HUD style; DREAM saves it to the dream drafts (`saveDreamToStorage`), PLAY opens `/world?seed=…` (V1 only: the game draws riders with V1 art). One shared canvas draws every card (drei `View`): a page only gets ~16 WebGL contexts.
+
+### Share previews (og:image)
+
+`/vote/:id`, `/candidates/:id`, `/noun/:id` and `/v2/noun/:id` go through `netlify/functions/og-proposal.ts` (see `public/_redirects`), which serves the SPA shell with og / twitter tags spliced in. A Noun's card is `/og/noun/:id.png` / `/og/v2/noun/:id.png` (`og-noun-image.ts`): a 1200 × 630 PNG of the Noun big on its own background, standing on the bottom edge, drawn from its seed (`seeds(id)`; `ownerOf` 404s unminted or burned ones) and the bundled trait art, encoded with node's zlib (`netlify/lib/nounOg.ts`, tested). The on-chain renderers (`tokenURI`, `generateSVGImage`) revert over public RPCs (gas caps), so they aren't used. Cached a year (a seed never changes).
+
 ### Security headers
 
 `public/_headers` sets `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, not `DENY`. noun.wtf frames its own pages (the ice cream van page embeds `/icecreamvan-scene/`); other sites still can't frame it.

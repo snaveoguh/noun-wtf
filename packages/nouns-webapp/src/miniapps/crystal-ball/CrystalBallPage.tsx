@@ -25,6 +25,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { getNounData, ImageData as NounsImageData } from '@noundry/nouns-assets';
 import { ImageDataV2, getNounDataV2 } from '@nouns/assets';
 import { buildSVG } from '@nouns/sdk';
+import { getPublicClient } from '@wagmi/core';
 import { ConnectKitButton } from 'connectkit';
 import { encodePacked, keccak256, type Hex } from 'viem';
 import { useAccount, useBlock, useReadContract, useWriteContract } from 'wagmi';
@@ -44,7 +45,9 @@ import { NOUNV2_TOKEN_ADDRESS } from '@/contracts/nounv2-token';
 import { useActiveDao, type ActiveDao } from '@/hooks/useActiveDao';
 import { REST_API_BASE } from '@/lib/api';
 import { traitName } from '@/lib/traitName';
-import { defaultChain } from '@/wagmi';
+import { config as wagmiConfig, defaultChain } from '@/wagmi';
+
+import MissedBlocks, { type MissedBlock } from './MissedBlocks';
 
 const CrystalBall = lazy(() => import('@/components/CrystalBall'));
 const MorphingNounVoxels = lazy(() => import('@/components/MorphingNounVoxels'));
@@ -195,12 +198,22 @@ const NOUNS_TOKEN_MAINNET = '0x9C8fF314C9Bc7F6e59A9d9225Fb22946427eDC03' as cons
  * in sync as new art is added on-chain (otherwise predictions silently
  * drift the moment a single new head/body/accessory is uploaded).
  */
+/**
+ * Every read and the settle tx go to the Nouns chain, never the wallet's
+ * current one: wagmi's config also carries Polygon, and with a wallet on
+ * Polygon the auction read failed (the page fell back to a cached
+ * "still live" prediction at Noun O'Clock), the seed hashed a Polygon block
+ * and a settle would have gone to Polygon (2026-11-01).
+ */
+const NOUNS_CHAIN = defaultChain.id;
+
 function useDescriptorTraitCounts(
   tokenAddress: `0x${string}` | undefined,
   fallback: TraitCounts,
   enabled: boolean,
 ): TraitCounts {
   const { data: descriptorAddress } = useReadContract({
+    chainId: NOUNS_CHAIN,
     address: tokenAddress,
     // Read each token's `descriptor()` rather than hardcoding V1/V2 descriptor
     // addresses (the V2 descriptor isn't the same instance as V1's).
@@ -216,6 +229,7 @@ function useDescriptorTraitCounts(
   });
 
   const countsQuery = {
+    chainId: NOUNS_CHAIN,
     address: descriptorAddress,
     abi: nounsDescriptorAbi,
     query: {
@@ -325,6 +339,7 @@ function useNounSeeds() {
  */
 function useNounV2Prediction(enabled: boolean): PredictResponse | null {
   const { data: auctionData } = useReadContract({
+    chainId: NOUNS_CHAIN,
     address: NOUNV2_AUCTION_HOUSE_ADDRESS,
     abi: nounV2AuctionHouseAbi,
     functionName: 'auction',
@@ -358,6 +373,7 @@ function useNounV2Prediction(enabled: boolean): PredictResponse | null {
   // time (~12s) is plenty: the next-noun seed only needs to be re-rolled
   // when a new parent block is mined.
   const { data: blockData } = useBlock({
+    chainId: NOUNS_CHAIN,
     query: {
       enabled: enabled && NOUNV2_AUCTION_HOUSE_ADDRESS !== ZERO_ADDRESS,
       refetchInterval: 12_000,
@@ -457,6 +473,7 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
     nounsAuctionHouseAddress[defaultChain.id as keyof typeof nounsAuctionHouseAddress];
 
   const { data: auctionData } = useReadContract({
+    chainId: NOUNS_CHAIN,
     address: v1Address,
     abi: nounsAuctionHouseAbi,
     functionName: 'auction',
@@ -487,6 +504,7 @@ function useNounV1Prediction(enabled: boolean): PredictResponse | null {
   // at the block time keeps the seed prediction fresh without blocking the
   // initial render on a WS handshake.
   const { data: blockData } = useBlock({
+    chainId: NOUNS_CHAIN,
     query: {
       enabled: enabled && v1Address != null,
       refetchInterval: 12_000,
@@ -863,6 +881,115 @@ function SeedVisual({
   );
 }
 
+// ─── Missed blocks (every block since the auction ended) ──────────────
+
+/** Cards kept (newest first). Each is one block fetch; the backfill stops here. */
+const MISSED_MAX = 24;
+const BLOCK_SECONDS = 12;
+
+/**
+ * Every block since the current auction ended, as the Noun it would have
+ * minted (settled in the next block, the seeder hashes this one's hash with
+ * the next Noun ID), newest first. Backfills the latest MISSED_MAX on load
+ * and adds each new block as the prediction sees it. Reads the Nouns chain
+ * only. Resets when a new auction starts.
+ */
+function useMissedBlocks(
+  prediction: PredictResponse | null,
+  activeDao: ActiveDao,
+  allSeeds: NounSeedWithId[],
+): { items: MissedBlock[]; sinceEnded: number } {
+  const isV2 = activeDao === 'nounv2';
+  const counts = useDescriptorTraitCounts(
+    isV2
+      ? NOUNV2_TOKEN_ADDRESS !== ZERO_ADDRESS
+        ? NOUNV2_TOKEN_ADDRESS
+        : undefined
+      : NOUNS_TOKEN_MAINNET,
+    isV2 ? V2_TRAIT_COUNTS_FALLBACK : V1_TRAIT_COUNTS_FALLBACK,
+    true,
+  );
+  const [hashes, setHashes] = useState<Map<number, Hex>>(new Map());
+  const keyRef = useRef('');
+  const ended = prediction?.auctionEnded === true;
+  const latest = prediction?.block ?? 0;
+  const auctionEnd = prediction?.auctionEnd ?? 0;
+  const nextNounId = prediction?.nextNounId ?? 0;
+
+  useEffect(() => {
+    if (!ended || latest <= 0 || auctionEnd <= 0) return;
+    // A new auction (or DAO): start over
+    const key = `${activeDao}:${nextNounId}`;
+    let known = hashes;
+    if (keyRef.current !== key) {
+      keyRef.current = key;
+      known = new Map();
+      setHashes(known);
+    }
+    const want: number[] = [];
+    for (let b = latest; b > latest - MISSED_MAX && b > 0; b--) if (!known.has(b)) want.push(b);
+    if (want.length === 0) return;
+    const client = getPublicClient(wagmiConfig, { chainId: NOUNS_CHAIN });
+    if (client == null) return;
+    let cancelled = false;
+    void (async () => {
+      const got = new Map<number, Hex>();
+      // A few at a time: free public RPCs rate-limit bursts
+      for (let i = 0; i < want.length && !cancelled; i += 4) {
+        const batch = await Promise.all(
+          want
+            .slice(i, i + 4)
+            .map(b => client.getBlock({ blockNumber: BigInt(b) }).catch(() => null)),
+        );
+        let reachedEnd = false;
+        for (const blk of batch) {
+          if (blk?.hash == null || blk.number == null) continue;
+          // Only blocks after the auction ended (before it, settle reverts)
+          if (Number(blk.timestamp) < auctionEnd) {
+            reachedEnd = true;
+            continue;
+          }
+          got.set(Number(blk.number), blk.hash);
+        }
+        if (reachedEnd) break;
+      }
+      if (cancelled || got.size === 0 || keyRef.current !== key) return;
+      setHashes(prev => {
+        const next = new Map(prev);
+        for (const [b, h] of got) next.set(b, h);
+        // Keep the newest MISSED_MAX
+        const keep = [...next.keys()].sort((a, b) => b - a).slice(0, MISSED_MAX);
+        return new Map(keep.map(b => [b, next.get(b)!]));
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ended, latest, auctionEnd, nextNounId, activeDao]);
+
+  const items = useMemo(() => {
+    if (!ended || nextNounId <= 0) return [];
+    return [...hashes.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([block, hash]) => {
+        const seed = predictSeed(hash, nextNounId, counts, isV2 ? 'v2' : 'v1');
+        const best = !isV2 && allSeeds.length > 0 ? findBestMatch(seed, allSeeds) : null;
+        return {
+          block,
+          nounId: nextNounId,
+          seed,
+          twin: best != null ? { nounId: best.nounId, matches: best.matches } : null,
+        };
+      });
+  }, [hashes, ended, nextNounId, counts, isV2, allSeeds]);
+
+  const sinceEnded = ended
+    ? Math.max(items.length, Math.floor((Date.now() / 1000 - auctionEnd) / BLOCK_SECONDS))
+    : 0;
+  return { items, sinceEnded };
+}
+
 // ─── User-driven settle (crystal ball emoji button) ────────────────────
 //
 // Sends `settleCurrentAndCreateNewAuction()` from the connected wallet to the
@@ -896,7 +1023,13 @@ function useUserSettle(
 
   const v2Configured = NOUNV2_AUCTION_HOUSE_ADDRESS !== ZERO_ADDRESS;
 
-  const auctionEnded = effectivePrediction?.auctionEnded ?? false;
+  // From the end time against the clock, not the payload's flag: a cached
+  // prediction (shown while the chain read is pending or failing) carries
+  // the flag from whenever it was saved, and said "still live" at Noun O'Clock
+  const auctionEnd = effectivePrediction?.auctionEnd ?? 0;
+  const auctionEnded =
+    (effectivePrediction?.auctionEnded ?? false) ||
+    (auctionEnd > 0 && auctionEnd <= Math.floor(Date.now() / 1000));
 
   const disabledReason: string | null = !isConnected
     ? 'Connect wallet'
@@ -912,6 +1045,7 @@ function useUserSettle(
     if (!canSettle) return;
     if (isV2) {
       v2Writer.writeContract({
+        chainId: NOUNS_CHAIN,
         address: NOUNV2_AUCTION_HOUSE_ADDRESS,
         abi: nounV2AuctionHouseAbi,
         functionName: 'settleCurrentAndCreateNewAuction',
@@ -921,7 +1055,7 @@ function useUserSettle(
     }
     // v1 — pre-bound to nounsAuctionHouseAddress[chainId] / nounsAuctionHouseAbi.
     void chainId;
-    v1Writer.writeContract({});
+    v1Writer.writeContract({ chainId: NOUNS_CHAIN });
   }, [canSettle, isV2, v1Writer, v2Writer, chainId]);
 
   return { trigger, txHash, isPending, canSettle, disabledReason };
@@ -1047,6 +1181,7 @@ export default function CrystalBallPage() {
   // the auction tuple directly from the AH contract is more reliable and
   // means the orb keeps working through Railway outages.
   const effectivePrediction = activeDao === 'nounv2' ? nounV2Prediction : nounV1ChainPrediction;
+  const missed = useMissedBlocks(effectivePrediction, activeDao, allSeeds);
 
   // If V2 hasn't been wired to a real auction house address yet, the
   // prediction hook intentionally short-circuits — without a guard here we'd
@@ -1672,6 +1807,13 @@ export default function CrystalBallPage() {
           TWIN MATCHING DISABLED FOR V2 — NO AGGREGATED SEED ENDPOINT YET
         </div>
       )}
+
+      {/* Every block since the auction ended, as the Noun it would have minted */}
+      <MissedBlocks
+        items={missed.items}
+        isV2={activeDao === 'nounv2'}
+        sinceEnded={missed.sinceEnded}
+      />
 
       {/* Settle pulse animation */}
       <style>{`
