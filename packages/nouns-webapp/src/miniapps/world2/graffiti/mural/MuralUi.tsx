@@ -486,6 +486,10 @@ export function MuralUi({ game }: { game: Game }) {
       game.mural.zoom(Math.exp(-e.deltaY * k), e.clientX, e.clientY);
     };
     const noMenu = (e: Event) => e.preventDefault();
+    // Only on the wall itself: on a button it would swallow the tap's click
+    const noTouch = (e: Event) => {
+      if (e.target === el) e.preventDefault();
+    };
     const blur = () => cls.reset();
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
@@ -495,7 +499,7 @@ export function MuralUi({ game }: { game: Game }) {
     el.addEventListener('wheel', wheel, { passive: false });
     el.addEventListener('contextmenu', noMenu);
     // iPadOS: no magnifier / selection / scroll from a held touch
-    el.addEventListener('touchstart', noMenu, { passive: false });
+    el.addEventListener('touchstart', noTouch, { passive: false });
     window.addEventListener('blur', blur);
     return () => {
       cls.reset();
@@ -507,7 +511,7 @@ export function MuralUi({ game }: { game: Game }) {
       el.removeEventListener('pointerleave', leave);
       el.removeEventListener('wheel', wheel);
       el.removeEventListener('contextmenu', noMenu);
-      el.removeEventListener('touchstart', noMenu);
+      el.removeEventListener('touchstart', noTouch);
       window.removeEventListener('blur', blur);
     };
   }, [game, ms.active]);
@@ -840,7 +844,7 @@ body[data-w2select] .mu-enter, body[data-camp-intro] .mu-enter { display: none; 
   background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
 .mu-knob-h { top: 50%; background: transparent; }
 .mu-row { display: flex; gap: 8px; align-items: center; }
-.mu-hex { flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid rgba(255,255,255,.2);
+.mu-hex { flex: 1; min-width: 0; min-height: 44px; border-radius: 12px; border: 1px solid rgba(255,255,255,.2);
   background: rgba(0,0,0,.4); color: #fff; padding: 0 10px; font: 600 15px ui-monospace, Menlo, monospace;
   text-transform: uppercase; }
 .mu-sw-row { display: flex; gap: 6px; flex-wrap: wrap; }
