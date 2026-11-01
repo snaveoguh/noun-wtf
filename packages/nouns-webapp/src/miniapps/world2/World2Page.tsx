@@ -1,6 +1,6 @@
 // ── Noun World v2 — skate the plaza as your Noun ───────────────────────
 
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router';
 
@@ -223,9 +223,11 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   }, [game, phase, audioOn, searchParams]);
   // A plain /world load (no deep link, no `?spawn=plaza`): everyone wakes
   // up in NOUNS CAMP, the condemned penthouse (world/camp). Once per page
-  // load; if CAMP isn't there the plaza spawn stands.
+  // load; if CAMP isn't there the plaza spawn stands. A layout effect: it
+  // wakes before the browser paints the first frame of play, so the plaza
+  // spawn behind the select never shows for a frame first.
   const wokeUp = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!game || !started || wokeUp.current) return;
     if (!firstSpawnInCamp(`?${searchParams.toString()}`)) return;
     const tryWake = () => {
