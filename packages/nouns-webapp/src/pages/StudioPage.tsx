@@ -27,6 +27,8 @@ import { TraitPreview, type LayerVisibility } from '@/components/Studio/TraitPre
 import { traitName } from '@/lib/traitName';
 import { INounSeed } from '@/wrappers/nounToken';
 
+import styles from './StudioPage.module.css';
+
 // ── Types ──
 type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'select';
 
@@ -181,7 +183,6 @@ const StudioPage: FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [pixelSize, setPixelSize] = useState(20);
 
   // Layer visibility
@@ -206,24 +207,6 @@ const StudioPage: FC = () => {
   useEffect(() => {
     setSavedTraits(loadSavedTraits());
   }, []);
-
-  // Center canvas on mount and resize
-  useEffect(() => {
-    const updateCenter = () => {
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const canvasW = GRID_SIZE * pixelSize;
-      const canvasH = GRID_SIZE * pixelSize;
-      setCanvasOffset({
-        x: Math.max(0, (rect.width - canvasW) / 2),
-        y: Math.max(0, (rect.height - canvasH) / 2),
-      });
-    };
-    updateCenter();
-    window.addEventListener('resize', updateCenter);
-    return () => window.removeEventListener('resize', updateCenter);
-  }, [pixelSize]);
 
   // Trait options
   const traitOptions = useMemo(
@@ -319,12 +302,7 @@ const StudioPage: FC = () => {
         ch - (selection.y + selection.h) * pixelSize,
       );
       // Left
-      ctx.fillRect(
-        0,
-        selection.y * pixelSize,
-        selection.x * pixelSize,
-        selection.h * pixelSize,
-      );
+      ctx.fillRect(0, selection.y * pixelSize, selection.x * pixelSize, selection.h * pixelSize);
       // Right
       ctx.fillRect(
         (selection.x + selection.w) * pixelSize,
@@ -341,7 +319,7 @@ const StudioPage: FC = () => {
 
   // Pixel coords from mouse event
   const getPixelCoords = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    (e: { clientX: number; clientY: number }) => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
       const rect = canvas.getBoundingClientRect();
@@ -405,10 +383,13 @@ const StudioPage: FC = () => {
     [activeTool, activeColor, floodFill, history.present],
   );
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       const coords = getPixelCoords(e);
       if (!coords) return;
+      // keep the stroke going if a finger or the mouse slides off the canvas
+      e.currentTarget.setPointerCapture?.(e.pointerId);
 
       if (activeTool === 'select') {
         setSelectStart(coords);
@@ -422,8 +403,8 @@ const StudioPage: FC = () => {
     [getPixelCoords, activeTool, handleAction],
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       const coords = getPixelCoords(e);
       if (!coords) return;
 
@@ -443,7 +424,7 @@ const StudioPage: FC = () => {
     [getPixelCoords, activeTool, selectStart, isDrawing, handleAction],
   );
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsDrawing(false);
     if (activeTool === 'select') {
       setSelectStart(null);
@@ -574,23 +555,72 @@ const StudioPage: FC = () => {
   // Nouns palette colors
   const nounsPalette = useMemo(() => ImageData.palette.map(hex => `#${hex}`), []);
   const extraColors = [
-    '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00',
-    '#ff00ff', '#00ffff', '#ff8800', '#8800ff', '#888888', '#cccccc',
+    '#000000',
+    '#ffffff',
+    '#ff0000',
+    '#00ff00',
+    '#0000ff',
+    '#ffff00',
+    '#ff00ff',
+    '#00ffff',
+    '#ff8800',
+    '#8800ff',
+    '#888888',
+    '#cccccc',
   ];
   const allColors = useMemo(() => [...new Set([...extraColors, ...nounsPalette])], [nounsPalette]);
 
   const canvasW = GRID_SIZE * pixelSize;
-  const canvasH = GRID_SIZE * pixelSize;
+
+  const layers: [
+    keyof LayerVisibility,
+    string,
+    number,
+    (v: number) => void,
+    { value: number; label: string }[],
+  ][] = [
+    [
+      'background',
+      'BG',
+      previewSeed.background,
+      v => setPreviewSeed(s => ({ ...s, background: v })),
+      ImageData.bgcolors.map((_, i) => ({ value: i, label: i === 0 ? 'Cool' : 'Warm' })),
+    ],
+    [
+      'head',
+      'Head',
+      previewSeed.head,
+      v => setPreviewSeed(s => ({ ...s, head: v })),
+      traitOptions.heads.map(t => ({ value: t.index, label: t.name })),
+    ],
+    [
+      'body',
+      'Body',
+      previewSeed.body,
+      v => setPreviewSeed(s => ({ ...s, body: v })),
+      traitOptions.bodies.map(t => ({ value: t.index, label: t.name })),
+    ],
+    [
+      'accessory',
+      'Acc',
+      previewSeed.accessory,
+      v => setPreviewSeed(s => ({ ...s, accessory: v })),
+      traitOptions.accessories.map(t => ({ value: t.index, label: t.name })),
+    ],
+    [
+      'glasses',
+      'Nog',
+      previewSeed.glasses,
+      v => setPreviewSeed(s => ({ ...s, glasses: v })),
+      traitOptions.glasses.map(t => ({ value: t.index, label: t.name })),
+    ],
+  ];
 
   return (
     <div
       ref={containerRef}
+      className={styles.root}
       style={{
-        position: 'relative',
-        width: '100%',
-        height: 'calc(100vh - 73px)',
-        overflow: 'hidden',
-        background: '#2a2a2a',
         cursor:
           activeTool === 'eyedropper'
             ? 'crosshair'
@@ -601,450 +631,204 @@ const StudioPage: FC = () => {
                 : 'default',
       }}
     >
-      {/* ─── Main canvas ─── */}
-      <canvas
-        ref={canvasRef}
-        width={canvasW}
-        height={canvasH}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => {
-          setIsDrawing(false);
-          if (activeTool === 'select') setSelectStart(null);
-        }}
-        style={{
-          position: 'absolute',
-          left: canvasOffset.x,
-          top: canvasOffset.y,
-          width: canvasW,
-          height: canvasH,
-          imageRendering: 'pixelated',
-          boxShadow: '0 0 40px rgba(0,0,0,0.5)',
-          borderRadius: '4px',
-        }}
-      />
-
       {/* ─── Top toolbar ─── */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 12,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(8px)',
-          padding: '6px 10px',
-          borderRadius: '12px',
-          boxShadow: '0 2px 20px rgba(0,0,0,0.2)',
-          zIndex: 10,
-        }}
-      >
+      <div className={`${styles.panel} ${styles.tools}`} role="toolbar" aria-label="Drawing tools">
         {/* Drawing tools */}
-        {(
-          [
-            ['pencil', Pencil, 'Pencil (B)'],
-            ['eraser', Eraser, 'Eraser (E)'],
-            ['fill', PaintBucket, 'Fill (G)'],
-            ['eyedropper', Pipette, 'Eyedropper (I)'],
-            ['select', Crop, 'Select area (S)'],
-          ] as const
-        ).map(([tool, Icon, label]) => (
+        <div className={styles.toolGroup}>
+          {(
+            [
+              ['pencil', Pencil, 'Pencil (B)'],
+              ['eraser', Eraser, 'Eraser (E)'],
+              ['fill', PaintBucket, 'Fill (G)'],
+              ['eyedropper', Pipette, 'Eyedropper (I)'],
+              ['select', Crop, 'Select area (S)'],
+            ] as const
+          ).map(([tool, Icon, label]) => (
+            <button
+              key={tool}
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => setActiveTool(tool)}
+              title={label}
+              aria-label={label}
+              aria-pressed={activeTool === tool}
+              style={{
+                background: activeTool === tool ? '#7c3aed' : 'transparent',
+                color: activeTool === tool ? '#fff' : '#333',
+              }}
+            >
+              <Icon style={{ width: 16, height: 16 }} />
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.sep} />
+
+        <div className={styles.toolGroup}>
+          {/* Undo / Redo */}
           <button
-            key={tool}
-            onClick={() => setActiveTool(tool)}
-            title={label}
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => dispatch({ type: 'UNDO' })}
+            disabled={history.past.length === 0}
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
             style={{
-              width: 34,
-              height: 34,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-              border: 'none',
-              background: activeTool === tool ? '#7c3aed' : 'transparent',
-              color: activeTool === tool ? '#fff' : '#333',
-              cursor: 'pointer',
-              transition: 'all 0.1s',
+              color: history.past.length === 0 ? '#ccc' : '#333',
+              cursor: history.past.length === 0 ? 'default' : 'pointer',
             }}
           >
-            <Icon style={{ width: 16, height: 16 }} />
+            <RotateCcw style={{ width: 16, height: 16 }} />
           </button>
-        ))}
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => dispatch({ type: 'REDO' })}
+            disabled={history.future.length === 0}
+            title="Redo (Ctrl+Y)"
+            aria-label="Redo"
+            style={{
+              color: history.future.length === 0 ? '#ccc' : '#333',
+              cursor: history.future.length === 0 ? 'default' : 'pointer',
+            }}
+          >
+            <RotateCw style={{ width: 16, height: 16 }} />
+          </button>
 
-        <div style={{ width: 1, height: 24, background: '#ddd', margin: '0 4px' }} />
+          <div className={styles.sep} />
 
-        {/* Undo / Redo */}
-        <button
-          onClick={() => dispatch({ type: 'UNDO' })}
-          disabled={history.past.length === 0}
-          title="Undo (Ctrl+Z)"
-          style={{
-            width: 34,
-            height: 34,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'transparent',
-            color: history.past.length === 0 ? '#ccc' : '#333',
-            cursor: history.past.length === 0 ? 'default' : 'pointer',
+          <button
+            type="button"
+            className={styles.toolBtn}
+            onClick={() => dispatch({ type: 'CLEAR' })}
+            title="Clear canvas"
+            aria-label="Clear canvas"
+            style={{ color: '#ef4444' }}
+          >
+            <Trash2 style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+
+        <div className={styles.sep} />
+
+        <div className={styles.toolGroup}>
+          {/* Active color swatch */}
+          <button
+            type="button"
+            className={styles.swatch}
+            style={{
+              background:
+                activeColor ||
+                'repeating-conic-gradient(#e8e8e8 0% 25%, #c8c8c8 0% 50%) 50% / 8px 8px',
+            }}
+            onClick={() => setShowPalette(p => !p)}
+            title="Toggle color palette"
+            aria-label="Toggle color palette"
+            aria-expanded={showPalette}
+          />
+
+          <div className={styles.sep} />
+
+          {/* Zoom */}
+          <label className={styles.zoom} title="Zoom (Ctrl+scroll)">
+            <span className={styles.zoomLabel}>{pixelSize}px</span>
+            <input
+              type="range"
+              className={styles.zoomRange}
+              min={8}
+              max={40}
+              step={2}
+              value={pixelSize}
+              onChange={e => setPixelSize(Number(e.target.value))}
+              aria-label="Zoom"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* ─── Main canvas ─── */}
+      <div className={styles.stage}>
+        <canvas
+          ref={canvasRef}
+          className={styles.canvas}
+          width={canvasW}
+          height={canvasW}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onPointerLeave={e => {
+            if (e.currentTarget.hasPointerCapture?.(e.pointerId)) return;
+            setIsDrawing(false);
+            if (activeTool === 'select') setSelectStart(null);
           }}
-        >
-          <RotateCcw style={{ width: 16, height: 16 }} />
-        </button>
-        <button
-          onClick={() => dispatch({ type: 'REDO' })}
-          disabled={history.future.length === 0}
-          title="Redo (Ctrl+Y)"
-          style={{
-            width: 34,
-            height: 34,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'transparent',
-            color: history.future.length === 0 ? '#ccc' : '#333',
-            cursor: history.future.length === 0 ? 'default' : 'pointer',
-          }}
-        >
-          <RotateCw style={{ width: 16, height: 16 }} />
-        </button>
-
-        <div style={{ width: 1, height: 24, background: '#ddd', margin: '0 4px' }} />
-
-        <button
-          onClick={() => dispatch({ type: 'CLEAR' })}
-          title="Clear canvas"
-          style={{
-            width: 34,
-            height: 34,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'transparent',
-            color: '#ef4444',
-            cursor: 'pointer',
-          }}
-        >
-          <Trash2 style={{ width: 16, height: 16 }} />
-        </button>
-
-        <div style={{ width: 1, height: 24, background: '#ddd', margin: '0 4px' }} />
-
-        {/* Active color swatch */}
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: '6px',
-            border: '2px solid #333',
-            background: activeColor || 'repeating-conic-gradient(#e8e8e8 0% 25%, #c8c8c8 0% 50%) 50% / 8px 8px',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-          onClick={() => setShowPalette(p => !p)}
-          title="Toggle color palette"
-        />
-
-        <div style={{ width: 1, height: 24, background: '#ddd', margin: '0 4px' }} />
-
-        {/* Zoom display */}
-        <span
-          style={{
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            color: '#666',
-            whiteSpace: 'nowrap',
-            userSelect: 'none',
-          }}
-        >
-          {pixelSize}px
-        </span>
-        <input
-          type="range"
-          min={8}
-          max={40}
-          step={2}
-          value={pixelSize}
-          onChange={e => setPixelSize(Number(e.target.value))}
-          style={{ width: 60 }}
-          title="Zoom (Ctrl+scroll)"
+          style={{ '--canvas-size': `${canvasW}px` } as React.CSSProperties}
         />
       </div>
 
-      {/* ─── Color palette (bottom) ─── */}
+      {/* ─── Color palette ─── */}
       {showPalette && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 12,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(8px)',
-            padding: '8px 12px',
-            borderRadius: '12px',
-            boxShadow: '0 2px 20px rgba(0,0,0,0.2)',
-            zIndex: 10,
-            maxWidth: '90vw',
-          }}
-        >
-          <div
-            style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', justifyContent: 'center' }}
-          >
+        <div className={`${styles.panel} ${styles.palette}`}>
+          <div className={styles.swatches}>
             {/* Transparent */}
             <button
+              type="button"
+              className={styles.color}
               onClick={() => setActiveColor('')}
               style={{
-                width: 22,
-                height: 22,
-                borderRadius: '4px',
                 border: activeColor === '' ? '2px solid #7c3aed' : '1px solid #ccc',
                 background:
                   'repeating-conic-gradient(#e8e8e8 0% 25%, #c8c8c8 0% 50%) 50% / 6px 6px',
-                cursor: 'pointer',
               }}
               title="Transparent"
+              aria-label="Transparent"
             />
             {allColors.slice(0, 64).map((color, i) => (
               <button
                 key={`${color}-${i}`}
+                type="button"
+                className={styles.color}
                 onClick={() => setActiveColor(color)}
                 style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: '4px',
                   border: activeColor === color ? '2px solid #7c3aed' : '1px solid rgba(0,0,0,0.1)',
                   background: color,
-                  cursor: 'pointer',
                 }}
                 title={color}
+                aria-label={color}
               />
             ))}
             <input
               type="color"
+              className={styles.color}
               value={activeColor || '#000000'}
               onChange={e => setActiveColor(e.target.value)}
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: '4px',
-                border: '1px solid transparent',
-                cursor: 'pointer',
-                padding: 0,
-              }}
+              style={{ border: '1px solid transparent' }}
               title="Custom color"
+              aria-label="Custom color"
             />
           </div>
         </div>
       )}
 
-      {/* ─── Noun preview (top-right) ─── */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 12,
-          right: 12,
-          zIndex: 10,
-        }}
-      >
-        <button
-          onClick={() => setShowPreview(p => !p)}
-          style={{
-            background: 'var(--theme-glass)',
-            backdropFilter: 'blur(8px)',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '4px 8px',
-            cursor: 'pointer',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            color: '#666',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            marginBottom: showPreview ? '8px' : 0,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-          }}
-        >
-          {showPreview ? <ChevronUp style={{ width: 12, height: 12 }} /> : <ChevronDown style={{ width: 12, height: 12 }} />}
-          PREVIEW
-        </button>
-
-        {showPreview && (
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(8px)',
-              borderRadius: '12px',
-              padding: '10px',
-              boxShadow: '0 2px 20px rgba(0,0,0,0.2)',
-              width: 200,
-            }}
-          >
-            <div
-              style={{
-                borderRadius: '8px',
-                overflow: 'hidden',
-                background: layerVisibility.background
-                  ? `#${ImageData.bgcolors[previewSeed.background]}`
-                  : 'repeating-conic-gradient(#e8e8e8 0% 25%, #c8c8c8 0% 50%) 50% / 12px 12px',
-              }}
-            >
-              <TraitPreview
-                seed={previewSeed}
-                customPixels={history.present}
-                layerVisibility={layerVisibility}
-                className="w-full"
-              />
-            </div>
-
-            <button
-              onClick={randomizeSeed}
-              style={{
-                width: '100%',
-                marginTop: '6px',
-                padding: '4px',
-                borderRadius: '6px',
-                border: '1px solid transparent',
-                background: 'var(--theme-surface)',
-                cursor: 'pointer',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                color: '#666',
-              }}
-            >
-              <Dice5 style={{ width: 12, height: 12 }} /> RANDOMIZE
-            </button>
-
-            {/* Layer visibility toggles with trait selectors */}
-            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              {(
-                [
-                  ['background', 'BG', null, previewSeed.background, (v: number) => setPreviewSeed(s => ({ ...s, background: v })), ImageData.bgcolors.map((_, i) => ({ value: i, label: i === 0 ? 'Cool' : 'Warm' }))],
-                  ['head', 'Head', 'heads', previewSeed.head, (v: number) => setPreviewSeed(s => ({ ...s, head: v })), traitOptions.heads.map(t => ({ value: t.index, label: t.name }))],
-                  ['body', 'Body', 'bodies', previewSeed.body, (v: number) => setPreviewSeed(s => ({ ...s, body: v })), traitOptions.bodies.map(t => ({ value: t.index, label: t.name }))],
-                  ['accessory', 'Acc', 'accessories', previewSeed.accessory, (v: number) => setPreviewSeed(s => ({ ...s, accessory: v })), traitOptions.accessories.map(t => ({ value: t.index, label: t.name }))],
-                  ['glasses', 'Nog', 'glasses', previewSeed.glasses, (v: number) => setPreviewSeed(s => ({ ...s, glasses: v })), traitOptions.glasses.map(t => ({ value: t.index, label: t.name }))],
-                ] as [keyof LayerVisibility, string, string | null, number, (v: number) => void, { value: number; label: string }[]][]
-              ).map(([layer, label, _key, value, onChange, options]) => (
-                <div key={layer} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <button
-                    onClick={() => toggleLayer(layer)}
-                    title={`Toggle ${label} visibility`}
-                    style={{
-                      width: 22,
-                      height: 22,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '4px',
-                      border: 'none',
-                      background: layerVisibility[layer] ? 'transparent' : 'rgba(239,68,68,0.1)',
-                      color: layerVisibility[layer] ? '#666' : '#ef4444',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {layerVisibility[layer] ? (
-                      <Eye style={{ width: 12, height: 12 }} />
-                    ) : (
-                      <EyeOff style={{ width: 12, height: 12 }} />
-                    )}
-                  </button>
-                  <select
-                    value={value}
-                    onChange={e => onChange(Number(e.target.value))}
-                    style={{
-                      flex: 1,
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      border: '1px solid transparent',
-                      borderRadius: '4px',
-                      padding: '2px 4px',
-                      background: 'var(--theme-surface)',
-                      cursor: 'pointer',
-                      color: layerVisibility[layer] ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)',
-                      minWidth: 0,
-                    }}
-                  >
-                    {options.map(opt => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* ─── Left panel: Save/Export/Gallery ─── */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 12,
-          left: 12,
-          zIndex: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px',
-        }}
-      >
+      <div className={styles.side}>
         {/* Trait name & type */}
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: '12px',
-            padding: '8px 10px',
-            boxShadow: '0 2px 20px rgba(0,0,0,0.2)',
-            width: 180,
-          }}
-        >
+        <div className={`${styles.panel} ${styles.traitCard}`}>
           <input
             type="text"
+            className={styles.field}
             value={traitName_}
             onChange={e => setTraitName(e.target.value)}
             placeholder="Trait name..."
-            style={{
-              width: '100%',
-              border: '1px solid transparent',
-              borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              marginBottom: '4px',
-            }}
+            aria-label="Trait name"
+            style={{ marginBottom: '4px' }}
           />
           <select
+            className={styles.field}
             value={traitType}
             onChange={e => setTraitType(e.target.value)}
-            style={{
-              width: '100%',
-              border: '1px solid transparent',
-              borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              marginBottom: '6px',
-              cursor: 'pointer',
-            }}
+            aria-label="Trait type"
+            style={{ marginBottom: '6px', cursor: 'pointer' }}
           >
             <option value="head">Head</option>
             <option value="body">Body</option>
@@ -1052,13 +836,8 @@ const StudioPage: FC = () => {
             <option value="glasses">Glasses</option>
           </select>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            <ToolButton
-              icon={Save}
-              label="Save"
-              onClick={handleSave}
-              disabled={!hasPixels}
-            />
+          <div className={styles.actions}>
+            <ToolButton icon={Save} label="Save" onClick={handleSave} disabled={!hasPixels} />
             <ToolButton
               icon={Download}
               label={selection ? 'Export sel.' : 'Export PNG'}
@@ -1100,7 +879,9 @@ const StudioPage: FC = () => {
               {selection.w}×{selection.h}px @ ({selection.x},{selection.y})
             </span>
             <button
+              type="button"
               onClick={() => setSelection(null)}
+              aria-label="Clear selection"
               style={{
                 background: 'none',
                 border: 'none',
@@ -1116,18 +897,7 @@ const StudioPage: FC = () => {
 
         {/* Gallery */}
         {showGallery && (
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(8px)',
-              borderRadius: '12px',
-              padding: '8px 10px',
-              boxShadow: '0 2px 20px rgba(0,0,0,0.2)',
-              width: 180,
-              maxHeight: '40vh',
-              overflowY: 'auto',
-            }}
-          >
+          <div className={`${styles.panel} ${styles.gallery}`}>
             <div
               style={{
                 fontSize: '0.75rem',
@@ -1145,80 +915,46 @@ const StudioPage: FC = () => {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {savedTraits.map(trait => (
-                  <div
-                    key={trait.id}
-                    onClick={() => handleLoad(trait)}
-                    style={{
-                      cursor: 'pointer',
-                      borderRadius: '6px',
-                      border: '1px solid transparent',
-                      padding: '4px',
-                      textAlign: 'center',
-                      position: 'relative',
-                      transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = 'var(--theme-bg-hover)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = 'transparent';
-                    }}
-                  >
-                    {trait.thumbnail && (
-                      <img
-                        src={trait.thumbnail}
-                        alt={trait.name}
-                        style={{
-                          width: 48,
-                          height: 48,
-                          imageRendering: 'pixelated',
-                          margin: '0 auto',
-                          display: 'block',
-                          borderRadius: '4px',
-                        }}
-                      />
-                    )}
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        marginTop: '2px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {trait.name}
-                    </div>
+                  <div key={trait.id} className={styles.galleryItem}>
                     <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleDelete(trait.id);
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: -4,
-                        right: -4,
-                        width: 16,
-                        height: 16,
-                        borderRadius: '50%',
-                        background: '#ef4444',
-                        color: '#fff',
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        opacity: 0,
-                        transition: 'opacity 0.1s',
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.opacity = '1';
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.opacity = '0';
-                      }}
+                      type="button"
+                      className={styles.galleryLoad}
+                      onClick={() => handleLoad(trait)}
+                      title={`Load ${trait.name}`}
+                    >
+                      {trait.thumbnail && (
+                        <img
+                          src={trait.thumbnail}
+                          alt={trait.name}
+                          style={{
+                            width: 48,
+                            height: 48,
+                            imageRendering: 'pixelated',
+                            margin: '0 auto',
+                            display: 'block',
+                            borderRadius: '4px',
+                          }}
+                        />
+                      )}
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          marginTop: '2px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {trait.name}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.galleryDelete}
+                      onClick={() => handleDelete(trait.id)}
+                      aria-label={`Delete ${trait.name}`}
+                      title="Delete"
                     >
                       ×
                     </button>
@@ -1230,31 +966,95 @@ const StudioPage: FC = () => {
         )}
       </div>
 
-      {/* ─── Bottom-right: keyboard hints ─── */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 12,
-          right: 12,
-          zIndex: 5,
-          background: 'rgba(0,0,0,0.4)',
-          borderRadius: '8px',
-          padding: '6px 10px',
-          color: 'rgba(255,255,255,0.5)',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          lineHeight: 1.8,
-        }}
-      >
+      {/* ─── Noun preview ─── */}
+      <div className={styles.preview}>
+        <button
+          type="button"
+          className={styles.previewToggle}
+          onClick={() => setShowPreview(p => !p)}
+          aria-expanded={showPreview}
+        >
+          {showPreview ? (
+            <ChevronUp style={{ width: 12, height: 12 }} />
+          ) : (
+            <ChevronDown style={{ width: 12, height: 12 }} />
+          )}
+          PREVIEW
+        </button>
+
+        {showPreview && (
+          <div className={`${styles.panel} ${styles.previewCard}`}>
+            <div
+              style={{
+                borderRadius: '8px',
+                overflow: 'hidden',
+                background: layerVisibility.background
+                  ? `#${ImageData.bgcolors[previewSeed.background]}`
+                  : 'repeating-conic-gradient(#e8e8e8 0% 25%, #c8c8c8 0% 50%) 50% / 12px 12px',
+              }}
+            >
+              <TraitPreview
+                seed={previewSeed}
+                customPixels={history.present}
+                layerVisibility={layerVisibility}
+                className="w-full"
+              />
+            </div>
+
+            <button type="button" className={styles.previewBtn} onClick={randomizeSeed}>
+              <Dice5 style={{ width: 12, height: 12 }} /> RANDOMIZE
+            </button>
+
+            {/* Layer visibility toggles with trait selectors */}
+            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              {layers.map(([layer, label, value, onChange, options]) => (
+                <div key={layer} className={styles.layerRow}>
+                  <button
+                    type="button"
+                    className={styles.eye}
+                    onClick={() => toggleLayer(layer)}
+                    title={`Toggle ${label} visibility`}
+                    aria-label={`Toggle ${label} visibility`}
+                    aria-pressed={!layerVisibility[layer]}
+                    style={{
+                      background: layerVisibility[layer] ? 'transparent' : 'rgba(239,68,68,0.1)',
+                      color: layerVisibility[layer] ? '#666' : '#ef4444',
+                    }}
+                  >
+                    {layerVisibility[layer] ? (
+                      <Eye style={{ width: 12, height: 12 }} />
+                    ) : (
+                      <EyeOff style={{ width: 12, height: 12 }} />
+                    )}
+                  </button>
+                  <select
+                    className={styles.layerSelect}
+                    value={value}
+                    onChange={e => onChange(Number(e.target.value))}
+                    aria-label={label}
+                    data-off={layerVisibility[layer] ? undefined : ''}
+                  >
+                    {options.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Keyboard hints ─── */}
+      <div className={styles.hints}>
         <div>
-          <kbd style={kbdStyle}>B</kbd> Pencil{' '}
-          <kbd style={kbdStyle}>E</kbd> Eraser{' '}
-          <kbd style={kbdStyle}>G</kbd> Fill{' '}
-          <kbd style={kbdStyle}>I</kbd> Pick
+          <kbd style={kbdStyle}>B</kbd> Pencil <kbd style={kbdStyle}>E</kbd> Eraser{' '}
+          <kbd style={kbdStyle}>G</kbd> Fill <kbd style={kbdStyle}>I</kbd> Pick
         </div>
         <div>
-          <kbd style={kbdStyle}>S</kbd> Select{' '}
-          <kbd style={kbdStyle}>Esc</kbd> Deselect{' '}
+          <kbd style={kbdStyle}>S</kbd> Select <kbd style={kbdStyle}>Esc</kbd> Deselect{' '}
           <kbd style={kbdStyle}>⌘Z</kbd> Undo
         </div>
         <div>
@@ -1270,9 +1070,9 @@ function ToolButton({
   icon: Icon,
   label,
   onClick,
-  disabled,
-  active,
-  accent,
+  disabled = false,
+  active = false,
+  accent = false,
 }: {
   icon: FC<{ style?: React.CSSProperties }>;
   label: string;
@@ -1283,22 +1083,16 @@ function ToolButton({
 }) {
   return (
     <button
+      type="button"
+      className={styles.actionBtn}
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={active}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '3px',
-        padding: '3px 8px',
-        borderRadius: '6px',
         border: active ? '1px solid #7c3aed' : '1px solid #ddd',
         background: accent ? '#f0fdf4' : active ? '#f5f3ff' : '#fff',
         color: disabled ? '#ccc' : accent ? '#16a34a' : '#333',
         cursor: disabled ? 'default' : 'pointer',
-        fontSize: '0.75rem',
-        fontWeight: 700,
-        whiteSpace: 'nowrap',
-        transition: 'all 0.1s',
       }}
     >
       <Icon style={{ width: 12, height: 12 }} />

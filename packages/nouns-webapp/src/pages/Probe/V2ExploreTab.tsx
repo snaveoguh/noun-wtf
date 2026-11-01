@@ -85,7 +85,7 @@ function AddressFilterDropdown({
   }, [counts, search]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative @max-sm:static">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -111,7 +111,7 @@ function AddressFilterDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-9 z-50 max-h-64 w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 @sm:right-auto @sm:top-9 @sm:mt-0 @sm:w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
           <input
             type="text"
             placeholder="Search address..."
@@ -370,7 +370,7 @@ const V2ExploreTab: FC = () => {
   return (
     <div>
       {/* Toolbar — mirrors the other probe tabs */}
-      <div className="mb-2 flex flex-wrap items-center gap-2 py-1">
+      <div className="relative mb-2 flex flex-wrap items-center gap-2 py-1">
         <input
           type="number"
           placeholder="Search ID..."
@@ -405,7 +405,7 @@ const V2ExploreTab: FC = () => {
           </button>
 
           {ownerDropdownOpen && (
-            <div className="absolute left-0 top-9 z-50 max-h-64 w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+            <div className="absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 @sm:right-auto @sm:top-9 @sm:mt-0 @sm:w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
               <input
                 type="text"
                 placeholder="Search address..."

@@ -7,7 +7,6 @@ import {
   useReadNounsTreasuryBalancesInUsd,
 } from '@nouns/sdk/react/treasury';
 import clsx from 'clsx';
-import { Col, Row } from 'react-bootstrap';
 import { Link, useSearchParams } from 'react-router';
 import { formatEther, formatUnits } from 'viem';
 
@@ -82,26 +81,14 @@ const GovernancePage = () => {
   return (
     <>
       {/* DAO Tab Bar */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          justifyContent: 'center',
-          padding: '16px 16px 0',
-          flexWrap: 'wrap',
-        }}
-      >
+      <div className={classes.daoTabs} role="tablist" aria-label="DAO">
         <button
+          type="button"
+          role="tab"
+          aria-selected={daoTab === 'nouns'}
           onClick={() => setDao('nouns')}
+          className={classes.daoTab}
           style={{
-            padding: '8px 20px',
-            borderRadius: 20,
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            fontFamily: "'PT Root UI', sans-serif",
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
             background: daoTab === 'nouns' ? '#14141f' : 'var(--theme-bg-card)',
             color: daoTab === 'nouns' ? '#fff' : '#8c8d92',
           }}
@@ -109,41 +96,27 @@ const GovernancePage = () => {
           Nouns DAO
         </button>
         <button
+          type="button"
+          role="tab"
+          aria-selected={daoTab === 'nounv2'}
           onClick={() => setDao('nounv2')}
           aria-label="NounV2"
           title="NounV2"
+          className={clsx(classes.daoTab, classes.daoTabRound)}
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            fontSize: '0.75rem',
-            fontWeight: 800,
-            fontFamily: "'PT Root UI', sans-serif",
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
             background: daoTab === 'nounv2' ? 'var(--theme-negative)' : 'var(--theme-bg-card)',
             color: daoTab === 'nounv2' ? '#fff' : 'var(--theme-negative)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-            flexShrink: 0,
           }}
         >
           V2
         </button>
         <button
+          type="button"
+          role="tab"
+          aria-selected={daoTab === 'yc'}
           onClick={() => setDao('yc')}
+          className={classes.daoTab}
           style={{
-            padding: '8px 20px',
-            borderRadius: 20,
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            fontFamily: "'PT Root UI', sans-serif",
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
             background: daoTab === 'yc' ? '#FFC700' : 'var(--theme-bg-card)',
             color: daoTab === 'yc' ? '#14141f' : '#8c8d92',
           }}
@@ -151,16 +124,12 @@ const GovernancePage = () => {
           Yellow
         </button>
         <button
+          type="button"
+          role="tab"
+          aria-selected={daoTab === 'lil'}
           onClick={() => setDao('lil')}
+          className={classes.daoTab}
           style={{
-            padding: '8px 20px',
-            borderRadius: 20,
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            fontFamily: "'PT Root UI', sans-serif",
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
             background: daoTab === 'lil' ? '#ff638d' : 'var(--theme-bg-card)',
             color: daoTab === 'lil' ? '#fff' : '#8c8d92',
           }}
@@ -172,33 +141,33 @@ const GovernancePage = () => {
       {daoTab === 'nouns' ? (
         <>
           <Section fullWidth={false} className={classes.section}>
-            <Col xs={12} lg={10} className={classes.wrapper}>
-              <Row className={classes.headerRow}>
+            <div className={classes.wrapper}>
+              <div className={classes.headerRow}>
                 <span>
                   <Trans>Governance</Trans>
                 </span>
                 <h1>
                   <Trans>Nouns DAO</Trans>
                 </h1>
-              </Row>
+              </div>
               <p className={classes.subheading}>{subHeading}</p>
 
-              <Row className={classes.treasuryInfoCard}>
-                <Col lg={8} className={classes.treasuryAmtWrapper}>
-                  <Row className={classes.headerRow}>
+              <div className={classes.treasuryInfoCard}>
+                <div className={classes.treasuryAmtWrapper}>
+                  <div className={clsx(classes.headerRow, classes.treasuryHeading)}>
                     <Link to="/nonsense" className={classes.treasuryLink}>
                       <Trans>Treasury</Trans>
                     </Link>
-                  </Row>
-                  <Row>
-                    <Col className={clsx(classes.ethTreasuryAmt)} lg={3}>
+                  </div>
+                  <div className={classes.treasuryAmts}>
+                    <div className={classes.ethTreasuryAmt}>
                       <h1 className={classes.ethSymbol}>Ξ</h1>
                       <h1>
                         {treasuryBalance != undefined &&
                           i18n.number(Number(Number(formatEther(treasuryBalance)).toFixed(0)))}
                       </h1>
-                    </Col>
-                    <Col className={classes.usdTreasuryAmt}>
+                    </div>
+                    <div className={classes.usdTreasuryAmt}>
                       <h1 className={classes.usdBalance}>
                         {treasuryBalanceUSD !== undefined &&
                           i18n.number(Number(formatUnits(treasuryBalanceUSD, 6)), {
@@ -206,10 +175,10 @@ const GovernancePage = () => {
                             currency: 'USD',
                           })}
                       </h1>
-                    </Col>
-                  </Row>
-                </Col>
-                <Col className={classes.treasuryInfoText}>
+                    </div>
+                  </div>
+                </div>
+                <div className={classes.treasuryInfoText}>
                   <Trans>
                     This treasury exists for <span className={classes.boldText}>Nouns DAO</span>{' '}
                     participants to allocate resources for the long-term growth and prosperity of
@@ -218,9 +187,9 @@ const GovernancePage = () => {
                   <Link to="/nonsense" className={classes.treasuryLink}>
                     <Trans>What it holds, where it came from and where it went →</Trans>
                   </Link>
-                </Col>
-              </Row>
-            </Col>
+                </div>
+              </div>
+            </div>
           </Section>
 
           <Proposals proposals={proposals ?? []} nounsRequired={nounsRequired} />

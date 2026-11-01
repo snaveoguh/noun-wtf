@@ -21,6 +21,9 @@ type SortMode = 'recent' | 'sponsors' | 'oldest';
 
 const PAGE_SIZE = 50;
 
+/** 40 px tall on touch screens (pointer, not width). */
+const TOUCH_TARGET = '[@media(pointer:coarse)]:min-h-10';
+
 const CandidatesPage: React.FC = () => {
   // Block-watch so the candidates list re-fetches as new blocks arrive —
   // newly-created candidates appear without a manual reload. The wrapper's
@@ -129,8 +132,11 @@ const CandidatesPage: React.FC = () => {
         <div style={styles.sortButtons}>
           {(['recent', 'sponsors', 'oldest'] as SortMode[]).map(mode => (
             <button
+              type="button"
               key={mode}
+              aria-pressed={sortMode === mode}
               onClick={() => setSortMode(mode)}
+              className={TOUCH_TARGET}
               style={{
                 ...styles.sortBtn,
                 ...(sortMode === mode ? styles.sortBtnActive : {}),
@@ -195,14 +201,19 @@ const CandidatesPage: React.FC = () => {
       {hasMore && <div ref={sentinelRef} style={{ height: 1 }} />}
 
       {/* Stats */}
-      {candidates && candidates.length > 0 && (
+      {candidates !== undefined && candidates.length > 0 && (
         <div style={styles.stats}>
           <span>
             {visibleCandidates.length} of {filteredCandidates.length} candidates
             {filteredCandidates.length < candidates.length && ` (${candidates.length} total)`}
           </span>
           {hasMore && (
-            <button onClick={loadMore} style={styles.loadMoreBtn}>
+            <button
+              type="button"
+              onClick={loadMore}
+              style={styles.loadMoreBtn}
+              className={TOUCH_TARGET}
+            >
               Load more
             </button>
           )}
@@ -214,11 +225,13 @@ const CandidatesPage: React.FC = () => {
 
 // ---- Inline candidate card for the miniapp ----
 
-const CandidateCardMini: React.FC<{
+type CandidateCardMiniProps = {
   candidate: ProposalCandidate;
   threshold: number;
   currentBlock?: bigint;
-}> = ({ candidate, threshold, currentBlock }) => {
+};
+
+function CandidateCardMini({ candidate, threshold, currentBlock }: CandidateCardMiniProps) {
   const signers = candidate.version.content.contentSignatures ?? [];
   const requiredVotes = candidate.requiredVotes || threshold;
 
@@ -232,7 +245,7 @@ const CandidateCardMini: React.FC<{
   const queryAddresses = Array.from(new Set([proposerLower, ...activeSignerIds].filter(Boolean)));
   const { query, variables } = delegateNounsAtBlockQuery(
     queryAddresses,
-    currentBlock ? currentBlock - 1n : 0n,
+    currentBlock !== undefined && currentBlock > 0n ? currentBlock - 1n : 0n,
   );
   const { data: delegateData } = useSubgraphQuery<{
     delegates: { items: Array<{ id: string; delegatedVotes: number }> };
@@ -277,7 +290,7 @@ const CandidateCardMini: React.FC<{
       </div>
     </Link>
   );
-};
+}
 
 // ---- Styles ----
 
@@ -285,7 +298,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     maxWidth: 960,
     margin: '0 auto',
-    padding: '2rem 1.5rem',
+    padding: '2rem clamp(1rem, 5cqi, 1.5rem)',
     fontFamily: "'PT Root UI', sans-serif",
   },
   header: {
@@ -298,7 +311,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     fontFamily: "'Londrina Solid', cursive",
-    fontSize: '2.5rem',
+    fontSize: 'clamp(2rem, 10cqi, 2.5rem)',
     margin: 0,
     lineHeight: 1.1,
   },
@@ -328,8 +341,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   searchInput: {
-    flex: 1,
-    minWidth: 200,
+    flex: '1 1 200px',
+    minWidth: 0,
     padding: '0.6rem 1rem',
     borderRadius: 10,
     border: '1px solid transparent',
@@ -339,6 +352,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sortButtons: {
     display: 'flex',
+    flexWrap: 'wrap',
     gap: '0.5rem',
   },
   sortBtn: {
@@ -399,7 +413,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
     gap: '1rem',
   },
   card: {

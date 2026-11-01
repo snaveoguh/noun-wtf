@@ -16,14 +16,19 @@ and a scan of each route's source. Pick a work unit from the top; follow
 | route | status |
 | --- | --- |
 | `/noun/:id`, `/v2/noun/:id` (Auction) | pilot, 26/26 clean in the last --all run · before/after sheets in `.claude/responsive-shots/noun-2062*/` |
+| `/` (homescreen) | 0/13 → 0/13 clean, severity 21.5 → 13.7 (**partial**) · `claude/responsive-home` (#220), sheets in `.claude/responsive-shots/home/` · after the foundation's shell + harness fixes: **6/13, severity 8** (every phone width clean; `home/after-shell/`). Left at 768+: the full-bleed hero's controls on video (as designed; `data-responsive-art-ok` is the owner's call) and shelf cards under the floating desktop tray |
+| `/probe` | 11/26 → 26/26 clean · `claude/responsive-probe` (#221) |
+| `/studio` | 6/26 → 26/26 clean · `claude/responsive-studio` (#222), sheets in `.claude/responsive-shots/studio/` |
+| `/vote`, `/candidates` (governance lists) | `/vote` 12/26 → 26/26, `/candidates` 22/26 → 26/26 clean (live indexer data) · `claude/responsive-governance` (#223), sheets in `.claude/responsive-shots/{vote,candidates}/` |
+| `/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist` (info) | 82/104 → 104/104 clean · `claude/responsive-info` (#224) |
 
 ## Work units (worst first)
 
-1. `/` — severity 21.5, viewport code 4
-2. `/studio` — severity 12.2, viewport code 0
-3. `/probe` — severity 10.1, viewport code 65
-4. `/vote`, `/candidates` — severity 5.9, viewport code 47 (group: governance)
-5. `/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist` — severity 3.7 (1 not measured), viewport code 4 (group: info)
+1. `/` — severity 21.5, viewport code 4 · **partial: 6/13, severity 8** (phones clean; see Done)
+2. ~~`/studio`~~ — done (see Done)
+3. ~~`/probe`~~ — done (see Done)
+4. ~~`/vote`, `/candidates`~~ — done (see Done)
+5. ~~`/hackathons`, `/nounders`, `/underground`, `/this-page-does-not-exist`~~ — done (see Done)
 6. `/cc0`, `/traits`, `/books/meme-value`, `/terraforms`, `/terraforms/1`, `/pip3` — severity 3.2 (4 not measured), viewport code 32 (group: art)
 7. `/nounv2/1`, `/nounv2/create`, `/nounv2` — severity 0.7, viewport code 48 (group: nounv2)
 8. `/playground` — severity 0.4, viewport code 9
@@ -64,6 +69,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 - element `StudioPage` in `src/pages/StudioPage.tsx` (3 files scanned)
 - components: `Studio`
 - viewport code: 0 (none)
+- **done:** 26/26 clean after (6/26 before). Stacked column below md, trait panel + preview side by side at md, canvas + sidebar at lg, the original floating layout from 1100 px; the canvas fits its column below 1100; pointer events (touch drawing); 40 px targets and a two-row scrolling palette on touch.
 - clean 6/26; worst page@320:35.5, page@360:28.5, page@390:24.5
 - w: 320:16 360:13 390:16 430:16 520:15 640:13 768:14 900:2 1024:2 1280:2 1440:✓ 1920:✓ 2560:✓
 - p: 320:36 360:29 390:25 430:25 520:23 640:22 768:15 900:13 1024:17 1280:11 1440:✓ 1920:✓ 2560:✓
@@ -77,6 +83,7 @@ and a scan of each route's source. Pick a work unit from the top; follow
 
 ### `/probe` — severity 10.1
 
+- **status: done, 11/26 → 26/26 clean** (`claude/responsive-probe`). Tab pills scroll sideways (snap, end fade below lg) instead of overflowing; padding/type `sm:`/`lg:` → `@sm:`/`@lg:`; Dreams grids `@sm:`…`@xl:`; owner/settler/curated menus follow the container (span the filter bar below sm) instead of going `fixed` to the viewport; the terminal prompt shortens to `~$` below sm; 40 px controls on `(pointer: coarse)`; Lils/Borgs grids re-measure on container resize. Left viewport-based on purpose: fixed popovers clamped to `innerWidth`, the fixed 3D overlay canvas, and modals (`DialogContent sm:max-w-*`, `DreamCreatePanel md:flex-row`).
 - route `probe` · navigator window · group explore
 - element `ProbePage` in `src/pages/Probe/ProbePage.tsx` (58 files scanned)
 - components: `BorgDetailPopover`, `BuilderTokenHoverCard`, `DreamDetailPopover`, `LilNounDetailPopover`, `Noun`, `Noun3DCell`, `NounDetailPopover`, `ProbeTerminal`, `Skeleton`, `StandaloneNoun`, `TraitFilterPanel`, `ui`
@@ -103,19 +110,16 @@ and a scan of each route's source. Pick a work unit from the top; follow
   - overflow: `div.container-lg > div.align-items-center.row > div._headerWrapper._forceFlexRow > div._tabs` (w320 w360 w390 w430 p320 p360 p390)
   - small taps: `5 controls` (p320 p360 p390 p430 p520 p640)
 
-### `/hackathons` — severity 3.7
+### `/hackathons` — severity 0 (done)
 
 - route `hackathons` · navigator window · group info
-- element `HackathonPage` in `src/pages/Hackathon/index.tsx` (2 files scanned)
-- components: —
-- viewport code: 1 (@media width 1)
-- clean 16/26; worst window@320:16.6, page@320:13.9, page@360:12.3
-- w: 320:17 360:12 390:11 430:9 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
-- p: 320:14 360:12 390:11 430:10 520:0 640:0 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
-- top issues:
-  - overflow: `div._section > div._linksGrid > a._linkRow > span._linkUrl` (w320 w360 w390 w430 p320 p360 p390 p430)
-  - small taps: `1 controls` (p320 p360 p390 p430 p520 p640)
-  - clipped: `div.nos-page > div._container > div._hero > div._heroAscii` (w320)
+- element `HackathonPage` in `src/pages/Hackathon/index.tsx`
+- viewport code: 0
+- clean 26/26 (before 16/26)
+- w: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
+- p: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
+- fix: below-md rules on `@container page`; the hero is its own container (title `clamp`, ASCII diagram scaled with `cqi` to fit); API rows put the hostname under the text below md; 40 px touch targets on inline links
+- shots: `.claude/responsive-shots/hackathons/{before,after}/`
 
 ### `/cc0` — severity 3.2
 
@@ -144,17 +148,16 @@ and a scan of each route's source. Pick a work unit from the top; follow
 - top issues:
   - overflow: `div.grid.grid-cols-2 > div.flex.h-full > div.flex.flex-1 > h3.text-center.text-sm` (w320 w360 w390 w430 w520)
 
-### `/nounders` — severity 0.7
+### `/nounders` — severity 0 (done)
 
 - route `nounders` · navigator window · group info
-- element `NoundersPage` in `src/pages/Nounders/index.tsx` (11 files scanned)
-- components: —
-- viewport code: 0 (none)
-- clean 20/26; worst page@320:3, page@360:3, page@390:3
+- element `NoundersPage` in `src/pages/Nounders/index.tsx`
+- viewport code: 0
+- clean 26/26 (before 20/26)
 - w: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
-- p: 320:3 360:3 390:3 430:3 520:3 640:3 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
-- top issues:
-  - small taps: `10 controls` (p320 p360 p390 p430 p520 p640)
+- p: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
+- fix: Twitter links are 40 px tall on `pointer: coarse`
+- shots: `.claude/responsive-shots/nounders/{before,after}/`
 
 ### `/nounv2/1` — severity 0.7
 
@@ -265,17 +268,16 @@ and a scan of each route's source. Pick a work unit from the top; follow
 - top issues:
   - small taps: `2 controls` (p320 p360 p390 p430 p520 p640)
 
-### `/underground` — severity 0.1
+### `/underground` — severity 0 (done)
 
 - route `underground` · navigator window · group info
-- element `UndergroundPage` in `src/pages/Underground/index.tsx` (2 files scanned)
-- components: —
-- viewport code: 1 (@media width 1)
-- clean 20/26; worst page@320:0.6, page@360:0.6, page@390:0.6
+- element `UndergroundPage` in `src/pages/Underground/index.tsx`
+- viewport code: 0
+- clean 26/26 (before 20/26)
 - w: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
-- p: 320:1 360:1 390:1 430:1 520:1 640:1 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
-- top issues:
-  - small taps: `2 controls` (p320 p360 p390 p430 p520 p640)
+- p: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
+- fix: below-md rules on `@container page`; footer wraps, its links 40 × 40 px on touch
+- shots: `.claude/responsive-shots/underground/{before,after}/`
 
 ### `/noun/2062` — severity 0
 
@@ -555,9 +557,13 @@ and a scan of each route's source. Pick a work unit from the top; follow
 - components: —
 - viewport code: 0 (none)
 
-### `/this-page-does-not-exist` — severity not measured
+### `/this-page-does-not-exist` — severity 0 (done)
 
 - route `*` · navigator window · group info
-- element `NotFoundPage` in `src/pages/NotFound/index.tsx` (4 files scanned)
-- components: —
-- viewport code: 2 (bootstrap grid 2)
+- element `NotFoundPage` in `src/pages/NotFound/index.tsx`
+- viewport code: 0
+- clean 26/26 (before 26/26)
+- w: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
+- p: 320:✓ 360:✓ 390:✓ 430:✓ 520:✓ 640:✓ 768:✓ 900:✓ 1024:✓ 1280:✓ 1440:✓ 1920:✓ 2560:✓
+- fix: viewport `Col lg=` → container grid: the image stacks over the heading below lg (it sat beside a six-line heading in narrow windows), 1 : 2 from lg as before
+- shots: `.claude/responsive-shots/this-page-does-not-exist/{before,after}/`

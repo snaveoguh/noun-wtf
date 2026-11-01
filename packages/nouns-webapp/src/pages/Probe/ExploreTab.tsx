@@ -83,10 +83,10 @@ function AddressDropdown({
     : label;
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative @max-sm:static">
       <button
         onClick={() => setOpen(!open)}
-        className={`border-border flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm ${value ? 'font-semibold text-black' : 'text-gray-400'}`}
+        className={`border-border flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm [@media(pointer:coarse)]:min-h-10 ${value ? 'font-semibold text-black' : 'text-gray-400'}`}
       >
         <span className="max-w-32 truncate">{loading ? '...' : selectedLabel}</span>
         {value ? (
@@ -104,7 +104,7 @@ function AddressDropdown({
       </button>
 
       {open && (
-        <div className="fixed left-2 right-2 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl sm:absolute sm:left-0 sm:right-auto sm:w-64">
+        <div className="absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-hidden rounded-xl border bg-white shadow-xl @sm:right-auto @sm:w-64">
           <input
             type="text"
             placeholder="Search..."
@@ -125,7 +125,7 @@ function AddressDropdown({
                     setOpen(false);
                     setQuery('');
                   }}
-                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-gray-50"
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-gray-50 [@media(pointer:coarse)]:min-h-10"
                 >
                   <span className="truncate font-medium">
                     {e.ens ?? `${e.address.slice(0, 8)}...${e.address.slice(-4)}`}
@@ -286,7 +286,7 @@ const ExploreTab: React.FC = () => {
       />
 
       {/* Compact filter bar — single row */}
-      <div className="flex flex-wrap items-center gap-2 py-3">
+      <div className="relative flex flex-wrap items-center gap-2 py-3">
         <AddressDropdown
           label="Owner"
           entries={owners}
@@ -314,7 +314,7 @@ const ExploreTab: React.FC = () => {
         <select
           value={sortBy}
           onChange={e => setSortBy(e.target.value as SortOption)}
-          className="border-border rounded-lg border bg-white px-3 py-2 text-sm"
+          className="border-border rounded-lg border bg-white px-3 py-2 text-sm [@media(pointer:coarse)]:min-h-10"
         >
           {sortOptions.map(opt => (
             <option key={opt.value} value={opt.value}>
@@ -327,7 +327,7 @@ const ExploreTab: React.FC = () => {
           variant={view3D ? 'default' : 'outline'}
           size="sm"
           onClick={() => setView3D(!view3D)}
-          className="gap-1"
+          className="gap-1 [@media(pointer:coarse)]:min-h-10"
         >
           <Box className="h-4 w-4" />
           3D
@@ -343,7 +343,7 @@ const ExploreTab: React.FC = () => {
           variant={showTraits ? 'default' : 'outline'}
           size="sm"
           onClick={() => setShowTraits(!showTraits)}
-          className="gap-1"
+          className="gap-1 [@media(pointer:coarse)]:min-h-10"
         >
           <Filter className="h-4 w-4" />
           Traits
@@ -364,7 +364,7 @@ const ExploreTab: React.FC = () => {
               setSettlerAddress('');
               setCuratorAddress('');
             }}
-            className="gap-1 text-red-500"
+            className="gap-1 text-red-500 [@media(pointer:coarse)]:min-h-10"
           >
             <X className="h-4 w-4" /> Clear
           </Button>
