@@ -1,0 +1,121 @@
+{
+ "mode": "loss",
+ "engine": "chromium",
+ "boot": {
+  "quality": "medium",
+  "lite": {
+   "scale": 1.5,
+   "shadows": true,
+   "post": true,
+   "aa": true,
+   "shadowMap": 2048
+  },
+  "weak": false,
+  "buffer": [
+   2160,
+   1350
+  ],
+  "shadowMap": 2048,
+  "diet": null
+ },
+ "samples": [
+  {
+   "at": 28,
+   "name": "boot",
+   "glMB": 541.3,
+   "texMB": 501.5,
+   "rbMB": 28.2,
+   "bufMB": 11.6,
+   "nTex": 135,
+   "canvases": 67,
+   "canvasMB": 85.8,
+   "bitmaps": 69,
+   "bitmapMB": 170.2,
+   "heapMB": 133.9,
+   "tex": 127,
+   "geo": 222,
+   "progs": 62,
+   "rss": {
+    "browser": 198,
+    "zygote": 140,
+    "gpu-process": 807,
+    "utility": 280,
+    "renderer": 873
+   }
+  },
+  {
+   "at": 48,
+   "name": "before-loss",
+   "glMB": 550.6,
+   "texMB": 508.5,
+   "rbMB": 28.2,
+   "bufMB": 13.9,
+   "nTex": 153,
+   "canvases": 64,
+   "canvasMB": 80,
+   "bitmaps": 79,
+   "bitmapMB": 167,
+   "heapMB": 127.7,
+   "tex": 145,
+   "geo": 285,
+   "progs": 68,
+   "rss": {
+    "browser": 202,
+    "zygote": 140,
+    "gpu-process": 1014,
+    "utility": 281,
+    "renderer": 846
+   }
+  },
+  {
+   "at": 82,
+   "name": "after-restore",
+   "glMB": 583.3,
+   "texMB": 536.6,
+   "rbMB": 30.9,
+   "bufMB": 15.8,
+   "nTex": 143,
+   "canvases": 65,
+   "canvasMB": 76.6,
+   "bitmaps": 79,
+   "bitmapMB": 167,
+   "heapMB": 153.2,
+   "tex": 131,
+   "geo": 241,
+   "progs": 50,
+   "rss": {
+    "browser": 201,
+    "zygote": 140,
+    "gpu-process": 944,
+    "utility": 282,
+    "renderer": 898
+   }
+  }
+ ],
+ "errors": [],
+ "lost": {
+  "lost": true,
+  "running": true
+ },
+ "notice": null,
+ "after": {
+  "quality": "medium",
+  "lite": {
+   "scale": 1.25,
+   "shadows": true,
+   "post": true,
+   "aa": true,
+   "shadowMap": 2048
+  },
+  "shadowMap": 2048,
+  "buffer": [
+   1800,
+   1125
+  ]
+ },
+ "restored": {
+  "lost": false,
+  "running": true
+ },
+ "loads": 1
+}

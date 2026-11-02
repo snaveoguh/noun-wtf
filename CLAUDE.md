@@ -215,6 +215,11 @@ A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Andro
   - entering a room builds the floor above on the next frame (still black), and the z-fight pass bins each plane along one axis (byte-identical output);
   - a breaks battle's stage links hidden during the countdown (`warmHidden`, 1.5 s cap).
   - `?perf=quiet`'s snapshot has a `hitchLog`: each frame over 50 ms CPU (or a gap 3× the median), with the systems that ran in it. WebKit (iPad) runs: `.claude/perf-shots/tablet/` (`session.cjs`, `ladder.cjs`).
+- **iPad black screens / crashes (2026-11-02, `.claude/perf-shots/ipad-memory/README.md`):**
+  - A lost WebGL context on any device shows a notice and reloads once (`watchContextLoss` in `render/textureDiet.ts`). For 30 min after, the page boots lighter (`bootsAfterLoss`): phones / tablets on the weak path, desktop High → Medium. A second loss within 2 min stops on a RELOAD button. three's own restore came back with dead textures: the black world, heads gone.
+  - Every non-weak auto-`low` phone / tablet is on the light diet (`textureDiet.light`): uploads capped at 1024 (`LIGHT_CAP`), env map 128, CAMP art at half size, the door-sign canvas freed after upload (`releaseAfterUpload`; only static textures nobody redraws or shares). iPad GL 274 → 213 MB, canvases 129 → 97 MB.
+  - `Game.frame` catches a throwing frame (`core/frameGuard.ts`): it reports once, still draws, and the first error ends the CAMP intro (`camp.abortIntro()`). A throw used to repeat every frame and freeze the canvas (the desktop "freezes on the book").
+  - Measuring GPU memory: `.claude/perf-shots/ipad-memory/glmem.js` (real GL bytes per allocation, named by path from `window.__w2`, plus a canvas census).
 - **Desktop heat (2026-10-28, `.claude/perf-shots/desktop/README.md`):**
   - `render/framePacer.ts` caps `Game.frame` at 60 fps by default (Settings → Frame rate 30 / 60 / max). It drops to 30 while the window is blurred or a menu covers the game (`game.coverGame(reason, opaque)`; an opaque one sets `gfx.hold`). The sim still steps on the interval since the last run frame: a capped 144 Hz screen plays like a 60 Hz one.
   - High draws at 1.5 on Retina (`bootScale`). Settings → Sharp restores 2. The ink thickness follows the render scale.
