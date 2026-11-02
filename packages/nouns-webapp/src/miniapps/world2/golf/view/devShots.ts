@@ -9,6 +9,9 @@
 
 import type { CourseLayout, V3 } from '../contract';
 
+import { toWorld, uYaw } from '../course/site';
+import { golfCourse } from '../course/surface';
+
 export type DevShot = 'mid' | 'top' | 'air' | 'tee1' | 'green' | 'clubhouse' | 'island' | 'noggle' | 'range' | 'entrance';
 
 export interface DevPose {
@@ -101,9 +104,13 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
     }
     case 'entrance':
     default: {
-      // The arch at u = −38 (scenery.ts entrance): in front of it, looking in
-      const s = L.holes[3].teeSpot;
-      return { rider: { ...s, yaw: 0 }, cam: { x: s.x, y: s.y + 6, z: s.z }, look: { x: s.x, y: s.y, z: s.z + 10 } };
+      // The arch at u = −38, v = 40 (scenery.ts entrance): from outside, looking in
+      const a = toWorld(-38, 40, { x: 0, z: 0 });
+      const out = uYaw(-38) + Math.PI;
+      const c = along(a.x, a.z, out, 26, 6);
+      const r = along(a.x, a.z, out, 12, 0);
+      const y = golfCourse().height(a.x, a.z);
+      return { rider: { x: r.x, y, z: r.z, yaw: out + Math.PI }, cam: { x: c.x, y: y + 5, z: c.z }, look: { x: a.x, y: y + 5, z: a.z } };
     }
   }
 }

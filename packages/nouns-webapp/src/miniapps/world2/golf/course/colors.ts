@@ -39,8 +39,8 @@ export function hexLinear(hex: number): Rgb {
 export const LIE_HEX = {
   fairway: 0x74d24c,
   fairway2: 0x5fbd40,
-  green: 0x8be35e,
-  green2: 0x80d955,
+  green: 0x98ec66,
+  green2: 0x8de25d,
   fringe: 0x6cc84a,
   tee: 0x78d550,
   rough: 0x4ea53b,

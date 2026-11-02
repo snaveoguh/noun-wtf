@@ -180,25 +180,42 @@ export function regionDist(r: Region, x: number, z: number): number {
 
 // ── Output buffer ───────────────────────────────────────────────────────
 
+/** A growable typed array (no garbage from number[] growth while building). */
+class Buf<T extends Float32Array | Uint32Array> {
+  n = 0;
+  constructor(public a: T) {}
+  push(...v: number[]) {
+    if (this.n + v.length > this.a.length) {
+      const next = new (this.a.constructor as { new (n: number): T })(Math.max(this.a.length * 2, this.n + v.length));
+      next.set(this.a);
+      this.a = next;
+    }
+    for (let i = 0; i < v.length; i++) this.a[this.n++] = v[i];
+  }
+  done(): T {
+    return this.a.slice(0, this.n) as T;
+  }
+}
+
 class Out {
-  pos: number[] = [];
-  nrm: number[] = [];
-  col: number[] = [];
-  idx: number[] = [];
+  pos = new Buf(new Float32Array(3 * 4096));
+  nrm = new Buf(new Float32Array(3 * 4096));
+  col = new Buf(new Float32Array(3 * 4096));
+  idx = new Buf(new Uint32Array(6 * 4096));
   constructor(
     readonly ox: number,
     readonly oz: number,
   ) {}
   get count() {
-    return this.pos.length / 3;
+    return this.pos.n / 3;
   }
   data(): MeshData {
     return {
-      pos: Float32Array.from(this.pos),
-      nrm: Float32Array.from(this.nrm),
-      col: Float32Array.from(this.col),
+      pos: this.pos.done(),
+      nrm: this.nrm.done(),
+      col: this.col.done(),
       uv: null,
-      idx: Uint32Array.from(this.idx),
+      idx: this.idx.done(),
       count: this.count,
     };
   }
@@ -402,12 +419,12 @@ function* stripRun(
       const d = a + nc;
       const e = d + 1;
       // Pick the winding that faces up
-      const ax = o.pos[a * 3];
-      const az = o.pos[a * 3 + 2];
-      const bx = o.pos[b * 3] - ax;
-      const bz = o.pos[b * 3 + 2] - az;
-      const dx = o.pos[d * 3] - ax;
-      const dz = o.pos[d * 3 + 2] - az;
+      const ax = o.pos.a[a * 3];
+      const az = o.pos.a[a * 3 + 2];
+      const bx = o.pos.a[b * 3] - ax;
+      const bz = o.pos.a[b * 3 + 2] - az;
+      const dx = o.pos.a[d * 3] - ax;
+      const dz = o.pos.a[d * 3 + 2] - az;
       // y of (d − a) × (b − a)
       if (dz * bx - dx * bz > 0) o.idx.push(a, d, b, b, d, e);
       else o.idx.push(a, b, d, b, e, d);

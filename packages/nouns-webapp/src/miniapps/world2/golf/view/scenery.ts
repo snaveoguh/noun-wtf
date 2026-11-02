@@ -479,10 +479,16 @@ export function* sceneryGen(C: GolfCourse, ox: number, oz: number, out: { scener
   yield;
   const flags = flagSet(L, ox, oz);
   yield;
+  // One conversion a step: the solid buffer alone is tens of thousands of vertices
+  const solidData = solid.data();
+  yield;
+  const glassData = glass.data();
+  const signsData = signs.data();
+  yield;
   out.scenery = {
-    solid: solid.data(),
-    glass: glass.data(),
-    signs: signs.data(),
+    solid: solidData,
+    glass: glassData,
+    signs: signsData,
     flags,
     colliders: cols,
   };

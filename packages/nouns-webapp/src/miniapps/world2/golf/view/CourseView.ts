@@ -454,6 +454,7 @@ export class CourseView {
     solid.name = 'golf:scenery';
     solid.castShadow = !low;
     solid.receiveShadow = true;
+    yield;
     const glass = this.mesh(sc.glass, M.glass, this.ox, this.oz);
     glass.name = 'golf:glass';
     glass.renderOrder = 2;

@@ -405,8 +405,11 @@ describe('CourseView', () => {
     expect(v.stats.far).toBe(21);
     expect(v.stats.near).toBeGreaterThan(0);
     expect(v.stats.trees).toBeGreaterThan(100);
-    // Slices stay near the budget (one slice can overrun by its last step)
-    expect(v.stats.maxSliceMs).toBeLessThan(40);
+    // Slices stay near the budget: one can overrun by its last step (~10 ms
+    // here unloaded; generous for a busy test machine), and most are ~3 ms
+    expect(v.stats.maxSliceMs).toBeLessThan(80);
+    const ms = slow.map(s => s[1]).filter(m => m > 0).sort((a, b) => a - b);
+    expect(ms[Math.floor(ms.length / 2)]).toBeLessThan(8);
     cam.position.copy(far);
     v.update(1 / 60, cam, far);
     expect(v.built).toBe(false);
