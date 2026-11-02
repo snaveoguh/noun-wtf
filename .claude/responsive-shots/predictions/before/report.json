@@ -1,0 +1,1687 @@
+{
+  "url": "/predictions",
+  "route": "predictions",
+  "group": "explore",
+  "kind": "page",
+  "label": "before",
+  "generated": "2026-11-01T11:45:08.013Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 3.5,
+    "worst": [
+      "page@360:12",
+      "page@390:12",
+      "page@320:9"
+    ],
+    "clean": 13,
+    "total": 26,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "window",
+      "width": 320,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "2 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "PASS 50%",
+            "px": 5
+          },
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 50%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-320.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 360,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "2 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "PASS 50%",
+            "px": 5
+          },
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 50%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-360.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 390,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "2 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "PASS 50%",
+            "px": 5
+          },
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 50%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-390.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 430,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 17%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-430.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 520,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 17%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-520.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 640,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 17%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-640.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 768,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 17%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-768.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 900,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-900.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1024,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1024.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1280,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1280.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1440,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1440.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1920,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1920.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 2560,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-2560.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 600
+      },
+      "line": "600 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 16,
+            "label": "Lil GIF Value"
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 32,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 32,
+            "label": "Boosting Nounish Art School @esc"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 32,
+            "label": "Nouns × Kismet Closing Party Far"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 16,
+            "label": "Set Auction Reserve Price to 2.8"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 16,
+            "label": "NoggleStar ⌐◨-◨ ⭐"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 32,
+            "label": "Whatever nounish means today - 2"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 32,
+            "label": "V2 Proposal to Gift Noun 586 to "
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 32,
+            "label": "Nouns Artist Residency — 6 Month"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 238,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 55,
+            "h": 22,
+            "label": "‹ Prev"
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 56,
+            "h": 22,
+            "label": "Next ›"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 12,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 600
+      },
+      "line": "1 clipped · 600 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 17%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 16,
+            "label": "Lil GIF Value"
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 32,
+            "label": "Boosting Nounish Art School @esc"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 32,
+            "label": "Nouns × Kismet Closing Party Far"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 16,
+            "label": "Set Auction Reserve Price to 2.8"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 16,
+            "label": "NoggleStar ⌐◨-◨ ⭐"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 32,
+            "label": "Whatever nounish means today - 2"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 16,
+            "label": "V2 Proposal to Gift Noun 586 to "
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 16,
+            "label": "Nouns Artist Residency — 6 Month"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 278,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 55,
+            "h": 22,
+            "label": "‹ Prev"
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 56,
+            "h": 22,
+            "label": "Next ›"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 12,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 600
+      },
+      "line": "1 clipped · 600 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.min-w-0.border-2 > div.mb-2 > div.flex.h-6 > div.flex.items-center",
+            "clipper": "div.grid.gap-4 > div.min-w-0.border-2 > div.mb-2 > div.flex.h-6",
+            "text": "FAIL 17%",
+            "px": 5
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "Lil GIF Value"
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "Boosting Nounish Art School @esc"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 32,
+            "label": "Nouns × Kismet Closing Party Far"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "Set Auction Reserve Price to 2.8"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "NoggleStar ⌐◨-◨ ⭐"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "Whatever nounish means today - 2"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "V2 Proposal to Gift Noun 586 to "
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "Nouns Artist Residency — 6 Month"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 308,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 55,
+            "h": 22,
+            "label": "‹ Prev"
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 56,
+            "h": 22,
+            "label": "Next ›"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 600
+      },
+      "line": "600 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "Lil GIF Value"
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "Boosting Nounish Art School @esc"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 32,
+            "label": "Nouns × Kismet Closing Party Far"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "Set Auction Reserve Price to 2.8"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "NoggleStar ⌐◨-◨ ⭐"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "Whatever nounish means today - 2"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "V2 Proposal to Gift Noun 586 to "
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "Nouns Artist Residency — 6 Month"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 348,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 55,
+            "h": 22,
+            "label": "‹ Prev"
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 56,
+            "h": 22,
+            "label": "Next ›"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 600
+      },
+      "line": "600 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Lil GIF Value"
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Boosting Nounish Art School @esc"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Nouns × Kismet Closing Party Far"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Set Auction Reserve Price to 2.8"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "NoggleStar ⌐◨-◨ ⭐"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Whatever nounish means today - 2"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "V2 Proposal to Gift Noun 586 to "
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Nouns Artist Residency — 6 Month"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 438,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 55,
+            "h": 22,
+            "label": "‹ Prev"
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 56,
+            "h": 22,
+            "label": "Next ›"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 600
+      },
+      "line": "600 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Lil GIF Value"
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.rounded.border > div.flex.items-center > div > button.border.border-[var(--accent-red)]",
+            "w": 63,
+            "h": 22,
+            "label": "Resolve"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Boosting Nounish Art School @esc"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Nouns × Kismet Closing Party Far"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Set Auction Reserve Price to 2.8"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "NoggleStar ⌐◨-◨ ⭐"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Whatever nounish means today - 2"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "V2 Proposal to Gift Noun 586 to "
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Nouns Artist Residency — 6 Month"
+          },
+          {
+            "selector": "div.block.space-y-2 > div.rounded.border > div.mb-2.text-[var(--ink-light)] > a.block.break-words",
+            "w": 558,
+            "h": 16,
+            "label": "Adjust Auction Reserve Price to "
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 55,
+            "h": 22,
+            "label": "‹ Prev"
+          },
+          {
+            "selector": "div.mx-auto.max-w-4xl > section.mb-8.border-t-2 > div.mt-3.flex > button.border.border-[var(--rule)]",
+            "w": 56,
+            "h": 22,
+            "label": "Next ›"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          },
+          {
+            "selector": "div.min-w-0.border-2 > div.mb-3.space-y-1 > div.flex.flex-wrap > a.shrink-0.uppercase",
+            "w": 47,
+            "h": 16,
+            "label": "View →"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 507,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 594,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 676,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 845,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 950,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1267,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 1690,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png"
+      ]
+    }
+  ]
+}

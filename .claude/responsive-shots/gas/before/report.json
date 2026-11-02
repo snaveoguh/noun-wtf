@@ -1,0 +1,1646 @@
+{
+  "url": "/gas",
+  "route": "gas",
+  "group": "stats",
+  "kind": "page",
+  "label": "before",
+  "generated": "2026-11-01T12:26:42.451Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 2.1,
+    "worst": [
+      "page@320:9",
+      "page@360:9",
+      "page@390:9"
+    ],
+    "clean": 20,
+    "total": 26,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "window",
+      "width": 320,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-320.png",
+        "window-320-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 360,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-360.png",
+        "window-360-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 390,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-390.png",
+        "window-390-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 430,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-430.png",
+        "window-430-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 520,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-520.png",
+        "window-520-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 640,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-640.png",
+        "window-640-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 768,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-768.png",
+        "window-768-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 900,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-900.png",
+        "window-900-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1024,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1024.png",
+        "window-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1280,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1280.png",
+        "window-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1440,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1440.png",
+        "window-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1920,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1920.png",
+        "window-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 2560,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-2560.png",
+        "window-2560-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 54
+      },
+      "line": "54 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > select",
+            "w": 182,
+            "h": 31,
+            "label": "All Actions Bidding Settling Pro"
+          },
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > input",
+            "w": 272,
+            "h": 33,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x75ee6eb3d8dacf41ee2e5307090b19"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x83fcfe8ba2fece9578f0bbafed4ebf"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x008c84421da5527f462886cec43d27"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x17beaa158e68ff9225b4c85151831c"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x6f9e3976fa3b5b22761fe5d635e1f0"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x696ed7b26f4b019ceec78dc8b9140a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xf476cd75be8fdd197ae0b466a2ec2a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x32d1a53f6709a03f4b6cf4cb050120"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xd049b3064990869c9f73bd7896271d"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xfd16f84e1f9bb5ec33b52d0133d61f"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xca04e939a0ac0626c4a4299735e353"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x67bace9bbdf3212509a7438ae026c7"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4298e663517593284ad4fe199b2181"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x01db485f57dc000e761b85641f78c9"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4754b7e3dede42d71d6c92978f25f3"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x5efdb6d8c798c2c2bea5b1961982a5"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x91dccaa260cc4616e1a6e6b693db72"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x0a383e69f43bd7cb5476fcedc1df6a"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png",
+        "page-320-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 54
+      },
+      "line": "54 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > select",
+            "w": 182,
+            "h": 31,
+            "label": "All Actions Bidding Settling Pro"
+          },
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > input",
+            "w": 312,
+            "h": 33,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x75ee6eb3d8dacf41ee2e5307090b19"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x83fcfe8ba2fece9578f0bbafed4ebf"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x008c84421da5527f462886cec43d27"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x17beaa158e68ff9225b4c85151831c"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x6f9e3976fa3b5b22761fe5d635e1f0"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x696ed7b26f4b019ceec78dc8b9140a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xf476cd75be8fdd197ae0b466a2ec2a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x32d1a53f6709a03f4b6cf4cb050120"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xd049b3064990869c9f73bd7896271d"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xfd16f84e1f9bb5ec33b52d0133d61f"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xca04e939a0ac0626c4a4299735e353"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x67bace9bbdf3212509a7438ae026c7"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4298e663517593284ad4fe199b2181"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x01db485f57dc000e761b85641f78c9"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4754b7e3dede42d71d6c92978f25f3"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x5efdb6d8c798c2c2bea5b1961982a5"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x91dccaa260cc4616e1a6e6b693db72"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x0a383e69f43bd7cb5476fcedc1df6a"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png",
+        "page-360-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 54
+      },
+      "line": "54 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > select",
+            "w": 182,
+            "h": 31,
+            "label": "All Actions Bidding Settling Pro"
+          },
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > input",
+            "w": 342,
+            "h": 33,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x75ee6eb3d8dacf41ee2e5307090b19"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x83fcfe8ba2fece9578f0bbafed4ebf"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x008c84421da5527f462886cec43d27"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x17beaa158e68ff9225b4c85151831c"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x6f9e3976fa3b5b22761fe5d635e1f0"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x696ed7b26f4b019ceec78dc8b9140a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xf476cd75be8fdd197ae0b466a2ec2a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x32d1a53f6709a03f4b6cf4cb050120"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xd049b3064990869c9f73bd7896271d"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xfd16f84e1f9bb5ec33b52d0133d61f"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xca04e939a0ac0626c4a4299735e353"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x67bace9bbdf3212509a7438ae026c7"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4298e663517593284ad4fe199b2181"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x01db485f57dc000e761b85641f78c9"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4754b7e3dede42d71d6c92978f25f3"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x5efdb6d8c798c2c2bea5b1961982a5"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x91dccaa260cc4616e1a6e6b693db72"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x0a383e69f43bd7cb5476fcedc1df6a"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png",
+        "page-390-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 54
+      },
+      "line": "54 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > select",
+            "w": 182,
+            "h": 31,
+            "label": "All Actions Bidding Settling Pro"
+          },
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > input",
+            "w": 192,
+            "h": 33,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x75ee6eb3d8dacf41ee2e5307090b19"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x83fcfe8ba2fece9578f0bbafed4ebf"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x008c84421da5527f462886cec43d27"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x17beaa158e68ff9225b4c85151831c"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x6f9e3976fa3b5b22761fe5d635e1f0"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x696ed7b26f4b019ceec78dc8b9140a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xf476cd75be8fdd197ae0b466a2ec2a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x32d1a53f6709a03f4b6cf4cb050120"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xd049b3064990869c9f73bd7896271d"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xfd16f84e1f9bb5ec33b52d0133d61f"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xca04e939a0ac0626c4a4299735e353"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x67bace9bbdf3212509a7438ae026c7"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4298e663517593284ad4fe199b2181"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x01db485f57dc000e761b85641f78c9"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4754b7e3dede42d71d6c92978f25f3"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x5efdb6d8c798c2c2bea5b1961982a5"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x91dccaa260cc4616e1a6e6b693db72"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x0a383e69f43bd7cb5476fcedc1df6a"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png",
+        "page-430-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 54
+      },
+      "line": "54 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > select",
+            "w": 182,
+            "h": 31,
+            "label": "All Actions Bidding Settling Pro"
+          },
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > input",
+            "w": 282,
+            "h": 33,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x75ee6eb3d8dacf41ee2e5307090b19"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x83fcfe8ba2fece9578f0bbafed4ebf"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x008c84421da5527f462886cec43d27"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x17beaa158e68ff9225b4c85151831c"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x6f9e3976fa3b5b22761fe5d635e1f0"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x696ed7b26f4b019ceec78dc8b9140a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xf476cd75be8fdd197ae0b466a2ec2a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x32d1a53f6709a03f4b6cf4cb050120"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xd049b3064990869c9f73bd7896271d"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xfd16f84e1f9bb5ec33b52d0133d61f"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xca04e939a0ac0626c4a4299735e353"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x67bace9bbdf3212509a7438ae026c7"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4298e663517593284ad4fe199b2181"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x01db485f57dc000e761b85641f78c9"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4754b7e3dede42d71d6c92978f25f3"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x5efdb6d8c798c2c2bea5b1961982a5"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x91dccaa260cc4616e1a6e6b693db72"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x0a383e69f43bd7cb5476fcedc1df6a"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png",
+        "page-520-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 54
+      },
+      "line": "54 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > select",
+            "w": 182,
+            "h": 31,
+            "label": "All Actions Bidding Settling Pro"
+          },
+          {
+            "selector": "div.nos-page > div.mx-auto.max-w-6xl > div > input",
+            "w": 402,
+            "h": 33,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x75ee6eb3d8dacf41ee2e5307090b19"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x83fcfe8ba2fece9578f0bbafed4ebf"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x008c84421da5527f462886cec43d27"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x17beaa158e68ff9225b4c85151831c"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x6f9e3976fa3b5b22761fe5d635e1f0"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x696ed7b26f4b019ceec78dc8b9140a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xf476cd75be8fdd197ae0b466a2ec2a"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x32d1a53f6709a03f4b6cf4cb050120"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xd049b3064990869c9f73bd7896271d"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xfd16f84e1f9bb5ec33b52d0133d61f"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0xca04e939a0ac0626c4a4299735e353"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x67bace9bbdf3212509a7438ae026c7"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4298e663517593284ad4fe199b2181"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x01db485f57dc000e761b85641f78c9"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x4754b7e3dede42d71d6c92978f25f3"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x5efdb6d8c798c2c2bea5b1961982a5"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x91dccaa260cc4616e1a6e6b693db72"
+          },
+          {
+            "selector": "div > div > div > a",
+            "w": 120,
+            "h": 19,
+            "label": "0x0a383e69f43bd7cb5476fcedc1df6a"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png",
+        "page-640-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 507,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png",
+        "page-768-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 594,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png",
+        "page-900-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 676,
+      "tier": "md",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png",
+        "page-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 845,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png",
+        "page-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 950,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png",
+        "page-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1267,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png",
+        "page-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 1690,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png",
+        "page-2560-s2.png"
+      ]
+    }
+  ]
+}

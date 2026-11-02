@@ -134,7 +134,8 @@ const HighwayPage: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="flex min-h-[calc(100vh-80px)] flex-col bg-black font-mono text-green-400"
+      data-page-fill
+      className="flex flex-col overflow-y-auto bg-black font-mono text-green-400"
       style={{ cursor: 'crosshair' }}
     >
       {/* Header */}
@@ -176,9 +177,9 @@ const HighwayPage: React.FC = () => {
 
       {/* Marquee */}
       {!isLoading && candidates.length > 0 && (
-        <div className="flex-1 overflow-hidden px-4 py-6">
+        <div className="shrink-0 grow overflow-hidden px-4 py-6">
           {/* Row 1: Scrolling proposals */}
-          <div className="mb-4 overflow-hidden whitespace-nowrap">
+          <div className="mb-4 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
               style={{
                 transform: `translateX(-${scrollOffset % (blockWidth * candidates.length * 10)}px)`,
@@ -189,6 +190,7 @@ const HighwayPage: React.FC = () => {
               {Array.from({ length: 3 }).map((_, rep) =>
                 candidates.map((c, ci) => (
                   <button
+                    type="button"
                     key={`${rep}-${ci}`}
                     onClick={e => {
                       e.stopPropagation();
@@ -211,12 +213,12 @@ const HighwayPage: React.FC = () => {
           </div>
 
           {/* Road line */}
-          <div className="overflow-hidden text-green-800">
-            <pre className="text-xs">{'═'.repeat(200)}</pre>
+          <div aria-hidden className="flex h-4 items-center text-green-800">
+            <div className="h-[5px] w-full border-y border-current" />
           </div>
 
           {/* Row 2: Reverse direction */}
-          <div className="mt-4 overflow-hidden whitespace-nowrap">
+          <div className="mt-4 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
               style={{
                 transform: `translateX(${(scrollOffset * 0.7) % (blockWidth * candidates.length * 10)}px)`,
@@ -226,6 +228,7 @@ const HighwayPage: React.FC = () => {
               {Array.from({ length: 3 }).map((_, rep) =>
                 [...candidates].reverse().map((c, ci) => (
                   <button
+                    type="button"
                     key={`r${rep}-${ci}`}
                     onClick={e => {
                       e.stopPropagation();
@@ -250,8 +253,8 @@ const HighwayPage: React.FC = () => {
           </div>
 
           {/* Another road line */}
-          <div className="mt-4 overflow-hidden text-green-800">
-            <pre className="text-xs">{'─'.repeat(200)}</pre>
+          <div aria-hidden className="mt-4 flex h-4 items-center text-green-800">
+            <div className="w-full border-t border-current" />
           </div>
         </div>
       )}
@@ -263,13 +266,14 @@ const HighwayPage: React.FC = () => {
           style={{ background: 'rgba(0,40,0,0.5)' }}
         >
           <div className="mx-auto max-w-2xl">
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-green-300">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <h3 className="min-w-0 break-words text-sm font-bold text-green-300">
                 {selectedCandidate.title.toUpperCase()}
               </h3>
               <button
+                type="button"
                 onClick={() => setSelectedCandidate(null)}
-                className="text-xs text-green-700 hover:text-green-400"
+                className="shrink-0 text-xs text-green-700 hover:text-green-400 [@media(pointer:coarse)]:min-h-10"
               >
                 [CLOSE]
               </button>
@@ -278,14 +282,15 @@ const HighwayPage: React.FC = () => {
               {selectedCandidate.description.slice(0, 200)}
               {selectedCandidate.description.length > 200 ? '...' : ''}
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Link
                 to={`/candidates/${selectedCandidate.id}`}
-                className="rounded border border-green-600 px-3 py-1 text-xs font-bold text-green-400 no-underline hover:bg-green-900"
+                className="inline-flex items-center rounded border border-green-600 px-3 py-1 text-xs font-bold text-green-400 no-underline hover:bg-green-900 [@media(pointer:coarse)]:min-h-10"
               >
                 VIEW FULL
               </Link>
               <button
+                type="button"
                 onClick={() => {
                   // Share on Warpcast — promote this candidate
                   const url = `https://noun.wtf/candidates/${selectedCandidate.id}`;
@@ -295,11 +300,12 @@ const HighwayPage: React.FC = () => {
                     '_blank',
                   );
                 }}
-                className="rounded border border-yellow-600 px-3 py-1 text-xs font-bold text-yellow-400 hover:bg-yellow-900"
+                className="rounded border border-yellow-600 px-3 py-1 text-xs font-bold text-yellow-400 hover:bg-yellow-900 [@media(pointer:coarse)]:min-h-10"
               >
                 📣 PROMOTE
               </button>
               <button
+                type="button"
                 onClick={() => {
                   if (!account) {
                     alert('Connect your wallet first to sponsor a candidate');
@@ -308,7 +314,7 @@ const HighwayPage: React.FC = () => {
                   // Open the candidate page to sponsor
                   window.open(`/candidates/${selectedCandidate.slug}`, '_blank');
                 }}
-                className="rounded border border-purple-600 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-900"
+                className="rounded border border-purple-600 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-900 [@media(pointer:coarse)]:min-h-10"
               >
                 🤝 SPONSOR
               </button>

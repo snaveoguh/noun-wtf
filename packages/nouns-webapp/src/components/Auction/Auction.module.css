@@ -308,6 +308,9 @@
   display: grid;
   gap: 1rem;
   min-width: 0;
+  /* The auction column is its own size container: the title and bid scale
+     with its width (cqi units in AuctionActivityNounTitle / CurrentBid). */
+  container: auction / inline-size;
 }
 
 .metaCard,
@@ -512,7 +515,9 @@
   gap: 0.8rem;
 }
 
-@media (min-width: 1180px) {
+/* Layout follows the page container (the NounOS window), not the viewport:
+   see src/lib/responsive/breakpoints.ts for the tiers. */
+@container page (min-width: 1024px) {
   .heroMain {
     grid-template-columns: minmax(0, 1fr) 22rem;
     align-items: start;
@@ -524,7 +529,7 @@
   }
 }
 
-@media (max-width: 991px) {
+@container page (max-width: 759.98px) {
   .addTab {
     display: none;
   }
@@ -542,7 +547,7 @@
   }
 }
 
-@media (max-width: 640px) {
+@container page (max-width: 559.98px) {
   .heroWrapper {
     padding:
       0.8rem
@@ -567,67 +572,7 @@
   }
 
   .heroStage {
-    min-height: 31rem;
     border-radius: 1.5rem;
-  }
-
-  .heroArtFrame,
-  .heroAscii,
-  .heroLoading {
-    top: 4.7rem;
-  }
-
-  .heroControlRail {
-    top: 0.85rem;
-    left: 0.85rem;
-    right: 0.85rem;
-    max-width: none;
-    gap: 0.45rem;
-  }
-
-  .railBtn {
-    width: 2.4rem;
-    height: 2.4rem;
-    min-width: 0;
-    flex: none;
-    padding: 0.2rem;
-  }
-
-  .railIcon {
-    font-size: 0.75rem;
-  }
-
-  .railLabel {
-    font-size: 0.4rem;
-  }
-
-  .navArrow {
-    top: auto;
-    bottom: 1rem;
-    transform: none;
-    width: 2.65rem;
-    height: 2.65rem;
-  }
-
-  .navArrowLeft {
-    left: auto;
-    right: 4.2rem;
-  }
-
-  .navArrowRight {
-    right: 1rem;
-  }
-
-  .emptyDraftNotice {
-    left: 0.85rem;
-    right: 0.85rem;
-    bottom: 4.4rem;
-    max-width: none;
-  }
-
-  .stageStatus {
-    bottom: 1rem;
-    left: 0.85rem;
   }
 
   .auctionCard {
@@ -683,16 +628,6 @@
    these are layout wrappers, not four forks of the hero. `classic` adds
    nothing. */
 
-/* Hero tools (tabs / rail / status) switched off — reclaim the room the
-   mobile rules reserve for the control rail. */
-@media (max-width: 640px) {
-  .toolsHidden .heroArtFrame,
-  .toolsHidden .heroAscii,
-  .toolsHidden .heroLoading {
-    top: 0;
-  }
-}
-
 /* centered — noun centred large, bid controls stacked beneath, ~720px wide. */
 .layoutCentered .heroShell {
   max-width: 45rem;
@@ -741,7 +676,7 @@
   -webkit-backdrop-filter: none;
 }
 
-@media (min-width: 992px) {
+@container page (min-width: 760px) {
   .layoutSplit .heroMain {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: center;
@@ -820,7 +755,7 @@
   flex: 0 1 auto;
 }
 
-@media (max-width: 767px) {
+@container page (max-width: 759.98px) {
   .layoutPoster .heroSidebar {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -891,7 +826,7 @@
   -webkit-backdrop-filter: none;
 }
 
-@media (min-width: 992px) {
+@container page (min-width: 760px) {
   .layoutMinimal .heroMain {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
     align-items: center;
@@ -904,8 +839,114 @@
   }
 }
 
-@media (max-width: 991px) {
+@container page (max-width: 759.98px) {
   .layoutMinimal .heroStage {
     width: min(100%, 60vh);
+  }
+}
+
+/* ─── Stage controls never sit on the art ────────────────────────────────
+   Below lg the stage is a column: the art as a full-width square, then one
+   row under it with the tools on the left and ‹ › on the right. From lg up
+   the art frame is inset instead, so the arrows sit in side gutters and the
+   tool rail in a top gutter. Comes last so it wins over the layout variants. */
+@container page (max-width: 759.98px) {
+  .heroStage,
+  .layoutMinimal .heroStage,
+  .layoutCentered .heroStage,
+  .layoutSplit .heroStage,
+  .layoutPoster .heroStage {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 0.5rem;
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+
+  .heroArtFrame {
+    position: relative;
+    inset: auto;
+    flex: 1 1 100%;
+    width: 100%;
+    /* a phone gets the full width; a wider stacked page keeps the art from
+       pushing the bid a whole screen down */
+    max-width: min(100%, 28rem);
+    margin-inline: auto;
+    aspect-ratio: 1 / 1;
+  }
+
+  .heroStage:has(> .heroControlRail, > .navArrow) {
+    padding-bottom: 0.6rem;
+  }
+
+  .heroControlRail {
+    position: static;
+    order: 1;
+    max-width: none;
+    margin-left: 0.6rem;
+    gap: 0.45rem;
+  }
+
+  .navArrow {
+    position: static;
+    order: 2;
+    flex: none;
+    transform: none;
+    margin-left: auto;
+  }
+
+  .navArrowLeft ~ .navArrowRight {
+    margin-left: 0;
+  }
+
+  .navArrow:last-of-type {
+    margin-right: 0.6rem;
+  }
+
+  .stageStatus {
+    display: none;
+  }
+
+  .emptyDraftNotice {
+    position: static;
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+    margin: 0 0.6rem;
+  }
+}
+
+@container page (min-width: 760px) {
+  .heroStage:has(> .navArrow) .heroArtFrame {
+    left: 4.75rem;
+    right: 4.75rem;
+  }
+
+  .heroStage:has(> .heroControlRail) .heroArtFrame {
+    top: 4.5rem;
+  }
+}
+
+/* Tabs that don't fit scroll sideways; the fade says there's more. */
+@container page (max-width: 759.98px) {
+  .heroTabs {
+    padding-right: 2.5rem;
+    margin-right: -0.85rem;
+    scroll-snap-type: x proximity;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+  }
+
+  .tabBtn {
+    scroll-snap-align: start;
+  }
+}
+
+/* Touch: tabs reach a 40 px tap target. */
+@media (pointer: coarse) {
+  .tabBtn {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
   }
 }

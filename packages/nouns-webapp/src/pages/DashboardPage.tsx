@@ -88,11 +88,15 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div
-      className="mx-auto min-h-screen max-w-6xl px-4 py-8 md:px-8"
-      style={{ fontFamily: "'PT Root UI', sans-serif", background: 'transparent', color: 'var(--theme-text-primary)' }}
+      className="@md:px-8 mx-auto min-h-screen max-w-6xl px-4 py-8"
+      style={{
+        fontFamily: "'PT Root UI', sans-serif",
+        background: 'transparent',
+        color: 'var(--theme-text-primary)',
+      }}
     >
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">noun.wtf dashboard</h1>
         <div className="flex gap-1 rounded-lg bg-white/5 p-1">
           {PERIODS.map((p, i) => (
@@ -100,7 +104,7 @@ const DashboardPage: React.FC = () => {
               type="button"
               key={p.label}
               onClick={() => setPeriodIdx(i)}
-              className={`rounded-md px-3 py-1 text-xs transition-colors ${
+              className={`rounded-md px-3 py-1 text-xs transition-colors [@media(pointer:coarse)]:min-h-10 ${
                 i === periodIdx ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/60'
               }`}
             >
@@ -142,7 +146,7 @@ const DashboardPage: React.FC = () => {
           ) : traffic?.aggregate?.results &&
             (traffic.aggregate.results.visitors?.value ?? 0) > 0 ? (
             <>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="@md:grid-cols-4 grid grid-cols-2 gap-3">
                 <StatCard
                   label="Visitors"
                   value={(traffic.aggregate.results.visitors?.value ?? 0).toLocaleString()}
@@ -205,7 +209,7 @@ const DashboardPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <div className="@lg:grid-cols-3 mt-3 grid gap-3">
                 {traffic.topPages?.results != null && (
                   <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                     <div className="mb-2 text-xs text-white/40">Top Pages</div>
@@ -266,7 +270,7 @@ const DashboardPage: React.FC = () => {
         <div className="text-sm text-white/30">Loading metrics...</div>
       ) : metrics ? (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="@md:grid-cols-4 grid grid-cols-2 gap-3">
             <StatCard
               label="Total Requests"
               value={metrics.totalRequests.toLocaleString()}
@@ -318,7 +322,7 @@ const DashboardPage: React.FC = () => {
             </div>
           )}
 
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="@lg:grid-cols-2 mt-3 grid gap-3">
             {/* Top Endpoints */}
             <div className="rounded-lg border border-white/10 bg-white/5 p-4">
               <div className="mb-2 text-xs text-white/40">Top Endpoints</div>
@@ -357,7 +361,7 @@ const DashboardPage: React.FC = () => {
           </div>
 
           {/* Status breakdown */}
-          <div className="mt-3 flex gap-3 text-xs text-white/30">
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-white/30">
             <span className="text-green-400/60">2xx: {metrics.statusBreakdown['2xx']}</span>
             <span className="text-blue-400/60">3xx: {metrics.statusBreakdown['3xx']}</span>
             <span className="text-yellow-400/60">4xx: {metrics.statusBreakdown['4xx']}</span>

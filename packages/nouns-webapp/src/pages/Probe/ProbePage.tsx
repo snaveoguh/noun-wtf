@@ -39,14 +39,15 @@ const ProbePage: React.FC = () => {
   }, [tab, searchParams, setSearchParams]);
 
   return (
-    <div className="mt-1 px-2 sm:px-4 lg:px-6">
-      {/* Tab Bar */}
-      <div className="mb-2 flex gap-1.5 border-b pb-2 pt-3 sm:gap-2 sm:pt-4">
+    <div className="@sm:px-4 @lg:px-6 mt-1 px-2">
+      {/* Tab Bar — scrolls sideways (snap + an end fade) when the pills don't fit */}
+      <div className="@sm:gap-2 @sm:pt-4 @max-lg:pr-6 @max-lg:[mask-image:linear-gradient(to_right,#000_calc(100%-24px),transparent)] mb-2 flex snap-x snap-mandatory gap-1.5 overflow-x-auto border-b pb-2 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={() => setTab('v2')}
+          aria-pressed={tab === 'v2'}
           aria-label="Browse NounV2 tokens"
-          className={`relative flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 sm:px-4 sm:py-1.5 sm:text-sm ${
+          className={`@sm:px-4 @sm:py-1.5 @sm:text-sm relative flex shrink-0 snap-start items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-white shadow-[0_1px_2px_rgba(220,38,38,0.35)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 [@media(pointer:coarse)]:min-h-10 ${
             tab === 'v2'
               ? 'bg-red-700 ring-2 ring-red-500 ring-offset-1'
               : 'bg-red-600 hover:bg-red-700'
@@ -60,8 +61,10 @@ const ProbePage: React.FC = () => {
         {TAB_CONFIG.map(t => (
           <button
             key={t.key}
+            type="button"
+            aria-pressed={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-full px-3 py-1 text-xs font-bold transition-colors sm:px-4 sm:py-1.5 sm:text-sm ${
+            className={`@sm:px-4 @sm:py-1.5 @sm:text-sm shrink-0 snap-start whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold transition-colors [@media(pointer:coarse)]:min-h-10 ${
               tab === t.key ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -80,7 +83,7 @@ const ProbePage: React.FC = () => {
               console.error('Failed to copy:', err);
             }
           }}
-          className="ml-auto shrink-0 cursor-grab self-center px-2 text-xs font-bold text-gray-600 transition-colors hover:text-black sm:text-sm"
+          className="@sm:text-sm ml-auto shrink-0 cursor-grab self-center whitespace-nowrap px-2 text-xs font-bold text-gray-600 transition-colors hover:text-black [@media(pointer:coarse)]:min-h-10"
         >
           {'⌐◨-◨'}
         </button>

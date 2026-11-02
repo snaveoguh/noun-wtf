@@ -1,0 +1,518 @@
+/*
+ * Studio (pixel trait editor) layout, from the page container's width
+ * (docs/responsive/PLAYBOOK.md):
+ *   below md (560)   one column: tools, canvas, palette, trait panel, preview
+ *   md (560–759)     the trait panel and the preview side by side under the canvas
+ *   lg (760–1099)    canvas with a sidebar (trait panel + preview) on the right
+ *   1100 and up      the original floating layout: canvas centred, panels over it
+ * The canvas fits its column below 1100 (the zoom is its largest size); from
+ * 1100 it is drawn at the zoom, as before.
+ */
+
+.root {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100%;
+  background: #2a2a2a;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  align-content: start;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'tools'
+    'stage'
+    'palette'
+    'side'
+    'preview'
+    'hints';
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Top toolbar ── */
+.tools {
+  grid-area: tools;
+  justify-self: center;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 6px 10px;
+  z-index: 10;
+}
+
+.toolGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sep {
+  display: none;
+  width: 1px;
+  height: 24px;
+  background: #ddd;
+  margin: 0 4px;
+}
+
+.toolBtn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.1s;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid #333;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.zoomLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #666;
+  user-select: none;
+  min-width: 3ch;
+}
+
+.zoomRange {
+  width: 60px;
+}
+
+/* ── Canvas ── */
+.stage {
+  grid-area: stage;
+  display: flex;
+  min-width: 0;
+}
+
+.canvas {
+  margin: auto;
+  display: block;
+  width: min(var(--canvas-size), 100%);
+  height: auto;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  touch-action: none;
+}
+
+/* ── Palette ── */
+.palette {
+  grid-area: palette;
+  justify-self: center;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  z-index: 10;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+}
+
+.color {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ── Trait panel, selection, gallery ── */
+.side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  z-index: 10;
+}
+
+.traitCard {
+  padding: 8px 10px;
+}
+
+.field {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  /* the panels are always light, so don't inherit the dark theme's light text */
+  color: #333;
+  background: #fff;
+}
+
+.field::placeholder {
+  color: #999;
+}
+
+/* The dark themes force light text on every input/select with !important
+   ([data-theme] input…), which is unreadable on these light panels. */
+.root .panel .field,
+.root .panel .layerSelect {
+  color: #333 !important;
+  background: #f4f4f5 !important;
+}
+
+.root .panel .field::placeholder {
+  color: #888 !important;
+}
+
+.root .panel .layerSelect[data-off] {
+  color: #aaa !important;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.1s;
+}
+
+.gallery {
+  padding: 8px 10px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.galleryItem {
+  position: relative;
+}
+
+.galleryLoad {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px;
+  text-align: center;
+  transition: background 0.1s;
+  color: inherit;
+}
+
+.galleryLoad:hover {
+  background: var(--theme-bg-hover);
+}
+
+.galleryDelete {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.galleryItem:hover .galleryDelete,
+.galleryDelete:focus-visible {
+  opacity: 1;
+}
+
+/* ── Noun preview ── */
+.preview {
+  grid-area: preview;
+  justify-self: center;
+  width: 100%;
+  max-width: 320px;
+  min-width: 0;
+  z-index: 10;
+}
+
+.previewToggle {
+  background: var(--theme-glass);
+  backdrop-filter: blur(8px);
+  border: none;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.previewCard {
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.previewBtn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--theme-surface);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #666;
+}
+
+.layerRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.eye {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.layerSelect {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: #f4f4f5;
+  cursor: pointer;
+}
+
+/* ── Keyboard hints ── */
+.hints {
+  grid-area: hints;
+  justify-self: end;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.8;
+}
+
+/* ── md: trait panel and preview side by side ── */
+@container page (min-width: 560px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'tools tools'
+      'stage stage'
+      'palette palette'
+      'side preview'
+      'hints hints';
+  }
+  .preview {
+    justify-self: stretch;
+    max-width: none;
+  }
+}
+
+/* ── lg: canvas with a sidebar ── */
+@container page (min-width: 760px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr) 220px;
+    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas:
+      'tools tools'
+      'stage side'
+      'stage preview'
+      'palette preview'
+      'hints preview';
+  }
+  .side,
+  .preview {
+    align-self: start;
+  }
+}
+
+/* ── 1100+: the original floating layout ── */
+@container page (min-width: 1100px) {
+  .root {
+    display: block;
+    padding: 0;
+    height: calc(100vh - 73px);
+    overflow: hidden;
+  }
+  .stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .canvas {
+    width: var(--canvas-size);
+    max-width: none;
+    flex-shrink: 0;
+  }
+  .tools {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-wrap: nowrap;
+    max-width: none;
+    gap: 4px;
+  }
+  .sep {
+    display: block;
+  }
+  .palette {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+  }
+  .side {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 180px;
+  }
+  .preview {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
+  .previewCard {
+    width: 200px;
+    box-sizing: border-box;
+  }
+  .hints {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+  }
+}
+
+/* Touch: 40 px targets, the palette becomes a two-row strip that scrolls sideways. */
+@media (pointer: coarse) {
+  .toolBtn,
+  .swatch,
+  .eye {
+    width: 40px;
+    height: 40px;
+  }
+  .zoomRange {
+    height: 40px;
+    width: 96px;
+  }
+  .field,
+  .layerSelect,
+  .actionBtn,
+  .previewToggle,
+  .previewBtn {
+    min-height: 40px;
+  }
+  .actionBtn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .palette {
+    justify-self: stretch;
+  }
+  .swatches {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, 40px);
+    grid-auto-columns: 40px;
+    gap: 4px;
+    justify-content: start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding-bottom: 2px;
+  }
+  .color {
+    width: 40px;
+    height: 40px;
+    scroll-snap-align: start;
+  }
+  .galleryDelete {
+    opacity: 1;
+    width: 40px;
+    height: 40px;
+    top: -8px;
+    right: -8px;
+  }
+}
+
+@media (hover: none) {
+  .hints {
+    display: none;
+  }
+}

@@ -19,7 +19,9 @@
 
 .timerWrapper {
   display: inline-flex;
-  flex-wrap: nowrap;
+  /* Narrow column: the time drops under the label as a unit instead of the
+     label breaking ("Auction / ends in") or the time being cut off. */
+  flex-wrap: wrap;
   gap: 0;
   min-width: 0;
   align-items: baseline;
@@ -28,6 +30,7 @@
 .timerSection,
 .timerSectionFinal {
   display: inline;
+  white-space: nowrap;
 }
 
 .timerSection {
@@ -52,6 +55,7 @@
 }
 
 .timerLabel {
+  white-space: nowrap;
   font-family: 'PT Root UI';
   font-weight: bold;
   font-size: 14px;
@@ -66,7 +70,7 @@
   padding: 0;
 }
 
-@media (max-width: 992px) {
+@container page (max-width: 759.98px) {
   .section h2 {
     font-size: 13px;
   }

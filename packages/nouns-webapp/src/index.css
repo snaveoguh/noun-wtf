@@ -817,6 +817,16 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
 [data-theme='abacus'] h4 { font-size: 0.95rem !important; }
 [data-theme='abacus'] h5 { font-size: 0.85rem !important; }
 [data-theme='abacus'] h6 { font-size: 0.75rem !important; }
+/* Those sizes beat a heading's Tailwind size class, but its fixed line-height
+   (text-xs 1rem, text-sm 1.25rem, …) stays: an h2.text-xs is 22.4px type in a
+   16px line, so a wrapped heading's lines overlap. Only the combinations where
+   the line is shorter than the type get a line just taller than it (1.05, so
+   one-line headings barely move); an explicit leading-* class still wins. */
+[data-theme='abacus'] h1:is(.text-xs, .text-sm, .text-base, .text-lg, .text-xl):not([class*='leading-']),
+[data-theme='abacus'] h2:is(.text-xs, .text-sm):not([class*='leading-']),
+[data-theme='abacus'] h3.text-xs:not([class*='leading-']) {
+  line-height: 1.05;
+}
 
 /* Single-weight font — normalise weight so nothing renders synthetic-bold smears. */
 [data-theme='abacus'] *,
@@ -1059,38 +1069,8 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
   border-radius: 4px;
 }
 
-/* ============================================================================
-   PROPOSAL PAGE GRID (pages/Vote). This was an inline `1fr 340px` grid with
-   no breakpoint, so on phones the 340px sticky vote column could not shrink
-   and the page overflowed sideways — the "vote bar off the page" bug.
-   `minmax(0, 1fr)` also stops long unbreakable content (addresses, hashes,
-   wide tables) from widening the content column past the viewport.
-   ============================================================================ */
-.vote-page-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 20px;
-  align-items: start;
-}
-
-.vote-page-side {
-  position: sticky;
-  top: 90px;
-  min-width: 0;
-}
-
-@media (max-width: 900px) {
-  .vote-page-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-  }
-  /* Vote panel first on phones — it's what people open the page to do, and
-     the tallies (VotingOverview) already sit above the grid. */
-  .vote-page-side {
-    position: static;
-    order: -1;
-  }
-}
+/* The proposal page grid (.vote-page-grid / .vote-page-side) moved to
+   pages/Vote/VotePage.module.css as container rules; both vote pages use it. */
 
 /* ─── Header font switcher (components/FontSwitcher). The current font's
    name only fits on wide headers; phones get the "Aa" glyph alone. ─── */
@@ -1342,26 +1322,34 @@ body[data-modal-open='true'] [data-site-ticker='true'] {
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
 
-/* NOIR: inputs are natural glass, never a black box */
-[data-theme='abacus'] .form-control,
-[data-theme='abacus'] .form-select,
-[data-theme='abacus'] .input-group-text,
-[data-theme='abacus'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.nos-bare),
-[data-theme='abacus'] textarea,
-[data-theme='abacus'] select {
+/* NOIR: inputs are natural glass, never a black box.
+   A panel that stays light in every theme marks itself data-surface="light"
+   and its fields keep their own colours (light text on it was unreadable). */
+[data-theme='abacus'] .form-control:not([data-surface='light'] *),
+[data-theme='abacus'] .form-select:not([data-surface='light'] *),
+[data-theme='abacus'] .input-group-text:not([data-surface='light'] *),
+[data-theme='abacus']
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.nos-bare):not(
+    [data-surface='light'] *
+  ),
+[data-theme='abacus'] textarea:not([data-surface='light'] *),
+[data-theme='abacus'] select:not([data-surface='light'] *) {
   background-color: rgba(255, 255, 255, 0.08) !important;
   color: #ecebe4 !important;
   border-color: transparent !important;
   border-radius: 12px;
 }
-[data-theme='abacus'] .form-control:focus,
-[data-theme='abacus'] input:not(.nos-bare):focus,
-[data-theme='abacus'] textarea:focus {
+[data-theme='abacus'] .form-control:focus:not([data-surface='light'] *),
+[data-theme='abacus'] input:not(.nos-bare):focus:not([data-surface='light'] *),
+[data-theme='abacus'] textarea:focus:not([data-surface='light'] *) {
   background-color: rgba(255, 255, 255, 0.12) !important;
   box-shadow: none !important;
 }
 [data-theme='abacus'] ::placeholder {
   color: rgba(236, 235, 228, 0.4) !important;
+}
+[data-theme='abacus'] [data-surface='light'] ::placeholder {
+  color: rgba(0, 0, 0, 0.4) !important;
 }
 
 /* NOIR: alerts/tips are dark glass */

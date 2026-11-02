@@ -135,7 +135,10 @@ class Probe {
     this.cpu.push(cpuMs);
     // Running median, refreshed every 30 frames (sorting 600 numbers a frame isn't free)
     if (this.frames.count % 30 === 0 && this.frames.length > 10)
-      this.medianFrame = percentile(this.frames.values().sort((a, b) => a - b), 50);
+      this.medianFrame = percentile(
+        this.frames.values().sort((a, b) => a - b),
+        50,
+      );
     if (isHitch(this.lastFrameMs, cpuMs, this.medianFrame)) {
       this.hitchLog.push({
         at: Math.round(this.t0),

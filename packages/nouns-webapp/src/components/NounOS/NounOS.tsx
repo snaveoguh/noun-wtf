@@ -20,6 +20,7 @@ import { ConnectKitButton } from 'connectkit';
 import { useLocation, useNavigate } from 'react-router';
 
 import { ChainNotificationsMount } from '@/components/Notifications/useChainNotifications';
+import NounFmTrayChip from '@/components/NounFm/NounFmTrayChip';
 import { Toaster } from '@/components/ui/sonner';
 import { useSiteTheme } from '@/contexts/SiteThemeContext';
 import { BIG_DROP_URL } from '@/miniapps/world2/missions/unlocks';
@@ -517,6 +518,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           </button>
         )}
         <AuctionChip onOpen={openPath} />
+        {desk && <NounFmTrayChip />}
         {desk && !os.isOpen('pip3') && (
           <button type="button" className="nos-chip" onClick={() => os.open('pip3')}>
             PIP3
