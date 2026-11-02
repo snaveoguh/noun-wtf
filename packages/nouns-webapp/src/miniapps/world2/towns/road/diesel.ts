@@ -53,7 +53,7 @@ export function dieselSigns(): SignSpec[] {
     w('tyre', 'TIRE SUPPLY STORE', '#ffc110', '#111111'),
     w('cb', 'CB RADIO SHACK', '#2a2f36', '#7cf2c8'),
     w('roadhouse', 'ROADHOUSE BAR', '#3b2412', '#ffcf4a'),
-    board('travel', 14, 1.6, 'DIESEL FLATS TRAVEL CENTER', '#2b83f6', '#ffffff', '#ffc110'),
+    board('travel', 14, 1.6, 'TRAVEL CENTER STORE', '#2b83f6', '#ffffff', '#ffc110'),
     board('tower', 6, 1.4, 'DIESEL FLATS', '#d9d4c7', '#2a1c10'),
     board('dieselcan', 12, 1.3, 'DIESEL · 24 HRS', '#ffc110', '#111111', '#111111'),
   ];

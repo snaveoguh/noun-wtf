@@ -107,6 +107,20 @@ export function buildAtlas(
   specs: SignSpec[],
   opts: { w?: number; h?: number; pxPerM?: number } = {},
 ): Atlas {
+  const plan = planAtlas(specs, opts);
+  while (!plan.paint(Infinity));
+  return plan.atlas;
+}
+
+/**
+ * Lay an atlas out (slots final, canvas grey) and paint it later, a few
+ * signs at a time: `paint(ms)` paints until the budget is spent and returns
+ * true once every sign is on. Signs read grey until their paint lands.
+ */
+export function planAtlas(
+  specs: SignSpec[],
+  opts: { w?: number; h?: number; pxPerM?: number } = {},
+): { atlas: Atlas; paint(budgetMs: number): boolean } {
   const AW = opts.w ?? ATLAS;
   const AH = opts.h ?? ATLAS;
   const ppm = opts.pxPerM ?? PX_PER_M;
@@ -117,6 +131,7 @@ export function buildAtlas(
   g.fillStyle = '#808080';
   g.fillRect(0, 0, AW, AH);
   const slots: Atlas['slots'] = new Map();
+  const jobs: { x: number; y: number; w: number; h: number; s: SignSpec }[] = [];
   let x = 0;
   let y = 0;
   let rowH = 0;
@@ -129,7 +144,7 @@ export function buildAtlas(
       y += rowH + pad;
       rowH = 0;
     }
-    drawSign(g, x + pad, y + pad, pw, ph, s);
+    jobs.push({ x: x + pad, y: y + pad, w: pw, h: ph, s });
     slots.set(s.key, {
       u0: (x + pad) / AW,
       u1: (x + pad + pw) / AW,
@@ -144,7 +159,21 @@ export function buildAtlas(
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
-  return { texture, slots };
+  let next = 0;
+  return {
+    atlas: { texture, slots },
+    paint(budgetMs: number) {
+      if (next >= jobs.length) return true;
+      const t0 = performance.now();
+      do {
+        const j = jobs[next++]!;
+        drawSign(g, j.x, j.y, j.w, j.h, j.s);
+      } while (next < jobs.length && performance.now() - t0 < budgetMs);
+      // One upload when it's all on (not one a frame while painting)
+      if (next >= jobs.length) texture.needsUpdate = true;
+      return next >= jobs.length;
+    },
+  };
 }
 
 /** Height (px) the specs need in an atlas `w` px wide at `pxPerM` (no drawing). */

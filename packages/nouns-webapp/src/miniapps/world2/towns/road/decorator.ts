@@ -29,8 +29,8 @@ import { textureDiet } from '../../render/textureDiet';
 import { inkExcluded, toonify } from '../../render/Toon';
 import { edgeDistance } from '../../world/mountain/config';
 import { terrainHeight } from '../../world/mountain/terrain';
-import { townMaterials, townStats } from '../build';
-import { TownBuilder, atlasHeight, boxAt, buildAtlas, type Atlas, type SignSpec } from '../kit';
+import { townAnimators, townMaterials, townStats } from '../build';
+import { TownBuilder, atlasHeight, boxAt, planAtlas, type Atlas, type SignSpec } from '../kit';
 import { townFrameNow, townToWorld, type PadFrame, type TownFrame } from '../site';
 
 import { LEVEL_CTX, type PartCtx, type RoadLook } from './look';
@@ -50,9 +50,20 @@ interface AtlasEntry {
   refs: number;
   /** Freed when its last chunk goes (segments only). */
   transient: boolean;
+  plan: { paint(ms: number): boolean };
 }
 
 const atlases = new Map<string, AtlasEntry>();
+
+/** Atlases still being painted, a sign or two a frame (never inside a chunk build). */
+const painting = new Set<{ paint(ms: number): boolean }>();
+const PAINT_MS = 2;
+townAnimators.add(() => {
+  for (const p of painting) {
+    if (p.paint(PAINT_MS)) painting.delete(p);
+    return;
+  }
+});
 
 function makeAtlas(specs: SignSpec[], transient: boolean): AtlasEntry {
   const w = textureDiet.on ? 512 : 1024;
@@ -62,10 +73,11 @@ function makeAtlas(specs: SignSpec[], transient: boolean): AtlasEntry {
   const need = atlasHeight(specs, w, ppm);
   let h = 64;
   while (h < need && h < w) h *= 2;
-  const atlas = buildAtlas(specs, { w, h, pxPerM: ppm });
-  const mat = new THREE.MeshStandardMaterial({ map: atlas.texture, roughness: 0.8 });
+  const plan = planAtlas(specs, { w, h, pxPerM: ppm });
+  painting.add(plan);
+  const mat = new THREE.MeshStandardMaterial({ map: plan.atlas.texture, roughness: 0.8 });
   mat.name = 'TownSigns';
-  return { atlas, mat, refs: 0, transient };
+  return { atlas: plan.atlas, mat, refs: 0, transient, plan };
 }
 
 function atlasFor(key: string, specs: () => SignSpec[], transient: boolean): AtlasEntry {
@@ -82,6 +94,7 @@ function release(key: string) {
   if (a === undefined) return;
   a.refs--;
   if (a.refs <= 0 && a.transient) {
+    painting.delete(a.plan);
     a.atlas.texture.dispose();
     a.mat.dispose();
     atlases.delete(key);
@@ -451,6 +464,7 @@ export function buildLookForTest(
   ctx: PartCtx = LEVEL_CTX,
 ): TownBuilder {
   const a = makeAtlas(look.signs(), true);
+  painting.delete(a.plan);
   const b = new TownBuilder(f, new THREE.Vector3(), a.atlas);
   for (const p of look.parts(f)) p.build(b, ctx);
   a.atlas.texture.dispose();
