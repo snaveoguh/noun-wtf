@@ -153,7 +153,7 @@ export function keeperStep(sim: FootballSim, gk: PlayerState, kb: KeeperBrain) {
         }
       }
       if (!kb.done) {
-        kb.react -= DT;
+        kb.react = Math.max(0, kb.react - DT);
         if (kb.react <= 0) {
           let tx = threat.x;
           if (kb.guess !== null && kb.guess !== Math.sign(threat.x) && Math.abs(threat.x) > 0.6)
@@ -162,9 +162,7 @@ export function keeperStep(sim: FootballSim, gk: PlayerState, kb: KeeperBrain) {
           const reach = 0.75;
           if (need < reach && threat.y < 2.1) {
             // Set and take it on the body / hands
-            pi.mx = Math.sign(tx - gk.x) * 0.6;
-            pi.mz = 0;
-            pi.gait = 1;
+            walkTo(sim, gk, { x: tx, z: lineZ + dir * 0.8 }, 1);
             gk.action = 'gk_ready';
             contact(sim, gk, kb, false);
           } else if (pi.act <= 0) {
@@ -199,7 +197,7 @@ function shotThreat(sim: FootballSim, gk: PlayerState) {
   const p = sim.pitch;
   const dir = sim.dir(gk.team);
   const toward = -dir * b.vz;
-  if (toward < 7) return null;
+  if (toward < 5) return null;
   const last = sim.player(b.lastTouch);
   if (last && last.team === gk.team && sim.i.restartKick === null && toward < 16) return null;
   const pred = sim.predict();

@@ -830,6 +830,18 @@ export class FootballSim implements FootballSimApi {
         const b = s.ball;
         pi.face = Math.atan2(b.x - pl.x, b.z - pl.z);
       }
+      // Dead ball: everyone (humans too) walks to their spot; the pad only aims
+      if (s.phase !== 'live') {
+        const t = s.restart ? this.restartTarget(pl) : { x: pl.x, z: pl.z };
+        const dx = t.x - pl.x;
+        const dz = t.z - pl.z;
+        const d = Math.hypot(dx, dz);
+        pi.mx = d > 0.2 ? dx / d : 0;
+        pi.mz = d > 0.2 ? dz / d : 0;
+        pi.gait = d < 0.2 || s.phase === 'goal' ? 0 : d > 8 ? 2 : 1;
+        pi.face =
+          d < 0.5 && s.restart?.taker === pl.id && m > 0.3 ? Math.atan2(pad.mx, pad.mz) : null;
+      }
       // Assisted receive: no stick while the ball's coming to you
       if (m < 0.15 && this.i.receiver === pl.id && s.ball.mode === 'free') {
         const t = this.interceptPoint(pl);
@@ -2152,7 +2164,8 @@ export class FootballSim implements FootballSimApi {
     pi.head = 0;
     this.i.passFrom = pl.id;
     this.i.kickTeam = pl.team;
-    this.i.kickKind = 'pass';
+    this.i.kickKind = wantShot && !ownBox ? 'shot' : 'pass';
+    if (this.i.kickKind === 'pass') s.stats[pl.team].passes++;
     this.i.offside = this.config.offside ? offsideSet(this, pl) : [];
     this.push({ type: 'header', id: pl.id, power: clamp(sp / 25, 0, 1) });
     return true;
