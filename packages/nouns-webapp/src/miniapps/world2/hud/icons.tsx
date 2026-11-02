@@ -59,9 +59,20 @@ export type IconName =
   | 'chat'
   | 'fm'
   | 'cog'
-  | 'share';
+  | 'share'
+  | 'pet';
 
 const PATHS: Record<IconName, ReactNode> = {
+  // the CAMP pet: a round-eared mouse head
+  pet: (
+    <>
+      <circle cx="6" cy="7" r="4.2" fill={PINK} {...S} />
+      <circle cx="18" cy="7" r="4.2" fill={PINK} {...S} />
+      <rect x="4.5" y="8.5" width="15" height="12.5" rx="5" fill="#f9e8dd" {...S} />
+      <path d="M8 13.5h3M13 13.5h3" fill="none" {...S} />
+      <path d="M11 17.5h2" fill="none" {...S} stroke={PINK} />
+    </>
+  ),
   mic: (
     <>
       <rect x="8.5" y="2.5" width="7" height="12" rx="3.5" fill={CYAN} {...S} />

@@ -58,6 +58,7 @@ import { fetchStats, riderId, StatsTracker, type MyBests, type WorldStats } from
 import { JerseyCrew } from './npc/JerseyCrew';
 import { ParkourSystem } from './parkour/ParkourSystem';
 import { perf, perfParam } from './perf/PerfProbe';
+import { PetSystem } from './pet/PetSystem';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
 import { PoolMode } from './pool/net/PoolMode';
@@ -383,6 +384,8 @@ export class Game {
   readonly interiors: InteriorSystem = new InteriorSystem(this);
   /** NOUNS CAMP (world/camp/): the condemned penthouse every first spawn wakes up in. */
   readonly camp: CampSystem = new CampSystem(this);
+  /** The CAMP pet (pet/): naps on CAMP's fridge until adopted, then follows you. */
+  readonly pet: PetSystem = new PetSystem(this);
   /** The mural bench (world/bench/): Pipe, SIT, the cinematic shot of the GIF mural. */
   readonly bench: BenchSystem = new BenchSystem(this);
   /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
@@ -2094,6 +2097,7 @@ export class Game {
     this.remotes.delete(id);
     this.parkour.dropRemote(id);
     this.skydive.dropRemote(id);
+    this.pet.dropRemote(id);
   }
 
   /** How a sound at `pos` reaches the listener (the camera): distance gain + stereo pan. */
@@ -2161,6 +2165,9 @@ export class Game {
   }
 
   private updateNetwork(dt: number) {
+    // The pet steps here: every branch of step() comes through (it sits and
+    // watches hoops / battles / pool), after the rider's been placed
+    this.pet.frame(dt);
     const p = this.player;
     // Share my voice tag only while sharing recordings is on
     this.net.voiceTag = settings.get().shareRecordings ? (myTag() ?? '') : '';
@@ -2242,6 +2249,7 @@ export class Game {
         riding: c.mode === 'board' && !c.anim.includes('bail'),
       });
       this.parkour.remote(id, ch, c.pk, dt);
+      this.pet.remote(id, rp, ch, apart, dt);
       this.skydive.remote(id, ch, c.sk, c.mode === 'board', dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       this.interiors.poseRemote(id, ch, rp.room ?? null, dt);
@@ -2609,6 +2617,7 @@ export class Game {
     this.missions.dispose();
     this.interiors.dispose();
     this.camp.dispose();
+    this.pet.dispose();
     this.bench.dispose();
     this.facades.dispose();
     this.hoops.dispose();

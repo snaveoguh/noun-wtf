@@ -118,6 +118,21 @@ export class CampSystem {
 
   constructor(private readonly game: Game) {}
 
+  /** MOCHI's perch on the fridge (pet/), world space; null before CAMP's built. */
+  petPerch(): { x: number; y: number; z: number; yaw: number } | null {
+    const b = this.built;
+    const s = this.site;
+    if (b === null || s === null) return null;
+    const P = b.layout.pet;
+    const [x, y, z] = toWorld(s, P.x, P.y, P.z);
+    return { x, y, z, yaw: P.yaw };
+  }
+
+  /** Is this world point inside CAMP? */
+  inside(x: number, y: number, z: number): boolean {
+    return this.site !== null && inCamp(this.site, x, y, z);
+  }
+
   get view(): CampView {
     return this.view_;
   }

@@ -74,10 +74,19 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
     },
     { gpu: P.gpu, cores: P.cores, memory: P.memory },
   );
+  // PET=1: an adopted CAMP pet (pet/store.ts), and every simulated rider brings one (`pt`)
+  if (process.env.PET)
+    await ctx.addInitScript(() => {
+      localStorage.setItem(
+        'noun-world-pet-v1',
+        JSON.stringify({ v: 1, look: 'mochi', name: 'PIP', follow: 'auto', at: 1 }),
+      );
+    });
   const p = await ctx.newPage();
   p.on('pageerror', e => log('pageerror', String(e).slice(0, 200)));
   const cdp = await ctx.newCDPSession(p);
-  const url = `${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1&spawn=plaza&camintro=0`;
+  // EXTRA=pet=0 etc.: more query (the pet A/B: the same build with pets off)
+  const url = `${base}/world?offline=1&skip=1&bday=0&perf=quiet&debug=1&spawn=plaza&camintro=0${process.env.EXTRA ? '&' + process.env.EXTRA : ''}`;
   log('goto', url);
   await p.goto(url, { timeout: 600000 });
   await p.waitForFunction(() => window.__w2 && window.__w2.me && window.__w2.running, null, {
@@ -167,7 +176,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
     await sleep(1000);
   }
   if (SCEN.includes('remotes')) {
-    await p.evaluate(() => {
+    await p.evaluate(pets => {
       const g = window.__w2;
       let t = 0;
       g.__bots = setInterval(() => {
@@ -191,11 +200,12 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
               sp: 6,
               n: `bot ${i}`,
               tr: i % 2 ? 'KICKFLIP + 50-50' : '',
+              ...(pets ? { pt: [1, i % 3 === 0 ? 2 : 0, `BOT${i}`] } : {}),
             }),
           });
         }
       }, 100);
-    });
+    }, !!process.env.PET);
     await sleep(20000); // build their Nouns (load heads)
     await measure('remotes-16', 12000);
     await p.evaluate(() => {

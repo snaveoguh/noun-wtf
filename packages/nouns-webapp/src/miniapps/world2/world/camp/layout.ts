@@ -74,6 +74,11 @@ export interface CampLayout {
   ramp: { x: number; z: number };
   /** The window's span along x (room frame) — the only way out. */
   window: { x0: number; x1: number };
+  /**
+   * MOCHI's perch before anyone adopts it (pet/): on top of the fridge,
+   * facing into the room (y = the fridge's top, yaw its facing).
+   */
+  pet: { x: number; z: number; y: number; yaw: number };
 }
 
 /** The MEME VALUE pages lying open round the room (left page of each spread). */
@@ -220,6 +225,21 @@ export function campLayout(
     ramp: { x: 0, z: 8.55 },
     pool: { x: 2.75, z: 5.85, yaw: Math.PI / 2, length: 2.3, width: 1.3 },
     window: { x0: winX0, x1: winX1 },
+    pet: petPerch(pieces.find(q => q.type === 'fridge')!),
+  };
+}
+
+/** On top of the fridge, a little in from its front edge, looking out where the fridge looks. */
+export function petPerch(fridge: Piece): { x: number; z: number; y: number; yaw: number } {
+  // the fridge's front faces +z in its own frame (interiors/build.ts), turned by yaw
+  const fx = Math.sin(fridge.yaw);
+  const fz = Math.cos(fridge.yaw);
+  const inset = fridge.d / 2 - 0.22;
+  return {
+    x: fridge.x + fx * inset,
+    z: fridge.z + fz * inset,
+    y: fridge.y + fridge.h,
+    yaw: fridge.yaw,
   };
 }
 

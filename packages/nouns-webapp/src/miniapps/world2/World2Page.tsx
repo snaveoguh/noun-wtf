@@ -27,6 +27,7 @@ import { InteriorsUi } from './interiors/InteriorsUi';
 import { MISSIONS_CSS, MissionsUi } from './missions/MissionsUi';
 import { DROP_PARAM } from './missions/unlocks';
 import { ParkourUi } from './parkour/game/ParkourUi';
+import { PetUi } from './pet/PetUi';
 import { PoolUi, usePoolActive } from './pool/net/PoolUi';
 import { applyWorldManifest, registerWorldSw } from './pwa/install';
 import { FM_CSS, FmPanel, FmScreen } from './radio/FmPanel';
@@ -479,6 +480,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       )}
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <CampUi game={game} touch={touchPage} />}
+      {game && started && !replaying && <PetUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <BenchUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
