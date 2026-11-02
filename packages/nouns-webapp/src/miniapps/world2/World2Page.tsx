@@ -16,6 +16,7 @@ import { parseSeedKey, randomSeed, type NounSeed } from './character/NounAppeara
 import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { DragonHud } from './dragon/DragonHud';
+import { FootballUi, useFootballActive } from './football/net/FootballUi';
 import { Game } from './Game';
 import { MuralUi } from './graffiti/mural/MuralUi';
 import { PLAZA_CENTRE, prefetchWalls } from './graffiti/storeLoad';
@@ -185,7 +186,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   // A Noun Breaks battle hides the skate HUD the same way hoops does
   const breakOn = useBreakActive(game);
   const poolOn = usePoolActive(game);
-  const hoopsOn = useHoopsActive(game) || breakOn || poolOn;
+  const footballOn = useFootballActive(game);
+  const hoopsOn = useHoopsActive(game) || breakOn || poolOn || footballOn;
   // (flying the dragon keeps the skate stick: it turns and sets the speed)
   const vanDriving = useVanDriving(game);
   const carDriving = useCarDriving(game);
@@ -289,6 +291,21 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     const tryLaunch = () => {
       if (game.me === null || game.hud.loading !== null || !game.pool.arrive()) return false;
       poolLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
+  // `?play=football` (the homepage's NOUN FOOTBALL card): NOUN STADIUM, menu open
+  const footballLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || footballLaunched.current || searchParams.get('play') !== 'football')
+      return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.football.arrive()) return false;
+      footballLaunched.current = true;
       return true;
     };
     if (tryLaunch()) return;
@@ -484,6 +501,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}
       {game && started && <PoolUi game={game} />}
+      {game && started && <FootballUi game={game} />}
       {game && started && !hoopsOn && !replaying && <MuralUi game={game} />}
       {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <HideSeekUi game={game} touch={touchPage} />}

@@ -72,6 +72,7 @@ export default function AgentHome({
   onEnterBreaks,
   onEnterParkour,
   onEnterPool,
+  onEnterFootball,
   onEnterHideSeek,
   onEnterDrive,
   onEnterWarfare,
@@ -88,6 +89,8 @@ export default function AgentHome({
   onEnterBreaks: () => void;
   onEnterParkour: () => void;
   onEnterPool?: () => void;
+  /** Noun World at NOUN STADIUM, menu open (`?play=football`) */
+  onEnterFootball?: () => void;
   onEnterHideSeek: () => void;
   /** Noun World in a car (`?play=drive`) */
   onEnterDrive: () => void;
@@ -149,6 +152,7 @@ export default function AgentHome({
       else if (id === 'breaks') onEnterBreaks();
       else if (id === 'parkour') onEnterParkour();
       else if (id === 'pool') onEnterPool?.();
+      else if (id === 'football') onEnterFootball?.();
       else if (id === 'hideseek') onEnterHideSeek();
       else if (id === 'drive') onEnterDrive();
       else if (id === 'warfare') onEnterWarfare();
@@ -166,6 +170,7 @@ export default function AgentHome({
       onEnterBreaks,
       onEnterParkour,
       onEnterPool,
+      onEnterFootball,
       onEnterHideSeek,
       onEnterDrive,
       onEnterWarfare,

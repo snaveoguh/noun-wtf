@@ -16,7 +16,8 @@ export type GameId =
   | 'drop'
   | 'drive'
   | 'parkour'
-  | 'pool';
+  | 'pool'
+  | 'football';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -268,6 +269,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'RACK EM',
     loading: 'chalking up. off to the pool hall',
+  },
+  {
+    id: 'football',
+    name: 'Noun Football',
+    cover: '/world2/football-cover.webp',
+    card: '/home/covers/football.webp',
+    focus: '50% 55%',
+    teaser:
+      'A full stadium 3 km down the mountain and a proper football game in it. Pass, shoot with power and curl, slide in, beat the keeper. 5, 7 or 11-a-side vs the CPU, a cup, or with friends online.',
+    tagline: 'PASS · SHOOT · SCORE',
+    facts: [
+      '5, 7 or 11-a-side, four CPU levels',
+      'Cup and season, or 1v1 / co-op online',
+      'NOUN STADIUM, inside Noun World',
+    ],
+    cta: 'KICK OFF',
+    loading: 'lacing up. off to NOUN STADIUM',
   },
 ];
 

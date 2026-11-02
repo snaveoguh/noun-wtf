@@ -41,6 +41,7 @@ import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
+import { FootballMode } from './football/net/FootballMode';
 import { StadiumSystem } from './football/view/stadium/StadiumSystem';
 import { Graffiti } from './graffiti/Graffiti';
 import { MuralMode } from './graffiti/mural/MuralMode';
@@ -396,6 +397,8 @@ export class Game {
   readonly skydive: SkydiveSystem = new SkydiveSystem(this);
   /** Noun Pool (pool/net/PoolMode.ts, PoolApi): bar tables + the pool hall; owns the frame. */
   readonly pool: PoolMode = new PoolMode(this);
+  /** Noun Football (football/net/FootballMode.ts): NOUN STADIUM's matches; owns the frame. */
+  readonly football: FootballMode = new FootballMode(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
   readonly freestyle: FreestyleMode = new FreestyleMode(this);
   /** Noun Hide & Seek (hideseek/net/HideSeekMode.ts): played in the normal game; hides hiders' tags. */
@@ -1145,6 +1148,16 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    // ── Noun Football: a match (or the menu) at NOUN STADIUM; the skater waits ──
+    if (this.football.active) {
+      this.input.poll(now);
+      this.football.step(dt);
+      this.updateFm(dt);
+      this.animTime += dt;
+      this.updateNetwork(dt);
+      this.gfx.render(dt);
+      return;
+    }
     // ── Freestyle: breakdancing on the spot; skater parked, skate camera orbiting ──
     if (this.freestyle.active) {
       const fin = this.input.poll(now);
@@ -1305,6 +1318,7 @@ export class Game {
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
     this.pool.idle(dt);
+    this.football.idle(dt);
     this.hideseek.update(dt);
     perf.lap('modes');
   }
@@ -2593,6 +2607,7 @@ export class Game {
     this.parkour.dispose();
     this.skydive.dispose();
     this.pool.dispose();
+    this.football.dispose();
     this.freestyle.dispose();
     this.hideseek.dispose();
     this.van2.dispose();
