@@ -1,5 +1,27 @@
 import type { Config } from 'tailwindcss'
+import plugin from 'tailwindcss/plugin';
 import tailwindcssAnimate from 'tailwindcss-animate';
+
+import { CONTAINER_BREAKPOINTS } from './src/lib/responsive/breakpoints';
+
+/**
+ * Container-query variants on the shared tokens (src/lib/responsive):
+ * `@md:flex` applies once the nearest size container (every NounOS window's
+ * `.nos-content`) is at least 560 px wide; `@max-md:hidden` below 560 px.
+ * `@container` makes an element a container itself. Viewport `sm:` / `md:`
+ * still exist for the OS chrome, but pages should use these.
+ */
+const containerQueries = plugin(({ addVariant, addUtilities }) => {
+  addUtilities({
+    '.\\@container': { 'container-type': 'inline-size' },
+  });
+  const tiers = Object.entries(CONTAINER_BREAKPOINTS);
+  // Registration order is cascade order: min-width ascending, then max-width
+  // descending, so the narrower rule wins when two apply.
+  for (const [name, px] of tiers) addVariant(`@${name}`, `@container (min-width: ${px}px)`);
+  for (const [name, px] of [...tiers].reverse())
+    addVariant(`@max-${name}`, `@container (max-width: ${px - 0.02}px)`);
+});
 
 export default {
   darkMode: ['class'],
@@ -69,5 +91,5 @@ export default {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [tailwindcssAnimate, containerQueries],
 } satisfies Config;

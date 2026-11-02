@@ -191,12 +191,12 @@ const FrameCard: React.FC<{ embed: CastEmbed }> = ({ embed }) => {
           href={actionUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-purple-700"
+          className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-purple-700 [@media(pointer:coarse)]:min-h-10"
           style={{ textDecoration: 'none' }}
         >
           {buttonTitle}
         </a>
-        {appName && <span className="text-xs text-purple-400">{appName}</span>}
+        {appName && <span className="shrink-0 text-xs text-purple-400">{appName}</span>}
       </div>
     </div>
   );
@@ -256,7 +256,7 @@ const EmbedRenderer: React.FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
               key={`img-${i}`}
               src={img.url}
               alt=""
-              className="max-h-56 rounded-lg object-cover"
+              className="max-h-56 max-w-full rounded-lg object-cover"
               loading="lazy"
             />
           ))}
@@ -281,10 +281,17 @@ const EmbedRenderer: React.FC<{ embeds: CastEmbed[] }> = ({ embeds }) => {
               {cast.author?.pfp_url && (
                 <img src={cast.author.pfp_url} alt="" className="h-5 w-5 rounded-full" />
               )}
-              <span className="text-xs font-bold">{cast.author?.display_name ?? 'Unknown'}</span>
-              <span className="text-xs text-gray-400">@{cast.author?.username ?? '?'}</span>
+              <span className="min-w-0 truncate text-xs font-bold">
+                {cast.author?.display_name ?? 'Unknown'}
+              </span>
+              <span className="min-w-0 truncate text-xs text-gray-400">
+                @{cast.author?.username ?? '?'}
+              </span>
             </div>
-            <p className="text-xs text-gray-600" style={{ textTransform: 'none' }}>
+            <p
+              className="text-xs text-gray-600 [overflow-wrap:anywhere]"
+              style={{ textTransform: 'none' }}
+            >
               {text.length > 200 ? text.slice(0, 200) + '...' : text}
             </p>
           </a>
@@ -358,6 +365,7 @@ const ComposeBox: React.FC<{ channel: FeedTab; onCasted?: () => void }> = ({
   if (!isLoggedIn) {
     return (
       <button
+        type="button"
         onClick={login}
         className="mb-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-purple-300 p-3 text-purple-500 transition-colors hover:border-purple-400 hover:bg-purple-50"
       >
@@ -389,9 +397,10 @@ const ComposeBox: React.FC<{ channel: FeedTab; onCasted?: () => void }> = ({
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
       <div className="mt-2 flex justify-end">
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={!text.trim() || sending}
-          className="rounded-lg bg-purple-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:bg-gray-300 disabled:hover:bg-gray-300"
+          className="rounded-lg bg-purple-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:bg-gray-300 disabled:hover:bg-gray-300 [@media(pointer:coarse)]:min-h-10"
         >
           {sending ? 'Casting...' : 'Cast'}
         </button>
@@ -461,7 +470,7 @@ const CastCard: React.FC<{
 
   return (
     <div
-      className="rounded-lg border p-4 transition-colors hover:bg-gray-50"
+      className="min-w-0 rounded-lg border p-4 transition-colors hover:bg-gray-50"
       style={
         isNew
           ? {
@@ -475,19 +484,24 @@ const CastCard: React.FC<{
       {/* Author header */}
       <div className="mb-2 flex items-center gap-2">
         {cast.author.pfp_url && (
-          <img src={cast.author.pfp_url} alt="" className="h-8 w-8 rounded-full" loading="lazy" />
+          <img
+            src={cast.author.pfp_url}
+            alt=""
+            className="h-8 w-8 shrink-0 rounded-full"
+            loading="lazy"
+          />
         )}
-        <div className="flex flex-col">
-          <span className="text-sm font-bold">{cast.author.display_name}</span>
-          <span className="text-xs text-gray-400">@{cast.author.username}</span>
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-bold">{cast.author.display_name}</span>
+          <span className="truncate text-xs text-gray-400">@{cast.author.username}</span>
         </div>
-        <span className="ml-auto text-xs text-gray-400">
+        <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-gray-400">
           {timeAgo(cast.timestamp, { seconds: false, clamp: false })}
         </span>
       </div>
 
       {/* Cast text */}
-      <p className="text-sm" style={{ textTransform: 'none' }}>
+      <p className="text-sm [overflow-wrap:anywhere]" style={{ textTransform: 'none' }}>
         {cast.text}
       </p>
 
@@ -498,9 +512,10 @@ const CastCard: React.FC<{
       <div className="mt-3 flex items-center gap-1">
         {/* Like */}
         <button
+          type="button"
           onClick={handleLike}
           disabled={liked}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors [@media(pointer:coarse)]:min-h-10 ${
             liked
               ? 'bg-red-50 text-red-500'
               : 'bg-gray-50 text-gray-500 hover:bg-red-50 hover:text-red-400'
@@ -512,9 +527,10 @@ const CastCard: React.FC<{
 
         {/* Recast */}
         <button
+          type="button"
           onClick={handleRecast}
           disabled={recasted}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors [@media(pointer:coarse)]:min-h-10 ${
             recasted
               ? 'bg-green-50 text-green-500'
               : 'bg-gray-50 text-gray-500 hover:bg-green-50 hover:text-green-400'
@@ -526,6 +542,7 @@ const CastCard: React.FC<{
 
         {/* Reply */}
         <button
+          type="button"
           onClick={() => {
             if (!isLoggedIn) {
               login();
@@ -533,7 +550,7 @@ const CastCard: React.FC<{
             }
             setShowReply(v => !v);
           }}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors [@media(pointer:coarse)]:min-h-10 ${
             showReply
               ? 'bg-purple-50 text-purple-500'
               : 'bg-gray-50 text-gray-500 hover:bg-purple-50 hover:text-purple-400'
@@ -558,18 +575,20 @@ const CastCard: React.FC<{
           />
           <div className="mt-1.5 flex justify-end gap-2">
             <button
+              type="button"
               onClick={() => {
                 setShowReply(false);
                 setReplyText('');
               }}
-              className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500"
+              className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-500 [@media(pointer:coarse)]:min-h-10"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleReply}
               disabled={!replyText.trim() || sending}
-              className="rounded-lg bg-purple-600 px-4 py-1 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:bg-gray-300"
+              className="rounded-lg bg-purple-600 px-4 py-1 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:bg-gray-300 [@media(pointer:coarse)]:min-h-10"
             >
               {sending ? 'Sending...' : 'Reply'}
             </button>
@@ -663,22 +682,29 @@ const FeedPage: React.FC = () => {
       `}</style>
 
       {/* Header with auth */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h1 className="text-2xl font-bold">Activity Feed</h1>
         {isLoggedIn ? (
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             {auth!.user.pfp_url && (
               <img src={auth!.user.pfp_url} alt="" className="h-6 w-6 rounded-full" />
             )}
-            <span className="text-xs font-bold text-gray-600">@{auth!.user.username}</span>
-            <button onClick={logout} className="ml-1 text-xs text-gray-400 hover:text-gray-600">
+            <span className="min-w-0 truncate text-xs font-bold text-gray-600">
+              @{auth!.user.username}
+            </span>
+            <button
+              type="button"
+              onClick={logout}
+              className="ml-1 shrink-0 text-xs text-gray-400 hover:text-gray-600 [@media(pointer:coarse)]:min-h-10"
+            >
               Sign out
             </button>
           </div>
         ) : (
           <button
+            type="button"
             onClick={login}
-            className="rounded-lg border border-purple-500 px-3 py-1 text-xs font-bold text-purple-500 transition-colors hover:bg-purple-50"
+            className="rounded-lg border border-purple-500 px-3 py-1 text-xs font-bold text-purple-500 transition-colors hover:bg-purple-50 [@media(pointer:coarse)]:min-h-10"
           >
             Sign in with Farcaster
           </button>
@@ -686,12 +712,13 @@ const FeedPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="mb-4 flex gap-2 border-b pb-2">
+      <div className="@max-lg:pr-10 @max-lg:[mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] mb-4 flex snap-x snap-proximity gap-2 overflow-x-auto border-b pb-2 [scrollbar-width:none]">
         {(['all', 'nouns', 'noc', 'lil'] as const).map(t => (
           <button
+            type="button"
             key={t}
             onClick={() => setTab(t)}
-            className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${
+            className={`shrink-0 snap-start whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-bold transition-colors [@media(pointer:coarse)]:min-h-10 ${
               tab === t ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -709,7 +736,7 @@ const FeedPage: React.FC = () => {
       {error && (
         <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600">
           {error}
-          <button onClick={() => fetchFeed(tab)} className="ml-2 underline">
+          <button type="button" onClick={() => fetchFeed(tab)} className="ml-2 underline">
             Retry
           </button>
         </div>

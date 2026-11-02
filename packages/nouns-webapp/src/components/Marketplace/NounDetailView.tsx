@@ -77,19 +77,22 @@ export function NounDetailView({ nounId }: { nounId: number }) {
   return (
     <div>
       {/* Breadcrumb */}
-      <nav className="mb-4 font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
-        <Link to="/marketplace" className="transition-colors hover:text-[var(--ink)]">
+      <nav className="mb-4 flex flex-wrap items-center font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
+        <Link
+          to="/marketplace"
+          className="inline-flex items-center transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
+        >
           Nouns Marketplace
         </Link>
         <span className="mx-1.5">/</span>
         <span className="text-[var(--ink)]">Noun {nounId}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="@lg:grid-cols-2 @lg:gap-8 grid gap-6">
         {/* Noun image */}
         <div className="flex items-start justify-center">
           <div
-            className="w-full max-w-md overflow-hidden border border-[var(--rule-light)]"
+            className="@lg:max-w-md w-full max-w-sm overflow-hidden border border-[var(--rule-light)]"
             style={{ backgroundColor: bgColor }}
           >
             {svgHtml ? (
@@ -108,7 +111,9 @@ export function NounDetailView({ nounId }: { nounId: number }) {
         {/* Details */}
         <div>
           {/* Title */}
-          <h1 className="font-headline text-4xl text-[var(--ink)]">Noun {nounId}</h1>
+          <h1 className="font-headline text-[clamp(1.875rem,9cqi,2.25rem)] leading-tight text-[var(--ink)]">
+            Noun {nounId}
+          </h1>
 
           {/* Owner */}
           {owner && (
@@ -118,7 +123,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
                 href={`https://etherscan.io/address/${owner}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)]"
+                className="inline-flex items-center text-[var(--ink-faint)] transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
               >
                 {owner.slice(0, 6)}...{owner.slice(-4)}
               </a>
@@ -158,7 +163,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
           {/* Price / Buy */}
           <div className="mt-6 border-b border-t border-[var(--rule)] py-4">
             {detail?.listedPriceEth ? (
-              <div className="flex items-center gap-4">
+              <div className="@md:flex-row @md:items-center @md:gap-4 flex flex-col gap-3">
                 <div>
                   <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
                     Listed Price
@@ -171,7 +176,11 @@ export function NounDetailView({ nounId }: { nounId: number }) {
                   </p>
                 </div>
                 {detail.orderHash && (
-                  <NounsBuyButton orderHash={detail.orderHash} priceEth={detail.listedPriceEth} />
+                  <NounsBuyButton
+                    orderHash={detail.orderHash}
+                    priceEth={detail.listedPriceEth}
+                    className="@md:w-auto @md:[&>button]:py-0.5 w-full [&>button]:py-2"
+                  />
                 )}
               </div>
             ) : loading ? (
@@ -198,7 +207,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
               href={`/noun/${nounId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="transition-colors hover:text-[var(--ink)]"
+              className="inline-flex items-center transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
             >
               noun.wtf &rsaquo;
             </a>
@@ -206,7 +215,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
               href={`https://opensea.io/assets/ethereum/${NOUNS_CONTRACT}/${nounId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="transition-colors hover:text-[var(--ink)]"
+              className="inline-flex items-center transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
             >
               OpenSea &rsaquo;
             </a>
@@ -214,7 +223,7 @@ export function NounDetailView({ nounId }: { nounId: number }) {
               href={`https://etherscan.io/nft/${NOUNS_CONTRACT}/${nounId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="transition-colors hover:text-[var(--ink)]"
+              className="inline-flex items-center transition-colors hover:text-[var(--ink)] [@media(pointer:coarse)]:min-h-10"
             >
               Etherscan &rsaquo;
             </a>

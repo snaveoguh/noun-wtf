@@ -10,14 +10,50 @@
 //   - static textures the generators or the level own are shrunk on the CPU
 //     before upload (shrinkTexture), which also drops the full-size copy;
 //   - texture builders read `textureDiet.on` to paint at a smaller size.
-// Desktop and normal phones never turn it on: nothing changes there.
+// Desktop never diets. Phones and tablets that aren't weak go on the light
+// diet (textureDiet.light, LIGHT_CAP); weak ones, and any device whose
+// context was lost in the last half hour, on the full one.
 
 import * as THREE from 'three';
 
 export const textureDiet = {
-  /** Set once by Game on a weak device, before anything loads. */
+  /** Set once by Game on a weak device (or after a lost context), before anything loads. */
   on: false,
+  /**
+   * The light diet: every phone and tablet on auto 'low' that isn't on the
+   * full one. iPad Safari lost its WebGL context (black world, heads gone,
+   * then a tab crash) with ~270 MB of GL + ~130 MB of canvases resident;
+   * uploads are capped at LIGHT_CAP, the env map bakes at 128 and the big
+   * static atlases paint at half size or free their canvas once uploaded.
+   */
+  light: false,
 };
+
+/** Largest edge any texture is uploaded with on the light diet (a tablet's screen at ~0.75 scale). */
+export const LIGHT_CAP = 1024;
+
+/** The upload cap in force (px; Infinity off the diet). */
+export function uploadCap(d: { on: boolean; light: boolean } = textureDiet): number {
+  return d.on ? UPLOAD_CAP : d.light ? LIGHT_CAP : Infinity;
+}
+
+/**
+ * A static texture whose canvas is never drawn again: once it's on the GPU,
+ * shrink the canvas to 1×1 so its backing store (16 MB for the door-sign
+ * atlas) is freed. Only on a diet, where a lost context reloads the page
+ * rather than re-uploading (watchContextLoss), so nothing re-reads it.
+ */
+export function releaseAfterUpload(tex: THREE.Texture) {
+  if (!textureDiet.on && !textureDiet.light) return;
+  tex.onUpdate = () => {
+    tex.onUpdate = null;
+    const img = tex.image as HTMLCanvasElement | null;
+    if (img !== null && typeof img === 'object' && 'getContext' in img) {
+      img.width = 1;
+      img.height = 1;
+    }
+  };
+}
 
 /** Largest edge any texture is uploaded with on a diet. */
 export const UPLOAD_CAP = 512;
@@ -34,7 +70,7 @@ export const WEAK_TEXTURE_BUDGET = 50e6;
  * weak phone bakes it at 64 px (768×1024 half-float → 192×256).
  */
 export function envMapSize(): number {
-  return textureDiet.on ? 64 : 256;
+  return textureDiet.on ? 64 : textureDiet.light ? 128 : 256;
 }
 
 /** The size `w`×`h` fits in `cap` (aspect kept, never upscaled, ≥ 1 px). */
@@ -233,41 +269,98 @@ export function capUploads(renderer: THREE.WebGLRenderer, cap = UPLOAD_CAP) {
   });
 }
 
-// ── Lost GPU context (weak phones) ──────────────────────────────────────
+// ── Lost GPU context (every device) ─────────────────────────────────────
 
 const LOST_KEY = 'noun-world-context-lost';
 /** A second loss this soon after a reload gives up instead of looping. */
 export const RELOAD_WINDOW_MS = 120_000;
+/** A page loaded this soon after a loss boots on the full diet (afterLoss). */
+export const LIGHTER_FOR_MS = 30 * 60_000;
 
 /** Reload after a lost WebGL context, unless the last reload for one was recent. */
 export function reloadAfterLoss(now: number, last: number | null): boolean {
   return last === null || !Number.isFinite(last) || now - last >= RELOAD_WINDOW_MS;
 }
 
+/** When the last lost-context reload happened (ms), or null. */
+export function lastLoss(): number | null {
+  try {
+    const v = sessionStorage.getItem(LOST_KEY);
+    const n = v === null ? NaN : Number(v);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** This page load follows a lost context (boot lighter: full diet / no High). */
+export function bootsAfterLoss(now: number, last: number | null): boolean {
+  return last !== null && now - last >= 0 && now - last < LIGHTER_FOR_MS;
+}
+
+/** What to do when the context goes: reload (lighter), or stop and say so. */
+export function lossAction(now: number, last: number | null): 'reload' | 'notice' {
+  return reloadAfterLoss(now, last) ? 'reload' : 'notice';
+}
+
+/** A plain overlay over the game (no React: the page may be in a bad way). */
+function lossNotice(canvas: HTMLCanvasElement, text: string, button: boolean): HTMLDivElement {
+  const el = document.createElement('div');
+  el.dataset.w2ContextLost = '1';
+  el.style.cssText =
+    'position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;' +
+    'align-items:center;justify-content:center;gap:16px;background:#111;color:#fff;' +
+    'font:700 18px/1.35 system-ui,sans-serif;text-align:center;padding:24px';
+  const p = document.createElement('div');
+  p.textContent = text;
+  el.appendChild(p);
+  if (button) {
+    const b = document.createElement('button');
+    b.textContent = 'RELOAD';
+    b.style.cssText =
+      'font:900 18px system-ui,sans-serif;padding:12px 28px;border-radius:10px;' +
+      'border:0;background:#f3c71b;color:#111;cursor:pointer';
+    b.onclick = () => window.location.reload();
+    el.appendChild(b);
+  }
+  (canvas.ownerDocument?.body ?? document.body).appendChild(el);
+  return el;
+}
+
 /**
- * A weak phone's lost context (the GPU process ran out of memory, or the
- * OS took it back while the tab was hidden) reloads the page once: a fresh
- * page re-fetches everything at diet sizes, where a restore would have to
- * re-upload into the same squeeze. Returns the unbind (call it before
- * disposing, so leaving the page doesn't count as a loss).
+ * A lost WebGL context (the GPU ran out of memory, the OS took it back, or
+ * the driver reset) on any device. three's own restore re-uploads from
+ * whatever sources are left, and some are gone by then (shrunk or freed
+ * after upload): on an iPad that was the black world with the heads
+ * missing, then a tab crash. So: say so, and reload once; the new page
+ * boots lighter (bootsAfterLoss: the full texture diet, no High). A
+ * second loss inside RELOAD_WINDOW_MS stops on a notice with a RELOAD
+ * button instead of looping. Returns the unbind (call it before disposing,
+ * so leaving the page doesn't count as a loss).
  */
 export function watchContextLoss(canvas: HTMLCanvasElement): () => void {
+  let notice: HTMLDivElement | null = null;
   const lost = (e: Event) => {
-    e.preventDefault(); // let three restore if we don't reload
-    let last: number | null = null;
-    try {
-      const v = sessionStorage.getItem(LOST_KEY);
-      last = v === null ? null : Number(v);
-    } catch {
-      // storage blocked: reload at most this once
+    e.preventDefault(); // keep the context restorable while we decide
+    if (notice !== null) return;
+    const now = Date.now();
+    if (lossAction(now, lastLoss()) === 'notice') {
+      notice = lossNotice(
+        canvas,
+        'Graphics memory ran out again. Close other tabs and apps, then reload.',
+        true,
+      );
+      return;
     }
-    if (!reloadAfterLoss(Date.now(), last)) return;
     try {
-      sessionStorage.setItem(LOST_KEY, String(Date.now()));
+      sessionStorage.setItem(LOST_KEY, String(now));
     } catch {
-      return; // can't remember it: don't risk a reload loop
+      // can't remember it: don't risk a reload loop
+      notice = lossNotice(canvas, 'Graphics memory ran out. Reload to keep playing.', true);
+      return;
     }
-    window.location.reload();
+    notice = lossNotice(canvas, 'Graphics memory ran out. Reloading lighter…', false);
+    window.setTimeout(() => window.location.reload(), 600);
   };
   canvas.addEventListener('webglcontextlost', lost);
   return () => canvas.removeEventListener('webglcontextlost', lost);

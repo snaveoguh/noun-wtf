@@ -85,11 +85,11 @@ function AddressFilterDropdown({
   }, [counts, search]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="@max-sm:static relative">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs ${
+        className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs [@media(pointer:coarse)]:min-h-10 ${
           value !== ''
             ? 'border-black bg-black text-white'
             : 'border-gray-200 bg-white text-gray-600'
@@ -111,7 +111,7 @@ function AddressFilterDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-9 z-50 max-h-64 w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="@sm:right-auto @sm:top-9 @sm:mt-0 @sm:w-64 absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
           <input
             type="text"
             placeholder="Search address..."
@@ -370,20 +370,20 @@ const V2ExploreTab: FC = () => {
   return (
     <div>
       {/* Toolbar — mirrors the other probe tabs */}
-      <div className="mb-2 flex flex-wrap items-center gap-2 py-1">
+      <div className="relative mb-2 flex flex-wrap items-center gap-2 py-1">
         <input
           type="number"
           placeholder="Search ID..."
           value={searchId}
           onChange={e => setSearchId(e.target.value)}
-          className="h-8 w-24 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none focus:border-gray-400"
+          className="h-8 w-24 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none focus:border-gray-400 [@media(pointer:coarse)]:min-h-10"
         />
 
         <div ref={ownerRef} className="relative">
           <button
             type="button"
             onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
-            className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs ${
+            className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs [@media(pointer:coarse)]:min-h-10 ${
               ownerFilter !== ''
                 ? 'border-black bg-black text-white'
                 : 'border-gray-200 bg-white text-gray-600'
@@ -405,7 +405,7 @@ const V2ExploreTab: FC = () => {
           </button>
 
           {ownerDropdownOpen && (
-            <div className="absolute left-0 top-9 z-50 max-h-64 w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+            <div className="@sm:right-auto @sm:top-9 @sm:mt-0 @sm:w-64 absolute left-0 right-0 top-auto z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
               <input
                 type="text"
                 placeholder="Search address..."
@@ -452,7 +452,7 @@ const V2ExploreTab: FC = () => {
         <button
           type="button"
           onClick={() => setShowTraits(!showTraits)}
-          className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs ${
+          className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs [@media(pointer:coarse)]:min-h-10 ${
             showTraits
               ? 'border-black bg-black text-white'
               : 'border-gray-200 bg-white text-gray-600'
@@ -477,7 +477,7 @@ const V2ExploreTab: FC = () => {
               setCuratedFilter('');
               setTraitFilters({ ...emptyTraitFilters });
             }}
-            className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs text-red-500 hover:bg-red-50"
+            className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs text-red-500 hover:bg-red-50 [@media(pointer:coarse)]:min-h-10"
           >
             <XIcon size={12} /> Clear
           </button>
@@ -486,7 +486,7 @@ const V2ExploreTab: FC = () => {
         <select
           value={sort}
           onChange={e => setSort(e.target.value as SortOption)}
-          className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none"
+          className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none [@media(pointer:coarse)]:min-h-10"
         >
           {sortOptions.map(o => (
             <option key={o.value} value={o.value}>

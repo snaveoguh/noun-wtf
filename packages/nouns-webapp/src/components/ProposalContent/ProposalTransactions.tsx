@@ -22,12 +22,14 @@ export default function ProposalTransactions({ details }: Readonly<Props>) {
   const chainId = defaultChain.id;
 
   return (
-    <ol>
+    // Long addresses break anywhere instead of widening a narrow window; links
+    // are 40px tall on touch screens.
+    <ol className="[overflow-wrap:anywhere] [@media(pointer:coarse)]:[&_a]:inline-flex [@media(pointer:coarse)]:[&_a]:min-h-10 [@media(pointer:coarse)]:[&_a]:max-w-full [@media(pointer:coarse)]:[&_a]:items-center">
       {details.map((d, i) => {
         return (
           <li key={i} className="m-0">
             {linkIfAddress(d.target)}.{d.functionSig}
-            {d.value ? d.value.toString() : null}
+            {d.value != null && d.value !== 0n ? d.value.toString() : null}
             {d.functionSig ? (
               <>
                 (<br />

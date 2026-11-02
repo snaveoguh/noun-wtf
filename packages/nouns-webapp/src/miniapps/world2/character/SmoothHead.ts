@@ -11,6 +11,7 @@ import type { VoxelPixel } from '@nouns/voxel-engine';
 import * as THREE from 'three';
 
 import { textureDiet } from '../render/textureDiet';
+
 import { parseRgb, softenAtlas } from './softenAtlas';
 
 const S = 4; // sub-samples per pixel

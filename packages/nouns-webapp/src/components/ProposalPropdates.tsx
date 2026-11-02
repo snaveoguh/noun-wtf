@@ -186,6 +186,7 @@ const ProposalPropdates: FC<{ proposalId: number }> = ({ proposalId }) => {
           href={`https://propdates.nouns.wtf/prop/${proposalId}`}
           target="_blank"
           rel="noreferrer"
+          className="[@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:items-center"
           style={{
             fontSize: '0.75rem',
             fontFamily: "'PT Root UI'",

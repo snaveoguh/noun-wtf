@@ -108,3 +108,13 @@
     margin-right: 0;
   }
 }
+
+/* Touch: the holder link (and the address button inside it) reach 40 px. */
+@media (pointer: coarse) {
+  .link,
+  .link button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+}

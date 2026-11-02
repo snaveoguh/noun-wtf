@@ -7,9 +7,10 @@
  * like a Noun World rider, with a minimal HUD in the game's style (ink
  * outlines, the yellow / pink / cyan, Londrina numbers). Under each card,
  * always: DREAM (save it to your dream drafts) and PLAY (Noun World with
- * that Noun as your rider; V1 only, the game draws riders with V1 art). The reel drifts and stops while you hover it.
+ * that Noun as your rider; V1 only, the game draws riders with V1 art). The reel drifts and stops while you hover it;
+ * on touch it holds still and scrolls by finger, with 40 px buttons.
  *
- * One shared canvas draws every card (drei `View`): a page can only hold
+ * One shared canvas, laid over the reel's card band, draws every card (drei `View`): a page can only hold
  * ~16 WebGL contexts, and a canvas per card would hit that in a minute of
  * Noun O'Clock.
  */
@@ -121,13 +122,17 @@ function CharacterNoun({ voxels, phase }: { voxels: Voxel[]; phase: number }) {
 }
 
 const CSS = `
-.cbr-wrap{width:100%;margin-top:auto;padding:10px 0 4px;overflow:hidden;position:relative}
+.cbr-wrap{width:100%;margin-top:auto;padding:10px 0 4px;position:relative}
+.cbr-scroll{position:relative;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.cbr-scroll::-webkit-scrollbar{display:none}
+.cbr-stage{position:relative}
+.cbr-gl{position:absolute;left:0;right:0;top:0;height:108px;pointer-events:none;z-index:1}
 .cbr-label{font:800 9px/1 system-ui,sans-serif;letter-spacing:.14em;color:#fff;opacity:.75;margin:0 16px 8px;text-shadow:0 1px 2px #000}
 .cbr-label b{color:#ffd400}
 .cbr-track{display:flex;gap:10px;width:max-content;padding:4px 16px 8px;animation:cbr-reel var(--cbr-dur,60s) linear infinite}
 .cbr-wrap:hover .cbr-track,.cbr-wrap:focus-within .cbr-track{animation-play-state:paused}
 @keyframes cbr-reel{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media (prefers-reduced-motion:reduce){.cbr-track{animation:none}.cbr-wrap{overflow-x:auto}}
+@media (prefers-reduced-motion:reduce){.cbr-track{animation:none}.cbr-scroll{scrollbar-width:thin}}
 .cbr-slot{flex:none;width:84px;display:flex;flex-direction:column;gap:5px}
 .cbr-card{position:relative;width:84px;height:104px;border-radius:10px;border:2px solid #0b0b12;box-shadow:0 0 0 1.5px rgba(255,255,255,.28),0 3px 0 rgba(0,0,0,.35);overflow:hidden;transition:transform .12s,box-shadow .15s}
 .cbr-slot:hover .cbr-card{transform:translateY(-3px);box-shadow:0 0 0 2px #ffd400,0 5px 0 rgba(0,0,0,.35)}
@@ -145,6 +150,13 @@ const CSS = `
 .cbr-btn:disabled{cursor:default;opacity:.8}
 .cbr-btn.cbr-play{background:#20d6ff}
 .cbr-btn:focus-visible{outline:2px solid #fff;outline-offset:1px}
+@media (pointer:coarse){
+.cbr-scroll{overscroll-behavior-x:contain;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.cbr-track{animation:none}
+.cbr-slot{width:100px;scroll-snap-align:start}
+.cbr-card{width:100px}
+.cbr-btn{min-height:40px}
+}
 `;
 
 function Card({
@@ -241,9 +253,15 @@ export default function MissedBlocks({
   // The shared canvas mounts after the first paint (View needs its DOM slots)
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
+  const [coarse] = useState(
+    () =>
+      typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true,
+  );
   if (items.length === 0) return null;
-  // Twice over, so the reel loops seamlessly (it scrolls by half its width)
-  const reel = [...items, ...items];
+  // Twice over, so the reel loops seamlessly (it scrolls by half its width).
+  // On touch it doesn't drift (a moving DREAM / PLAY is hard to tap): it
+  // scrolls by finger, so each block is shown once.
+  const reel = coarse ? items : [...items, ...items];
   const play = (m: MissedBlock) => navigate(`/world?seed=${seedKey(m.seed)}`);
   return (
     <section className="cbr-wrap" aria-label="Missed blocks">
@@ -252,27 +270,42 @@ export default function MissedBlocks({
         MISSED BLOCKS · <b>{sinceEnded.toLocaleString()}</b> SINCE THE AUCTION ENDED
         {sinceEnded > items.length ? ` · LATEST ${items.length}` : ''}
       </div>
-      <div className="cbr-track" style={{ ['--cbr-dur' as string]: `${items.length * 3.2}s` }}>
-        {reel.map((m, i) => (
-          <Card
-            key={`${m.block}-${i}`}
-            m={m}
-            isV2={isV2}
-            phase={(i % items.length) * 0.7}
-            onPlay={play}
-          />
-        ))}
+      <div className="cbr-stage">
+        <div className="cbr-scroll">
+          <div className="cbr-track" style={{ ['--cbr-dur' as string]: `${items.length * 3.2}s` }}>
+            {reel.map((m, i) => (
+              <Card
+                key={`${m.block}-${i}`}
+                m={m}
+                isV2={isV2}
+                phase={(i % items.length) * 0.7}
+                onPlay={play}
+              />
+            ))}
+          </div>
+        </div>
+        {/* The shared canvas covers only the cards' band of the strip (the
+            Views draw nothing elsewhere), not the page or the buttons. */}
+        {ready && (
+          <Canvas
+            eventSource={document.body}
+            className="cbr-gl"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 108,
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+            gl={{ alpha: true, antialias: true }}
+            dpr={[1, 2]}
+          >
+            <View.Port />
+          </Canvas>
+        )}
       </div>
-      {ready && (
-        <Canvas
-          eventSource={document.body}
-          style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1 }}
-          gl={{ alpha: true, antialias: true }}
-          dpr={[1, 2]}
-        >
-          <View.Port />
-        </Canvas>
-      )}
     </section>
   );
 }

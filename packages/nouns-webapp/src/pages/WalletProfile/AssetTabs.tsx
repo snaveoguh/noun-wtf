@@ -27,8 +27,8 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   }, [profile.holdings]);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
-      <div className="lg:col-span-2">
+    <div className="@lg:grid-cols-3 grid gap-3">
+      <div className="@lg:col-span-2">
         <Card
           title={`Won, ${fmtInt(a?.wonCount ?? won.length)}`}
           right={<span className="wp-muted text-xs">spent {fmtEth(a?.totalSpentEth)}</span>}
@@ -36,7 +36,7 @@ export const AuctionsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
           {won.length === 0 ? (
             <Empty>No auction wins.</Empty>
           ) : (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+            <div className="@md:grid-cols-4 @lg:grid-cols-5 grid grid-cols-3 gap-3">
               {won.map(w => (
                 <div key={String(w.nounId)} className="min-w-0">
                   <NounLink nounId={w.nounId}>
@@ -114,13 +114,13 @@ export const NounsTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   const ens = useEnsNames(addrs);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
-      <div className="lg:col-span-2">
+    <div className="@lg:grid-cols-3 grid gap-3">
+      <div className="@lg:col-span-2">
         <Card title={`Held, ${fmtInt(h?.count ?? nouns.length)}`}>
           {nouns.length === 0 ? (
             <Empty>Holds no Nouns right now.</Empty>
           ) : (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+            <div className="@md:grid-cols-4 @lg:grid-cols-6 grid grid-cols-3 gap-3">
               {nouns.map(n => (
                 <div key={String(n.nounId)} className="min-w-0">
                   <NounLink nounId={n.nounId}>
@@ -241,8 +241,8 @@ export const TreasuryTab: FC<{ profile: WalletProfile }> = ({ profile }) => {
   const ens = useEnsNames(counterparties);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
-      <div className="grid gap-3 lg:col-span-2">
+    <div className="@lg:grid-cols-3 grid gap-3">
+      <div className="@lg:col-span-2 grid gap-3">
         <Card title={`Streams, ${streams.length}`}>
           {streams.length === 0 ? (
             <Empty>No treasury streams to this wallet.</Empty>

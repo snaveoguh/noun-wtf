@@ -81,3 +81,13 @@
     padding-right: 0.25rem;
   }
 }
+
+/* Touch: the winner link reaches 40 px. */
+@media (pointer: coarse) {
+  .link,
+  .link button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+}

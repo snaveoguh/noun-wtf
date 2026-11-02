@@ -1,0 +1,1945 @@
+{
+  "url": "/noun/2062?sections=heroTools",
+  "route": "noun/:id",
+  "group": "auction",
+  "kind": "page",
+  "label": "before",
+  "generated": "2026-11-01T04:57:15.340Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 8,
+    "worst": [
+      "window@320:23.9",
+      "window@360:21.2",
+      "window@390:20.8"
+    ],
+    "clean": 0,
+    "total": 26,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "window",
+      "width": 320,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": false,
+      "score": 23.9,
+      "counts": {
+        "overflowPx": 47,
+        "clipped": 0,
+        "covered": 1,
+        "overArt": 4,
+        "overlaps": 2,
+        "smallTargets": 0
+      },
+      "line": "overflow 47px · 1 covered · 4 on art · 2 overlaps",
+      "issues": {
+        "overflow": {
+          "px": 47,
+          "offenders": [
+            {
+              "selector": "div._heroMain > aside._heroSidebar > div._metaCard > div",
+              "px": 46,
+              "text": "November 01, 2026 Noun 2062"
+            },
+            {
+              "selector": "aside._heroSidebar > div._auctionCard > div.max-lg:mx-4.relative > div._wrapper",
+              "px": 46,
+              "text": "Current bid Ξ 0.00"
+            },
+            {
+              "selector": "div.max-lg:mx-4.relative > div._timerRow > div._wrapper._section > h2._timerWrapper._timeLeft",
+              "px": 35,
+              "text": "Auction ends in 22h 34m 11s"
+            },
+            {
+              "selector": "div.max-lg:mx-4.relative > div._bidGroup > div._bidActionRow > button._bidBtn.btn",
+              "px": 31,
+              "text": "Bid"
+            },
+            {
+              "selector": "aside._heroSidebar > div._auctionCard > div.max-lg:mx-4.relative > div._wrapper",
+              "px": 7,
+              "text": "RESERVE 2.8 ETH"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "by": "div._heroShell > div._heroMain > section._heroStage._bgCool > div._stageStatus"
+          }
+        ],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "b": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "pct": 39
+          },
+          {
+            "a": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "b": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "pct": 41
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-320.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 360,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": false,
+      "score": 21.2,
+      "counts": {
+        "overflowPx": 31,
+        "clipped": 0,
+        "covered": 1,
+        "overArt": 4,
+        "overlaps": 1,
+        "smallTargets": 0
+      },
+      "line": "overflow 31px · 1 covered · 4 on art · 1 overlaps",
+      "issues": {
+        "overflow": {
+          "px": 31,
+          "offenders": [
+            {
+              "selector": "div._heroMain > aside._heroSidebar > div._metaCard > div",
+              "px": 30,
+              "text": "November 01, 2026 Noun 2062"
+            },
+            {
+              "selector": "aside._heroSidebar > div._auctionCard > div.max-lg:mx-4.relative > div._wrapper",
+              "px": 30,
+              "text": "Current bid Ξ 0.00"
+            },
+            {
+              "selector": "div.max-lg:mx-4.relative > div._timerRow > div._wrapper._section > h2._timerWrapper._timeLeft",
+              "px": 17,
+              "text": "Auction ends in 22h 34m 8s"
+            },
+            {
+              "selector": "div.max-lg:mx-4.relative > div._bidGroup > div._bidActionRow > button._bidBtn.btn",
+              "px": 15,
+              "text": "Bid"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "by": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft"
+          }
+        ],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "b": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "pct": 66
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-360.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 390,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": false,
+      "score": 20.8,
+      "counts": {
+        "overflowPx": 19,
+        "clipped": 0,
+        "covered": 1,
+        "overArt": 4,
+        "overlaps": 1,
+        "smallTargets": 0
+      },
+      "line": "overflow 19px · 1 covered · 4 on art · 1 overlaps",
+      "issues": {
+        "overflow": {
+          "px": 19,
+          "offenders": [
+            {
+              "selector": "div._heroMain > aside._heroSidebar > div._metaCard > div",
+              "px": 18,
+              "text": "November 01, 2026 Noun 2062"
+            },
+            {
+              "selector": "aside._heroSidebar > div._auctionCard > div.max-lg:mx-4.relative > div._wrapper",
+              "px": 18,
+              "text": "Current bid Ξ 0.00"
+            },
+            {
+              "selector": "div.max-lg:mx-4.relative > div._timerRow > div._wrapper._section > h2._timerWrapper._timeLeft",
+              "px": 4,
+              "text": "Auction ends in 22h 34m 2s"
+            },
+            {
+              "selector": "div.max-lg:mx-4.relative > div._bidGroup > div._bidActionRow > button._bidBtn.btn",
+              "px": 3,
+              "text": "Bid"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "by": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft"
+          }
+        ],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "b": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "pct": 84
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-390.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 430,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": false,
+      "score": 14.1,
+      "counts": {
+        "overflowPx": 3,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 3px · 4 on art",
+      "issues": {
+        "overflow": {
+          "px": 3,
+          "offenders": [
+            {
+              "selector": "div._heroMain > aside._heroSidebar > div._metaCard > div",
+              "px": 2,
+              "text": "November 01, 2026 Noun 2062"
+            },
+            {
+              "selector": "aside._heroSidebar > div._auctionCard > div.max-lg:mx-4.relative > div._wrapper",
+              "px": 2,
+              "text": "Current bid Ξ 0.00"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-430.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 520,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-520.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 640,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-640.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 768,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-768.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 900,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-900.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1024,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1024.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1280,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1280.png",
+        "window-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1440,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1440.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1920,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1920.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 2560,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-2560.png",
+        "window-2560-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 5.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 1,
+        "overlaps": 0,
+        "smallTargets": 13
+      },
+      "line": "1 on art · 13 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn._tabActive",
+            "w": 47,
+            "h": 26,
+            "label": "Real"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 38,
+            "h": 26,
+            "label": "3D"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 55,
+            "h": 26,
+            "label": "ASCII"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 58,
+            "h": 26,
+            "label": "Sprite"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 64,
+            "h": 26,
+            "label": "2D Edit"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 65,
+            "h": 26,
+            "label": "3D Edit"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "w": 38,
+            "h": 38,
+            "label": "Default scroll mode"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Grab and inspect"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Download artwork (S)"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 30,
+            "h": 18,
+            "label": "Vote"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 41,
+            "h": 18,
+            "label": "Wallet"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 75,
+            "h": 18,
+            "label": "Playground"
+          },
+          {
+            "selector": "div._page > div._bar > div._root > button._trigger",
+            "w": 100,
+            "h": 29,
+            "label": "⚙ customise"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png",
+        "page-320-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 5.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 1,
+        "overlaps": 0,
+        "smallTargets": 13
+      },
+      "line": "1 on art · 13 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn._tabActive",
+            "w": 47,
+            "h": 26,
+            "label": "Real"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 38,
+            "h": 26,
+            "label": "3D"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 55,
+            "h": 26,
+            "label": "ASCII"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 58,
+            "h": 26,
+            "label": "Sprite"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 64,
+            "h": 26,
+            "label": "2D Edit"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 65,
+            "h": 26,
+            "label": "3D Edit"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "w": 38,
+            "h": 38,
+            "label": "Default scroll mode"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Grab and inspect"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Download artwork (S)"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 30,
+            "h": 18,
+            "label": "Vote"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 41,
+            "h": 18,
+            "label": "Wallet"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 75,
+            "h": 18,
+            "label": "Playground"
+          },
+          {
+            "selector": "div._page > div._bar > div._root > button._trigger",
+            "w": 100,
+            "h": 29,
+            "label": "⚙ customise"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png",
+        "page-360-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 5.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 1,
+        "overlaps": 0,
+        "smallTargets": 13
+      },
+      "line": "1 on art · 13 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn._tabActive",
+            "w": 47,
+            "h": 26,
+            "label": "Real"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 38,
+            "h": 26,
+            "label": "3D"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 55,
+            "h": 26,
+            "label": "ASCII"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 58,
+            "h": 26,
+            "label": "Sprite"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 64,
+            "h": 26,
+            "label": "2D Edit"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 65,
+            "h": 26,
+            "label": "3D Edit"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "w": 38,
+            "h": 38,
+            "label": "Default scroll mode"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Grab and inspect"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Download artwork (S)"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 30,
+            "h": 18,
+            "label": "Vote"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 41,
+            "h": 18,
+            "label": "Wallet"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 75,
+            "h": 18,
+            "label": "Playground"
+          },
+          {
+            "selector": "div._page > div._bar > div._root > button._trigger",
+            "w": 100,
+            "h": 29,
+            "label": "⚙ customise"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png",
+        "page-390-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 5.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 1,
+        "overlaps": 0,
+        "smallTargets": 13
+      },
+      "line": "1 on art · 13 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn._tabActive",
+            "w": 47,
+            "h": 26,
+            "label": "Real"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 38,
+            "h": 26,
+            "label": "3D"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 55,
+            "h": 26,
+            "label": "ASCII"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 58,
+            "h": 26,
+            "label": "Sprite"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 64,
+            "h": 26,
+            "label": "2D Edit"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 65,
+            "h": 26,
+            "label": "3D Edit"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "w": 38,
+            "h": 38,
+            "label": "Default scroll mode"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Grab and inspect"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Download artwork (S)"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 30,
+            "h": 18,
+            "label": "Vote"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 41,
+            "h": 18,
+            "label": "Wallet"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 75,
+            "h": 18,
+            "label": "Playground"
+          },
+          {
+            "selector": "div._page > div._bar > div._root > button._trigger",
+            "w": 100,
+            "h": 29,
+            "label": "⚙ customise"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png",
+        "page-430-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 5.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 1,
+        "overlaps": 0,
+        "smallTargets": 13
+      },
+      "line": "1 on art · 13 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn._tabActive",
+            "w": 47,
+            "h": 26,
+            "label": "Real"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 38,
+            "h": 26,
+            "label": "3D"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 55,
+            "h": 26,
+            "label": "ASCII"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 58,
+            "h": 26,
+            "label": "Sprite"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 64,
+            "h": 26,
+            "label": "2D Edit"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 65,
+            "h": 26,
+            "label": "3D Edit"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "w": 38,
+            "h": 38,
+            "label": "Default scroll mode"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Grab and inspect"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Download artwork (S)"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 30,
+            "h": 18,
+            "label": "Vote"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 41,
+            "h": 18,
+            "label": "Wallet"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 75,
+            "h": 18,
+            "label": "Playground"
+          },
+          {
+            "selector": "div._page > div._bar > div._root > button._trigger",
+            "w": 100,
+            "h": 29,
+            "label": "⚙ customise"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png",
+        "page-520-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 5.4,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 1,
+        "overlaps": 0,
+        "smallTargets": 13
+      },
+      "line": "1 on art · 13 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn._tabActive",
+            "w": 47,
+            "h": 26,
+            "label": "Real"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 38,
+            "h": 26,
+            "label": "3D"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 55,
+            "h": 26,
+            "label": "ASCII"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 58,
+            "h": 26,
+            "label": "Sprite"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 64,
+            "h": 26,
+            "label": "2D Edit"
+          },
+          {
+            "selector": "div._heroShell > div._heroTopRow > div._heroTabs > button._tabBtn",
+            "w": 65,
+            "h": 26,
+            "label": "3D Edit"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "w": 38,
+            "h": 38,
+            "label": "Default scroll mode"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Grab and inspect"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "w": 38,
+            "h": 38,
+            "label": "Download artwork (S)"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 30,
+            "h": 18,
+            "label": "Vote"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 41,
+            "h": 18,
+            "label": "Wallet"
+          },
+          {
+            "selector": "div._page > div._bar > nav._links > a",
+            "w": 75,
+            "h": 18,
+            "label": "Playground"
+          },
+          {
+            "selector": "div._page > div._bar > div._root > button._trigger",
+            "w": 100,
+            "h": 29,
+            "label": "⚙ customise"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png",
+        "page-640-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 507,
+      "tier": "sm",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png",
+        "page-768-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 594,
+      "tier": "md",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png",
+        "page-900-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 676,
+      "tier": "md",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png",
+        "page-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 845,
+      "tier": "lg",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png",
+        "page-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 950,
+      "tier": "lg",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png",
+        "page-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1267,
+      "tier": "xl",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png",
+        "page-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 1690,
+      "tier": "2xl",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 4,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "4 on art",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn._railBtnActive",
+            "label": "Default scroll mode",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroMain > section._heroStage._bgCool > div._heroControlRail > button._railBtn",
+            "label": "Grab and inspect",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "section._heroStage._bgCool > div._heroControlRail > div._downloadWrap > button._railBtn",
+            "label": "Download artwork (S)",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          },
+          {
+            "selector": "div._heroShell > div._heroMain > section._heroStage._bgCool > button._navArrow._navArrowLeft",
+            "label": "Previous Noun",
+            "art": "section._heroStage._bgCool > div._heroArtFrame > div > img"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png",
+        "page-2560-s2.png"
+      ]
+    }
+  ]
+}

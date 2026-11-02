@@ -190,7 +190,25 @@
   padding: 0;
 }
 
-@media (max-width: 640px) {
+/* Narrow page (phone, narrow window): Bid goes full width on top, "View all
+   bids" sits centred under it instead of being squeezed beside it. */
+@container page (max-width: 559.98px) {
+  .bidActionRow,
+  .bidActionRow:has(> :nth-child(2)) {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .bidActionRow > .bidBtn,
+  :global([data-theme]) .bidActionRow > .bidBtn.bidBtn {
+    order: -1;
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0 !important;
+  }
+}
+
+@container page (max-width: 559.98px) {
   .bidInput {
     height: 48px;
     font-size: 18px;

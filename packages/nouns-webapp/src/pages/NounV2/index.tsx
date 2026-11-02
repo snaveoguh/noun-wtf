@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react';
 
 import { Link } from 'react-router';
@@ -27,6 +26,12 @@ import {
 } from '@/contracts/nounv2-treasury';
 
 import classes from './NounV2.module.css';
+
+/** wagmi/viem errors carry a short, user-facing `shortMessage`. */
+function shortMessage(e: unknown): string | undefined {
+  const m = (e as { shortMessage?: unknown } | null | undefined)?.shortMessage;
+  return typeof m === 'string' && m !== '' ? m : undefined;
+}
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
@@ -67,8 +72,7 @@ export default function NounV2Page() {
   const { data: blockNumber } = useBlockNumber({ watch: true });
 
   const addressesMissing =
-    NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS ||
-    NOUNV2_TREASURY_ADDRESS === ZERO_ADDRESS;
+    NOUNV2_AUCTION_HOUSE_ADDRESS === ZERO_ADDRESS || NOUNV2_TREASURY_ADDRESS === ZERO_ADDRESS;
 
   const { data: balance } = useBalance({
     address: NOUNV2_TREASURY_ADDRESS,
@@ -77,10 +81,7 @@ export default function NounV2Page() {
   const treasuryEth = balance ? formatEther(balance.value) : '0';
 
   // ─── Active auction ─────────────────────────────────────────────
-  const {
-    data: auctionData,
-    refetch: refetchAuction,
-  } = useReadContract({
+  const { data: auctionData, refetch: refetchAuction } = useReadContract({
     address: NOUNV2_AUCTION_HOUSE_ADDRESS,
     abi: nounV2AuctionHouseAbi,
     functionName: 'auction',
@@ -108,7 +109,7 @@ export default function NounV2Page() {
     | readonly [bigint, bigint, bigint, bigint, `0x${string}`, boolean]
     | undefined;
 
-  const [nounId, bidAmount, _startTime, endTime, bidder, settled] = auction ?? [];
+  const [nounId, bidAmount, , endTime, bidder, settled] = auction ?? [];
 
   const now = Math.floor(Date.now() / 1000);
   const secondsLeft = endTime != null ? Number(endTime) - now : 0;
@@ -124,12 +125,7 @@ export default function NounV2Page() {
 
   // ─── Bid form ────────────────────────────────────────────────────
   const [bidInput, setBidInput] = useState('');
-  const {
-    writeContractAsync,
-    data: txHash,
-    isPending,
-    reset: resetWrite,
-  } = useWriteContract();
+  const { writeContractAsync, data: txHash, isPending, reset: resetWrite } = useWriteContract();
   const { isSuccess: txConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
 
   useEffect(() => {
@@ -171,8 +167,8 @@ export default function NounV2Page() {
         value,
       });
       toast.success('Bid submitted');
-    } catch (e: any) {
-      toast.error(e?.shortMessage || 'Bid failed');
+    } catch (e: unknown) {
+      toast.error(shortMessage(e) ?? 'Bid failed');
     }
   }
 
@@ -184,8 +180,8 @@ export default function NounV2Page() {
         functionName: 'settleCurrentAndCreateNewAuction',
       });
       toast.success('Settlement submitted');
-    } catch (e: any) {
-      toast.error(e?.shortMessage || 'Settle failed');
+    } catch (e: unknown) {
+      toast.error(shortMessage(e) ?? 'Settle failed');
     }
   }
 
@@ -298,7 +294,9 @@ export default function NounV2Page() {
         <div className={classes.titleRow}>
           <h1 className={classes.title}>NounV2</h1>
           <span className={classes.badge}>NEW</span>
-          {balance && <span className={classes.treasury}>{parseFloat(treasuryEth).toFixed(4)} ETH</span>}
+          {balance && (
+            <span className={classes.treasury}>{parseFloat(treasuryEth).toFixed(4)} ETH</span>
+          )}
         </div>
         <p className={classes.subtitle}>
           A Nouns fork with no-reserve auctions. Proceeds route to a beneficiary. Governance is a
@@ -328,9 +326,7 @@ export default function NounV2Page() {
               </div>
             </div>
             <div>
-              <div className={classes.auctionStatLabel}>
-                {auctionEnded ? 'Status' : 'Ends in'}
-              </div>
+              <div className={classes.auctionStatLabel}>{auctionEnded ? 'Status' : 'Ends in'}</div>
               <div className={classes.auctionStatValue}>
                 {auctionEnded ? 'Ended' : formatSecondsLeft(secondsLeft)}
               </div>
@@ -347,9 +343,7 @@ export default function NounV2Page() {
             </div>
             <div>
               <div className={classes.auctionStatLabel}>Min Next Bid</div>
-              <div className={classes.auctionStatValue}>
-                {formatEther(minNextBid)} ETH
-              </div>
+              <div className={classes.auctionStatValue}>{formatEther(minNextBid)} ETH</div>
             </div>
           </div>
 
@@ -366,6 +360,7 @@ export default function NounV2Page() {
                   min="0"
                 />
                 <button
+                  type="button"
                   className={classes.auctionBidBtn}
                   onClick={handleBid}
                   disabled={isPending || !userAddr}
@@ -381,6 +376,7 @@ export default function NounV2Page() {
 
           {auctionEnded && settled !== true && (
             <button
+              type="button"
               className={classes.settleBtn}
               onClick={handleSettle}
               disabled={isPending || !userAddr}
@@ -394,11 +390,7 @@ export default function NounV2Page() {
       {/* ─── Proposal list ───────────────────────────────────── */}
       <div className={classes.sectionTitle}>
         Governance ({proposalCount} {proposalCount === 1 ? 'proposal' : 'proposals'})
-        <Link
-          to="/nounv2/create"
-          className={classes.createBtn}
-          style={{ float: 'right', marginTop: -4 }}
-        >
+        <Link to="/nounv2/create" className={classes.createBtn}>
           + New Proposal
         </Link>
       </div>
@@ -417,9 +409,7 @@ export default function NounV2Page() {
           const forPct = totalVotes > 0 ? (Number(p.forVotes) / totalVotes) * 100 : 50;
           const isActive = p.state === NounV2ProposalState.Active;
           const blocksLeft =
-            isActive && blockNumber != null
-              ? Number(p.endBlock - (blockNumber ?? 0n))
-              : 0;
+            isActive && blockNumber != null ? Number(p.endBlock - (blockNumber ?? 0n)) : 0;
           const hoursLeft = Math.max(0, (blocksLeft * 12) / 3600);
 
           return (
