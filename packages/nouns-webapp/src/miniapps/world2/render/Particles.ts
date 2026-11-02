@@ -179,6 +179,32 @@ export class Particles {
     }
   }
 
+  /** A little puff of pipe smoke (rises, drifts, fades). Uses the dust pool: no extra draw. */
+  smokeAt(pos: THREE.Vector3, n = 4) {
+    for (let i = 0; i < n; i++) {
+      const life = 1.8 + Math.random() * 1.2;
+      const g = 0.82 + Math.random() * 0.12;
+      this.dust.emit({
+        pos: pos
+          .clone()
+          .add(
+            new THREE.Vector3((Math.random() - 0.5) * 0.06, i * 0.03, (Math.random() - 0.5) * 0.06),
+          ),
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.12 + 0.05,
+          0.25 + Math.random() * 0.2,
+          (Math.random() - 0.5) * 0.12,
+        ),
+        life,
+        maxLife: life,
+        size: 0.16 + Math.random() * 0.12,
+        color: new THREE.Color(g, g, g * 1.02),
+        gravity: -0.08,
+        drag: 0.5,
+      });
+    }
+  }
+
   update(dt: number, groundY: (p: THREE.Vector3) => number | null) {
     this.sparks.update(dt, groundY);
     this.dust.update(dt, () => null);

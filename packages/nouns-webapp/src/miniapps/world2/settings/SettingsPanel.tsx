@@ -370,6 +370,11 @@ function Panel({ game, onClose }: { game: Game; onClose: () => void }) {
               on={s.reduceMotion}
               onClick={() => settings.update({ reduceMotion: !s.reduceMotion })}
             />
+            <Toggle
+              name="Trippy intro (flashing style cuts)"
+              on={s.introFx && !s.reduceMotion}
+              onClick={() => settings.update({ introFx: !s.introFx })}
+            />
           </div>
         </Section>
 

@@ -15,6 +15,7 @@ export function applySettings(game: Game, s: WorldSettings) {
   game.input.lookSensitivity = s.lookSens;
   game.input.invertY = s.invertY;
   game.cam.shakeScale = s.reduceMotion ? 0 : 1;
+  game.camp.introFx = s.introFx && !s.reduceMotion;
   if (game.cam.mode !== s.camMode) game.cam.mode = s.camMode;
   game.voiceMode = s.voices;
   game.frameCap = capFps(s.frameCap);

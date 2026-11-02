@@ -7,10 +7,10 @@ Everything here is re-runnable: change a shot or an edit list, render, cut.
 | File | What |
 | --- | --- |
 | `shots.mjs` | Every shot: its scene, frame count, and a page-side `setup(arg)` that stages the moment and installs `window.__sizzleFrame` (advance one 1/30 s frame, leave it drawn). |
-| `scenes.mjs` | Scene openers: Noun World (`world`), the Big Drop (`bigdrop`), a Noun Breaks battle (`breaks`), Noun Hoops (`hoops`), the 3D Grand Exchange (`exchange`), the pool hall (`pool`), NOUN PARKOUR (`parkour`), Noun Warfare (`warfare`, `__wf`: slow motion via `frame(speed)`). They stop the game loop and install `__sz` / `__bd` / `__d` / `__gx` / `__pl` / `__pk` helpers. |
+| `scenes.mjs` | Scene openers: Noun World (`world`), NOUNS CAMP (`camp`: the CAMP spawn, its opening shot replayed seeded via `__camp.intro(seed)`), the plaza on a missingnoun (`missingnoun`), the Big Drop (`bigdrop`), a Noun Breaks battle (`breaks`), Noun Hoops (`hoops`), the 3D Grand Exchange (`exchange`), the pool hall (`pool`), NOUN PARKOUR (`parkour`), Noun Warfare (`warfare`, `__wf`: slow motion via `frame(speed)`). They stop the game loop and install `__sz` / `__bd` / `__d` / `__gx` / `__pl` / `__pk` helpers. |
 | `edits/*.json` | Edit lists: which shots, in and out points, crossfades, grade, exact length, poster time. One per clip. |
 | `render.mjs` | Renders the shots an edit list (or `--shots a,b`) needs into `.frames/<shot>/f0000.jpg…` (git-ignored), opening each scene once. |
-| `cut.mjs` | Cuts the frames into `<name>.webm` (VP9) + `<name>.mp4` (H.264, faststart) + `<name>-poster.jpg` in `public/home/`, at 1920×1080, with a bitrate ceiling (`maxrate`, default 2.4 Mbit/s) so a 12 s clip stays under ~4 MB. |
+| `cut.mjs` | Cuts the frames into `<name>.webm` (VP9) + `<name>.mp4` (H.264, faststart) + `<name>-poster.jpg` in `public/home/` (or the edit list's `out`), at 1920×1080 (or its `size`), with a bitrate ceiling (`maxrate`, default 2.4 Mbit/s) so a 12 s clip stays under ~4 MB. |
 | `SHOTLIST.md` | The shot list: every shot, what's in it, and which reel uses it. |
 | `lib.mjs` | Browser launch, the clean-frame CSS, the frame loop. |
 
@@ -52,6 +52,28 @@ time.
 | `hero-parkour` | `edits/parkour.json` | `parkour` |
 | `hero-pool` | `edits/pool.json` | `pool` |
 | `hero-warfare` | `edits/warfare.json` | `warfare` |
+
+### Social clips (`public/clips/`)
+
+Short clips for socials, each in vertical 1080×1920 (`-v`) and horizontal
+1920×1080 (`-h`), not wired into the homepage. Their edit lists carry
+`"size"`, `"out": "public/clips"` and `"frames"` (`.frames-v` for the
+vertical renders, so they never mix with the 1920×1080 frames of the same
+shots); `render.mjs --edit` renders at the edit's `size`
+(`SIZZLE_SCALE=0.5` for a half-size preview). A vertical frame gets a
+wider lens than the game's (`sz.fovK`, a shot's `portraitK`, default
+≈1.4): the game's fov is vertical, so 9:16 at the same fov sees a sliver.
+
+| Clip | Edit lists | What |
+| --- | --- | --- |
+| `camp-flyin-{v,h}` | `edits/camp-flyin-{v,h}.json` | CAMP's opening shot (seed 3): over the plaza, in through the window, into the rider's eyes, flicking through MEME VALUE. Ends before the pull-out (the camera passes through the rider's head there). |
+| `camp-jump-{v,h}` | `edits/camp-jump-{v,h}.json` | Run at CAMP's window, leap, 146 m down the tower, roll the landing. |
+| `missingnoun-skate-{v,h}` | `edits/missingnoun-skate-{v,h}.json` | A missingnoun rider (`?seed=1-13-31-138-7-m`) skating the plaza with flip tricks: side, orbit, chase. |
+
+```bash
+node scripts/sizzle/render.mjs --base http://127.0.0.1:5321 --edit scripts/sizzle/edits/camp-flyin-v.json --edit scripts/sizzle/edits/camp-jump-v.json
+node scripts/sizzle/cut.mjs scripts/sizzle/edits/camp-flyin-v.json
+```
 
 ### Music
 

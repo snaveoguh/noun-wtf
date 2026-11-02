@@ -4,7 +4,9 @@
 // (Mali-G52 / Adreno 5xx class, 3–4 GB): 1x pixels, a 1024 shadow map and a
 // full-screen ink pass. A *weak* device boots one step lighter (render scale
 // below 1), and the runtime ladder keeps stepping down while the frame rate
-// stays bad: render scale → no shadows → no ink pass (straight render).
+// stays bad: render scale → no shadows → no ink. None of the rungs relinks a
+// material (Graphics.applyLite), and a tablet boots within a phone's pixel
+// budget (budgetScale).
 // Pure functions; Game/Graphics apply them.
 
 import type { Quality } from './Graphics';
@@ -91,14 +93,34 @@ export function readDevice(gl?: WebGLRenderingContext | WebGL2RenderingContext |
 export const WEAK_BOOT_SCALE = 0.75;
 /** Lowest render scale the ladder goes to before dropping features. */
 export const MIN_SCALE = 0.6;
+
+/**
+ * CSS pixels a 'low' frame draws at render scale 1 before the boot scale
+ * comes down: about a big phone (430×932 is 0.40 MP). A tablet on 'low'
+ * drew ~1 MP (iPad 1180×820, Android 1280×800), 3× a phone's pixels through
+ * the scene and the ink pass on a phone-class GPU, so it was the device
+ * most likely to walk the ladder down to the shadow / ink rungs.
+ */
+export const LOW_PIXEL_BUDGET = 600_000;
+
+/**
+ * Render scale that keeps a 'low' frame within `budget` CSS px² (in 0.05
+ * steps, never under MIN_SCALE). Phones come out at 1, tablets ~0.75.
+ */
+export function budgetScale(w: number, h: number, budget = LOW_PIXEL_BUDGET): number {
+  const area = w * h;
+  if (!(area > budget)) return 1;
+  return Math.max(MIN_SCALE, Math.floor(Math.sqrt(budget / area) * 20 + 1e-9) / 20);
+}
 /** Each rung of render scale. */
 export const SCALE_STEP = 0.15;
 
 export interface LiteState {
   /** Pixel ratio the renderer uses. */
   scale: number;
+  /** Off: the sun's shadow map is cleared and frozen (no relink; Graphics.applyLite). */
   shadows: boolean;
-  /** Ink outline + post (off = straight render, no composer). */
+  /** Ink outline (off: the ink pass only copies to the screen; no relink). */
   post: boolean;
   /** Desktop: the SMAA pass (absent = as built). */
   aa?: boolean;

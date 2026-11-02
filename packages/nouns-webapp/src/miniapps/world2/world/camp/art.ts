@@ -3,8 +3,8 @@
 // The MEME VALUE cover and the spreads lying open (the book's own page
 // images, loaded after the room is up), the whiteboard's ice cream van
 // plans, the sunset poster, the closure notice and the NOUNS CAMP tag.
-// One texture, one material ('art' in the room's kit). 2048 × 1792, half on a
-// weak phone's texture diet.
+// One texture, one material ('art' in the room's kit). 2048 × 1792, half on
+// either texture diet (weak phones; every other phone / tablet on the light one).
 
 import * as THREE from 'three';
 
@@ -87,7 +87,8 @@ export interface CampArt {
 const PAGE_URL = (n: number) => `/books/meme-value/sm/p${String(n).padStart(3, '0')}.webp`;
 
 export function buildCampArt(): CampArt {
-  const S = textureDiet.on ? 512 : 1024;
+  // Half size on either diet: 2048 × 1792 with mips was 25 MB of an iPad's GPU
+  const S = textureDiet.on || textureDiet.light ? 512 : 1024;
   const k = S / 1024;
   const canvas = document.createElement('canvas');
   canvas.width = AW * k;

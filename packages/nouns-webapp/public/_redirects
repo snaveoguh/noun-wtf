@@ -26,6 +26,13 @@ https://www.probe.wtf/*  https://noun.wtf/probe  301!
 /v2/noun/:id     /.netlify/functions/og-proposal  200
 /og/noun/:file     /.netlify/functions/og-noun-image  200
 /og/v2/noun/:file  /.netlify/functions/og-noun-image  200
+# Noun World: /world and play-as links (/world?seed=<rider key>) unfurl as
+# the rider with "PLAY AS ME", plus the Farcaster mini app embed. The
+# function serves the SPA shell, so the game loads as usual. The card
+# images are drawn by og-rider-image.
+/world             /.netlify/functions/og-proposal     200
+/og/world/fc/:file /.netlify/functions/og-rider-image  200
+/og/world/:file    /.netlify/functions/og-rider-image  200
 
 # Read-only proxy to the pooter.world trading bot API for the terminal's
 # TRADING tab (TradingPanel.tsx). Same-origin so the browser needs no CORS.

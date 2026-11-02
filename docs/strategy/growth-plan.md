@@ -28,7 +28,7 @@ From the public `world-stats` and `world-exchange` endpoints:
 | wallets linked | 2 |
 | Grand Exchange | only bots trade. Treasury 0, last fill 5 days before the read |
 | D1 / D7 retention | **can't be measured yet** (see below) |
-| graffiti pieces a day | **can't be measured yet**: tags aren't attributed or counted per day |
+| graffiti pieces a day | **not counted per day yet** (tags are anonymous by design; count them, not who made them) |
 
 That's a promising, very deep game with almost no audience yet. Every step below is about
 getting people in, getting them back the next day, and giving them a reason to make things.
@@ -43,8 +43,8 @@ You can't gate on numbers you don't collect:
   - a `?src=` parameter on every shared link (clip, play-as, mini app, Noun O'Clock), kept
     with the rider's first session;
   - privacy: a source tag, never a profile.
-- **Creator counts:** tags per day per wall now. Attributed pieces per rider once the snapshot
-  work signs strokes.
+- **Creator counts:** tags per day per wall now, and distinct writer tags (anonymous) once
+  tags exist. Never per rider.
 - **Trade ledger aggregates:** daily COIN earned, spent and held per rider (the 600/day figure
   in `SUPPLY.md` is a guess).
 - **A private dashboard** of the gate metrics below, with weekly numbers kept so the trend
@@ -119,8 +119,9 @@ Goal: what you do in the city is kept, and is yours.
 
 - **Daily Base snapshot** of graffiti and proved records (in progress elsewhere): a
   merkle root a day.
-  - **Attribution:** each piece signed by its rider or linked address. Graffiti POSTs carry no
-    rider today (`world-graffiti.ts`).
+  - **Graffiti stays anonymous:** a piece is either untagged or signed with an optional
+    writer's tag. The tag key lives on the writer's device and isn't linked to their rider or
+    wallet (token-design.md §6a).
   - **Free:** being in the snapshot costs nothing.
 - **Minting your own piece or record** as an edition is optional: ETH now, CITY later.
 - **Wallet linking becomes worth doing.** World-stats `link` exists (2 linked today). Linking
@@ -134,8 +135,8 @@ Goal: what you do in the city is kept, and is yours.
 
 | metric | target |
 | --- | ---: |
-| weekly active creators (≥ 1 attributed piece a week) | ≥ 100 |
-| attributed pieces a day | ≥ 150 |
+| weekly active creators (distinct writer tags painting, plus other creators) | ≥ 100 |
+| graffiti pieces a day | ≥ 150 |
 | linked wallets | ≥ 500 |
 | snapshot pieces minted by their painters | ≥ 50 a week (proves people want ownership) |
 
@@ -173,7 +174,7 @@ hauling cargo, hosting events. They earn by serving people, not by being paid to
 | D1 retention (rolling cohort) | ≥ 30% |
 | D7 retention | ≥ 12% |
 | weekly active creators | ≥ 200 |
-| attributed graffiti pieces a day | ≥ 300 |
+| graffiti pieces a day | ≥ 300 |
 | agent trades a day (≥ 50% with a human counterparty) | ≥ 1,000 |
 | linked wallets | ≥ 1,500 |
 
@@ -181,7 +182,7 @@ Plus the non-negotiables:
 
 - counsel's written sign-off for the launch jurisdictions, and a geofence;
 - anti-farm defences live and tested (token-design.md §6). Respect events made
-  server-witnessed, graffiti attributed;
+  server-witnessed, writer's tags and props live;
 - a shop of CITY sinks people want (walls, rooms, styles, events) built *before* launch, so the
   first thing anyone can do with CITY is use it;
 - contracts audited: ERC-20, merkle distributor, governor and timelock, vesting;
@@ -208,7 +209,7 @@ that promises conversion, sell anything, or list on a CEX in the first months.
 | D1 | ? | 25% | 28% | 30% | 30% |
 | D7 | ? | 8% | 10% | 12% | 12% |
 | weekly active creators | ? | — | 100 | 150 | 200 |
-| attributed pieces a day | 0 | — | 150 | 200 | 300 |
+| graffiti pieces a day | ? | — | 150 | 200 | 300 |
 | agent trades a day | bots only | — | — | 1,000 | 1,000 |
 | linked wallets | 2 | 100 | 500 | 1,000 | 1,500 |
 

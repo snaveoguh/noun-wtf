@@ -36,12 +36,14 @@ import {
   type CharacterAssets,
 } from './character/NounCharacter';
 import { encodeOutfit, type Outfit } from './character/outfit';
+import { FrameGuard } from './core/frameGuard';
 import { Input, type InputFrame } from './core/Input';
 import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
 import { Graffiti } from './graffiti/Graffiti';
+import { MuralMode } from './graffiti/mural/MuralMode';
 import { HideSeekMode } from './hideseek/net/HideSeekMode';
 import { courtSpawn, hoopsEntry } from './hoops/net/court';
 import { HoopsMode } from './hoops/net/HoopsMode';
@@ -68,7 +70,13 @@ import {
   type TownThemeState,
 } from './radio/townTheme';
 import { localTransport, netTransport } from './radio/transport';
-import { autoQuality, isWeakDevice, readDevice, WEAK_BOOT_SCALE } from './render/deviceTier';
+import {
+  autoQuality,
+  budgetScale,
+  isWeakDevice,
+  readDevice,
+  WEAK_BOOT_SCALE,
+} from './render/deviceTier';
 import { BLURRED_FPS, COVERED_FPS, effectiveFps, makePacer, pace } from './render/framePacer';
 import { bootScale, Graphics, type Quality } from './render/Graphics';
 import { Particles } from './render/Particles';
@@ -86,8 +94,11 @@ import {
 import { ShaderWarmer } from './render/shaderWarm';
 import { SkateCamera } from './render/SkateCamera';
 import {
+  bootsAfterLoss,
   capUploads,
   checkTextureBudget,
+  lastLoss,
+  LIGHT_CAP,
   textureDiet,
   watchContextLoss,
 } from './render/textureDiet';
@@ -108,6 +119,7 @@ import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
 import { TradeClient } from './trade/TradeClient';
 import { VanDrive } from './van/VanDrive';
+import { BenchSystem } from './world/bench/BenchSystem';
 import { CampSystem } from './world/camp/CampSystem';
 import { FacadeSystem } from './world/facades/FacadeSystem';
 import { buildIceCreamVan, vanStation, type VanStation } from './world/IceCreamVan';
@@ -271,6 +283,9 @@ export interface GameOptions {
   offline?: boolean;
 }
 
+/** New remote riders' Nouns built per frame (a build is a hitch: see updateNetwork). */
+const REMOTE_BUILDS_PER_FRAME = 1;
+
 export class Game {
   gfx: Graphics;
   input: Input;
@@ -346,6 +361,8 @@ export class Game {
   net = new Net();
   particles = new Particles();
   graffiti: Graffiti | null = null;
+  /** Mural mode: the camera squared up to a wall, pen / finger painting (graffiti/mural/). */
+  readonly mural = new MuralMode(this);
   /** On-chain drop party pickups (null when VITE_WORLD_DROPS_ADDRESS is unset). */
   readonly drops = Drops.create();
   level: LevelData | null = null;
@@ -366,6 +383,8 @@ export class Game {
   readonly interiors: InteriorSystem = new InteriorSystem(this);
   /** NOUNS CAMP (world/camp/): the condemned penthouse every first spawn wakes up in. */
   readonly camp: CampSystem = new CampSystem(this);
+  /** The mural bench (world/bench/): Pipe, SIT, the cinematic shot of the GIF mural. */
+  readonly bench: BenchSystem = new BenchSystem(this);
   /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
   readonly facades: FacadeSystem = new FacadeSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
@@ -401,7 +420,7 @@ export class Game {
   private fpsAcc = 0;
   private fpsFrames = 0;
   private listeners = new Set<() => void>();
-  private labelLayer: HTMLElement;
+  readonly labelLayer: HTMLElement;
   /** The name-tag DOM layer (hoops/view puts its ballers' tags there). */
   get labelLayerEl(): HTMLElement {
     return this.labelLayer;
@@ -436,19 +455,24 @@ export class Game {
     this.seed = opts.seed ?? randomSeed();
     this.nounId = opts.nounId ?? 0;
     this.name = opts.name ?? `noun ${seedKey(this.seed).split('-')[3]}`;
-    const quality = opts.quality ?? autoQuality(readDevice());
+    // A page loaded right after a lost context boots lighter (render/textureDiet.ts)
+    const afterLoss = bootsAfterLoss(Date.now(), lastLoss());
+    const auto = autoQuality(readDevice());
+    const quality = opts.quality ?? (afterLoss && auto === 'high' ? 'medium' : auto);
     this.gfx = new Graphics(opts.canvas, quality);
     // Low: only the rider's own Noun casts a shadow (NPCs, customers, remotes don't)
     NounCharacter.castShadows = quality !== 'low';
     // 'low' picked automatically: a weak phone boots lighter and the ladder
     // may keep stepping down (an explicit Low / ?q=low stays as chosen)
     if (quality === 'low' && opts.quality === undefined) {
-      this.weakDevice = isWeakDevice(readDevice(this.gfx.renderer.getContext()));
-      if (this.weakDevice)
-        this.gfx.applyLite({
-          ...this.gfx.lite,
-          scale: Math.min(this.gfx.lite.scale, WEAK_BOOT_SCALE),
-        });
+      this.weakDevice = afterLoss || isWeakDevice(readDevice(this.gfx.renderer.getContext()));
+      // A tablet draws a phone's worth of pixels, not 3× (deviceTier budgetScale)
+      const scale = Math.min(
+        this.gfx.lite.scale,
+        this.weakDevice ? WEAK_BOOT_SCALE : 1,
+        budgetScale(window.innerWidth, window.innerHeight),
+      );
+      if (scale !== this.gfx.lite.scale) this.gfx.applyLite({ ...this.gfx.lite, scale });
       this.adaptive = makeController(phoneRungs(this.gfx.lite), PHONE_TUNING);
     } else if (quality !== 'low') {
       this.adaptive = makeController(
@@ -456,17 +480,20 @@ export class Game {
         DESKTOP_TUNING,
       );
     }
-    // A weak phone also goes on the texture diet (render/textureDiet.ts)
+    // A weak phone goes on the texture diet, every other auto-'low' phone /
+    // tablet on the light one (render/textureDiet.ts). Set before anything loads.
     textureDiet.on = this.weakDevice;
+    textureDiet.light = !this.weakDevice && quality === 'low' && opts.quality === undefined;
     if (this.weakDevice) {
       capUploads(this.gfx.renderer);
       this.gfx.sun.shadow.mapSize.set(512, 512);
-      this.unwatchLoss = watchContextLoss(opts.canvas);
-    }
+    } else if (textureDiet.light) capUploads(this.gfx.renderer, LIGHT_CAP);
+    // Every device: a lost context reloads (lighter) instead of a black world
+    this.unwatchLoss = watchContextLoss(opts.canvas);
     const perfOpts = perfParam();
     if (perfOpts !== null) {
       perf.enable(this.gfx.renderer, perfOpts);
-      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}`;
+      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}${textureDiet.light ? ' (light diet)' : ''}${afterLoss ? ' (after a lost context)' : ''}`;
     }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
@@ -574,6 +601,8 @@ export class Game {
     }
     this.cars.stripBaked(level);
     this.world.build(level.collisionMeshes);
+    // Placed against the static collision only (the same on every client)
+    this.bench.start(level);
     this.player.softBounds = level.softBounds ?? Infinity;
     if (level.mountain !== undefined) this.buildMountain(level);
     const fountain = level.spawns.find(s => /fountain/i.test(s.name ?? ''));
@@ -1012,11 +1041,35 @@ export class Game {
     if (raw > 0 && raw < 1000 && this.frameMs.length < 600) this.frameMs.push(raw);
     if (dt <= 0) return;
     perf.frameStart(now);
-    this.warmer?.tick(dt);
-    perf.lap('warm');
-    this.step(dt, now);
+    try {
+      this.warmer?.tick(dt);
+      perf.lap('warm');
+      this.step(dt, now);
+      this.frameGuard.ok();
+    } catch (err) {
+      this.frameFailed(err, dt);
+    }
     perf.frameEnd();
   };
+
+  /** Errors in a frame (core/frameGuard.ts): the loop goes on, the picture too. */
+  readonly frameGuard = new FrameGuard();
+
+  private frameFailed(err: unknown, dt: number) {
+    const a = this.frameGuard.failed(err);
+    if (a.report) {
+      console.error('[noun world] a frame failed; carrying on', err);
+      perf.extra.frameError = String(err).slice(0, 160);
+    }
+    // The opening shot's grade / camera / book are the newest moving parts:
+    // drop them, so a throw there leaves the plain game, not a frozen frame
+    if (a.abortIntro) this.camp.abortIntro();
+    try {
+      this.gfx.render(dt);
+    } catch {
+      // the render itself is what failed: nothing more to do this frame
+    }
+  }
 
   /** Dev: Noun Breaks' battle view on its mock battle, in front of the skater (breakdance/view/dev.ts). */
   breakDev = (o?: import('./breakdance/view/dev').BreakDevOptions) =>
@@ -1139,6 +1192,8 @@ export class Game {
     if (this.cutscene.active) return this.stepCutscene(dt, now);
     this.cutscene.tick();
     const input = this.input.poll(now);
+    this.mural.tick(dt, input);
+    this.bench.tick(dt, input);
     // Driving the ice cream van: E / R / spray are the van's this frame
     const driving =
       this.van2.preStep(input) || this.cars.preStep(input) || this.dragon.preStep(input);
@@ -1225,6 +1280,7 @@ export class Game {
     perf.lap('missions');
     this.interiors.update(dt);
     this.camp.update(dt);
+    this.bench.update(dt);
     // A pocket room and the Big Drop set their own light: the sky waits
     if (this.todClock.tick(dt, this.interiors.inside || this.missions.ud.active))
       this.cycleTimeOfDay();
@@ -1263,6 +1319,7 @@ export class Game {
       this.nature?.update(dt, this.player.pos);
       this.billboards.update(dt, this.gfx.camera.position);
     }
+    this.bench.camera(dt);
     this.camHook?.(this.gfx.camera, dt);
     perf.lap('nature');
     this.gfx.render(dt);
@@ -1567,11 +1624,11 @@ export class Game {
     this.setTimeOfDay(Game.TOD[(i + 1) % Game.TOD.length]!);
   }
 
-  /** Straight to a time of day (CAMP wakes you at sunset: 'golden'). */
-  setTimeOfDay(next: TimeOfDayPreset) {
+  /** Straight to a time of day (CAMP wakes you at sunset: 'golden'); `duration` s, default 2. */
+  setTimeOfDay(next: TimeOfDayPreset, duration?: number) {
     this.todClock.reset();
     if (this.nature === null || this.level === null || this.hud.timeOfDay === next) return;
-    applyTimeOfDay(this.gfx, next, this.level);
+    applyTimeOfDay(this.gfx, next, this.level, { duration });
     this.hud = { ...this.hud, timeOfDay: next };
     this.emit();
   }
@@ -1763,7 +1820,7 @@ export class Game {
       cam.getWorldDirection(dir);
       dirs.push(dir);
     }
-    g.update(dt, active, cam.position, dirs, p.pos, {
+    g.update(dt, active, cam.position, dirs, this.mural.focus ?? p.pos, {
       line: input.mode === 'keyboard' && input.sprint,
       cursor: p.mode === 'foot' || active,
     });
@@ -2150,9 +2207,16 @@ export class Game {
     const cam = this.gfx.camera;
     const w = this.opts.canvas.clientWidth;
     const h = this.opts.canvas.clientHeight;
+    // At most one new rider's Noun built a frame: joining a busy room (or a
+    // crowd arriving) built them all in one frame, 1 s for 16 on an iPad and
+    // 4 s on an Android tablet; the rest appear over the next frames
+    let builds = 0;
     for (const [id, rp] of this.net.players) {
+      const fresh = this.remotes.get(id)?.seedKey !== rp.seedKey;
+      if (fresh && builds >= REMOTE_BUILDS_PER_FRAME) continue;
       const r = this.ensureRemote(id, rp.seedKey);
       if (!r) continue;
+      if (fresh) builds++;
       const c = rp.current;
       const ch = r.character;
       // Only riders where I am are drawn: the street, or the same room and
@@ -2181,6 +2245,7 @@ export class Game {
       this.skydive.remote(id, ch, c.sk, c.mode === 'board', dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       this.interiors.poseRemote(id, ch, rp.room ?? null, dt);
+      this.bench.poseRemote(id, ch, rp.bench ?? null, dt);
       // Name tag (hide & seek: hidden / faint for hiders, see hideseek/policy.ts)
       const show = this.hideseek.labelFor(id);
       if (apart) {
@@ -2544,6 +2609,7 @@ export class Game {
     this.missions.dispose();
     this.interiors.dispose();
     this.camp.dispose();
+    this.bench.dispose();
     this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();

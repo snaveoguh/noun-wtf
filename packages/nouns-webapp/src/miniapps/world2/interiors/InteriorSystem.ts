@@ -513,7 +513,11 @@ export class InteriorSystem implements InteriorsApi {
       }
     } else if (this.fadeT < 0) {
       // Fading back in (fadeT runs −FADE_S → 0), once the room can draw
-      if (!this.warming) this.fadeT = Math.min(0, this.fadeT + dt);
+      if (this.upperPending) {
+        this.upperPending = false;
+        const L = this.live;
+        if (L !== null && L.floors.length > 1 && L.floors[1]!.built === null) this.buildFloor(L, 1);
+      } else if (!this.warming) this.fadeT = Math.min(0, this.fadeT + dt);
       this.setFade(-this.fadeT / FADE_S);
     }
     if (this.stepOffT > 0) {
@@ -804,14 +808,12 @@ export class InteriorSystem implements InteriorsApi {
       );
       g.cam.snap(g.player);
     }
-    // The floor above too, now while the screen is black: updateFloors built
-    // it 0.4 s after the fade-in, a ~0.5 s freeze on a desktop, seconds on a phone
-    if (
-      fromRoof === undefined &&
-      this.live.floors.length > 1 &&
-      this.live.floors[1]!.built === null
-    )
-      this.buildFloor(this.live, 1);
+    // The floor above too, while the screen is black: updateFloors built it
+    // 0.4 s after the fade-in, a ~0.5 s freeze on a desktop, seconds on a
+    // phone. Next frame, not this one (this frame is already the room: one
+    // 4 s frame on a tablet); the fade holds on black until it's done
+    this.upperPending =
+      fromRoof === undefined && this.live.floors.length > 1 && this.live.floors[1]!.built === null;
     this.applyEffects(effects);
     const s = built.stats;
     if (import.meta.env.DEV)
@@ -843,6 +845,8 @@ export class InteriorSystem implements InteriorsApi {
 
   /** The room's shaders are still compiling: hold the fade on black. */
   private warming = false;
+  /** The floor above is built on the frame after entering (still black). */
+  private upperPending = false;
 
   /** A resident's character: built one per frame after you're in (heads take a moment). */
   private makeCharacter(def: ResidentDef): NounCharacter | null {
@@ -891,6 +895,7 @@ export class InteriorSystem implements InteriorsApi {
 
   private goOut() {
     this.warming = false;
+    this.upperPending = false;
     const L = this.live;
     if (L === null) return;
     const g = this.game;

@@ -14,11 +14,15 @@ import type { Aabb } from '../mountain/ringOcclusion';
 
 import * as THREE from 'three';
 
+import { TripGrade } from '../../render/TripPass';
+
 import { Birds } from './birds';
 import { buildCamp, type CampBuild, type CampWorld } from './build';
 import { pickSpawn } from './firstSpawn';
 import { HandBook } from './HandBook';
 import { INTRO_SECONDS, introShot, type Shot, type V3 } from './intro';
+import { steppedTime, styleAt, styleCuts, windowCrossAt, type StyleCut } from './introStyles';
+import { Loungers } from './LoungerSystem';
 import { portalPlanes, seenFromRoom } from './portal';
 import { FLIP_SECONDS, readingPlan, readingShot, type ReadingPlan } from './reading';
 import { CAMP_TOWER, inCamp, toWorld, type CampSite } from './site';
@@ -88,6 +92,8 @@ export class CampSystem {
     hidden: new Set<THREE.Object3D>(),
   };
   birds: Birds | null = null;
+  /** COIN HEAD and MICROWAVE HEAD, lounging (LoungerSystem.ts). */
+  loungers: Loungers | null = null;
   /** The opening shot while it runs (spawnInside starts it). */
   private intro: {
     t: number;
@@ -98,7 +104,15 @@ export class CampSystem {
     /** First person, reading. */
     eyes: { pos: THREE.Vector3; look: THREE.Vector3 };
     play: { pos: THREE.Vector3; look: THREE.Vector3 };
+    /** The style cuts over the fly-in (introStyles.ts); null: ungraded. */
+    cuts: StyleCut[] | null;
   } | null = null;
+  /**
+   * The trip-wearing-off grade over the fly-in (settings: Settings → Trippy
+   * intro, off under Reduce motion). bind.ts keeps it in step.
+   */
+  introFx = true;
+  private grade: TripGrade | null = null;
   /** How many meshes the portal cull is hiding (perf probes). */
   culled = 0;
 
@@ -124,10 +138,16 @@ export class CampSystem {
       const built = buildCamp(site, world, { low: this.game.gfx.quality === 'low' });
       level.root.add(built.group);
       this.birds = new Birds(site);
+      this.loungers = new Loungers(this.game, site, built.layout);
       level.root.add(this.birds.mesh);
       level.collisionMeshes.push(...built.collision);
       this.site = site;
       this.built = built;
+      // The intro's grade compiles now, behind the loader, not on its first frame
+      if (introMayPlay()) {
+        this.grade = new TripGrade(this.game.gfx);
+        this.grade.warm();
+      }
       if (import.meta.env.DEV)
         console.info(
           `[camp] built: ${built.stats.drawCalls} draws, ${built.stats.triangles} tris, stair ${built.stair?.flights ?? 0} flights`,
@@ -156,7 +176,8 @@ export class CampSystem {
     p.mode = 'foot';
     p.footGrounded = true;
     g.cam.snap(p);
-    g.setTimeOfDay('golden');
+    // At once: a 2 s crossfade played the shot's first second in the afternoon
+    g.setTimeOfDay('golden', 0);
     b.art.loadPages();
     this.startIntro([x, s.floorY, z], sp.yaw);
     g.hud = {
@@ -180,8 +201,10 @@ export class CampSystem {
     const g = this.game;
     const p = g.player.pos;
     const o = s.origin;
-    if (Math.abs(p.x - o.x) < NEAR_CAMP && Math.abs(p.z - o.z) < NEAR_CAMP && p.y > o.y - 60)
-      b.animate(this.t);
+    const near =
+      Math.abs(p.x - o.x) < NEAR_CAMP && Math.abs(p.z - o.z) < NEAR_CAMP && p.y > o.y - 60;
+    if (near) b.animate(this.t);
+    this.loungers?.update(dt, this.t, near, inCamp(s, p.x, p.y, p.z) && this.intro === null);
     const cam = g.gfx.camera.position;
     if (
       this.birds !== null &&
@@ -340,14 +363,23 @@ export class CampSystem {
     const book = new HandBook(plan.spreads, this.site!.floorY, sh.book);
     g.gfx.scene.add(book.group);
     this.book = book;
+    const shot = introShot(this.site!, rider, sh.cam, sh.look, READ_FOV, sh.approach);
+    // Trip → anime → haze → b&w (cut at the window) → the game's own look
+    let cuts: StyleCut[] | null = null;
+    if (this.introFx && new URLSearchParams(window.location.search).get('introfx') !== '0') {
+      this.grade ??= new TripGrade(g.gfx);
+      if (this.grade.start())
+        cuts = styleCuts(windowCrossAt(s => shot(s).pos, this.site!.faceZ, INTRO_SECONDS));
+    }
     this.intro = {
       t: 0,
-      shot: introShot(this.site!, rider, sh.cam, sh.look, READ_FOV, sh.approach),
+      shot,
       rider,
       yaw,
       plan,
       eyes: { pos: new THREE.Vector3(...sh.cam), look: new THREE.Vector3(...sh.look) },
       play,
+      cuts,
     };
     this.introRig = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: FOOT_FOV };
     this.view_ = { ...this.view_, intro: true };
@@ -374,8 +406,13 @@ export class CampSystem {
     const r = this.introRig!;
     const me = g.me;
     const book = this.book!;
+    // The grade: uniforms only; out of the composer once it's back to the game's look
+    const f = styleAt(I.t, { cuts: I.cuts ?? undefined, off: I.cuts === null || !this.introFx });
+    if (f.style === 'none' || I.t >= INTRO_SECONDS) this.endGrade();
+    else this.grade?.set(f.style, f.amt, I.t, f.style === 'trip' && !f.flicker);
     if (I.t < INTRO_SECONDS) {
-      const s = I.shot(I.t);
+      // (on twos through the anime: the camera holds each drawing 1/12 s)
+      const s = I.shot(steppedTime(I.t, f));
       r.pos.set(...s.pos);
       r.look.set(...s.look);
       r.fov = s.fov;
@@ -489,6 +526,7 @@ export class CampSystem {
     const g = this.game;
     const I = this.intro;
     this.intro = null;
+    this.endGrade();
     if (I !== null) this.book?.drop(g.me, I.rider, I.yaw);
     if (g.cam.rig === this.introRig) g.cam.rig = null;
     g.cam.fov = FOOT_FOV;
@@ -497,6 +535,39 @@ export class CampSystem {
       window.removeEventListener(ev, this.skipIntro, { capture: true });
     this.view_ = { ...this.view_, intro: false };
     for (const l of this.listeners) l();
+  }
+
+  /**
+   * Something in a frame threw while the opening shot ran (Game.frame's
+   * FrameGuard): end it, back to the plain game look and the game camera,
+   * even if ending it throws too. Owner, desktop Brave: the picture froze on
+   * the book with the B&W grade still on while the HUD kept working.
+   */
+  abortIntro(): boolean {
+    if (this.intro === null && this.grade === null) return false;
+    try {
+      this.endIntro();
+    } catch (err) {
+      console.error('[camp] ending the intro failed', err);
+      this.intro = null;
+      try {
+        this.endGrade();
+      } catch {
+        this.grade = null;
+      }
+      const g = this.game;
+      if (g.cam.rig === this.introRig) g.cam.rig = null;
+      this.view_ = { ...this.view_, intro: false };
+      for (const l of this.listeners) l();
+    }
+    return true;
+  }
+
+  /** The grade's done (or skipped): out of the composer, freed. */
+  private endGrade() {
+    if (this.grade === null) return;
+    this.grade.stop();
+    this.grade = null;
   }
 
   act(kind: CampPrompt['kind']) {
@@ -623,7 +694,9 @@ export class CampSystem {
 
   dispose() {
     if (this.intro !== null) this.endIntro();
+    this.endGrade();
     this.birds?.dispose();
+    this.loungers?.dispose();
     this.book?.dispose();
     this.releaseCull();
     if (this.keyBound) document.removeEventListener('keydown', this.onKey, true);
@@ -686,4 +759,11 @@ function boxOf(it: CullItem): Aabb {
     b.maxZ = _b.max.z;
   }
   return it.box;
+}
+
+/** Could this page load play the opening shot (so its grade is worth compiling)? */
+function introMayPlay(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true) return false;
+  return new URLSearchParams(window.location.search).get('camintro') !== '0';
 }

@@ -1,0 +1,4879 @@
+{
+ "profile": "ipad-port",
+ "engine": "webkit",
+ "bootS": 8.389,
+ "boot": {
+  "quality": "low",
+  "lite": {
+   "scale": 1,
+   "shadows": true,
+   "post": true
+  },
+  "weak": false,
+  "pr": 1,
+  "buffer": [
+   820,
+   1180
+  ],
+  "shadowMap": 1024,
+  "diet": false,
+  "adaptive": 6,
+  "tier": {
+   "quality": "low"
+  }
+ },
+ "scenarios": {
+  "camp": {
+   "frame": {
+    "frames": 69,
+    "fps": 3.5395506309633733,
+    "mean": 282.5217391304348,
+    "p50": 264,
+    "p95": 326,
+    "p99": 841,
+    "max": 841,
+    "hitches": 69
+   },
+   "cpu": {
+    "frames": 70,
+    "fps": 8.978963571062067,
+    "mean": 111.37142857142878,
+    "p50": 101,
+    "p95": 143.00000000000182,
+    "p99": 474,
+    "max": 474,
+    "hitches": 70
+   },
+   "systems": [
+    {
+     "name": "render",
+     "mean": 97.35714285714299,
+     "p95": 117,
+     "max": 394
+    },
+    {
+     "name": "towns",
+     "mean": 6.128571428571298,
+     "p95": 29.99999999999818,
+     "max": 58
+    },
+    {
+     "name": "interiors",
+     "mean": 2.0857142857144155,
+     "p95": 5,
+     "max": 60
+    },
+    {
+     "name": "mountain",
+     "mean": 1.2428571428571948,
+     "p95": 7,
+     "max": 11
+    },
+    {
+     "name": "warm",
+     "mean": 1.199999999999948,
+     "p95": 8,
+     "max": 22
+    },
+    {
+     "name": "physics",
+     "mean": 0.6285714285715065,
+     "p95": 1.000000000003638,
+     "max": 4
+    },
+    {
+     "name": "input",
+     "mean": 0.4142857142858702,
+     "p95": 2,
+     "max": 5
+    },
+    {
+     "name": "character",
+     "mean": 0.4142857142856623,
+     "p95": 1.000000000003638,
+     "max": 6
+    },
+    {
+     "name": "net",
+     "mean": 0.3142857142857143,
+     "p95": 1.000000000003638,
+     "max": 5
+    },
+    {
+     "name": "audio",
+     "mean": 0.22857142857142856,
+     "p95": 1.000000000003638,
+     "max": 3
+    },
+    {
+     "name": "hud",
+     "mean": 0.22857142857140259,
+     "p95": 1.000000000003638,
+     "max": 3
+    },
+    {
+     "name": "wild",
+     "mean": 0.21428571428576626,
+     "p95": 1,
+     "max": 4
+    },
+    {
+     "name": "missions",
+     "mean": 0.19999999999992205,
+     "p95": 1,
+     "max": 1.000000000003638
+    },
+    {
+     "name": "vehicles",
+     "mean": 0.1857142857143117,
+     "p95": 1,
+     "max": 3
+    },
+    {
+     "name": "nature",
+     "mean": 0.18571428571425974,
+     "p95": 1,
+     "max": 8
+    },
+    {
+     "name": "modes",
+     "mean": 0.15714285714290913,
+     "p95": 1,
+     "max": 1.000000000003638
+    },
+    {
+     "name": "graffiti",
+     "mean": 0.09999999999992204,
+     "p95": 1,
+     "max": 2
+    },
+    {
+     "name": "decks",
+     "mean": 0.02857142857142857,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "crew",
+     "mean": 0.02857142857142857,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "particles",
+     "mean": 0.028571428571402584,
+     "p95": 0,
+     "max": 1
+    }
+   ],
+   "render": {
+    "calls": 120,
+    "triangles": 122258,
+    "points": 2,
+    "lines": 48,
+    "programs": 56,
+    "textures": 129,
+    "geometries": 183,
+    "pixelRatio": 1,
+    "width": 820,
+    "height": 1180
+   },
+   "heapMB": null,
+   "allocMBps": null,
+   "longTasks": {
+    "count": 0,
+    "totalMs": 0,
+    "maxMs": 0
+   },
+   "hitchLog": [
+    {
+     "at": 9826,
+     "frameMs": 0,
+     "cpuMs": 474,
+     "top": [
+      [
+       "render",
+       394
+      ],
+      [
+       "interiors",
+       60
+      ],
+      [
+       "mountain",
+       11
+      ],
+      [
+       "audio",
+       3
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 10667,
+     "frameMs": 841,
+     "cpuMs": 192,
+     "top": [
+      [
+       "render",
+       135
+      ],
+      [
+       "towns",
+       39
+      ],
+      [
+       "mountain",
+       9
+      ],
+      [
+       "interiors",
+       3
+      ],
+      [
+       "vehicles",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 11285,
+     "frameMs": 618,
+     "cpuMs": 201,
+     "top": [
+      [
+       "render",
+       117
+      ],
+      [
+       "towns",
+       58
+      ],
+      [
+       "mountain",
+       11
+      ],
+      [
+       "nature",
+       8
+      ],
+      [
+       "hud",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 11709,
+     "frameMs": 422,
+     "cpuMs": 143,
+     "top": [
+      [
+       "render",
+       99
+      ],
+      [
+       "towns",
+       30
+      ],
+      [
+       "mountain",
+       7
+      ],
+      [
+       "vehicles",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 12033,
+     "frameMs": 326,
+     "cpuMs": 130,
+     "top": [
+      [
+       "render",
+       92
+      ],
+      [
+       "towns",
+       27
+      ],
+      [
+       "mountain",
+       7
+      ]
+     ]
+    },
+    {
+     "at": 12310,
+     "frameMs": 278,
+     "cpuMs": 124,
+     "top": [
+      [
+       "render",
+       90
+      ],
+      [
+       "towns",
+       25
+      ],
+      [
+       "physics",
+       2
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 12593,
+     "frameMs": 282,
+     "cpuMs": 111,
+     "top": [
+      [
+       "render",
+       85
+      ],
+      [
+       "towns",
+       21
+      ]
+     ]
+    },
+    {
+     "at": 12868,
+     "frameMs": 275,
+     "cpuMs": 143,
+     "top": [
+      [
+       "render",
+       101
+      ],
+      [
+       "towns",
+       30
+      ],
+      [
+       "net",
+       5
+      ],
+      [
+       "physics",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 13161,
+     "frameMs": 293,
+     "cpuMs": 120,
+     "top": [
+      [
+       "render",
+       87
+      ],
+      [
+       "towns",
+       20
+      ],
+      [
+       "warm",
+       8
+      ]
+     ]
+    },
+    {
+     "at": 13463,
+     "frameMs": 303,
+     "cpuMs": 121,
+     "top": [
+      [
+       "render",
+       97
+      ],
+      [
+       "towns",
+       14
+      ],
+      [
+       "character",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 13748,
+     "frameMs": 284,
+     "cpuMs": 127,
+     "top": [
+      [
+       "render",
+       119
+      ],
+      [
+       "towns",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 14042,
+     "frameMs": 295,
+     "cpuMs": 98,
+     "top": [
+      [
+       "render",
+       88
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 14313,
+     "frameMs": 270,
+     "cpuMs": 112,
+     "top": [
+      [
+       "render",
+       102
+      ],
+      [
+       "towns",
+       3
+      ],
+      [
+       "net",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 14585,
+     "frameMs": 272,
+     "cpuMs": 111,
+     "top": [
+      [
+       "render",
+       102
+      ],
+      [
+       "towns",
+       3
+      ],
+      [
+       "warm",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 14849,
+     "frameMs": 265,
+     "cpuMs": 91,
+     "top": [
+      [
+       "render",
+       77
+      ],
+      [
+       "towns",
+       10
+      ]
+     ]
+    },
+    {
+     "at": 15132,
+     "frameMs": 283,
+     "cpuMs": 92,
+     "top": [
+      [
+       "render",
+       83
+      ],
+      [
+       "towns",
+       3
+      ],
+      [
+       "hud",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 15438,
+     "frameMs": 305,
+     "cpuMs": 92,
+     "top": [
+      [
+       "render",
+       86
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 15719,
+     "frameMs": 282,
+     "cpuMs": 113,
+     "top": [
+      [
+       "render",
+       96
+      ],
+      [
+       "towns",
+       7
+      ],
+      [
+       "input",
+       4
+      ],
+      [
+       "interiors",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 16023,
+     "frameMs": 304,
+     "cpuMs": 90,
+     "top": [
+      [
+       "render",
+       79
+      ],
+      [
+       "towns",
+       4
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 16289,
+     "frameMs": 265,
+     "cpuMs": 87,
+     "top": [
+      [
+       "render",
+       78
+      ],
+      [
+       "towns",
+       4
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 16568,
+     "frameMs": 280,
+     "cpuMs": 82,
+     "top": [
+      [
+       "render",
+       75
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 16828,
+     "frameMs": 260,
+     "cpuMs": 106,
+     "top": [
+      [
+       "render",
+       98
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 17089,
+     "frameMs": 261,
+     "cpuMs": 101,
+     "top": [
+      [
+       "render",
+       94
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 17332,
+     "frameMs": 243,
+     "cpuMs": 104,
+     "top": [
+      [
+       "render",
+       87
+      ],
+      [
+       "warm",
+       7
+      ],
+      [
+       "towns",
+       6
+      ]
+     ]
+    },
+    {
+     "at": 17587,
+     "frameMs": 255,
+     "cpuMs": 100,
+     "top": [
+      [
+       "render",
+       91
+      ],
+      [
+       "towns",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 17831,
+     "frameMs": 243,
+     "cpuMs": 103,
+     "top": [
+      [
+       "render",
+       90
+      ],
+      [
+       "towns",
+       8
+      ],
+      [
+       "input",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 18083,
+     "frameMs": 253,
+     "cpuMs": 101,
+     "top": [
+      [
+       "render",
+       91
+      ],
+      [
+       "towns",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 18335,
+     "frameMs": 252,
+     "cpuMs": 106,
+     "top": [
+      [
+       "render",
+       98
+      ],
+      [
+       "towns",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 18594,
+     "frameMs": 258,
+     "cpuMs": 122,
+     "top": [
+      [
+       "render",
+       95
+      ],
+      [
+       "warm",
+       14
+      ],
+      [
+       "towns",
+       9
+      ]
+     ]
+    },
+    {
+     "at": 18867,
+     "frameMs": 274,
+     "cpuMs": 96,
+     "top": [
+      [
+       "render",
+       89
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 19132,
+     "frameMs": 264,
+     "cpuMs": 89,
+     "top": [
+      [
+       "render",
+       78
+      ],
+      [
+       "towns",
+       8
+      ]
+     ]
+    },
+    {
+     "at": 19372,
+     "frameMs": 241,
+     "cpuMs": 103,
+     "top": [
+      [
+       "render",
+       82
+      ],
+      [
+       "interiors",
+       7
+      ],
+      [
+       "warm",
+       5
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 19640,
+     "frameMs": 267,
+     "cpuMs": 98,
+     "top": [
+      [
+       "render",
+       84
+      ],
+      [
+       "character",
+       6
+      ],
+      [
+       "towns",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 19884,
+     "frameMs": 245,
+     "cpuMs": 103,
+     "top": [
+      [
+       "render",
+       85
+      ],
+      [
+       "towns",
+       7
+      ],
+      [
+       "interiors",
+       5
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 20146,
+     "frameMs": 262,
+     "cpuMs": 96,
+     "top": [
+      [
+       "render",
+       86
+      ],
+      [
+       "towns",
+       7
+      ]
+     ]
+    },
+    {
+     "at": 20398,
+     "frameMs": 252,
+     "cpuMs": 101,
+     "top": [
+      [
+       "render",
+       93
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 20681,
+     "frameMs": 283,
+     "cpuMs": 93,
+     "top": [
+      [
+       "render",
+       87
+      ],
+      [
+       "towns",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 20929,
+     "frameMs": 246,
+     "cpuMs": 101,
+     "top": [
+      [
+       "render",
+       74
+      ],
+      [
+       "towns",
+       23
+      ]
+     ]
+    },
+    {
+     "at": 21199,
+     "frameMs": 271,
+     "cpuMs": 100,
+     "top": [
+      [
+       "render",
+       87
+      ],
+      [
+       "warm",
+       10
+      ]
+     ]
+    },
+    {
+     "at": 21513,
+     "frameMs": 314,
+     "cpuMs": 102,
+     "top": [
+      [
+       "render",
+       99
+      ]
+     ]
+    },
+    {
+     "at": 21795,
+     "frameMs": 283,
+     "cpuMs": 97,
+     "top": [
+      [
+       "render",
+       93
+      ]
+     ]
+    },
+    {
+     "at": 22044,
+     "frameMs": 249,
+     "cpuMs": 86,
+     "top": [
+      [
+       "render",
+       78
+      ],
+      [
+       "input",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 22302,
+     "frameMs": 258,
+     "cpuMs": 91,
+     "top": [
+      [
+       "render",
+       85
+      ]
+     ]
+    },
+    {
+     "at": 22547,
+     "frameMs": 245,
+     "cpuMs": 101,
+     "top": [
+      [
+       "render",
+       74
+      ],
+      [
+       "warm",
+       22
+      ],
+      [
+       "input",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 22789,
+     "frameMs": 238,
+     "cpuMs": 95,
+     "top": [
+      [
+       "render",
+       92
+      ]
+     ]
+    },
+    {
+     "at": 23050,
+     "frameMs": 265,
+     "cpuMs": 95,
+     "top": [
+      [
+       "render",
+       91
+      ]
+     ]
+    },
+    {
+     "at": 23300,
+     "frameMs": 250,
+     "cpuMs": 91,
+     "top": [
+      [
+       "render",
+       88
+      ]
+     ]
+    },
+    {
+     "at": 23542,
+     "frameMs": 242,
+     "cpuMs": 109,
+     "top": [
+      [
+       "render",
+       101
+      ],
+      [
+       "towns",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 23798,
+     "frameMs": 256,
+     "cpuMs": 105,
+     "top": [
+      [
+       "render",
+       93
+      ],
+      [
+       "warm",
+       8
+      ]
+     ]
+    },
+    {
+     "at": 24072,
+     "frameMs": 274,
+     "cpuMs": 93,
+     "top": [
+      [
+       "render",
+       89
+      ]
+     ]
+    },
+    {
+     "at": 24324,
+     "frameMs": 252,
+     "cpuMs": 105,
+     "top": [
+      [
+       "render",
+       99
+      ],
+      [
+       "input",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 24585,
+     "frameMs": 260,
+     "cpuMs": 100,
+     "top": [
+      [
+       "render",
+       96
+      ]
+     ]
+    },
+    {
+     "at": 24856,
+     "frameMs": 272,
+     "cpuMs": 117,
+     "top": [
+      [
+       "render",
+       113
+      ]
+     ]
+    },
+    {
+     "at": 25121,
+     "frameMs": 265,
+     "cpuMs": 91,
+     "top": [
+      [
+       "render",
+       86
+      ]
+     ]
+    },
+    {
+     "at": 25376,
+     "frameMs": 255,
+     "cpuMs": 97,
+     "top": [
+      [
+       "render",
+       92
+      ],
+      [
+       "hud",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 25627,
+     "frameMs": 251,
+     "cpuMs": 97,
+     "top": [
+      [
+       "render",
+       89
+      ],
+      [
+       "interiors",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 25882,
+     "frameMs": 255,
+     "cpuMs": 99,
+     "top": [
+      [
+       "render",
+       90
+      ],
+      [
+       "wild",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 26177,
+     "frameMs": 295,
+     "cpuMs": 107,
+     "top": [
+      [
+       "render",
+       102
+      ]
+     ]
+    },
+    {
+     "at": 26443,
+     "frameMs": 265,
+     "cpuMs": 92,
+     "top": [
+      [
+       "render",
+       88
+      ]
+     ]
+    },
+    {
+     "at": 26694,
+     "frameMs": 252,
+     "cpuMs": 97,
+     "top": [
+      [
+       "render",
+       93
+      ]
+     ]
+    },
+    {
+     "at": 26956,
+     "frameMs": 262,
+     "cpuMs": 97,
+     "top": [
+      [
+       "render",
+       93
+      ]
+     ]
+    },
+    {
+     "at": 27220,
+     "frameMs": 264,
+     "cpuMs": 91,
+     "top": [
+      [
+       "render",
+       88
+      ]
+     ]
+    },
+    {
+     "at": 27496,
+     "frameMs": 275,
+     "cpuMs": 99,
+     "top": [
+      [
+       "render",
+       97
+      ]
+     ]
+    },
+    {
+     "at": 27744,
+     "frameMs": 249,
+     "cpuMs": 112,
+     "top": [
+      [
+       "render",
+       107
+      ],
+      [
+       "graffiti",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 28002,
+     "frameMs": 258,
+     "cpuMs": 109,
+     "top": [
+      [
+       "render",
+       101
+      ],
+      [
+       "interiors",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 28279,
+     "frameMs": 277,
+     "cpuMs": 108,
+     "top": [
+      [
+       "render",
+       102
+      ],
+      [
+       "audio",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 28541,
+     "frameMs": 261,
+     "cpuMs": 109,
+     "top": [
+      [
+       "render",
+       107
+      ]
+     ]
+    },
+    {
+     "at": 28802,
+     "frameMs": 261,
+     "cpuMs": 104,
+     "top": [
+      [
+       "render",
+       101
+      ]
+     ]
+    },
+    {
+     "at": 29061,
+     "frameMs": 259,
+     "cpuMs": 111,
+     "top": [
+      [
+       "render",
+       108
+      ]
+     ]
+    },
+    {
+     "at": 29320,
+     "frameMs": 259,
+     "cpuMs": 112,
+     "top": [
+      [
+       "render",
+       109
+      ]
+     ]
+    }
+   ],
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   },
+   "wallS": 20.036,
+   "rss": {
+    "net": 77.9,
+    "web": 2051
+   },
+   "inCamp": false
+  },
+  "remotes": {
+   "frame": {
+    "frames": 68,
+    "fps": 2.85210972233873,
+    "mean": 350.61764705882354,
+    "p50": 323,
+    "p95": 408,
+    "p99": 1513,
+    "max": 1513,
+    "hitches": 68
+   },
+   "cpu": {
+    "frames": 69,
+    "fps": 10.347930413917227,
+    "mean": 96.63768115942018,
+    "p50": 74,
+    "p95": 125,
+    "p99": 1080,
+    "max": 1080,
+    "hitches": 68
+   },
+   "systems": [
+    {
+     "name": "render",
+     "mean": 65.55072463768094,
+     "p95": 96,
+     "max": 113
+    },
+    {
+     "name": "net",
+     "mean": 15.420289855072516,
+     "p95": 4.999999999992724,
+     "max": 992.9999999999964
+    },
+    {
+     "name": "decks",
+     "mean": 4.536231884057971,
+     "p95": 0,
+     "max": 310
+    },
+    {
+     "name": "modes",
+     "mean": 3.202898550724743,
+     "p95": 4.000000000007276,
+     "max": 12
+    },
+    {
+     "name": "interiors",
+     "mean": 2.652173913043162,
+     "p95": 7,
+     "max": 32
+    },
+    {
+     "name": "warm",
+     "mean": 1.028985507246166,
+     "p95": 9,
+     "max": 13
+    },
+    {
+     "name": "mountain",
+     "mean": 0.8260869565219501,
+     "p95": 4,
+     "max": 9
+    },
+    {
+     "name": "physics",
+     "mean": 0.7246376811592093,
+     "p95": 1.000000000007276,
+     "max": 6.999999999992724
+    },
+    {
+     "name": "vehicles",
+     "mean": 0.565217391304137,
+     "p95": 1.000000000007276,
+     "max": 4.999999999992724
+    },
+    {
+     "name": "wild",
+     "mean": 0.42028985507235833,
+     "p95": 1.000000000007276,
+     "max": 5
+    },
+    {
+     "name": "audio",
+     "mean": 0.34782608695678535,
+     "p95": 1.000000000007276,
+     "max": 8
+    },
+    {
+     "name": "towns",
+     "mean": 0.2753623188406852,
+     "p95": 1,
+     "max": 3
+    },
+    {
+     "name": "character",
+     "mean": 0.24637681159430835,
+     "p95": 1,
+     "max": 3.999999999992724
+    },
+    {
+     "name": "input",
+     "mean": 0.23188405797111994,
+     "p95": 1,
+     "max": 5
+    },
+    {
+     "name": "graffiti",
+     "mean": 0.2028985507246377,
+     "p95": 1,
+     "max": 4
+    },
+    {
+     "name": "hud",
+     "mean": 0.2028985507246377,
+     "p95": 1,
+     "max": 1.000000000007276
+    },
+    {
+     "name": "missions",
+     "mean": 0.10144927536231885,
+     "p95": 1,
+     "max": 1.000000000007276
+    },
+    {
+     "name": "nature",
+     "mean": 0.07246376811604748,
+     "p95": 1,
+     "max": 1.000000000007276
+    },
+    {
+     "name": "particles",
+     "mean": 0.02898550724648226,
+     "p95": 0,
+     "max": 1.000000000007276
+    },
+    {
+     "name": "crew",
+     "mean": 0,
+     "p95": 0,
+     "max": 0
+    }
+   ],
+   "render": {
+    "calls": 26,
+    "triangles": 33227,
+    "points": 0,
+    "lines": 0,
+    "programs": 55,
+    "textures": 131,
+    "geometries": 221,
+    "pixelRatio": 1,
+    "width": 820,
+    "height": 1180
+   },
+   "heapMB": null,
+   "allocMBps": null,
+   "longTasks": {
+    "count": 0,
+    "totalMs": 0,
+    "maxMs": 0
+   },
+   "hitchLog": [
+    {
+     "at": 32731,
+     "frameMs": 0,
+     "cpuMs": 1080,
+     "top": [
+      [
+       "net",
+       993
+      ],
+      [
+       "render",
+       70
+      ],
+      [
+       "modes",
+       12
+      ]
+     ]
+    },
+    {
+     "at": 34244,
+     "frameMs": 1513,
+     "cpuMs": 383,
+     "top": [
+      [
+       "decks",
+       310
+      ],
+      [
+       "render",
+       63
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 34921,
+     "frameMs": 676,
+     "cpuMs": 99,
+     "top": [
+      [
+       "render",
+       76
+      ],
+      [
+       "mountain",
+       9
+      ],
+      [
+       "modes",
+       5
+      ],
+      [
+       "character",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 35275,
+     "frameMs": 355,
+     "cpuMs": 99,
+     "top": [
+      [
+       "render",
+       85
+      ],
+      [
+       "vehicles",
+       4
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 35602,
+     "frameMs": 327,
+     "cpuMs": 76,
+     "top": [
+      [
+       "render",
+       68
+      ],
+      [
+       "modes",
+       3
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 35932,
+     "frameMs": 330,
+     "cpuMs": 98,
+     "top": [
+      [
+       "render",
+       86
+      ],
+      [
+       "graffiti",
+       4
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 36267,
+     "frameMs": 335,
+     "cpuMs": 98,
+     "top": [
+      [
+       "render",
+       91
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 36612,
+     "frameMs": 345,
+     "cpuMs": 94,
+     "top": [
+      [
+       "render",
+       77
+      ],
+      [
+       "input",
+       5
+      ],
+      [
+       "wild",
+       4
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 36974,
+     "frameMs": 361,
+     "cpuMs": 104,
+     "top": [
+      [
+       "render",
+       92
+      ],
+      [
+       "net",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 37317,
+     "frameMs": 344,
+     "cpuMs": 93,
+     "top": [
+      [
+       "render",
+       83
+      ],
+      [
+       "modes",
+       3
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 37646,
+     "frameMs": 329,
+     "cpuMs": 97,
+     "top": [
+      [
+       "render",
+       88
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 37970,
+     "frameMs": 323,
+     "cpuMs": 93,
+     "top": [
+      [
+       "render",
+       76
+      ],
+      [
+       "modes",
+       4
+      ],
+      [
+       "decks",
+       3
+      ],
+      [
+       "physics",
+       3
+      ],
+      [
+       "mountain",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 38295,
+     "frameMs": 326,
+     "cpuMs": 101,
+     "top": [
+      [
+       "render",
+       74
+      ],
+      [
+       "warm",
+       13
+      ],
+      [
+       "net",
+       6
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 38633,
+     "frameMs": 338,
+     "cpuMs": 91,
+     "top": [
+      [
+       "render",
+       83
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 38979,
+     "frameMs": 346,
+     "cpuMs": 101,
+     "top": [
+      [
+       "render",
+       94
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 39320,
+     "frameMs": 341,
+     "cpuMs": 95,
+     "top": [
+      [
+       "render",
+       87
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 39645,
+     "frameMs": 325,
+     "cpuMs": 97,
+     "top": [
+      [
+       "render",
+       89
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 40024,
+     "frameMs": 378,
+     "cpuMs": 126,
+     "top": [
+      [
+       "render",
+       113
+      ],
+      [
+       "warm",
+       4
+      ],
+      [
+       "modes",
+       3
+      ],
+      [
+       "net",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 40431,
+     "frameMs": 408,
+     "cpuMs": 111,
+     "top": [
+      [
+       "render",
+       103
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 40857,
+     "frameMs": 426,
+     "cpuMs": 104,
+     "top": [
+      [
+       "render",
+       96
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 41229,
+     "frameMs": 372,
+     "cpuMs": 102,
+     "top": [
+      [
+       "render",
+       91
+      ],
+      [
+       "modes",
+       4
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 41573,
+     "frameMs": 344,
+     "cpuMs": 93,
+     "top": [
+      [
+       "render",
+       86
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 41913,
+     "frameMs": 340,
+     "cpuMs": 125,
+     "top": [
+      [
+       "render",
+       99
+      ],
+      [
+       "warm",
+       13
+      ],
+      [
+       "interiors",
+       5
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 42291,
+     "frameMs": 377,
+     "cpuMs": 91,
+     "top": [
+      [
+       "render",
+       75
+      ],
+      [
+       "vehicles",
+       5
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 42663,
+     "frameMs": 372,
+     "cpuMs": 96,
+     "top": [
+      [
+       "render",
+       86
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 43025,
+     "frameMs": 363,
+     "cpuMs": 84,
+     "top": [
+      [
+       "render",
+       76
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 43364,
+     "frameMs": 339,
+     "cpuMs": 98,
+     "top": [
+      [
+       "render",
+       57
+      ],
+      [
+       "interiors",
+       32
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 43761,
+     "frameMs": 397,
+     "cpuMs": 86,
+     "top": [
+      [
+       "render",
+       69
+      ],
+      [
+       "interiors",
+       7
+      ],
+      [
+       "warm",
+       4
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 44093,
+     "frameMs": 329,
+     "cpuMs": 78,
+     "top": [
+      [
+       "render",
+       64
+      ],
+      [
+       "interiors",
+       9
+      ]
+     ]
+    },
+    {
+     "at": 44430,
+     "frameMs": 340,
+     "cpuMs": 75,
+     "top": [
+      [
+       "render",
+       52
+      ],
+      [
+       "interiors",
+       7
+      ],
+      [
+       "mountain",
+       6
+      ],
+      [
+       "wild",
+       5
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 44741,
+     "frameMs": 311,
+     "cpuMs": 61,
+     "top": [
+      [
+       "render",
+       53
+      ],
+      [
+       "interiors",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 45036,
+     "frameMs": 295,
+     "cpuMs": 66,
+     "top": [
+      [
+       "render",
+       57
+      ],
+      [
+       "modes",
+       4
+      ],
+      [
+       "interiors",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 45354,
+     "frameMs": 317,
+     "cpuMs": 75,
+     "top": [
+      [
+       "render",
+       53
+      ],
+      [
+       "warm",
+       9
+      ],
+      [
+       "net",
+       5
+      ],
+      [
+       "modes",
+       3
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 45672,
+     "frameMs": 319,
+     "cpuMs": 73,
+     "top": [
+      [
+       "render",
+       64
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 45999,
+     "frameMs": 327,
+     "cpuMs": 80,
+     "top": [
+      [
+       "render",
+       70
+      ],
+      [
+       "interiors",
+       4
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 46320,
+     "frameMs": 321,
+     "cpuMs": 79,
+     "top": [
+      [
+       "render",
+       67
+      ],
+      [
+       "modes",
+       4
+      ],
+      [
+       "interiors",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 46642,
+     "frameMs": 321,
+     "cpuMs": 70,
+     "top": [
+      [
+       "render",
+       58
+      ],
+      [
+       "interiors",
+       7
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 46961,
+     "frameMs": 319,
+     "cpuMs": 73,
+     "top": [
+      [
+       "render",
+       63
+      ],
+      [
+       "warm",
+       3
+      ],
+      [
+       "interiors",
+       2
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 47262,
+     "frameMs": 301,
+     "cpuMs": 68,
+     "top": [
+      [
+       "render",
+       59
+      ],
+      [
+       "interiors",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 47582,
+     "frameMs": 320,
+     "cpuMs": 74,
+     "top": [
+      [
+       "render",
+       66
+      ],
+      [
+       "interiors",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 47888,
+     "frameMs": 307,
+     "cpuMs": 72,
+     "top": [
+      [
+       "render",
+       63
+      ],
+      [
+       "interiors",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 48188,
+     "frameMs": 300,
+     "cpuMs": 71,
+     "top": [
+      [
+       "render",
+       64
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 48528,
+     "frameMs": 339,
+     "cpuMs": 75,
+     "top": [
+      [
+       "render",
+       64
+      ],
+      [
+       "warm",
+       3
+      ],
+      [
+       "modes",
+       3
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 48831,
+     "frameMs": 303,
+     "cpuMs": 69,
+     "top": [
+      [
+       "render",
+       59
+      ],
+      [
+       "interiors",
+       4
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 49129,
+     "frameMs": 298,
+     "cpuMs": 67,
+     "top": [
+      [
+       "render",
+       60
+      ],
+      [
+       "interiors",
+       2
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 49440,
+     "frameMs": 311,
+     "cpuMs": 71,
+     "top": [
+      [
+       "render",
+       65
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 49756,
+     "frameMs": 317,
+     "cpuMs": 71,
+     "top": [
+      [
+       "render",
+       56
+      ],
+      [
+       "interiors",
+       9
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 50056,
+     "frameMs": 299,
+     "cpuMs": 63,
+     "top": [
+      [
+       "render",
+       54
+      ],
+      [
+       "warm",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 50351,
+     "frameMs": 295,
+     "cpuMs": 61,
+     "top": [
+      [
+       "render",
+       49
+      ],
+      [
+       "interiors",
+       6
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 50655,
+     "frameMs": 305,
+     "cpuMs": 66,
+     "top": [
+      [
+       "render",
+       53
+      ],
+      [
+       "physics",
+       6
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 50968,
+     "frameMs": 310,
+     "cpuMs": 51,
+     "top": [
+      [
+       "render",
+       38
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "interiors",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 51280,
+     "frameMs": 314,
+     "cpuMs": 60,
+     "top": [
+      [
+       "render",
+       52
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 51908,
+     "frameMs": 310,
+     "cpuMs": 54,
+     "top": [
+      [
+       "render",
+       47
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 52253,
+     "frameMs": 346,
+     "cpuMs": 53,
+     "top": [
+      [
+       "render",
+       43
+      ],
+      [
+       "audio",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 52558,
+     "frameMs": 304,
+     "cpuMs": 59,
+     "top": [
+      [
+       "render",
+       46
+      ],
+      [
+       "interiors",
+       7
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 52848,
+     "frameMs": 291,
+     "cpuMs": 53,
+     "top": [
+      [
+       "render",
+       45
+      ],
+      [
+       "modes",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 53170,
+     "frameMs": 321,
+     "cpuMs": 59,
+     "top": [
+      [
+       "render",
+       49
+      ],
+      [
+       "modes",
+       4
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 53492,
+     "frameMs": 323,
+     "cpuMs": 56,
+     "top": [
+      [
+       "render",
+       41
+      ],
+      [
+       "audio",
+       8
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 53813,
+     "frameMs": 321,
+     "cpuMs": 59,
+     "top": [
+      [
+       "render",
+       36
+      ],
+      [
+       "net",
+       8
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "interiors",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 54118,
+     "frameMs": 305,
+     "cpuMs": 55,
+     "top": [
+      [
+       "render",
+       44
+      ],
+      [
+       "interiors",
+       6
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 54447,
+     "frameMs": 328,
+     "cpuMs": 72,
+     "top": [
+      [
+       "render",
+       66
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 54771,
+     "frameMs": 325,
+     "cpuMs": 59,
+     "top": [
+      [
+       "render",
+       49
+      ],
+      [
+       "warm",
+       3
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 55075,
+     "frameMs": 303,
+     "cpuMs": 52,
+     "top": [
+      [
+       "render",
+       38
+      ],
+      [
+       "interiors",
+       6
+      ],
+      [
+       "modes",
+       3
+      ],
+      [
+       "input",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 55362,
+     "frameMs": 288,
+     "cpuMs": 58,
+     "top": [
+      [
+       "render",
+       51
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 55663,
+     "frameMs": 300,
+     "cpuMs": 61,
+     "top": [
+      [
+       "render",
+       48
+      ],
+      [
+       "physics",
+       7
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 55954,
+     "frameMs": 292,
+     "cpuMs": 55,
+     "top": [
+      [
+       "render",
+       45
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 56249,
+     "frameMs": 293,
+     "cpuMs": 63,
+     "top": [
+      [
+       "render",
+       42
+      ],
+      [
+       "warm",
+       9
+      ],
+      [
+       "interiors",
+       5
+      ],
+      [
+       "wild",
+       3
+      ],
+      [
+       "modes",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 56573,
+     "frameMs": 326,
+     "cpuMs": 67,
+     "top": [
+      [
+       "render",
+       61
+      ],
+      [
+       "modes",
+       3
+      ]
+     ]
+    }
+   ],
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   },
+   "wallS": 24.099,
+   "rss": {
+    "net": 78.7,
+    "web": 1967.9
+   }
+  },
+  "room-enter": {
+   "frame": {
+    "frames": 41,
+    "fps": 3.317957433033908,
+    "mean": 301.390243902439,
+    "p50": 260,
+    "p95": 341,
+    "p99": 1516,
+    "max": 1516,
+    "hitches": 41
+   },
+   "cpu": {
+    "frames": 42,
+    "fps": 14.203584714237158,
+    "mean": 70.40476190476312,
+    "p50": 43,
+    "p95": 69,
+    "p99": 1017,
+    "max": 1017,
+    "hitches": 10
+   },
+   "systems": [
+    {
+     "name": "render",
+     "mean": 39.14285714285905,
+     "p95": 53,
+     "max": 124
+    },
+    {
+     "name": "interiors",
+     "mean": 26.16666666666736,
+     "p95": 36,
+     "max": 826
+    },
+    {
+     "name": "physics",
+     "mean": 0.9761904761894368,
+     "p95": 3,
+     "max": 7
+    },
+    {
+     "name": "net",
+     "mean": 0.7857142857142857,
+     "p95": 1,
+     "max": 26
+    },
+    {
+     "name": "input",
+     "mean": 0.7619047619051084,
+     "p95": 4,
+     "max": 5
+    },
+    {
+     "name": "character",
+     "mean": 0.5476190476188744,
+     "p95": 1.000000000007276,
+     "max": 7
+    },
+    {
+     "name": "warm",
+     "mean": 0.38095238095238093,
+     "p95": 3,
+     "max": 6
+    },
+    {
+     "name": "vehicles",
+     "mean": 0.2857142857142857,
+     "p95": 1,
+     "max": 6
+    },
+    {
+     "name": "modes",
+     "mean": 0.2857142857141125,
+     "p95": 1,
+     "max": 2
+    },
+    {
+     "name": "missions",
+     "mean": 0.23809523809523808,
+     "p95": 1,
+     "max": 2
+    },
+    {
+     "name": "mountain",
+     "mean": 0.16666666666666666,
+     "p95": 0,
+     "max": 6
+    },
+    {
+     "name": "hud",
+     "mean": 0.14285714285696963,
+     "p95": 1,
+     "max": 1
+    },
+    {
+     "name": "particles",
+     "mean": 0.14285714285662315,
+     "p95": 1,
+     "max": 1
+    },
+    {
+     "name": "audio",
+     "mean": 0.0952380952384417,
+     "p95": 1,
+     "max": 2
+    },
+    {
+     "name": "graffiti",
+     "mean": 0.09523809523809523,
+     "p95": 1,
+     "max": 2
+    },
+    {
+     "name": "wild",
+     "mean": 0.07142857142857142,
+     "p95": 1,
+     "max": 1
+    },
+    {
+     "name": "towns",
+     "mean": 0.047619047619047616,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "decks",
+     "mean": 0.023809523809523808,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "crew",
+     "mean": 0.023809523809523808,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "nature",
+     "mean": 0.023809523809523808,
+     "p95": 0,
+     "max": 1
+    }
+   ],
+   "render": {
+    "calls": 35,
+    "triangles": 34789,
+    "points": 2,
+    "lines": 0,
+    "programs": 57,
+    "textures": 142,
+    "geometries": 233,
+    "pixelRatio": 1,
+    "width": 820,
+    "height": 1180
+   },
+   "heapMB": null,
+   "allocMBps": null,
+   "longTasks": {
+    "count": 0,
+    "totalMs": 0,
+    "maxMs": 0
+   },
+   "hitchLog": [
+    {
+     "at": 59391,
+     "frameMs": 249,
+     "cpuMs": 57,
+     "top": [
+      [
+       "render",
+       53
+      ]
+     ]
+    },
+    {
+     "at": 59645,
+     "frameMs": 254,
+     "cpuMs": 59,
+     "top": [
+      [
+       "render",
+       53
+      ],
+      [
+       "interiors",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 59904,
+     "frameMs": 259,
+     "cpuMs": 60,
+     "top": [
+      [
+       "render",
+       55
+      ]
+     ]
+    },
+    {
+     "at": 60193,
+     "frameMs": 275,
+     "cpuMs": 1017,
+     "top": [
+      [
+       "interiors",
+       826
+      ],
+      [
+       "render",
+       124
+      ],
+      [
+       "net",
+       26
+      ],
+      [
+       "physics",
+       7
+      ],
+      [
+       "character",
+       7
+      ]
+     ]
+    },
+    {
+     "at": 61696,
+     "frameMs": 1516,
+     "cpuMs": 134,
+     "top": [
+      [
+       "interiors",
+       93
+      ],
+      [
+       "render",
+       33
+      ],
+      [
+       "physics",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 62845,
+     "frameMs": 312,
+     "cpuMs": 69,
+     "top": [
+      [
+       "interiors",
+       36
+      ],
+      [
+       "render",
+       30
+      ]
+     ]
+    },
+    {
+     "at": 64241,
+     "frameMs": 278,
+     "cpuMs": 56,
+     "top": [
+      [
+       "render",
+       51
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 64582,
+     "frameMs": 341,
+     "cpuMs": 58,
+     "top": [
+      [
+       "render",
+       48
+      ],
+      [
+       "warm",
+       6
+      ],
+      [
+       "interiors",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 65938,
+     "frameMs": 258,
+     "cpuMs": 53,
+     "top": [
+      [
+       "render",
+       38
+      ],
+      [
+       "interiors",
+       7
+      ],
+      [
+       "input",
+       4
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 69281,
+     "frameMs": 248,
+     "cpuMs": 66,
+     "top": [
+      [
+       "interiors",
+       34
+      ],
+      [
+       "render",
+       30
+      ]
+     ]
+    }
+   ],
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   },
+   "wallS": 12.624,
+   "rss": {
+    "net": 78.9,
+    "web": 2012.8
+   },
+   "ok": true,
+   "inMs": 2578,
+   "lastBuildMs": 695
+  },
+  "room-leave": {
+   "frame": {
+    "frames": 19,
+    "fps": 3.738685556867375,
+    "mean": 267.4736842105263,
+    "p50": 263,
+    "p95": 354,
+    "p99": 354,
+    "max": 354,
+    "hitches": 19
+   },
+   "cpu": {
+    "frames": 20,
+    "fps": 19.06577693040965,
+    "mean": 52.45000000000073,
+    "p50": 51,
+    "p95": 72,
+    "p99": 75,
+    "max": 75,
+    "hitches": 11
+   },
+   "systems": [
+    {
+     "name": "render",
+     "mean": 39.7,
+     "p95": 44,
+     "max": 46.99999999998545
+    },
+    {
+     "name": "mountain",
+     "mean": 5.850000000002183,
+     "p95": 28,
+     "max": 30.000000000014552
+    },
+    {
+     "name": "interiors",
+     "mean": 3.199999999998545,
+     "p95": 14,
+     "max": 20
+    },
+    {
+     "name": "physics",
+     "mean": 0.5500000000007276,
+     "p95": 1.000000000014552,
+     "max": 2
+    },
+    {
+     "name": "character",
+     "mean": 0.55,
+     "p95": 1,
+     "max": 1.000000000014552
+    },
+    {
+     "name": "vehicles",
+     "mean": 0.4500000000007276,
+     "p95": 1.000000000014552,
+     "max": 8
+    },
+    {
+     "name": "wild",
+     "mean": 0.4499999999992724,
+     "p95": 2,
+     "max": 4
+    },
+    {
+     "name": "towns",
+     "mean": 0.4,
+     "p95": 1,
+     "max": 4
+    },
+    {
+     "name": "hud",
+     "mean": 0.3,
+     "p95": 1,
+     "max": 1
+    },
+    {
+     "name": "warm",
+     "mean": 0.25,
+     "p95": 2,
+     "max": 3
+    },
+    {
+     "name": "missions",
+     "mean": 0.24999999999927242,
+     "p95": 1,
+     "max": 1
+    },
+    {
+     "name": "modes",
+     "mean": 0.2,
+     "p95": 1,
+     "max": 1
+    },
+    {
+     "name": "input",
+     "mean": 0.15,
+     "p95": 1,
+     "max": 1
+    },
+    {
+     "name": "graffiti",
+     "mean": 0.05,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "net",
+     "mean": 0.05,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "nature",
+     "mean": 0.05,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "decks",
+     "mean": 0,
+     "p95": 0,
+     "max": 0
+    },
+    {
+     "name": "audio",
+     "mean": 0,
+     "p95": 0,
+     "max": 0
+    },
+    {
+     "name": "crew",
+     "mean": 0,
+     "p95": 0,
+     "max": 0
+    },
+    {
+     "name": "particles",
+     "mean": 0,
+     "p95": 0,
+     "max": 0
+    }
+   ],
+   "render": {
+    "calls": 26,
+    "triangles": 33227,
+    "points": 0,
+    "lines": 0,
+    "programs": 55,
+    "textures": 135,
+    "geometries": 221,
+    "pixelRatio": 1,
+    "width": 820,
+    "height": 1180
+   },
+   "heapMB": null,
+   "allocMBps": null,
+   "longTasks": {
+    "count": 0,
+    "totalMs": 0,
+    "maxMs": 0
+   },
+   "hitchLog": [
+    {
+     "at": 72725,
+     "frameMs": 228,
+     "cpuMs": 66,
+     "top": [
+      [
+       "render",
+       42
+      ],
+      [
+       "interiors",
+       20
+      ]
+     ]
+    },
+    {
+     "at": 72986,
+     "frameMs": 260,
+     "cpuMs": 64,
+     "top": [
+      [
+       "render",
+       44
+      ],
+      [
+       "vehicles",
+       8
+      ],
+      [
+       "mountain",
+       6
+      ],
+      [
+       "wild",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 73339,
+     "frameMs": 354,
+     "cpuMs": 51,
+     "top": [
+      [
+       "render",
+       40
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "physics",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 74122,
+     "frameMs": 263,
+     "cpuMs": 51,
+     "top": [
+      [
+       "render",
+       40
+      ],
+      [
+       "mountain",
+       6
+      ],
+      [
+       "interiors",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 74658,
+     "frameMs": 256,
+     "cpuMs": 51,
+     "top": [
+      [
+       "render",
+       43
+      ],
+      [
+       "mountain",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 74915,
+     "frameMs": 257,
+     "cpuMs": 75,
+     "top": [
+      [
+       "render",
+       38
+      ],
+      [
+       "mountain",
+       30
+      ],
+      [
+       "warm",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 75200,
+     "frameMs": 285,
+     "cpuMs": 72,
+     "top": [
+      [
+       "render",
+       42
+      ],
+      [
+       "mountain",
+       28
+      ]
+     ]
+    },
+    {
+     "at": 75491,
+     "frameMs": 290,
+     "cpuMs": 59,
+     "top": [
+      [
+       "render",
+       42
+      ],
+      [
+       "mountain",
+       9
+      ],
+      [
+       "towns",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 75762,
+     "frameMs": 272,
+     "cpuMs": 58,
+     "top": [
+      [
+       "render",
+       40
+      ],
+      [
+       "mountain",
+       15
+      ]
+     ]
+    },
+    {
+     "at": 76047,
+     "frameMs": 285,
+     "cpuMs": 51,
+     "top": [
+      [
+       "render",
+       44
+      ],
+      [
+       "interiors",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 76318,
+     "frameMs": 271,
+     "cpuMs": 55,
+     "top": [
+      [
+       "render",
+       47
+      ],
+      [
+       "interiors",
+       4
+      ]
+     ]
+    }
+   ],
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   },
+   "wallS": 5.48,
+   "rss": {
+    "net": 78.9,
+    "web": 2014.1
+   }
+  },
+  "breaks": {
+   "frame": {
+    "frames": 92,
+    "fps": 4.154811904439327,
+    "mean": 240.68478260869566,
+    "p50": 222,
+    "p95": 345,
+    "p99": 543,
+    "max": 543,
+    "hitches": 92
+   },
+   "cpu": {
+    "frames": 93,
+    "fps": 9.996775233795598,
+    "mean": 100.03225806451566,
+    "p50": 87,
+    "p95": 176,
+    "p99": 318,
+    "max": 318,
+    "hitches": 93
+   },
+   "systems": [
+    {
+     "name": "other",
+     "mean": 90.16129032257986,
+     "p95": 176,
+     "max": 318
+    },
+    {
+     "name": "render",
+     "mean": 6.967741935483558,
+     "p95": 78.99999999998545,
+     "max": 84.99999999998545
+    },
+    {
+     "name": "warm",
+     "mean": 1.3440860215055328,
+     "p95": 9,
+     "max": 42
+    },
+    {
+     "name": "interiors",
+     "mean": 0.3548387096772629,
+     "p95": 1.000000000014552,
+     "max": 15.999999999985448
+    },
+    {
+     "name": "mountain",
+     "mean": 0.3118279569890908,
+     "p95": 3.999999999985448,
+     "max": 8
+    },
+    {
+     "name": "physics",
+     "mean": 0.2795698924735877,
+     "p95": 2.000000000014552,
+     "max": 8
+    },
+    {
+     "name": "hud",
+     "mean": 0.09677419354854357,
+     "p95": 0,
+     "max": 5
+    },
+    {
+     "name": "character",
+     "mean": 0.08602150537603113,
+     "p95": 0.9999999999854481,
+     "max": 3
+    },
+    {
+     "name": "wild",
+     "mean": 0.07526881720461402,
+     "p95": 1,
+     "max": 3
+    },
+    {
+     "name": "net",
+     "mean": 0.06451612903241453,
+     "p95": 1,
+     "max": 2.000000000014552
+    },
+    {
+     "name": "input",
+     "mean": 0.05376344086037153,
+     "p95": 0,
+     "max": 2
+    },
+    {
+     "name": "towns",
+     "mean": 0.043010752688172046,
+     "p95": 0,
+     "max": 3
+    },
+    {
+     "name": "vehicles",
+     "mean": 0.04301075268801557,
+     "p95": 0,
+     "max": 3
+    },
+    {
+     "name": "decks",
+     "mean": 0.03225806451612903,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "graffiti",
+     "mean": 0.03225806451597256,
+     "p95": 0,
+     "max": 2
+    },
+    {
+     "name": "missions",
+     "mean": 0.021505376344242495,
+     "p95": 0,
+     "max": 1.000000000014552
+    },
+    {
+     "name": "nature",
+     "mean": 0.021505376344086023,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "modes",
+     "mean": 0.021505376343929548,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "particles",
+     "mean": 0.010752688172199484,
+     "p95": 0,
+     "max": 1.000000000014552
+    },
+    {
+     "name": "audio",
+     "mean": 0.010752688172043012,
+     "p95": 0,
+     "max": 1
+    },
+    {
+     "name": "crew",
+     "mean": 0,
+     "p95": 0,
+     "max": 0
+    }
+   ],
+   "render": {
+    "calls": 26,
+    "triangles": 33227,
+    "points": 0,
+    "lines": 0,
+    "programs": 62,
+    "textures": 266,
+    "geometries": 256,
+    "pixelRatio": 1,
+    "width": 820,
+    "height": 1180
+   },
+   "heapMB": null,
+   "allocMBps": null,
+   "longTasks": {
+    "count": 0,
+    "totalMs": 0,
+    "maxMs": 0
+   },
+   "hitchLog": [
+    {
+     "at": 76904,
+     "frameMs": 0,
+     "cpuMs": 145,
+     "top": [
+      [
+       "other",
+       145
+      ]
+     ]
+    },
+    {
+     "at": 77446,
+     "frameMs": 543,
+     "cpuMs": 318,
+     "top": [
+      [
+       "other",
+       318
+      ]
+     ]
+    },
+    {
+     "at": 77957,
+     "frameMs": 510,
+     "cpuMs": 242,
+     "top": [
+      [
+       "other",
+       242
+      ]
+     ]
+    },
+    {
+     "at": 78482,
+     "frameMs": 523,
+     "cpuMs": 133,
+     "top": [
+      [
+       "other",
+       133
+      ]
+     ]
+    },
+    {
+     "at": 78744,
+     "frameMs": 265,
+     "cpuMs": 164,
+     "top": [
+      [
+       "other",
+       164
+      ]
+     ]
+    },
+    {
+     "at": 79020,
+     "frameMs": 275,
+     "cpuMs": 148,
+     "top": [
+      [
+       "other",
+       148
+      ]
+     ]
+    },
+    {
+     "at": 79323,
+     "frameMs": 304,
+     "cpuMs": 190,
+     "top": [
+      [
+       "other",
+       190
+      ]
+     ]
+    },
+    {
+     "at": 79611,
+     "frameMs": 288,
+     "cpuMs": 123,
+     "top": [
+      [
+       "other",
+       123
+      ]
+     ]
+    },
+    {
+     "at": 79843,
+     "frameMs": 232,
+     "cpuMs": 176,
+     "top": [
+      [
+       "other",
+       176
+      ]
+     ]
+    },
+    {
+     "at": 80110,
+     "frameMs": 267,
+     "cpuMs": 89,
+     "top": [
+      [
+       "other",
+       89
+      ]
+     ]
+    },
+    {
+     "at": 80337,
+     "frameMs": 227,
+     "cpuMs": 77,
+     "top": [
+      [
+       "other",
+       77
+      ]
+     ]
+    },
+    {
+     "at": 80543,
+     "frameMs": 206,
+     "cpuMs": 97,
+     "top": [
+      [
+       "other",
+       97
+      ]
+     ]
+    },
+    {
+     "at": 80765,
+     "frameMs": 222,
+     "cpuMs": 70,
+     "top": [
+      [
+       "other",
+       70
+      ]
+     ]
+    },
+    {
+     "at": 80953,
+     "frameMs": 187,
+     "cpuMs": 83,
+     "top": [
+      [
+       "other",
+       79
+      ],
+      [
+       "warm",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 81156,
+     "frameMs": 204,
+     "cpuMs": 92,
+     "top": [
+      [
+       "other",
+       92
+      ]
+     ]
+    },
+    {
+     "at": 81372,
+     "frameMs": 216,
+     "cpuMs": 76,
+     "top": [
+      [
+       "other",
+       76
+      ]
+     ]
+    },
+    {
+     "at": 81570,
+     "frameMs": 198,
+     "cpuMs": 81,
+     "top": [
+      [
+       "other",
+       81
+      ]
+     ]
+    },
+    {
+     "at": 81763,
+     "frameMs": 193,
+     "cpuMs": 89,
+     "top": [
+      [
+       "other",
+       89
+      ]
+     ]
+    },
+    {
+     "at": 81991,
+     "frameMs": 227,
+     "cpuMs": 91,
+     "top": [
+      [
+       "other",
+       80
+      ],
+      [
+       "warm",
+       11
+      ]
+     ]
+    },
+    {
+     "at": 82194,
+     "frameMs": 204,
+     "cpuMs": 76,
+     "top": [
+      [
+       "other",
+       76
+      ]
+     ]
+    },
+    {
+     "at": 82396,
+     "frameMs": 202,
+     "cpuMs": 171,
+     "top": [
+      [
+       "other",
+       171
+      ]
+     ]
+    },
+    {
+     "at": 82656,
+     "frameMs": 258,
+     "cpuMs": 82,
+     "top": [
+      [
+       "other",
+       82
+      ]
+     ]
+    },
+    {
+     "at": 82907,
+     "frameMs": 252,
+     "cpuMs": 76,
+     "top": [
+      [
+       "other",
+       76
+      ]
+     ]
+    },
+    {
+     "at": 83161,
+     "frameMs": 255,
+     "cpuMs": 68,
+     "top": [
+      [
+       "other",
+       65
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 83389,
+     "frameMs": 224,
+     "cpuMs": 77,
+     "top": [
+      [
+       "other",
+       77
+      ]
+     ]
+    },
+    {
+     "at": 83610,
+     "frameMs": 224,
+     "cpuMs": 62,
+     "top": [
+      [
+       "other",
+       62
+      ]
+     ]
+    },
+    {
+     "at": 83822,
+     "frameMs": 213,
+     "cpuMs": 71,
+     "top": [
+      [
+       "other",
+       71
+      ]
+     ]
+    },
+    {
+     "at": 84049,
+     "frameMs": 227,
+     "cpuMs": 66,
+     "top": [
+      [
+       "other",
+       66
+      ]
+     ]
+    },
+    {
+     "at": 84277,
+     "frameMs": 227,
+     "cpuMs": 66,
+     "top": [
+      [
+       "other",
+       63
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 84512,
+     "frameMs": 236,
+     "cpuMs": 81,
+     "top": [
+      [
+       "other",
+       81
+      ]
+     ]
+    },
+    {
+     "at": 84857,
+     "frameMs": 345,
+     "cpuMs": 65,
+     "top": [
+      [
+       "other",
+       65
+      ]
+     ]
+    },
+    {
+     "at": 85082,
+     "frameMs": 225,
+     "cpuMs": 74,
+     "top": [
+      [
+       "other",
+       74
+      ]
+     ]
+    },
+    {
+     "at": 85317,
+     "frameMs": 232,
+     "cpuMs": 70,
+     "top": [
+      [
+       "other",
+       70
+      ]
+     ]
+    },
+    {
+     "at": 85538,
+     "frameMs": 224,
+     "cpuMs": 98,
+     "top": [
+      [
+       "other",
+       81
+      ],
+      [
+       "warm",
+       17
+      ]
+     ]
+    },
+    {
+     "at": 85786,
+     "frameMs": 248,
+     "cpuMs": 75,
+     "top": [
+      [
+       "other",
+       75
+      ]
+     ]
+    },
+    {
+     "at": 86039,
+     "frameMs": 253,
+     "cpuMs": 94,
+     "top": [
+      [
+       "other",
+       94
+      ]
+     ]
+    },
+    {
+     "at": 86318,
+     "frameMs": 279,
+     "cpuMs": 82,
+     "top": [
+      [
+       "other",
+       82
+      ]
+     ]
+    },
+    {
+     "at": 86544,
+     "frameMs": 226,
+     "cpuMs": 81,
+     "top": [
+      [
+       "other",
+       81
+      ]
+     ]
+    },
+    {
+     "at": 86766,
+     "frameMs": 222,
+     "cpuMs": 132,
+     "top": [
+      [
+       "other",
+       90
+      ],
+      [
+       "warm",
+       42
+      ]
+     ]
+    },
+    {
+     "at": 87005,
+     "frameMs": 239,
+     "cpuMs": 86,
+     "top": [
+      [
+       "other",
+       86
+      ]
+     ]
+    },
+    {
+     "at": 87223,
+     "frameMs": 218,
+     "cpuMs": 83,
+     "top": [
+      [
+       "other",
+       83
+      ]
+     ]
+    },
+    {
+     "at": 87441,
+     "frameMs": 217,
+     "cpuMs": 101,
+     "top": [
+      [
+       "other",
+       101
+      ]
+     ]
+    },
+    {
+     "at": 87657,
+     "frameMs": 217,
+     "cpuMs": 78,
+     "top": [
+      [
+       "other",
+       78
+      ]
+     ]
+    },
+    {
+     "at": 87869,
+     "frameMs": 212,
+     "cpuMs": 87,
+     "top": [
+      [
+       "other",
+       84
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 88087,
+     "frameMs": 217,
+     "cpuMs": 84,
+     "top": [
+      [
+       "other",
+       84
+      ]
+     ]
+    },
+    {
+     "at": 88307,
+     "frameMs": 221,
+     "cpuMs": 83,
+     "top": [
+      [
+       "other",
+       82
+      ]
+     ]
+    },
+    {
+     "at": 88542,
+     "frameMs": 234,
+     "cpuMs": 82,
+     "top": [
+      [
+       "other",
+       82
+      ]
+     ]
+    },
+    {
+     "at": 88756,
+     "frameMs": 215,
+     "cpuMs": 107,
+     "top": [
+      [
+       "other",
+       107
+      ]
+     ]
+    },
+    {
+     "at": 88976,
+     "frameMs": 220,
+     "cpuMs": 86,
+     "top": [
+      [
+       "other",
+       82
+      ],
+      [
+       "warm",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 89210,
+     "frameMs": 233,
+     "cpuMs": 83,
+     "top": [
+      [
+       "other",
+       83
+      ]
+     ]
+    },
+    {
+     "at": 89435,
+     "frameMs": 225,
+     "cpuMs": 83,
+     "top": [
+      [
+       "other",
+       83
+      ]
+     ]
+    },
+    {
+     "at": 89654,
+     "frameMs": 220,
+     "cpuMs": 80,
+     "top": [
+      [
+       "other",
+       80
+      ]
+     ]
+    },
+    {
+     "at": 89873,
+     "frameMs": 219,
+     "cpuMs": 83,
+     "top": [
+      [
+       "other",
+       83
+      ]
+     ]
+    },
+    {
+     "at": 90120,
+     "frameMs": 232,
+     "cpuMs": 192,
+     "top": [
+      [
+       "other",
+       177
+      ],
+      [
+       "warm",
+       14
+      ]
+     ]
+    },
+    {
+     "at": 90415,
+     "frameMs": 310,
+     "cpuMs": 133,
+     "top": [
+      [
+       "other",
+       133
+      ]
+     ]
+    },
+    {
+     "at": 90672,
+     "frameMs": 257,
+     "cpuMs": 114,
+     "top": [
+      [
+       "other",
+       114
+      ]
+     ]
+    },
+    {
+     "at": 90886,
+     "frameMs": 214,
+     "cpuMs": 103,
+     "top": [
+      [
+       "other",
+       103
+      ]
+     ]
+    },
+    {
+     "at": 91091,
+     "frameMs": 204,
+     "cpuMs": 105,
+     "top": [
+      [
+       "other",
+       105
+      ]
+     ]
+    },
+    {
+     "at": 91303,
+     "frameMs": 212,
+     "cpuMs": 107,
+     "top": [
+      [
+       "other",
+       103
+      ],
+      [
+       "warm",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 91517,
+     "frameMs": 215,
+     "cpuMs": 100,
+     "top": [
+      [
+       "other",
+       99
+      ]
+     ]
+    },
+    {
+     "at": 91727,
+     "frameMs": 210,
+     "cpuMs": 98,
+     "top": [
+      [
+       "other",
+       98
+      ]
+     ]
+    },
+    {
+     "at": 91945,
+     "frameMs": 218,
+     "cpuMs": 107,
+     "top": [
+      [
+       "other",
+       107
+      ]
+     ]
+    },
+    {
+     "at": 92151,
+     "frameMs": 206,
+     "cpuMs": 132,
+     "top": [
+      [
+       "other",
+       132
+      ]
+     ]
+    },
+    {
+     "at": 92372,
+     "frameMs": 219,
+     "cpuMs": 81,
+     "top": [
+      [
+       "other",
+       77
+      ],
+      [
+       "warm",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 92571,
+     "frameMs": 200,
+     "cpuMs": 90,
+     "top": [
+      [
+       "other",
+       90
+      ]
+     ]
+    },
+    {
+     "at": 92765,
+     "frameMs": 194,
+     "cpuMs": 78,
+     "top": [
+      [
+       "other",
+       78
+      ]
+     ]
+    },
+    {
+     "at": 92981,
+     "frameMs": 217,
+     "cpuMs": 80,
+     "top": [
+      [
+       "other",
+       80
+      ]
+     ]
+    },
+    {
+     "at": 93172,
+     "frameMs": 191,
+     "cpuMs": 117,
+     "top": [
+      [
+       "other",
+       117
+      ]
+     ]
+    },
+    {
+     "at": 93365,
+     "frameMs": 192,
+     "cpuMs": 68,
+     "top": [
+      [
+       "other",
+       64
+      ],
+      [
+       "warm",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 93545,
+     "frameMs": 181,
+     "cpuMs": 78,
+     "top": [
+      [
+       "other",
+       78
+      ]
+     ]
+    },
+    {
+     "at": 93737,
+     "frameMs": 192,
+     "cpuMs": 80,
+     "top": [
+      [
+       "other",
+       80
+      ]
+     ]
+    },
+    {
+     "at": 93933,
+     "frameMs": 196,
+     "cpuMs": 103,
+     "top": [
+      [
+       "other",
+       103
+      ]
+     ]
+    },
+    {
+     "at": 94116,
+     "frameMs": 183,
+     "cpuMs": 139,
+     "top": [
+      [
+       "other",
+       139
+      ]
+     ]
+    },
+    {
+     "at": 94422,
+     "frameMs": 306,
+     "cpuMs": 124,
+     "top": [
+      [
+       "other",
+       115
+      ],
+      [
+       "warm",
+       9
+      ]
+     ]
+    },
+    {
+     "at": 94664,
+     "frameMs": 233,
+     "cpuMs": 83,
+     "top": [
+      [
+       "other",
+       83
+      ]
+     ]
+    },
+    {
+     "at": 95085,
+     "frameMs": 429,
+     "cpuMs": 86,
+     "top": [
+      [
+       "other",
+       86
+      ]
+     ]
+    },
+    {
+     "at": 95323,
+     "frameMs": 232,
+     "cpuMs": 89,
+     "top": [
+      [
+       "other",
+       89
+      ]
+     ]
+    },
+    {
+     "at": 95518,
+     "frameMs": 201,
+     "cpuMs": 85,
+     "top": [
+      [
+       "other",
+       85
+      ]
+     ]
+    },
+    {
+     "at": 95734,
+     "frameMs": 215,
+     "cpuMs": 89,
+     "top": [
+      [
+       "other",
+       86
+      ],
+      [
+       "warm",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 95952,
+     "frameMs": 220,
+     "cpuMs": 96,
+     "top": [
+      [
+       "other",
+       96
+      ]
+     ]
+    },
+    {
+     "at": 96159,
+     "frameMs": 206,
+     "cpuMs": 88,
+     "top": [
+      [
+       "other",
+       88
+      ]
+     ]
+    },
+    {
+     "at": 96366,
+     "frameMs": 206,
+     "cpuMs": 105,
+     "top": [
+      [
+       "other",
+       105
+      ]
+     ]
+    },
+    {
+     "at": 96584,
+     "frameMs": 220,
+     "cpuMs": 106,
+     "top": [
+      [
+       "other",
+       106
+      ]
+     ]
+    },
+    {
+     "at": 96858,
+     "frameMs": 274,
+     "cpuMs": 100,
+     "top": [
+      [
+       "other",
+       100
+      ]
+     ]
+    },
+    {
+     "at": 97177,
+     "frameMs": 318,
+     "cpuMs": 80,
+     "top": [
+      [
+       "render",
+       45
+      ],
+      [
+       "physics",
+       8
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "character",
+       3
+      ],
+      [
+       "vehicles",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 97376,
+     "frameMs": 199,
+     "cpuMs": 72,
+     "top": [
+      [
+       "render",
+       63
+      ],
+      [
+       "mountain",
+       4
+      ]
+     ]
+    },
+    {
+     "at": 97646,
+     "frameMs": 270,
+     "cpuMs": 83,
+     "top": [
+      [
+       "render",
+       64
+      ],
+      [
+       "mountain",
+       7
+      ],
+      [
+       "physics",
+       4
+      ],
+      [
+       "input",
+       2
+      ],
+      [
+       "hud",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 97860,
+     "frameMs": 214,
+     "cpuMs": 96,
+     "top": [
+      [
+       "render",
+       80
+      ],
+      [
+       "mountain",
+       8
+      ],
+      [
+       "net",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 98078,
+     "frameMs": 219,
+     "cpuMs": 92,
+     "top": [
+      [
+       "render",
+       82
+      ],
+      [
+       "hud",
+       5
+      ]
+     ]
+    },
+    {
+     "at": 98330,
+     "frameMs": 251,
+     "cpuMs": 111,
+     "top": [
+      [
+       "render",
+       85
+      ],
+      [
+       "interiors",
+       16
+      ],
+      [
+       "mountain",
+       4
+      ],
+      [
+       "physics",
+       3
+      ]
+     ]
+    },
+    {
+     "at": 98581,
+     "frameMs": 248,
+     "cpuMs": 83,
+     "top": [
+      [
+       "render",
+       79
+      ]
+     ]
+    },
+    {
+     "at": 98818,
+     "frameMs": 239,
+     "cpuMs": 88,
+     "top": [
+      [
+       "render",
+       80
+      ],
+      [
+       "interiors",
+       5
+      ],
+      [
+       "physics",
+       2
+      ]
+     ]
+    },
+    {
+     "at": 99047,
+     "frameMs": 230,
+     "cpuMs": 85,
+     "top": [
+      [
+       "render",
+       70
+      ],
+      [
+       "physics",
+       6
+      ],
+      [
+       "interiors",
+       4
+      ],
+      [
+       "towns",
+       3
+      ]
+     ]
+    }
+   ],
+   "extra": {
+    "quality": "low",
+    "adaptive": "rung 0/5 {\"scale\":1,\"shadows\":true,\"post\":true}"
+   },
+   "wallS": 22.333,
+   "rss": {
+    "net": 79.6,
+    "web": 2278.5
+   },
+   "ok": true,
+   "active": false
+  }
+ },
+ "rss": [
+  {
+   "at": 29.881,
+   "name": "camp",
+   "net": 77.9,
+   "web": 2051,
+   "heap": null,
+   "tex": 129,
+   "geo": 183,
+   "progs": 56
+  },
+  {
+   "at": 57.031,
+   "name": "remotes",
+   "net": 78.7,
+   "web": 1967.9,
+   "heap": null,
+   "tex": 131,
+   "geo": 221,
+   "progs": 55
+  },
+  {
+   "at": 71.686,
+   "name": "room-enter",
+   "net": 78.9,
+   "web": 2012.8,
+   "heap": null,
+   "tex": 142,
+   "geo": 233,
+   "progs": 57
+  },
+  {
+   "at": 77.169,
+   "name": "room-leave",
+   "net": 78.9,
+   "web": 2014.1,
+   "heap": null,
+   "tex": 135,
+   "geo": 221,
+   "progs": 55
+  },
+  {
+   "at": 99.506,
+   "name": "breaks",
+   "net": 79.6,
+   "web": 2278.5,
+   "heap": null,
+   "tex": 266,
+   "geo": 256,
+   "progs": 62
+  }
+ ],
+ "errors": [],
+ "loads": 1
+}

@@ -52,16 +52,19 @@ const HINTS = {
       '<b>W</b> track · <b>S</b> flare · <b>SHIFT</b> dive · <b>A/D</b> turn · <b>SPACE</b> pull',
     canopy: '<b>A/D</b> steer · <b>W</b> faster · <b>S</b> brake',
     pull: 'SPACE',
+    offer: 'SPACE',
   },
   gamepad: {
     freefall: 'stick: track · flare · turn · <b>L3</b> dive · <b>A</b> pull',
     canopy: 'stick: steer · faster · brake',
     pull: 'Ⓐ',
+    offer: 'Ⓐ',
   },
   touch: {
     freefall: 'stick: track · flare · turn · <b>RUN</b> dive · <b>PULL</b>',
     canopy: 'stick: steer · faster · brake',
     pull: 'TAP PULL',
+    offer: 'TAP SKYDIVE',
   },
 } as const;
 
@@ -219,7 +222,7 @@ export class SkydiveSystem {
     const p = this.game.player;
     if (this.hud === null) {
       const parent = this.game.gfx.renderer.domElement.parentElement;
-      if (parent === null || s.phase === 'off') return;
+      if (parent === null || (s.phase === 'off' && !ctl.offer)) return;
       this.hud = new SkyHud(
         parent,
         () => (ctl.pullQueued = true),
@@ -246,6 +249,8 @@ export class SkydiveSystem {
       floor: SKY.pullMin / scale,
       hint: !on ? '' : ff ? h.freefall : h.canopy,
       prompt,
+      offer: ctl.offer,
+      offerKey: h.offer,
       touch: this.mode === 'touch',
       ready: canPull,
     });

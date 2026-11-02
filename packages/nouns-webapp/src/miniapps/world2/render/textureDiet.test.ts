@@ -4,17 +4,24 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { barkTextures, lawnTexture, rockNormalTexture } from '../nature/textures';
 
 import {
+  LIGHT_CAP,
+  LIGHTER_FOR_MS,
   MINOR_CAP,
   RELOAD_WINDOW_MS,
   UPLOAD_CAP,
   WEAK_TEXTURE_BUDGET,
+  bootsAfterLoss,
   downsampleRGBA,
+  envMapSize,
+  lossAction,
+  releaseAfterUpload,
   estimateTextureBytes,
   fitSize,
   reloadAfterLoss,
   shrinkTexture,
   textureBytes,
   textureDiet,
+  uploadCap,
 } from './textureDiet';
 
 const rgba = (w: number, h: number, fill: (x: number, y: number) => number[]) => {
@@ -25,6 +32,7 @@ const rgba = (w: number, h: number, fill: (x: number, y: number) => number[]) =>
 
 afterEach(() => {
   textureDiet.on = false;
+  textureDiet.light = false;
 });
 
 describe('fitSize', () => {
@@ -149,5 +157,54 @@ describe('reloadAfterLoss', () => {
     expect(reloadAfterLoss(now, now - 5_000)).toBe(false);
     expect(reloadAfterLoss(now, now - RELOAD_WINDOW_MS)).toBe(true);
     expect(reloadAfterLoss(now, Number.NaN)).toBe(true);
+  });
+});
+
+describe('diet levels', () => {
+  it('caps uploads at 512 (weak), 1024 (light), never off the diet', () => {
+    expect(uploadCap({ on: true, light: false })).toBe(UPLOAD_CAP);
+    expect(uploadCap({ on: false, light: true })).toBe(LIGHT_CAP);
+    expect(uploadCap({ on: false, light: false })).toBe(Infinity);
+    expect(uploadCap({ on: true, light: true })).toBe(UPLOAD_CAP);
+  });
+  it('bakes the env map smaller on a diet', () => {
+    expect(envMapSize()).toBe(256);
+    textureDiet.light = true;
+    expect(envMapSize()).toBe(128);
+    textureDiet.on = true;
+    expect(envMapSize()).toBe(64);
+  });
+});
+
+describe('after a lost context', () => {
+  const now = 10_000_000;
+  it('boots lighter for half an hour after a loss', () => {
+    expect(bootsAfterLoss(now, null)).toBe(false);
+    expect(bootsAfterLoss(now, now - 1_000)).toBe(true);
+    expect(bootsAfterLoss(now, now - LIGHTER_FOR_MS + 1)).toBe(true);
+    expect(bootsAfterLoss(now, now - LIGHTER_FOR_MS)).toBe(false);
+    expect(bootsAfterLoss(now, now + 5_000)).toBe(false); // clock went backwards
+  });
+  it('reloads the first time, stops on a notice when it happens again soon', () => {
+    expect(lossAction(now, null)).toBe('reload');
+    expect(lossAction(now, now - 10_000)).toBe('notice');
+    expect(lossAction(now, now - RELOAD_WINDOW_MS)).toBe('reload');
+  });
+});
+
+describe('releaseAfterUpload', () => {
+  const canvasLike = () => ({ width: 2048, height: 2048, getContext: () => null });
+  it('frees a static canvas once it is on the GPU, only on a diet', () => {
+    const off = new THREE.Texture(canvasLike() as unknown as HTMLCanvasElement);
+    releaseAfterUpload(off);
+    expect(off.onUpdate).toBeNull();
+    textureDiet.light = true;
+    const c = canvasLike();
+    const t = new THREE.Texture(c as unknown as HTMLCanvasElement);
+    releaseAfterUpload(t);
+    expect(c.width).toBe(2048);
+    t.onUpdate!(t); // three calls it after the upload
+    expect([c.width, c.height]).toEqual([1, 1]);
+    expect(t.onUpdate).toBeNull();
   });
 });

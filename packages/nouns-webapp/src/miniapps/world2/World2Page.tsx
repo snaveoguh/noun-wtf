@@ -1,6 +1,6 @@
 // ── Noun World v2 — skate the plaza as your Noun ───────────────────────
 
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useNavigate, useSearchParams } from 'react-router';
 
@@ -17,6 +17,7 @@ import { BUILDS, parseBoardType } from './character/NounCharacter';
 import { CUTSCENE_CSS, CutsceneUi } from './cutscene/CutsceneUi';
 import { DragonHud } from './dragon/DragonHud';
 import { Game } from './Game';
+import { MuralUi } from './graffiti/mural/MuralUi';
 import { PLAZA_CENTRE, prefetchWalls } from './graffiti/storeLoad';
 import { HideSeekUi } from './hideseek/net/HideSeekUi';
 import { HoopsUi, useHoopsActive } from './hoops/net/HoopsUi';
@@ -36,6 +37,8 @@ import { bindSettings } from './settings/bind';
 import { SETTINGS_CSS } from './settings/hudCss';
 import { HudPrefsStyle } from './settings/SettingsPanel';
 import { bootQuality } from './settings/store';
+import { startMiniApp } from './share/miniApp';
+import { ShareUi } from './share/ShareUi';
 import { TradeUi } from './trade/TradeUi';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
@@ -44,6 +47,7 @@ import { TouchControls, useIsTouch } from './ui/TouchControls';
 import { LOADER_CSS, WorldLoader } from './ui/WorldLoader';
 import { useVanDriving } from './van/useVan';
 import { VanHud } from './van/VanHud';
+import { BenchUi } from './world/bench/BenchUi';
 import { CampUi } from './world/camp/CampUi';
 import { firstSpawnInCamp } from './world/camp/firstSpawn';
 import { worldPause } from './worldPause';
@@ -72,6 +76,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   // Installable as an app on /world: Noun World's manifest + offline worker
   useEffect(() => {
     registerWorldSw(window.location.pathname);
+    void startMiniApp(); // a Farcaster mini app: safe areas + hide the host's splash
     return applyWorldManifest(window.location.pathname);
   }, []);
   // Every HUD / panel button clicks (audio/sfx/uiSounds)
@@ -219,9 +224,11 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   }, [game, phase, audioOn, searchParams]);
   // A plain /world load (no deep link, no `?spawn=plaza`): everyone wakes
   // up in NOUNS CAMP, the condemned penthouse (world/camp). Once per page
-  // load; if CAMP isn't there the plaza spawn stands.
+  // load; if CAMP isn't there the plaza spawn stands. A layout effect: it
+  // wakes before the browser paints the first frame of play, so the plaza
+  // spawn behind the select never shows for a frame first.
   const wokeUp = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!game || !started || wokeUp.current) return;
     if (!firstSpawnInCamp(`?${searchParams.toString()}`)) return;
     const tryWake = () => {
@@ -442,7 +449,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       </style>
       <HudPrefsStyle />
       <div ref={hostRef} data-w2keep="" className="absolute inset-0" />
-      <div ref={labelsRef} className="pointer-events-none absolute inset-0" />
+      <div ref={labelsRef} className="pointer-events-none absolute inset-0" data-w2labels />
       {game && started && !hoopsOn && !replaying && (
         <RingHud
           game={game}
@@ -463,6 +470,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && !hoopsOn && !replaying && <CarHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <DragonHud game={game} touch={touchPage} />}
       {game && started && !hoopsOn && <MissionsUi game={game} touch={touchPage} />}
+      {game && started && <ShareUi game={game} />}
       {game && started && !hoopsOn && !replaying && <TradeUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && (
         <Suspense fallback={null}>
@@ -471,10 +479,12 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       )}
       {game && started && !hoopsOn && !replaying && <InteriorsUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <CampUi game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <BenchUi game={game} touch={touchPage} />}
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}
       {game && started && <PoolUi game={game} />}
+      {game && started && !hoopsOn && !replaying && <MuralUi game={game} />}
       {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && !replaying && <HideSeekUi game={game} touch={touchPage} />}
       {game && started && !hoopsOn && (

@@ -134,7 +134,7 @@ export const HUD_CSS = `
 .w2-prompt{pointer-events:auto;display:inline-flex;align-items:center;gap:8px;background:#ffd400;color:#0b0b12;border:2px solid #0b0b12;box-shadow:3px 3px 0 #ff2f8e;padding:5px 12px 5px 6px;border-radius:999px;font:900 italic 14px system-ui,sans-serif;letter-spacing:.02em;white-space:nowrap;animation:w2hin .25s ease-out}
 .w2-prompt kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 5px;border-radius:6px;background:#0b0b12;color:#ffd400;font:900 12px system-ui,sans-serif;font-style:normal}
 .w2-prompt-at{position:absolute;left:50%;transform:translateX(-50%);bottom:24%;z-index:35}
-@media (pointer:coarse){.w2-prompt-at{bottom:auto;top:calc(136px + env(safe-area-inset-top))}.w2-prompt{font-size:13px}}
+@media (pointer:coarse){.w2-prompt-at{bottom:auto;top:calc(136px + var(--w2-safe-top, env(safe-area-inset-top)))}.w2-prompt{font-size:13px}}
 
 /* Replays (RecordsUi) when the ring isn't up */
 .w2h-replay{left:12px;top:12px}
@@ -143,7 +143,7 @@ export const HUD_CSS = `
 /* The site's NOUN FM while the ring HUD is up: the off pill lives in the
    icon row; a playing tile moves clear of the thumb buttons on phones */
 body[data-w2hud-on] [data-nounfm="off"]{display:none!important}
-@media (pointer:coarse){body[data-w2hud-on] [data-nounfm]:not([data-nounfm="off"]){top:calc(48px + env(safe-area-inset-top))!important;bottom:auto!important;left:8px!important;right:auto!important}}
+@media (pointer:coarse){body[data-w2hud-on] [data-nounfm]:not([data-nounfm="off"]){top:calc(48px + var(--w2-safe-top, env(safe-area-inset-top)))!important;bottom:auto!important;left:8px!important;right:auto!important}}
 
 @keyframes w2hin{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
 .w2-prompt-at.w2-prompt{animation:none}

@@ -63,10 +63,12 @@ US posture as we understand it (verify all of this):
 
 ---
 
-## 2. United Kingdom
+## 2. United Kingdom (UK players)
 
-The owner is likely UK-based, so UK rules may apply to the project itself, not just to UK
-players. **Raise this first.**
+The owner is based in Costa Rica (§2a), so this is about **UK players**, not the project's
+home. The UK rules turn on who a communication reaches, not where the issuer sits: a
+promotion "capable of having an effect" in the UK is in scope from anywhere. Noun World has
+UK players, so this still matters.
 
 - **Financial promotions:** since October 2023, marketing "qualifying cryptoassets" to UK
   consumers is a regulated financial promotion. It must be made or approved by an authorised
@@ -92,12 +94,50 @@ players. **Raise this first.**
 
 1. Is CITY a "qualifying cryptoasset" for the financial promotion rules? If so, can *any*
    in-game or social mention of rewards be made to UK users without an authorised approver?
-2. Would the project, or the owner personally, be "issuing" or "offering" a cryptoasset under
-   the forthcoming regime? What's the timeline?
+2. Would an overseas issuer making CITY available to UK users be "issuing" or "offering" a
+   cryptoasset under the forthcoming regime? What's the timeline?
 3. Should UK users be excluded from claiming until there's an approved promotion route? How
    do we handle UK players who earned points before launch?
-4. What does the builders allocation mean for the owner's personal tax (at grant, vesting or
-   sale)?
+4. Is geofencing UK users out of claims, and out of every token mention in game, enough to
+   stay outside the regime?
+
+---
+
+## 2a. Costa Rica (the owner's base) and where the issuer sits
+
+The owner lives in Costa Rica and does business outside it. The owner's understanding is
+that this means no Costa Rican registration is needed. That may well be right, but **confirm
+it with Costa Rican counsel for this activity specifically.** A token issued and run from
+Costa Rica is a different thing from a consulting business with foreign clients. Points to
+check (from general knowledge, which may be out of date):
+
+- **Crypto rules.** As we understand it, Costa Rica has no dedicated crypto-asset statute yet;
+  bills have been proposed, so check their status. The central bank (BCCR) has said crypto
+  isn't legal tender and isn't regulated as money. SUGEVAL's view on tokens that look like
+  securities should be checked.
+- **AML registration.** Costa Rica's AML law (Ley 7786, the "15 bis" activities) has required
+  some non-financial businesses, reportedly including virtual-asset services, to register
+  with SUGEF. Does that turn on where the clients are, or on where the business operates
+  from? Does running a token distribution, or the agent marketplace, from Costa Rica count?
+- **Tax.** Costa Rica has taxed on a territorial basis (foreign-source income generally not
+  taxed). There have been proposals to move to worldwide taxation. How would these be
+  treated: the builders allocation (at grant, vest or sale), treasury activity, and fees
+  earned onchain from foreign users?
+- **The issuing entity.** Many projects issue from a foundation or company in a
+  crypto-friendly place (e.g. Switzerland, Cayman, BVI, Panama). Counsel should advise
+  whether CITY needs an entity at all, where it should be, and how that interacts with the
+  owner being resident in Costa Rica. Wherever the entity sits, the rules where **players**
+  are (US, UK, EU, others) still apply to what's offered and said to them.
+
+### Questions for Costa Rican counsel
+
+1. Does issuing and operating CITY (distribution, treasury, agent fees) from Costa Rica, for
+   users abroad, need any registration (SUGEF under Ley 7786 15 bis, SUGEVAL, other)?
+2. Does the territorial tax principle cover the owner's builders allocation and onchain
+   income from foreign users? Is any change to worldwide taxation pending?
+3. Should a separate entity (in Costa Rica or elsewhere) issue the token? What would being a
+   Costa Rica resident mean for a foreign entity's management and control?
+4. Any consumer-protection or gambling rules for Costa Rican players (tournaments, prizes)?
 
 ---
 
@@ -232,13 +272,16 @@ A possible default at launch, pending advice:
 
 ## 9. A short list for the first call with counsel
 
-1. Classification of CITY in the US, UK and EU, given no sale and earned-by-play.
+1. Classification of CITY in the US, UK and EU, given no sale and earned-by-play; and
+   confirming that nothing needs registering in Costa Rica (§2a).
 2. The UK financial promotions regime: what we may say in game and on social, to whom, and when.
 3. MiCA white paper and the free-offer exemption.
-4. Builders allocation and treasury: structure, disclosure, personal tax.
+4. Builders allocation and treasury: structure, disclosure, personal tax (Costa Rica's
+   territorial basis).
 5. Geofencing scope and method, and what happens to fenced players' pre-launch activity.
 6. Tournaments and prizes, including the existing prize payouts to record winners.
 7. The agent economy: is any part of it a regulated service?
 8. NTCOIN: confirm not deploying it is the right call, or what it would take.
-9. Which entity issues CITY (foundation, company, none), where, and how it's governed.
+9. Which entity issues CITY (foundation, company, none), where, and how it's governed,
+   given the owner lives in Costa Rica.
 10. Terms of service, risk disclosures, privacy notice for anti-sybil data, and age gating.

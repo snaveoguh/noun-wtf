@@ -10,7 +10,10 @@
 //     "poster": 4.2,                    // poster still at this time (s)
 //     "grade": "eq=…,unsharp=…",        // optional ffmpeg filters on the whole cut
 //     "music": { "file": "scripts/sizzle/music/noun-drop.mp3", "in": 0 },  // optional soundtrack
-//     "cuts": [ { "shot": "bd-summit", "in": 0, "dur": 2.0, "fade": 0.2 }, … ] }
+//     "cuts": [ { "shot": "bd-summit", "in": 0, "dur": 2.0, "fade": 0.2 }, … ],
+//     "size": [1080, 1920],             // optional: output size (default 1920×1080)
+//     "out": "public/clips",            // optional: output folder from packages/nouns-webapp (default public/home)
+//     "frames": ".frames-v" }           // optional: frames folder under scripts/sizzle (render.mjs uses it too)
 // A cut takes `shot` (rendered frames) or `video` (an existing gameplay clip,
 // path from packages/nouns-webapp, e.g. "public/home/hero-hoops.mp4").
 // `in` / `dur` are seconds into the shot's frames, `fade` a crossfade from
@@ -24,9 +27,6 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FPS = 30;
-/** Output size (the hero is full-bleed; phones get the same file). */
-const OUT_W = 1920;
-const OUT_H = 1080;
 
 const args = process.argv.slice(2);
 const opt = (k, d) => {
@@ -39,8 +39,12 @@ if (!editPath) {
   process.exit(1);
 }
 const edit = JSON.parse(readFileSync(editPath, 'utf8'));
-const framesDir = resolve(opt('--frames', process.env.SIZZLE_FRAMES ?? join(HERE, '.frames')));
-const outDir = resolve(opt('--out', join(HERE, '../../public/home')));
+/** Output size (the hero is full-bleed; phones get the same file). Social clips set `size`. */
+const [OUT_W, OUT_H] = edit.size ?? [1920, 1080];
+const framesDir = resolve(
+  opt('--frames', process.env.SIZZLE_FRAMES ?? join(HERE, edit.frames ?? '.frames')),
+);
+const outDir = resolve(opt('--out', join(HERE, '../..', edit.out ?? 'public/home')));
 mkdirSync(outDir, { recursive: true });
 
 const inputs = [];

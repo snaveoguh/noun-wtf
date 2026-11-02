@@ -9,12 +9,17 @@
 // --preview renders every 6th frame only (for contact sheets); --skip-done
 // leaves shots that already have all their frames; --limit N renders only
 // each shot's first N frames.
+//
+// An edit list's `size` ([w, h], e.g. [1080, 1920] for a vertical clip) is
+// the render size (SIZZLE_SCALE=0.5 halves it for a preview; SIZZLE_W /
+// SIZZLE_H still win), and its `frames` (a folder under scripts/sizzle)
+// keeps those frames apart from the 1920×1080 ones of the same shots.
 
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { launch, newPage, shoot } from './lib.mjs';
+import { H, W, launch, newPage, shoot } from './lib.mjs';
 import { SCENES, SHOTS } from './shots.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -24,7 +29,15 @@ const opt = (k, d) => {
   return i >= 0 ? args[i + 1] : d;
 };
 const base = opt('--base', process.env.SIZZLE_BASE ?? 'http://127.0.0.1:5318');
-const framesDir = resolve(opt('--frames', process.env.SIZZLE_FRAMES ?? join(HERE, '.frames')));
+const edits = args.filter((a, i) => args[i - 1] === '--edit').map(e => JSON.parse(readFileSync(e, 'utf8')));
+const editFrames = edits.find(e => e.frames)?.frames;
+const framesDir = resolve(
+  opt('--frames', process.env.SIZZLE_FRAMES ?? (editFrames ? join(HERE, editFrames) : join(HERE, '.frames'))),
+);
+const editSize = edits.find(e => e.size)?.size;
+const scale = Number(process.env.SIZZLE_SCALE ?? 1);
+const size =
+  process.env.SIZZLE_W || !editSize ? [W, H] : editSize.map(v => Math.round((v * scale) / 2) * 2);
 const preview = args.includes('--preview');
 const skipDone = args.includes('--skip-done');
 // --limit N: only the first N frames of each shot (a quick look at framing)
@@ -33,9 +46,7 @@ const limit = Number(opt('--limit', 0)) || Infinity;
 let ids = opt('--shots', '')
   .split(',')
   .filter(Boolean);
-for (const e of args.filter((a, i) => args[i - 1] === '--edit')) {
-  for (const c of JSON.parse(readFileSync(e, "utf8")).cuts) if (c.shot && !ids.includes(c.shot)) ids.push(c.shot);
-}
+for (const e of edits) for (const c of e.cuts) if (c.shot && !ids.includes(c.shot)) ids.push(c.shot);
 if (ids.length === 0) ids = Object.keys(SHOTS);
 for (const id of ids) if (!SHOTS[id]) throw new Error(`unknown shot ${id}`);
 
@@ -59,8 +70,8 @@ for (const [s, list] of byScene) byScene.set(s, [...list].sort((a, b) => Number(
 const browser = await launch();
 try {
   for (const [scene, list] of byScene) {
-    log(`scene ${scene}: ${list.join(', ')}`);
-    const p = await newPage(browser, log);
+    log(`scene ${scene} at ${size.join('×')}: ${list.join(', ')}`);
+    const p = await newPage(browser, log, size);
     await SCENES[scene](p, base);
     for (const id of list) {
       const shot = SHOTS[id];

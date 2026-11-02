@@ -24,7 +24,7 @@
 export type Bucket =
   | 'retro' // launch conversion of COIN / points (one snapshot)
   | 'play' // ongoing play rewards, weekly epochs
-  | 'creators' // graffiti, voice, CC0, covers, maps: snapshot-attributed work
+  | 'creators' // graffiti, voice, CC0, covers, maps: work in the snapshots (graffiti via anonymous writer tags)
   | 'agents' // agent-economy bootstrapping (fee rebates, bonds matched)
   | 'treasury' // the city's treasury, governed + timelocked
   | 'liquidity' // protocol-owned liquidity on Base, LP locked
@@ -84,7 +84,7 @@ export function emissionSchedule(pool: number, weeks: number, decayPerYear = 0.5
 /**
  * One account's week, as the server would see it. `proved` means the server
  * can check it (run proofs for records, server-ledger COIN from world-trade,
- * graffiti attributed in a signed daily Base snapshot). Client-claimed
+ * graffiti kept up in the daily Base snapshots and vouched for by verified players). Client-claimed
  * things (respect events today: the client sends them, the server re-scores
  * but can't witness most of them) are `claimed`.
  */
@@ -93,7 +93,11 @@ export interface WeekActivity {
   activeDays: number;
   /** Server-ledger COIN earned this week, starter purses excluded. */
   coinEarned: number;
-  /** Graffiti pieces attributed in that week's snapshots. */
+  /**
+   * Graffiti pieces under this player's writer's tag that week. Graffiti is anonymous:
+   * in reality a tag is paid on its own (token-design.md §6a). Here the tag's pieces
+   * stand in for the player behind it.
+   */
   pieces: number;
   /** Pieces other players kept up / reacted to (the quality signal). */
   piecesKept: number;
@@ -422,7 +426,7 @@ export interface RetroAccount {
   respectTier: number;
   /** Proved records held (world-stats competition boards). */
   provedRecords: number;
-  /** Graffiti pieces attributed in onchain snapshots before launch. */
+  /** Pieces under a writer's tag the player chose to link (opt-in; untagged art counts nothing). */
   pieces: number;
   /** Distinct days played (world-stats). */
   activeDays: number;
