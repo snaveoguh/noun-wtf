@@ -24,14 +24,46 @@ export function linear(hex: number): [number, number, number] {
   return v;
 }
 
+/** A growable typed array (number[] pushes + a copy cost ~5× more at build time). */
+class Buf<T extends Float32Array | Uint32Array | Uint8Array> {
+  length = 0;
+  constructor(public a: T) {}
+  private grow(n: number) {
+    if (this.length + n <= this.a.length) return;
+    const C = this.a.constructor as new (n: number) => T;
+    const b = new C(Math.max(this.a.length * 2, this.length + n));
+    b.set(this.a);
+    this.a = b;
+  }
+  push1(x: number) {
+    this.grow(1);
+    this.a[this.length++] = x;
+  }
+  push2(x: number, y: number) {
+    this.grow(2);
+    this.a[this.length++] = x;
+    this.a[this.length++] = y;
+  }
+  push3(x: number, y: number, z: number) {
+    this.grow(3);
+    this.a[this.length++] = x;
+    this.a[this.length++] = y;
+    this.a[this.length++] = z;
+  }
+  /** A right-sized copy. */
+  out(): T {
+    return this.a.slice(0, this.length) as T;
+  }
+}
+
 export class Geo {
-  pos: number[] = [];
-  nrm: number[] = [];
-  col: number[] = [];
-  uv: number[] = [];
-  idx: number[] = [];
+  pos = new Buf(new Float32Array(3 * 1024));
+  nrm = new Buf(new Float32Array(3 * 1024));
+  col = new Buf(new Float32Array(3 * 1024));
+  uv = new Buf(new Float32Array(2 * 1024));
+  idx = new Buf(new Uint32Array(1536));
   /** Optional per-vertex tag (setKits recolours seats by it). */
-  tag: number[] = [];
+  tag = new Buf(new Uint8Array(1024));
   /** Write UVs too (else none). */
   constructor(readonly withUv = false) {}
 
@@ -68,10 +100,10 @@ export class Geo {
     const l = Math.hypot(n[0], n[1], n[2]) || 1;
     const [r, g, bl] = linear(color);
     for (const p of [a, b, c, d]) {
-      this.pos.push(p[0], p[1], p[2]);
-      this.nrm.push(n[0] / l, n[1] / l, n[2] / l);
-      this.col.push(r, g, bl);
-      this.tag.push(tag);
+      this.pos.push3(p[0], p[1], p[2]);
+      this.nrm.push3(n[0] / l, n[1] / l, n[2] / l);
+      this.col.push3(r, g, bl);
+      this.tag.push1(tag);
     }
     if (this.withUv) {
       const u = uvs ?? [
@@ -80,10 +112,15 @@ export class Geo {
         [1, 1],
         [0, 1],
       ];
-      for (const q of u) this.uv.push(q[0], q[1]);
+      for (const q of u) this.uv.push2(q[0], q[1]);
     }
-    if (flip) this.idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
-    else this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    if (flip) {
+      this.idx.push3(base, base + 2, base + 1);
+      this.idx.push3(base, base + 3, base + 2);
+    } else {
+      this.idx.push3(base, base + 1, base + 2);
+      this.idx.push3(base, base + 2, base + 3);
+    }
   }
 
   /** Axis-aligned box. `skip`: faces to leave out ('-y' bottom etc.). */
@@ -273,15 +310,15 @@ export class Geo {
   /** A BufferGeometry of everything written (indexed). */
   toGeometry(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nrm, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    if (this.withUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos.out(), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(this.nrm.out(), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(this.col.out(), 3));
+    if (this.withUv) g.setAttribute('uv', new THREE.BufferAttribute(this.uv.out(), 2));
     const n = this.vertexCount;
     g.setIndex(
       n > 65535
-        ? new THREE.Uint32BufferAttribute(this.idx, 1)
-        : new THREE.Uint16BufferAttribute(this.idx, 1),
+        ? new THREE.BufferAttribute(this.idx.out(), 1)
+        : new THREE.BufferAttribute(Uint16Array.from(this.idx.out()), 1),
     );
     g.computeBoundingSphere();
     g.computeBoundingBox();

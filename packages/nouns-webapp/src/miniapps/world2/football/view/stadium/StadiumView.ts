@@ -253,7 +253,7 @@ export class StadiumView implements StadiumViewApi {
 
   private finishSeats() {
     const seats = this.seatsGeo.toGeometry();
-    seats.userData.tags = Uint8Array.from(this.seatsGeo.tag);
+    seats.userData.tags = this.seatsGeo.tag.out();
     this.seatsMesh = this.mesh(seats, this.shellMat, 'seats');
     this.seatsGeo = new Geo();
   }
