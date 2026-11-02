@@ -35,7 +35,7 @@ import { checkPetName, DEFAULT_PET_NAME } from './name';
 import { blendPose, poseFor, restPose, type PetPose } from './pose';
 import { petSound } from './sound';
 import { loadPet, savePet, type SavedPet } from './store';
-import { decodePet, encodePet } from './wire';
+import { decodePet, encodePet, type RemotePet } from './wire';
 
 export interface PetView {
   /** Near the fridge with no pet yet: ADOPT. */
@@ -49,6 +49,24 @@ export interface PetView {
 
 const _v = new THREE.Vector3();
 const _f = new THREE.Vector3();
+
+/**
+ * Someone else's pet. They're cosmetic, so they're cheaper than mine: each
+ * steps (its collision rays) every 2nd frame, every 4th past 20 m, on a
+ * stagger, and is drawn eased between steps.
+ */
+interface Remote extends Pet {
+  head: HeadTop;
+  lastSeen: number;
+  /** The blob's raw `pt` last decoded (decode only when a new blob brings one). */
+  raw: unknown;
+  info: RemotePet | null;
+  slot: number;
+  /** Time since it last stepped (s). */
+  acc: number;
+  shown: THREE.Vector3;
+  placed: boolean;
+}
 
 interface Pet {
   rig: PetRig;
@@ -87,7 +105,10 @@ export class PetSystem {
   private world: PetWorld | null = null;
   private saved: SavedPet | null = loadPet();
   private mine: Pet | null = null;
-  private remotes = new Map<string, Pet & { head: HeadTop; lastSeen: number }>();
+  private remotes = new Map<string, Remote>();
+  /** Frames counted (remote pets step on a stagger). */
+  private frameNo = 0;
+  private slots = 0;
   private remoteMat: THREE.Material | null = null;
   private myHead = new HeadTop();
   private view_: PetView;
@@ -198,6 +219,7 @@ export class PetSystem {
     const g = this.game;
     if (PETS_OFF || g.me === null || g.showroom) return;
     this.clock += dt;
+    this.frameNo++;
     if (this.world === null) this.world = collisionPetWorld(g.world);
     if (!this.keyBound) {
       document.addEventListener('keydown', this.onKey, true);
@@ -344,7 +366,7 @@ export class PetSystem {
       mode = b.mode;
     }
     pet.rig.mesh.visible = mode !== 'away';
-    this.draw(pet, dt, false);
+    this.draw(pet, dt, true);
   }
 
   /** In a car or on the dragon: on your head; in the van: up on its roof. */
@@ -378,9 +400,17 @@ export class PetSystem {
     const target = poseFor(b.gait, b.gait === 'happy' ? happyK : b.phase, this.clock, r.hip);
     blendPose(pet.pose, target, 1 - Math.exp(-14 * dt));
     applyPose(r, pet.pose);
-    r.mesh.position.set(b.x, b.y, b.z);
+    if (local) r.mesh.position.set(b.x, b.y, b.z);
+    else {
+      // others' pets step every few frames: drawn eased toward where they are
+      const rm = pet as Remote;
+      _v.set(b.x, b.y, b.z);
+      if (!rm.placed || rm.shown.distanceToSquared(_v) > 4) rm.shown.copy(_v);
+      else rm.shown.lerp(_v, 1 - Math.exp(-22 * dt));
+      rm.placed = true;
+      r.mesh.position.copy(rm.shown);
+    }
     r.mesh.rotation.set(0, b.yaw, 0);
-    void local;
   }
 
   private puff(pet: Pet) {
@@ -417,8 +447,8 @@ export class PetSystem {
    */
   remote(id: string, rp: RemotePlayer, ch: NounCharacter, hidden: boolean, dt: number) {
     if (PETS_OFF) return;
-    const info = decodePet(rp.pet);
     let pet = this.remotes.get(id);
+    const info = pet !== undefined && pet.raw === rp.pet ? pet.info : decodePet(rp.pet);
     if (info === null || info.mode === 'perch') {
       if (pet !== undefined) this.dropRemote(id);
       return;
@@ -449,16 +479,34 @@ export class PetSystem {
         shownPoof: 0,
         head: new HeadTop(),
         lastSeen: 0,
+        raw: undefined,
+        info: null,
+        slot: this.slots++,
+        acc: 0,
+        shown: new THREE.Vector3(c.pos.x, c.pos.y, c.pos.z),
+        placed: false,
       };
       this.remotes.set(id, pet);
     }
     pet.lastSeen = this.clock;
+    pet.raw = rp.pet;
+    pet.info = info;
+    pet.acc += dt;
     const visible = !hidden && !far && info.mode !== 'away';
     pet.rig.mesh.visible = visible;
     if (!visible) {
       pet.body.mode = 'away';
+      pet.placed = false;
       return;
     }
+    // its turn to step? (the pose still eases every frame)
+    const every = c.pos.distanceTo(g.gfx.camera.position) < 20 ? 2 : 4;
+    if ((this.frameNo + pet.slot) % every !== 0 && pet.placed) {
+      this.draw(pet, dt, false);
+      return;
+    }
+    const stepDt = pet.acc;
+    pet.acc = 0;
     _f.set(0, 0, 1).applyQuaternion(c.quat);
     _f.y = 0;
     if (_f.lengthSq() < 1e-6) _f.set(0, 0, 1);
@@ -482,7 +530,7 @@ export class PetSystem {
       b.yaw = Math.atan2(o.fx, o.fz);
       b.gait = 'ride';
       b.mode = 'ride';
-    } else if (stepPet(b, o, info.mode, this.world, dt) === 'poof') this.puff(pet);
+    } else if (stepPet(b, o, info.mode, this.world, stepDt) === 'poof') this.puff(pet);
     this.draw(pet, dt, false);
   }
 
