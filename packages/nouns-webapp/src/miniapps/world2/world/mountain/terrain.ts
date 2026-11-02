@@ -20,6 +20,7 @@
 // Gradients stay ≲ 0.8, so the analytic heightfield doubles as the collision
 // surface (sphere-traced in raycastTerrain, bound TERRAIN_LIPSCHITZ).
 
+import { applyGolf, golfBlocked, golfSink } from '../../golf/course/surface';
 import { applyTownPads, setTownNatural, townBlocked } from '../../towns/site';
 import { landmarkBlocked } from '../landmarks/sites';
 
@@ -105,6 +106,8 @@ export function sampleTerrain(x: number, z: number, out: TerrainSample): Terrain
   applyBowl(x, z, out);
   // Noun Trade towns (towns/site.ts): last, resolving one may re-query the network
   applyTownPads(x, z, out);
+  // NOUN LINKS (golf/course/surface.ts): its own ground over the whole site
+  applyGolf(x, z, out);
   return out;
 }
 
@@ -208,7 +211,11 @@ export function terrainInDomain(x: number, z: number): boolean {
  */
 export function meshHeight(x: number, z: number, out: TerrainSample): TerrainSample {
   sampleTerrain(x, z, out);
-  if (Math.max(Math.abs(x), Math.abs(z)) >= MOUNTAIN.wallZ - 2) return out;
+  if (Math.max(Math.abs(x), Math.abs(z)) >= MOUNTAIN.wallZ - 2) {
+    // Under the golf course's overlays (fairways, greens…) the mesh sits a touch lower
+    out.y -= golfSink(x, z);
+    return out;
+  }
   for (const al of ALLEYS) {
     const l = worldToAlley(al, x, z, _l);
     if (Math.abs(l.a - al.a) > al.width / 2 + 6 || l.o < ALLEY_O0 - 5) continue;
@@ -595,7 +602,13 @@ export function megaAt(x: number, z: number, margin: number): MegaHit | null {
  * with a margin — and the Noun Jersey terrace.
  */
 export function megaBlocked(x: number, z: number): boolean {
-  if (njBlocked(x, z) || bowlBlocked(x, z) || townBlocked(x, z) || landmarkBlocked(x, z))
+  if (
+    njBlocked(x, z) ||
+    bowlBlocked(x, z) ||
+    townBlocked(x, z) ||
+    landmarkBlocked(x, z) ||
+    golfBlocked(x, z)
+  )
     return true;
   return eachMega(
     x,
