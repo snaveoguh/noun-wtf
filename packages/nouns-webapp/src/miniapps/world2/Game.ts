@@ -109,6 +109,7 @@ import { AudioMixer } from './settings/mixer';
 import { settings } from './settings/store';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
+import { OceanSystem } from './ocean/OceanSystem';
 import { SkydiveSystem } from './skydive/SkydiveSystem';
 import { townsDecorator } from './towns/build';
 import { isGrownTown, townSpawn } from './towns/site';
@@ -391,6 +392,8 @@ export class Game {
   readonly parkour: ParkourSystem = new ParkourSystem(this);
   /** Skydiving (skydive/): long falls become freefall, with a parachute. */
   readonly skydive: SkydiveSystem = new SkydiveSystem(this);
+  /** The ocean off Puerto Noun (ocean/): the sea, swimming, surfing, the surf shop. */
+  readonly ocean: OceanSystem = new OceanSystem(this);
   /** Noun Pool (pool/net/PoolMode.ts, PoolApi): bar tables + the pool hall; owns the frame. */
   readonly pool: PoolMode = new PoolMode(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
@@ -1208,6 +1211,7 @@ export class Game {
       this.updateMyCharacter(dt);
       this.parkour.frame(dt, input);
       this.skydive.frame(dt, input);
+      this.ocean.frame(dt, input);
     }
     perf.lap('character');
     this.updateAudio(dt);
@@ -2060,6 +2064,7 @@ export class Game {
     this.remotes.delete(id);
     this.parkour.dropRemote(id);
     this.skydive.dropRemote(id);
+    this.ocean.dropRemote(id);
   }
 
   /** How a sound at `pos` reaches the listener (the camera): distance gain + stereo pan. */
@@ -2160,6 +2165,7 @@ export class Game {
         lc: this.cars.leftKey,
         pk: this.parkour.netKey(),
         sk: this.skydive.netKey(),
+        sf: this.ocean.netKey(),
         trick: this.player.combo.entries.length
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
@@ -2209,6 +2215,7 @@ export class Game {
       });
       this.parkour.remote(id, ch, c.pk, dt);
       this.skydive.remote(id, ch, c.sk, c.mode === 'board', dt);
+      this.ocean.remote(id, ch, c.sf, dt);
       this.freestyle.remote(id, ch, rp.freestyle ?? null, dt);
       this.interiors.poseRemote(id, ch, rp.room ?? null, dt);
       this.bench.poseRemote(id, ch, rp.bench ?? null, dt);
@@ -2581,6 +2588,7 @@ export class Game {
     this.breaks.dispose();
     this.parkour.dispose();
     this.skydive.dispose();
+    this.ocean.dispose();
     this.pool.dispose();
     this.freestyle.dispose();
     this.hideseek.dispose();

@@ -325,6 +325,20 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => window.clearInterval(t);
   }, [game, started, searchParams]);
 
+  // `?play=surf` (the homepage's NOUN SURF card): on a board at Puerto Noun's line-up
+  const surfLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || surfLaunched.current || searchParams.get('play') !== 'surf') return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.ocean.arrive()) return false;
+      surfLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   // `?play=parkour` (the homepage's NOUN PARKOUR card): the route menu
   const parkourLaunched = useRef(false);
   useEffect(() => {

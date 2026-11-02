@@ -348,6 +348,13 @@ export class Player {
     readonly active: boolean;
   } | null = null;
 
+  /**
+   * The sea (ocean/): wading, swimming, surfing. Called first in every step
+   * (either mode); while it returns true it has moved the rider itself and
+   * this step's walking / riding is skipped (bounds + respawn still run).
+   */
+  water: { step(dt: number, input: InputFrame, camYaw: number): boolean } | null = null;
+
   /** Bumped on every spawn / rescue, so the ride recorder can start afresh. */
   respawns = 0;
 
@@ -395,6 +402,12 @@ export class Player {
     if (this.emoteTimer > 0) {
       this.emoteTimer -= dt;
       if (this.emoteTimer <= 0) this.emote = 0;
+    }
+
+    if (this.water !== null && this.water.step(dt, input, camYaw)) {
+      this.clampBounds();
+      if (input.respawnPressed) this.respawnHome();
+      return;
     }
 
     if (

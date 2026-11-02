@@ -158,6 +158,8 @@ interface GenJob {
   alley: Float32Array;
   side: Float32Array;
   tint: Float32Array;
+  /** Beach / seabed sand (ocean/coast.ts). */
+  sand: Float32Array;
   ms: number;
 }
 
@@ -210,6 +212,8 @@ const GRASS_DRY = new THREE.Color(0x9ccf4f);
 const DIRT = new THREE.Color(0xc58a4e);
 const DIRT_DARK = new THREE.Color(0x9a6337);
 const CONCRETE = new THREE.Color(0x9a95a6);
+const SAND = new THREE.Color(0xead7a4);
+const SAND_WET = new THREE.Color(0xc9b07c);
 const _c = new THREE.Color();
 const _c2 = new THREE.Color();
 
@@ -507,6 +511,7 @@ export class MountainStream {
       alley: new Float32Array(v),
       side: new Float32Array(v),
       tint: new Float32Array(v),
+      sand: new Float32Array(v),
       ms: 0,
     };
   }
@@ -534,6 +539,7 @@ export class MountainStream {
           j.alley[vi] = s.alley;
           j.side[vi] = s.side;
           j.tint[vi] = tintNoise(wx, wz);
+          j.sand[vi] = s.sand ?? 0;
         }
       }
       j.row++;
@@ -613,6 +619,11 @@ export class MountainStream {
         }
         const al = j.alley[vi];
         if (al > 0) _c.lerp(CONCRETE, al);
+        const sd = j.sand[vi];
+        if (sd > 0) {
+          _c2.copy(SAND).lerp(SAND_WET, Math.min(1, Math.max(0, 0.5 - tn * 0.6)));
+          _c.lerp(_c2, sd);
+        }
         col[vi * 3] = _c.r;
         col[vi * 3 + 1] = _c.g;
         col[vi * 3 + 2] = _c.b;

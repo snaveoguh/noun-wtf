@@ -16,11 +16,13 @@
 //          (+ Noun Jersey)         the secret spot's terrace (nounJersey.ts)
 //          (+ the Noggle Bowl)     terrace, bowl + roll-in ~42 km out (noggleBowl.ts)
 //          (+ Noun Trade towns)    level pads around the +X line (towns/site.ts)
+//          (+ the ocean)           a sea basin off Puerto Noun (ocean/coast.ts)
 //
 // Gradients stay ≲ 0.8, so the analytic heightfield doubles as the collision
 // surface (sphere-traced in raycastTerrain, bound TERRAIN_LIPSCHITZ).
 
 import { applyTownPads, setTownNatural, townBlocked } from '../../towns/site';
+import { applyOcean, oceanBlocked } from '../../ocean/coast';
 import { landmarkBlocked } from '../landmarks/sites';
 
 import {
@@ -94,6 +96,8 @@ export interface TerrainSample {
   side: number;
   /** Unsigned (effective) distance to the nearest track, ≤ INFLUENCE. */
   dist: number;
+  /** 0..1 beach / seabed sand (ocean/coast.ts). */
+  sand?: number;
 }
 
 /** Full sample (height + surface blend). */
@@ -105,6 +109,9 @@ export function sampleTerrain(x: number, z: number, out: TerrainSample): Terrain
   applyBowl(x, z, out);
   // Noun Trade towns (towns/site.ts): last, resolving one may re-query the network
   applyTownPads(x, z, out);
+  // The ocean off Puerto Noun (ocean/coast.ts): after the pads, it clamps them
+  out.sand = 0;
+  applyOcean(x, z, out);
   return out;
 }
 
@@ -595,7 +602,13 @@ export function megaAt(x: number, z: number, margin: number): MegaHit | null {
  * with a margin — and the Noun Jersey terrace.
  */
 export function megaBlocked(x: number, z: number): boolean {
-  if (njBlocked(x, z) || bowlBlocked(x, z) || townBlocked(x, z) || landmarkBlocked(x, z))
+  if (
+    njBlocked(x, z) ||
+    bowlBlocked(x, z) ||
+    townBlocked(x, z) ||
+    landmarkBlocked(x, z) ||
+    oceanBlocked(x, z)
+  )
     return true;
   return eachMega(
     x,

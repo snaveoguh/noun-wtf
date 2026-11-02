@@ -117,7 +117,16 @@ export interface TradeState {
 }
 
 /** 'dragon' isn't fitted to the van: it's the Dragon Roost's mount (dragon/), bought the same way. */
-export type VanUpgrade = 'freezer' | 'bigbox' | 'engine' | 'horn' | 'neon' | 'dragon';
+export type VanUpgrade =
+  | 'freezer'
+  | 'bigbox'
+  | 'engine'
+  | 'horn'
+  | 'neon'
+  | 'dragon'
+  // Surfboards (ocean/surf/boards.ts), sold at Puerto Noun's surf shop
+  | 'longboard'
+  | 'shortboard';
 
 // ── Client → server (netlify/functions/world-trade) ──
 

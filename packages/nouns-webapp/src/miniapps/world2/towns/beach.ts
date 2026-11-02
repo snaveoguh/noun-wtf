@@ -109,6 +109,34 @@ export function beachSigns(): SignSpec[] {
     board('hostel', 9, 1.2, 'HOSTEL PURA VIDA', '#2ec4b6', '#ffffff'),
     board('pulperia', 6, 1.1, 'PULPERÍA', '#f4a259', '#2a2320'),
     board('muelle', 5, 1, 'MUELLE', '#f4f1ea', '#1b4965'),
+    // The sea front (beachFront below, ocean/)
+    {
+      key: 'surfshop',
+      w: 8,
+      h: 1.6,
+      bg: '#ff6f61',
+      fg: '#fff3c4',
+      border: '#1b4965',
+      lines: [
+        { text: 'SURF SHOP', size: 0.5, y: 0.42 },
+        { text: 'PURA VIDA SURF CO. · RENTALS', size: 0.17, y: 0.8, color: '#ffd23f' },
+      ],
+    },
+    board('ola', 6, 1.1, 'BAR LA OLA', '#2ec4b6', '#fff3c4'),
+    board('coco', 6, 1.1, 'COCO LOCO', '#ffd23f', '#7a1f3d'),
+    {
+      key: 'break',
+      w: 3.4,
+      h: 2.2,
+      bg: '#fff3c4',
+      fg: '#1b4965',
+      border: '#ff6f61',
+      lines: [
+        { text: 'SURF BREAK', size: 0.17, y: 0.28 },
+        { text: 'PADDLE OUT ↑', size: 0.13, y: 0.55, color: '#ff6f61' },
+        { text: 'LINE-UP AT THE BUOYS', size: 0.08, y: 0.8 },
+      ],
+    },
   ];
 }
 
@@ -416,6 +444,7 @@ export function buildBeach(b: TownBuilder, ground: (vp: number, u: number) => nu
     umbrella(b, 32 + rnd() * 12, u, cols[i % cols.length], rnd);
   }
   lifeguard(b, 44, 72);
+  beachFront(b);
   surfRack(b, 15, 62);
   canoe(b, 42, 186);
   // Palms: along the beach, behind the shacks, then out on the slope around town
@@ -432,10 +461,222 @@ export function buildBeach(b: TownBuilder, ground: (vp: number, u: number) => nu
       u = 10 + rnd() * (f.Lf - 20);
     } else {
       const sgn = rnd() < 0.4 ? -1 : 1;
-      vp = sgn < 0 ? -(50 + rnd() * 50) : 122 + rnd() * 40;
+      // (the far side past the lagoon is the ocean's beach now: palms on its dune rim)
+      vp = sgn < 0 ? -(50 + rnd() * 50) : 114.5 + rnd() * 3;
       u = -30 + rnd() * (f.Lf + 60);
       y = ground(vp, u);
     }
     b.plant(vp, u, y - 0.1, rnd() * Math.PI * 2, 0.8 + rnd() * 0.5);
   }
+}
+
+// ── The sea front (ocean/: the ocean's beach is past the lagoon) ─────────
+//
+// Between the lagoon and the sea runs a dune rim (v' 114–118, pad level)
+// and then the beach falls to the water at v' 132. Along the rim: a
+// boardwalk on posts the length of town, a footbridge across the lagoon to
+// it, the surf shop and two beach bars out on stilts over the sand, and the
+// lifeguard flags. `SEA_FRONT` is read by ocean/ (the shop's spot, the
+// boardwalk height).
+
+export const SEA_FRONT = {
+  /** Boardwalk: v' span, deck height over the pad, u span. */
+  walk0: 114.5,
+  walk1: 119,
+  deck: 0.55,
+  u0: 18,
+  u1Back: 18,
+  /** The lagoon bridge (u) and its landing on the beach side (v'). */
+  bridgeU: 58,
+  bridgeV0: 44,
+  /** The surf shop: centre (u, v'), it faces the boardwalk (−v'). */
+  shopU: 70,
+  shopV: 123,
+  /** Beach bars (u). */
+  bars: [140, 192],
+} as const;
+
+function boardwalk(b: TownBuilder) {
+  const f = b.f;
+  const { walk0, walk1, deck } = SEA_FRONT;
+  const u0 = SEA_FRONT.u0;
+  const u1 = f.Lf - SEA_FRONT.u1Back;
+  const w = walk1 - walk0;
+  const mid = (walk0 + walk1) / 2;
+  const m = b.at(mid, u0, 0, 0, 1);
+  // deck (x across = v', z along = u)
+  b.add(boxAt(-w / 2, w / 2, deck - 0.14, deck, 0, u1 - u0), C.wood, m, { collide: true });
+  // planks: darker seams every 1.2 m
+  for (let z = 0.6; z < u1 - u0; z += 1.2)
+    b.add(boxAt(-w / 2, w / 2, deck, deck + 0.004, z - 0.03, z + 0.03), C.woodDark, m, { bucket: 'thin' });
+  // posts down into the sand
+  for (let z = 0; z <= u1 - u0; z += 4)
+    for (const x of [-w / 2 + 0.15, w / 2 - 0.15])
+      b.add(boxAt(x - 0.1, x + 0.1, -2.4, deck - 0.14, z - 0.1, z + 0.1), C.woodDark, m);
+  // a rail on the sea side
+  b.add(boxAt(w / 2 - 0.08, w / 2, deck + 0.95, deck + 1.05, 0, u1 - u0), C.white, m, { bucket: 'thin' });
+  for (let z = 0; z <= u1 - u0; z += 3)
+    b.add(boxAt(w / 2 - 0.07, w / 2 - 0.01, deck, deck + 0.95, z - 0.03, z + 0.03), C.white, m, { bucket: 'thin' });
+  // ramps down onto the rim at both ends
+  for (const [u, dir] of [
+    [u0, -1],
+    [u1, 1],
+  ] as const) {
+    const r = b.at(mid, u, 0, 0, dir);
+    b.add(
+      prismX(
+        [
+          [0, deck],
+          [3.2, 0.02],
+          [3.2, 0],
+          [0, deck - 0.14],
+        ],
+        w,
+      ),
+      C.wood,
+      r,
+      { collide: true },
+    );
+  }
+}
+
+function lagoonBridge(b: TownBuilder) {
+  const { bridgeU, bridgeV0, walk0, deck } = SEA_FRONT;
+  const half = 1.4;
+  const m = b.at(bridgeV0, bridgeU, 0, 1, 0);
+  const len = walk0 - bridgeV0;
+  // ramp up off the beach, then the span (local +z = +v')
+  b.add(
+    prismX(
+      [
+        [0, 0],
+        [3, deck - 0.14],
+        [3, deck],
+        [0, 0.08],
+      ],
+      half * 2,
+    ),
+    C.wood,
+    m,
+    { collide: true },
+  );
+  b.add(boxAt(-half, half, deck - 0.14, deck, 3, len + 0.2), C.wood, m, { collide: true });
+  for (let z = 6; z < len; z += 5)
+    for (const x of [-half + 0.12, half - 0.12]) {
+      b.add(cyl(0.12, 0.12, 2.6, 6, x, deck - 1.4, z), C.woodDark, m);
+      b.add(boxAt(x - 0.04, x + 0.04, deck, deck + 0.9, z - 0.04, z + 0.04), C.woodDark, m, { bucket: 'thin' });
+    }
+  for (const x of [-half + 0.12, half - 0.12])
+    b.add(boxAt(x - 0.04, x + 0.04, deck + 0.86, deck + 0.94, 4, len), C.white, m, { bucket: 'thin' });
+}
+
+/** A hut on stilts out over the sand, facing the boardwalk (−v'). */
+function stiltHut(
+  b: TownBuilder,
+  u: number,
+  vp: number,
+  w: number,
+  d: number,
+  wall: number,
+  roof: number,
+  sign: string,
+  open: boolean,
+) {
+  const { deck, walk1 } = SEA_FRONT;
+  // local: +z = toward the boardwalk (−v'), x along u
+  const m = b.at(vp, u, 0, -1, 0);
+  // platform from the boardwalk edge (local z = vp − walk1) out over the sand
+  b.add(boxAt(-w / 2, w / 2, deck - 0.14, deck, -d / 2, vp - walk1), C.wood, m, { collide: true });
+  const z0 = -(d / 2);
+  const z1 = d / 2;
+  for (const x of [-w / 2 + 0.2, w / 2 - 0.2])
+    for (const z of [z0 + 0.2, z1 - 0.2])
+      b.add(boxAt(x - 0.12, x + 0.12, -2.6, deck, z - 0.12, z + 0.12), C.woodDark, m);
+  const h = 3.1;
+  if (!open) {
+    // walls (back + sides), the front open over a counter
+    b.add(boxAt(-w / 2, w / 2, deck, deck + h, z0, z0 + 0.15), wall, m, { collide: true });
+    for (const x of [-w / 2, w / 2 - 0.15])
+      b.add(boxAt(x, x + 0.15, deck, deck + h, z0, z1), wall, m, { collide: true });
+    b.add(boxAt(-w / 2, -1, deck, deck + h, z1 - 0.15, z1), wall, m, { collide: true });
+    b.add(boxAt(1, w / 2, deck, deck + h, z1 - 0.15, z1), wall, m, { collide: true });
+    b.add(boxAt(-1, 1, deck + 2.3, deck + h, z1 - 0.15, z1), wall, m);
+  } else {
+    // a palapa: posts, an open bar counter, stools
+    for (const x of [-w / 2 + 0.25, w / 2 - 0.25])
+      for (const z of [z0 + 0.25, z1 - 0.25])
+        b.add(cyl(0.11, 0.13, h, 6, x, deck + h / 2, z), C.trunk, m, { collide: true });
+    b.add(boxAt(-w / 2 + 0.8, w / 2 - 0.8, deck, deck + 1.1, -0.4, 0.2), C.wood, m, { collide: true });
+    b.add(boxAt(-w / 2 + 0.7, w / 2 - 0.7, deck + 1.1, deck + 1.18, -0.5, 0.35), C.woodDark, m);
+    for (let x = -w / 2 + 1.3; x < w / 2 - 1; x += 1.1) {
+      b.add(cyl(0.2, 0.2, 0.08, 8, x, deck + 0.75, 0.9), C.coral, m);
+      b.add(cyl(0.04, 0.04, 0.72, 4, x, deck + 0.36, 0.9), C.dark, m, { bucket: 'thin' });
+    }
+    // bottles on a shelf at the back
+    for (let x = -w / 2 + 1; x < w / 2 - 1; x += 0.35)
+      b.add(cyl(0.05, 0.05, 0.28, 5, x, deck + 1.32, -1.2), (x * 7) % 2 > 1 ? C.lime : C.turquoise, m);
+    b.add(boxAt(-w / 2 + 0.8, w / 2 - 0.8, deck + 1.16, deck + 1.2, -1.35, -1.05), C.woodDark, m);
+  }
+  // thatch / tin roof overhanging the front
+  b.add(
+    prismX(
+      [
+        [z0 - 0.6, deck + h - 0.05],
+        [0, deck + h + 1.5],
+        [z1 + 1.0, deck + h - 0.05],
+        [z1 + 1.0, deck + h - 0.2],
+        [0, deck + h + 1.35],
+        [z0 - 0.6, deck + h - 0.2],
+      ],
+      w + 0.8,
+    ),
+    roof,
+    m,
+  );
+  b.add(boxAt(-3.1, 3.1, deck + h - 0.9, deck + h + 0.25, z1 + 0.95, z1 + 1.05), C.navy, m);
+  b.sign(sign, m, 0, deck + h - 0.32, z1 + 1.07, sign === 'surfshop' ? 0.75 : 1);
+}
+
+function surfShop(b: TownBuilder) {
+  const { shopU, shopV, deck } = SEA_FRONT;
+  stiltHut(b, shopU, shopV, 9, 7, C.turquoise, C.tin, 'surfshop', false);
+  // boards stacked out front on the boardwalk side, and a rack inside
+  const m = b.at(shopV, shopU, 0, -1, 0);
+  const cols = [C.coral, C.yellow, 0x5ec8f2, C.pink, C.white, C.lime, 0xf4ead2];
+  cols.forEach((c, i) => {
+    const x = -4.2 + i * 0.32;
+    b.add(box(0.5, 2.5, 0.07).rotateX(0.12).translate(x, deck + 1.25, 3.9), c, m);
+  });
+  for (let i = 0; i < 6; i++) {
+    const x = 2.2 + (i % 3) * 0.55;
+    b.add(box(0.48, 2.2, 0.07).rotateX(-0.1).translate(x, deck + 1.1, -3.1 + Math.floor(i / 3) * 0.12), cols[(i + 2) % cols.length], m);
+  }
+  // wax + a counter
+  b.add(boxAt(-2, 1.2, deck, deck + 1.05, 1.2, 1.8), C.wood, m, { collide: true });
+  b.add(box(0.3, 0.12, 0.3, -1.2, deck + 1.11, 1.5), C.yellow, m);
+}
+
+function flags(b: TownBuilder, u: number) {
+  const m = b.at(121, u, 0, -1, 0);
+  for (const [x, c] of [
+    [-0.8, C.coral],
+    [0.8, C.yellow],
+  ] as const) {
+    b.add(rod(v3(x, -1.2, 0), v3(x, 3.6, 0), 0.04, 4), C.white, m, { bucket: 'thin' });
+    b.add(boxAt(x + 0.04, x + 1.0, 2.9, 3.55, -0.01, 0.01), c, m);
+  }
+  // the break sign at the top of the beach
+  const s = b.at(SEA_FRONT.walk0 - 0.6, u + 6, 0, 1, 0);
+  b.add(boxAt(-0.08, 0.08, 0, 2.4, -0.05, 0.05), C.woodDark, s);
+  b.add(boxAt(-1.75, 1.75, 2.3, 4.55, -0.06, 0), C.wood, s);
+  b.sign('break', s, 0, 3.42, 0.01, 1);
+}
+
+function beachFront(b: TownBuilder) {
+  boardwalk(b);
+  lagoonBridge(b);
+  surfShop(b);
+  stiltHut(b, SEA_FRONT.bars[0], 124, 8, 7, C.white, C.thatch, 'ola', true);
+  stiltHut(b, SEA_FRONT.bars[1], 124, 8, 7, C.white, C.thatch, 'coco', true);
+  flags(b, 104);
 }

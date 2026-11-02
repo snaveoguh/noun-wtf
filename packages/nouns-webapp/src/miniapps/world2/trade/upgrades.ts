@@ -18,6 +18,10 @@ export const UPGRADES: Record<VanUpgrade, UpgradeSpec> = {
   // Not a van part (not in UPGRADE_IDS, so the van garage never lists it):
   // the Dragon Roost in Noggle City sells it (dragon/pay.ts)
   dragon: { id: 'dragon', name: 'Noun dragon', cost: 2500, blurb: 'A rideable, flying dragon' },
+  // Nor are these: Puerto Noun's surf shop sells them (ocean/surf/shop.ts;
+  // costs match ocean/surf/boards.ts, a test checks)
+  longboard: { id: 'longboard', name: 'Longboard', cost: 250, blurb: "9'6\" log surfboard" },
+  shortboard: { id: 'shortboard', name: 'Shortboard', cost: 600, blurb: "6'0\" thruster surfboard" },
 };
 
 export const UPGRADE_IDS: VanUpgrade[] = ['horn', 'neon', 'freezer', 'bigbox', 'engine'];
