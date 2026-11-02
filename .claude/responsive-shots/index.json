@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-02T00:55:00.698Z",
+  "generated": "2026-11-02T01:10:04.914Z",
   "widths": [
     320,
     360,
@@ -223,13 +223,13 @@
       "group": "wallet",
       "kind": "page",
       "severity": {
-        "score": 0.8,
+        "score": 0,
         "worst": [
-          "page@320:3.3",
-          "page@360:3.3",
-          "page@390:3.3"
+          "window@320:0",
+          "window@360:0",
+          "window@390:0"
         ],
-        "clean": 20,
+        "clean": 26,
         "total": 26,
         "errors": 0
       },
@@ -420,84 +420,84 @@
           "mode": "page",
           "width": 320,
           "contentWidth": 320,
-          "score": 3.3,
+          "score": 0,
           "counts": {
             "overflowPx": 0,
             "clipped": 0,
             "covered": 0,
             "overArt": 0,
             "overlaps": 0,
-            "smallTargets": 11
+            "smallTargets": 0
           }
         },
         {
           "mode": "page",
           "width": 360,
           "contentWidth": 360,
-          "score": 3.3,
+          "score": 0,
           "counts": {
             "overflowPx": 0,
             "clipped": 0,
             "covered": 0,
             "overArt": 0,
             "overlaps": 0,
-            "smallTargets": 11
+            "smallTargets": 0
           }
         },
         {
           "mode": "page",
           "width": 390,
           "contentWidth": 390,
-          "score": 3.3,
+          "score": 0,
           "counts": {
             "overflowPx": 0,
             "clipped": 0,
             "covered": 0,
             "overArt": 0,
             "overlaps": 0,
-            "smallTargets": 11
+            "smallTargets": 0
           }
         },
         {
           "mode": "page",
           "width": 430,
           "contentWidth": 430,
-          "score": 3.3,
+          "score": 0,
           "counts": {
             "overflowPx": 0,
             "clipped": 0,
             "covered": 0,
             "overArt": 0,
             "overlaps": 0,
-            "smallTargets": 11
+            "smallTargets": 0
           }
         },
         {
           "mode": "page",
           "width": 520,
           "contentWidth": 520,
-          "score": 3.3,
+          "score": 0,
           "counts": {
             "overflowPx": 0,
             "clipped": 0,
             "covered": 0,
             "overArt": 0,
             "overlaps": 0,
-            "smallTargets": 11
+            "smallTargets": 0
           }
         },
         {
           "mode": "page",
           "width": 640,
           "contentWidth": 640,
-          "score": 3.3,
+          "score": 0,
           "counts": {
             "overflowPx": 0,
             "clipped": 0,
             "covered": 0,
             "overArt": 0,
             "overlaps": 0,
-            "smallTargets": 11
+            "smallTargets": 0
           }
         },
         {
