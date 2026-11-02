@@ -74,6 +74,7 @@ export default function AgentHome({
   onEnterPool,
   onEnterHideSeek,
   onEnterDrive,
+  onEnterTaxi,
   onEnterWarfare,
   onEnterDrop,
   onOpen,
@@ -91,6 +92,8 @@ export default function AgentHome({
   onEnterHideSeek: () => void;
   /** Noun World in a car (`?play=drive`) */
   onEnterDrive: () => void;
+  /** Noun World in the NOUN CAB (`?play=taxi`) */
+  onEnterTaxi?: () => void;
   onEnterWarfare: () => void;
   /** Noun World straight onto the Big Drop (only offered once it's unlocked) */
   onEnterDrop: () => void;
@@ -151,6 +154,7 @@ export default function AgentHome({
       else if (id === 'pool') onEnterPool?.();
       else if (id === 'hideseek') onEnterHideSeek();
       else if (id === 'drive') onEnterDrive();
+      else if (id === 'taxi') (onEnterTaxi ?? onEnterDrive)();
       else if (id === 'warfare') onEnterWarfare();
       else if (id === 'drop') {
         // Locked: the sheet says how to open it (its button opens Noun World)
@@ -168,6 +172,7 @@ export default function AgentHome({
       onEnterPool,
       onEnterHideSeek,
       onEnterDrive,
+      onEnterTaxi,
       onEnterWarfare,
       onEnterWorld,
       onEnterDrop,

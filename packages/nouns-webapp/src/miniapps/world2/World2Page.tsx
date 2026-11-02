@@ -39,6 +39,7 @@ import { HudPrefsStyle } from './settings/SettingsPanel';
 import { bootQuality } from './settings/store';
 import { startMiniApp } from './share/miniApp';
 import { ShareUi } from './share/ShareUi';
+import { TaxiUi } from './taxi/view/TaxiUi';
 import { TradeUi } from './trade/TradeUi';
 import { CharacterSelect, loadSavedCharacter, type SavedCharacter } from './ui/CharacterSelect';
 import { DeckDesigner, useDeckWallet } from './ui/DeckDesigner';
@@ -325,6 +326,20 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
     return () => window.clearInterval(t);
   }, [game, started, searchParams]);
 
+  // `?play=taxi` (the homepage's NOUN TAXI card): in the cab at the plaza's rank
+  const taxiLaunched = useRef(false);
+  useEffect(() => {
+    if (!game || !started || taxiLaunched.current || searchParams.get('play') !== 'taxi') return;
+    const tryLaunch = () => {
+      if (game.me === null || game.hud.loading !== null || !game.cars.arrive('cab')) return false;
+      taxiLaunched.current = true;
+      return true;
+    };
+    if (tryLaunch()) return;
+    const t = window.setInterval(() => tryLaunch() && window.clearInterval(t), 250);
+    return () => window.clearInterval(t);
+  }, [game, started, searchParams]);
+
   // `?play=parkour` (the homepage's NOUN PARKOUR card): the route menu
   const parkourLaunched = useRef(false);
   useEffect(() => {
@@ -483,6 +498,7 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
       {game && started && <HoopsUi game={game} />}
       {game && started && <BreakUi game={game} />}
       {game && started && !hoopsOn && <ParkourUi game={game} touch={touchPage} />}
+      {game && started && !hoopsOn && !replaying && <TaxiUi game={game} touch={touchPage} />}
       {game && started && <PoolUi game={game} />}
       {game && started && !hoopsOn && !replaying && <MuralUi game={game} />}
       {game && started && !hoopsOn && !replaying && <FreestyleUi game={game} touch={touchPage} />}

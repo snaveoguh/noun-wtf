@@ -32,6 +32,7 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint'], full = false): MapS
     drops: game.drops?.mapPoints(),
     towns: game.towns?.mapPoints(full),
     landmarks: game.landmarks?.mapPoints(full),
+    taxi: game.taxi.mapPoints(),
   };
 }
 

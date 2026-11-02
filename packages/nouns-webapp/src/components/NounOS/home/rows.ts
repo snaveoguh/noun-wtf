@@ -15,6 +15,7 @@ export type GameId =
   | 'hideseek'
   | 'drop'
   | 'drive'
+  | 'taxi'
   | 'parkour'
   | 'pool';
 
@@ -250,6 +251,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'DRIVE',
     loading: 'keys in. off to the ring road',
+  },
+  {
+    id: 'taxi',
+    name: 'Noun Taxi',
+    cover: '/world2/taxi-cover.webp',
+    card: '/home/covers/taxi.webp',
+    focus: '50% 58%',
+    teaser:
+      'Drive the NOUN CAB. Pick up fares waving at the kerb and race them across the plaza or kilometres down the dirt roads to the towns. Near misses, airs and drifts earn tips; the clock never stops.',
+    tagline: 'PICK UP · FLOOR IT · TIP',
+    facts: [
+      'City hops and long hauls to the towns',
+      'Hitchhikers on the long roads, in any car',
+      'Fares pay COIN · runs inside Noun World',
+    ],
+    cta: 'HAIL',
+    loading: 'meter running. off to the taxi rank',
   },
   {
     id: 'pool',

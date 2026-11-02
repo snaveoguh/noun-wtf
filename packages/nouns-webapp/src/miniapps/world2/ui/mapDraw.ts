@@ -41,6 +41,14 @@ export interface MapScene {
   towns?: { x: number; z: number; name: string; km: number }[];
   /** Nounish landmarks (world/landmarks/LandmarkSystem.ts → mapPoints). */
   landmarks?: { x: number; z: number; name: string; icon: string; found: boolean }[];
+  /** NOUN TAXI (taxi/view/TaxiSystem.ts → mapPoints): the rank, the fare's stop, people waiting. */
+  taxi?: {
+    x: number;
+    z: number;
+    name: string;
+    icon: string;
+    kind: 'rank' | 'stop' | 'fare' | 'hitch';
+  }[];
 }
 
 const C = {
@@ -487,6 +495,16 @@ export function drawMap(
         size: 10,
         color: l.found ? C.landmark : C.landmarkUnseen,
       });
+  }
+
+  // NOUN TAXI: the rank, people waiting (near only), the fare's stop (edge marker too)
+  for (const t of scene.taxi ?? []) {
+    let p = S(t.x, t.z);
+    const off = !inside(p, 12);
+    if (off && t.kind !== 'stop' && !(o.full && t.kind === 'rank')) continue;
+    if (off) p = edge(p, 12);
+    pin(ctx, p.x, p.y, t.kind === 'stop' ? '#3ee86a' : '#ffd400', t.icon);
+    if (o.full && !off) label(ctx, t.name, p.x, p.y - 22, { size: 10, color: '#ffd400' });
   }
 
   // Waypoint

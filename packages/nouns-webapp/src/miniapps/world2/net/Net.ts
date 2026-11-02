@@ -53,6 +53,7 @@ import { SHARE_RE } from '../character/deckSchema';
 import { parseBoardType, type BoardType } from '../character/NounCharacter';
 import { OUTFIT_KEY_RE } from '../character/outfit';
 import { decodeRoom, type RoomKey, type RoomWire } from '../interiors/roomNet';
+import { decodeTaxi, type TaxiWire } from '../taxi/net/wire';
 import { decodeBench, type BenchWire } from '../world/bench/rules';
 
 import { Voice } from './Voice';
@@ -163,6 +164,8 @@ export interface RemotePlayer {
   room?: RoomKey | null;
   /** Sat on the mural bench (`bn`): which seat (world/bench/rules.ts), null = not. */
   bench?: number | null;
+  /** On a taxi shift / carrying a hitchhiker (`tx`, taxi/net/wire.ts), else null. */
+  taxi?: TaxiWire | null;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -246,6 +249,8 @@ export class Net {
   room: RoomWire | null = null;
   /** My seat on the mural bench (world/bench/rules.ts), relayed as `bn` while sat. */
   bench: BenchWire | null = null;
+  /** My taxi state (taxi/net/wire.ts), relayed as `tx` while on shift / with a hitchhiker. */
+  taxi: [number, string] | null = null;
 
   connect() {
     if (this.ws) return;
@@ -426,6 +431,7 @@ export class Net {
     rp.crew = decodeCrew(blob.ps);
     rp.room = decodeRoom(blob.in);
     rp.bench = decodeBench(blob.bn);
+    rp.taxi = decodeTaxi(blob.tx);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
       this.onCallout?.(id, co);
@@ -524,6 +530,7 @@ export class Net {
       ...(this.crew !== null ? { ps: this.crew } : {}),
       ...(this.room !== null ? { in: this.room } : {}),
       ...(this.bench !== null ? { bn: this.bench } : {}),
+      ...(this.taxi !== null ? { tx: this.taxi } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

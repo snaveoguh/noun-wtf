@@ -71,6 +71,23 @@ export function emptyTotals(): ShiftTotals {
   };
 }
 
+export type RideIn = Omit<Ride, 't' | 'style' | 'allow'> & { road: boolean };
+
+/** A ride on the meter (its clock from the route's length; style tips capped). */
+export function makeRide(r: RideIn): Ride {
+  return {
+    id: r.id,
+    kind: r.kind,
+    name: r.name,
+    dest: r.dest,
+    metres: r.metres,
+    from: r.from,
+    allow: allowance(r.metres, r.road),
+    t: 0,
+    style: new StyleMeter(styleCap(r.metres, r.kind)),
+  };
+}
+
 export class Shift {
   on = false;
   clock: number = SHIFT.start;
@@ -79,24 +96,14 @@ export class Shift {
   private warned = new Set<number>();
 
   /** A passenger gets in (starts the shift if it's off). */
-  board(r: Omit<Ride, 't' | 'style' | 'allow'> & { road: boolean }): Ride {
+  board(r: RideIn): Ride {
     if (!this.on) {
       this.on = true;
       this.clock = SHIFT.start;
       this.totals = emptyTotals();
       this.warned.clear();
     }
-    const ride: Ride = {
-      id: r.id,
-      kind: r.kind,
-      name: r.name,
-      dest: r.dest,
-      metres: r.metres,
-      from: r.from,
-      allow: allowance(r.metres, r.road),
-      t: 0,
-      style: new StyleMeter(styleCap(r.metres, r.kind)),
-    };
+    const ride = makeRide(r);
     this.ride = ride;
     return ride;
   }

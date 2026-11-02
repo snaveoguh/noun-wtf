@@ -476,7 +476,7 @@ export const CARS: Record<CarId, CarSpec> = {
     doors: 'none',
     open: false,
     special: 'stomp',
-    paints: [0xf2c200, 0xf4f1ea, 0x1d1f24, 0xd8232a],
+    paints: [0xffd21a, 0xf4f1ea, 0x1d1f24, 0xd8232a],
     engine: 1.1,
     horn: 'beep',
     mass: 1550,

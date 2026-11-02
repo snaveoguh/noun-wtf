@@ -110,6 +110,8 @@ import { settings } from './settings/store';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { SkydiveSystem } from './skydive/SkydiveSystem';
+import { taxiTag } from './taxi/net/wire';
+import { TaxiSystem } from './taxi/view/TaxiSystem';
 import { townsDecorator } from './towns/build';
 import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
@@ -405,6 +407,8 @@ export class Game {
   readonly dragon: DragonRide;
   /** The cars (cars/): kerbside fleet + slow traffic on the ring road; E takes one. */
   readonly cars: CarSystem;
+  /** NOUN TAXI (taxi/): fares in the cab, hitchhikers on the long roads in any car. */
+  readonly taxi: TaxiSystem;
   /** RESPECT (respect/): the score, tiers, persistence; the hooks report the street's events. */
   readonly respect: RespectSystem;
   readonly respectHooks: RespectHooks;
@@ -491,6 +495,7 @@ export class Game {
     this.van2 = new VanDrive(this);
     this.dragon = new DragonRide(this);
     this.cars = new CarSystem(this);
+    this.taxi = new TaxiSystem(this);
     this.gfx.scene.add(this.particles.group);
     inkExcluded.add(this.particles.group);
     this.hud = {
@@ -1231,6 +1236,8 @@ export class Game {
     this.cars.update(dt);
     this.dragon.update(dt);
     perf.lap('vehicles');
+    this.taxi.update(dt);
+    perf.lap('taxi');
     // On the Big Drop the world you left waits: nothing down there streams
     // or triggers round a rider who's somewhere else entirely
     const away = this.missions.ud.active || this.interiors.inside;
@@ -2164,6 +2171,7 @@ export class Game {
           ? rideTrickLabel(comboLabel(this.player.combo), this.boardType).slice(-60)
           : '',
       };
+      this.net.taxi = this.taxi.netKey() ?? null;
       this.net.send(dt, pose, this.nounId);
       const fwd = new THREE.Vector3();
       this.gfx.camera.getWorldDirection(fwd);
@@ -2238,7 +2246,10 @@ export class Game {
             rp.transcript && performance.now() - rp.transcriptAt < 6000
               ? `<div class="w2-said">${escapeHtml(rp.transcript)}</div>`
               : '';
-          const trick = c.trick ? `<div class="w2-trick">${escapeHtml(c.trick)}</div>` : '';
+          const cab = taxiTag(rp.taxi ?? null);
+          const trick =
+            (c.trick ? `<div class="w2-trick">${escapeHtml(c.trick)}</div>` : '') +
+            (cab !== '' ? `<div class="w2-trick">${escapeHtml(cab)}</div>` : '');
           html = `${said}${trick}<span>${escapeHtml(rp.name || 'noun')}${rp.respectBadge === 'L' ? LEGEND_BADGE : ''}${talk}</span>`;
         }
         setTag(
@@ -2585,6 +2596,7 @@ export class Game {
     this.freestyle.dispose();
     this.hideseek.dispose();
     this.van2.dispose();
+    this.taxi.dispose();
     this.cars.dispose();
     this.dragon.dispose();
     this.stats.dispose();

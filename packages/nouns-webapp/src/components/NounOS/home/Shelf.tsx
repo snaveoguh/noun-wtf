@@ -105,6 +105,7 @@ function hrefOf(it: Item): string | undefined {
       if (it.action.id === 'pool') return '/world?play=pool';
       if (it.action.id === 'hideseek') return '/world?play=hideseek';
       if (it.action.id === 'drive') return '/world?play=drive';
+      if (it.action.id === 'taxi') return '/world?play=taxi';
       if (it.action.id === 'drop') return it.locked !== undefined ? '/world' : BIG_DROP_URL;
       return `/${it.action.id}`;
     case 'external':

@@ -261,6 +261,19 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // NOUN TAXI: Noun World in the cab at the plaza's taxi rank (`?play=taxi`)
+  const goTaxi = useCallback(() => {
+    const url = '/world?play=taxi';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // THE BIG DROP: Noun World straight onto the mountain (`?drop=1`, read when
   // the game starts, so a running one reloads, like Hoops)
   const goDrop = useCallback(() => {
@@ -420,6 +433,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           onEnterPool={goPool}
           onEnterHideSeek={goHideSeek}
           onEnterDrive={goDrive}
+          onEnterTaxi={goTaxi}
           onEnterDrop={goDrop}
           onEnterWarfare={goWarfare}
           onOpen={id => os.open(id)}
