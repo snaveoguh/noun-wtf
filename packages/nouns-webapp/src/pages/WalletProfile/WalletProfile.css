@@ -401,7 +401,8 @@
     min-width: 40px;
   }
   /* a one-line link in a row or table cell (autopilot's proposal titles) */
-  .wp-tap-line {
+  .wp-tap-line,
+  .wp-row > .flex > .wp-link.wp-ellipsis {
     display: block;
     min-height: 40px;
     min-width: 40px;
