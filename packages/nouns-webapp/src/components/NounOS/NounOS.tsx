@@ -247,6 +247,20 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // NOUN SURF: Noun World on a board at Puerto Noun's line-up (`?play=surf`,
+  // read when the game starts, so a running one reloads)
+  const goSurf = useCallback(() => {
+    const url = '/world?play=surf';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // NOUN DRIVE: Noun World in a car on the ring road (`?play=drive`, read
   // when the game starts, so a running one reloads)
   const goDrive = useCallback(() => {
@@ -420,6 +434,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           onEnterPool={goPool}
           onEnterHideSeek={goHideSeek}
           onEnterDrive={goDrive}
+          onEnterSurf={goSurf}
           onEnterDrop={goDrop}
           onEnterWarfare={goWarfare}
           onOpen={id => os.open(id)}

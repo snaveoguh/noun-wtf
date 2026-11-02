@@ -46,6 +46,8 @@ const CUE = '<svg viewBox="0 0 400 24"><rect x="2" y="5" width="396" height="14"
 // Two big eyes peeking over a wall (hide & seek)
 const PEEK = '<svg viewBox="-70 -60 140 120"><g stroke="#0b0b0f" stroke-width="5" stroke-linejoin="round"><ellipse cx="-24" cy="-14" rx="22" ry="26" fill="#fff"/><ellipse cx="24" cy="-14" rx="22" ry="26" fill="#fff"/></g><circle cx="-16" cy="-8" r="10" fill="#0b0b0f"/><circle cx="32" cy="-8" r="10" fill="#0b0b0f"/><circle cx="-13" cy="-12" r="3" fill="#fff"/><circle cx="35" cy="-12" r="3" fill="#fff"/><g stroke="#0b0b0f" stroke-width="5"><rect x="-66" y="4" width="132" height="54" fill="#ff7a4a"/><path d="M-66 22H66M-66 40H66M-30 4V22M14 4V22M40 4V22M-52 22V40M-8 22V40M30 22V40M-30 40V58M14 40V58M52 40V58" fill="none"/></g></svg>';
 const TYRE = '<svg viewBox="-60 -60 120 120"><circle r="54" fill="#232624" stroke="#0b0b0f" stroke-width="6"/><g stroke="#0b0b0f" stroke-width="6">' + [0,30,60,90,120,150,180,210,240,270,300,330].map(a => '<path d="M0-54V-44" transform="rotate(' + a + ')"/>').join('') + '</g><circle r="32" fill="#d7dde2" stroke="#0b0b0f" stroke-width="5"/><g fill="#0b0b0f">' + [0,72,144,216,288].map(a => '<circle cx="0" cy="-19" r="5" transform="rotate(' + a + ')"/>').join('') + '</g><circle r="9" fill="#ffd400" stroke="#0b0b0f" stroke-width="4"/><path d="M-36-30a46 46 0 0 1 26-16" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".5"/></svg>';
+const BOARD = '<svg viewBox="0 0 80 300"><path d="M40 6 C70 56 72 190 58 252 C52 282 28 282 22 252 C8 190 10 56 40 6Z" fill="#ffd23f" stroke="#0b0b0f" stroke-width="7"/><path d="M40 16 L40 270" stroke="#ff6f61" stroke-width="9"/><path d="M31 250 L40 292 L49 250" fill="#1b4965" stroke="#0b0b0f" stroke-width="5"/></svg>';
+const WAVE = '<svg viewBox="0 0 300 180"><path d="M8 170 C40 60 150 0 230 30 C280 48 292 100 250 118 C220 130 200 100 214 84 C186 80 168 110 172 140 C176 160 200 170 210 170 Z" fill="#20d6ff" stroke="#0b0b0f" stroke-width="8"/><path d="M60 120 C100 70 160 40 220 52" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round"/></svg>';
 const K = {
   hoops: { bg: 'linear-gradient(150deg,#ff8a1f 0%,#ff5a3c 45%,#7b3cff 100%)', accent: '#ffe23a', badge: '#20d6ff',
     t1: 'NOUN', t2: 'HOOPS', tag: 'DUNK · CROSS · SWISH', url: 'NOUN.WTF/WORLD', bdg: '3 ON 3',
@@ -89,6 +91,12 @@ const K = {
     prop: '<div class="speed" style="left:40px;top:470px;width:120px;transform:rotate(-14deg)"></div><div class="speed" style="left:30px;top:530px;width:150px;transform:rotate(-14deg)"></div><div class="prop" style="left:150px;top:400px;width:260px;transform:rotate(-14deg)">' + TYRE + '</div>',
     portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '132px', l2x: '24px', cap: ['doors UP!', 'left:500px;top:330px', '6deg'],
       prop: '<div class="prop" style="left:560px;top:860px;width:190px;transform:rotate(14deg)">' + TYRE + '</div>' } },
+  surf: { bg: 'linear-gradient(150deg,#20d6ff 0%,#1f6bff 46%,#ff6f61 100%)', accent: '#ffd23f', badge: '#ff6f61',
+    t1: 'NOUN', t2: 'SURF', tag: 'PADDLE · DROP · SHRED', url: 'NOUN.WTF/WORLD', bdg: 'PUERTO NOUN',
+    sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['pura vida!', 'left:860px;top:205px', '6deg'], ts: '210px', l2x: '120px', br: '1.12',
+    prop: '<div class="prop" style="left:40px;top:520px;width:300px;transform:rotate(-8deg)">' + WAVE + '</div><div class="prop" style="left:250px;top:380px;width:120px;transform:rotate(24deg)">' + BOARD + '</div>',
+    portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '150px', l2x: '40px', cap: ['pura vida!', 'left:500px;top:330px', '6deg'],
+      prop: '<div class="prop" style="left:600px;top:820px;width:110px;transform:rotate(14deg)">' + BOARD + '</div>' } },
 }[kind];
 const img = q.get('img');
 const c = document.getElementById('c');

@@ -74,6 +74,7 @@ export default function AgentHome({
   onEnterPool,
   onEnterHideSeek,
   onEnterDrive,
+  onEnterSurf,
   onEnterWarfare,
   onEnterDrop,
   onOpen,
@@ -91,6 +92,8 @@ export default function AgentHome({
   onEnterHideSeek: () => void;
   /** Noun World in a car (`?play=drive`) */
   onEnterDrive: () => void;
+  /** Noun World on a surfboard at Puerto Noun (`?play=surf`) */
+  onEnterSurf?: () => void;
   onEnterWarfare: () => void;
   /** Noun World straight onto the Big Drop (only offered once it's unlocked) */
   onEnterDrop: () => void;
@@ -151,6 +154,7 @@ export default function AgentHome({
       else if (id === 'pool') onEnterPool?.();
       else if (id === 'hideseek') onEnterHideSeek();
       else if (id === 'drive') onEnterDrive();
+      else if (id === 'surf') (onEnterSurf ?? (() => onNavigate('/world?play=surf')))();
       else if (id === 'warfare') onEnterWarfare();
       else if (id === 'drop') {
         // Locked: the sheet says how to open it (its button opens Noun World)
@@ -168,9 +172,11 @@ export default function AgentHome({
       onEnterPool,
       onEnterHideSeek,
       onEnterDrive,
+      onEnterSurf,
       onEnterWarfare,
       onEnterWorld,
       onEnterDrop,
+      onNavigate,
     ],
   );
 

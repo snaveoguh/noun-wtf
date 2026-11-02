@@ -113,8 +113,9 @@ export class SurfHud {
       el.lastChild!.textContent = v.prompt === 'pop' ? v.popKey : '';
     });
     this.set('spd', v.ride ? String(Math.round(v.kmh)) : '', (el, t) => (el.textContent = t));
-    this.set('button', v.button, (el, b) => {
-      el.textContent = b === 'duck' ? 'DUCK' : 'POP';
+    this.set('button', v.button, (_el, b) => {
+      const el = this.el.btn!;
+      el.textContent = b === 'duck' ? 'DUCK' : b === 'pop' ? 'POP' : '';
       el.classList.toggle('pop', b === 'pop');
     });
     this.set('shop', v.shop, (el, s) => {

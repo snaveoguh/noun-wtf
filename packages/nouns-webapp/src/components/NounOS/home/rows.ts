@@ -16,7 +16,8 @@ export type GameId =
   | 'drop'
   | 'drive'
   | 'parkour'
-  | 'pool';
+  | 'pool'
+  | 'surf';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -268,6 +269,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'RACK EM',
     loading: 'chalking up. off to the pool hall',
+  },
+  {
+    id: 'surf',
+    name: 'Noun Surf',
+    cover: '/world2/surf-cover.webp',
+    card: '/home/covers/surf.webp',
+    focus: '50% 50%',
+    teaser:
+      "Paddle out from Puerto Noun, the beach town 25 km down the mountain. Duck the whitewater, catch a set wave, pop up and ride it down the line: carves, cutbacks, airs off the lip, and a wipeout when the lip lands on you.",
+    tagline: 'PADDLE · DROP · SHRED',
+    facts: [
+      'Foamie, longboard or shortboard',
+      'Waves peel down the beach in sets',
+      'Runs inside Noun World',
+    ],
+    cta: 'PADDLE OUT',
+    loading: 'waxing up. off to puerto noun',
   },
 ];
 
