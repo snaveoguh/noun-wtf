@@ -36,8 +36,16 @@ import type {
   SwingInput,
   V3,
 } from '../contract';
-import type {
-  HoleInfo,
+
+import * as THREE from 'three';
+
+import { seedKey } from '../../character/NounAppearance';
+import { toWorld } from '../course/site';
+import { golfCourse, golfCourseBuilt, type GolfCourse } from '../course/surface';
+import { BallView } from '../play/BallView';
+import { Golfer, PUTT, SWING, swingAngle } from '../play/Golfer';
+import {
+  type HoleInfo,
   CLUBS,
   applyShot,
   ballOf,
@@ -62,14 +70,6 @@ import type {
   type MeterState,
   type MeterView,
 } from '../sim';
-
-import * as THREE from 'three';
-
-import { seedKey } from '../../character/NounAppearance';
-import { toWorld } from '../course/site';
-import { golfCourse, golfCourseBuilt, type GolfCourse } from '../course/surface';
-import { BallView } from '../play/BallView';
-import { Golfer, PUTT, SWING, swingAngle } from '../play/Golfer';
 
 import { GolfSession, type GolfTransport, type SessionEvent } from './session';
 import { bumpLife, readBest, saveBest, type GolfBest } from './store';
