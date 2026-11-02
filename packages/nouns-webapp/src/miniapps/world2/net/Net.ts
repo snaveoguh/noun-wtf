@@ -215,6 +215,8 @@ export class Net {
   onPool?: (m: Record<string, unknown>) => void;
   /** Noun Hide & Seek (hideseek/net): every `hideseek:*` message, raw (its codec checks it). */
   onHideSeek?: (m: Record<string, unknown>) => void;
+  /** Noun Football (football/net): every `football:*` message, raw (its codec checks it). */
+  onFootball?: (m: Record<string, unknown>) => void;
   /** NOUN FM (radio/): every `fm:*` message goes here. */
   onFm?: (m: Record<string, unknown>) => void;
   /** Voice Booth: a remote rider's callout fired. */
@@ -288,6 +290,10 @@ export class Net {
     }
     if (type.startsWith('hideseek:')) {
       this.onHideSeek?.(d);
+      return;
+    }
+    if (type.startsWith('football:')) {
+      this.onFootball?.(d);
       return;
     }
     if (type.startsWith('fm:')) {
@@ -592,6 +598,10 @@ export class Net {
   }
 
   sendHideSeek(m: { type: string }) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+  }
+
+  sendFootball(m: { type: string }) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
