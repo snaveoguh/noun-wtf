@@ -341,6 +341,8 @@ function doneText(a: TradeAction): string {
       return `Fitted: ${a.up}`;
     case 'spend':
       return `Spent ${a.coin} COIN`;
+    case 'fare':
+      return `Fare +${a.coin} COIN`;
     default:
       return 'Done';
   }

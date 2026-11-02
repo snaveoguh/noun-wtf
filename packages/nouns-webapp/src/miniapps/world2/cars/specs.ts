@@ -19,7 +19,8 @@ export type CarId =
   | 'stompa'
   | 'bubble'
   | 'kaido'
-  | 'bruiser';
+  | 'bruiser'
+  | 'cab';
 
 /** What X (or the SPECIAL button) does in this car. */
 export type CarSpecial = 'fly' | 'hop' | 'stomp' | null;
@@ -454,6 +455,47 @@ export const CARS: Record<CarId, CarSpec> = {
     hbYaw: 1.5,
     downforce: 0.0012,
     comH: 0.56,
+  },
+  cab: {
+    id: 'cab',
+    name: 'NOUN CAB',
+    tagline: 'Yellow cab, roof light on. Pick up fares, floor it, earn tips.',
+    inspiration: 'big-city yellow cabs (the sedan shape, never a fleet livery)',
+    source: 'procedural',
+    geo: {
+      length: 4.7,
+      width: 2.0,
+      height: 1.62,
+      axleF: 1.45,
+      axleR: -1.42,
+      halfTrack: 0.82,
+      wheelR: 0.38,
+      wheelW: 0.28,
+      seat: [0.4, 0.5, 0.1],
+    },
+    doors: 'none',
+    open: false,
+    special: 'stomp',
+    paints: [0xf2c200, 0xf4f1ea, 0x1d1f24, 0xd8232a],
+    engine: 1.1,
+    horn: 'beep',
+    mass: 1550,
+    topKmh: 230,
+    boostKmh: 290,
+    accel: 12,
+    mu: 1.12,
+    slide: 0.86,
+    sag: 0.09,
+    zeta: 0.45,
+    travel: 0.24,
+    restLen: 0.34,
+    frontDrive: 0.15,
+    steerMax: 0.62,
+    steerFade: 11,
+    hbGrip: 0.32,
+    hbYaw: 1.7,
+    downforce: 0.0014,
+    comH: 0.5,
   },
 };
 

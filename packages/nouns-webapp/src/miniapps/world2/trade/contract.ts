@@ -130,7 +130,19 @@ export type TradeAction =
   | { t: 'cancel'; order: string }
   // Inside a building (interiors/): COIN spent on the spot, nothing to carry:
   // a gift to a resident, a meal eaten in, a service (a haircut, a day pass)
-  | { t: 'spend'; town: TownId; to: string; coin: number; what: 'gift' | 'meal' | 'service' };
+  | { t: 'spend'; town: TownId; to: string; coin: number; what: 'gift' | 'meal' | 'service' }
+  // NOUN TAXI (taxi/): a ride's pay at the drop-off in `town`, picked up in
+  // `from`, `metres` on the meter, `who` the passenger (fare or hitchhiker).
+  // The ledger caps it (taxi/sim/pay.ts maxPay) and checks the timing.
+  | {
+      t: 'fare';
+      town: TownId;
+      from: TownId;
+      coin: number;
+      metres: number;
+      who: string;
+      kind: 'fare' | 'hitch';
+    };
 
 export interface TradeResult {
   ok: boolean;

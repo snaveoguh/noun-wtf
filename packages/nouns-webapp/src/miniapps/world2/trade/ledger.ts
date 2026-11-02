@@ -25,9 +25,16 @@
 //  • rate: a token bucket (BUCKET_MAX burst, BUCKET_RATE per second);
 //  • street sales: one per SERVE_GAP_MS, and each customer pays once per
 //    CUSTOMER_COOLDOWN_MS;
+//  • taxi fares (taxi/): at most maxPay() for the ride (its metres, never
+//    more than the towns' road distance + FARE_SLACK_M), one per
+//    FARE_GAP_MS, each passenger once per CUSTOMER_COOLDOWN_MS, and only
+//    as fast as a car can cover the road since the last fare / trade
+//    (CAR_MAX_SPEED: the roadster boosting, with headroom);
 //  • every number is an integer in range, every id a known one.
 
 import type { GoodId, TownId, TradeAction, TradeState, VanUpgrade } from './contract';
+
+import { maxPay } from '../taxi/sim/pay';
 
 import { GOOD_IDS, GOODS, isGood } from './goods';
 import {
@@ -61,6 +68,11 @@ export const RULES = {
   SERVE_PREMIUM: 1.1,
   /** Largest single spend inside a building (a gift, a meal, a service). */
   MAX_SPEND: 100,
+  /** Taxi fares: fastest a car covers road (m/s), gap between fares, slack on the road distance (m). */
+  CAR_MAX_SPEED: 170,
+  FARE_GAP_MS: 6000,
+  FARE_SLACK_M: 2500,
+  MAX_FARE_M: 120_000,
   /** Bookkeeping caps. */
   SERVED_KEEP: 200,
   IDS_KEEP: 32,
@@ -105,6 +117,8 @@ export interface TradeRow {
   /** Street customers served (id → ms) and the last street sale. */
   served: Record<string, number>;
   serveAt: number;
+  /** The last taxi fare paid (ms); absent on rows from before taxis. */
+  fareAt?: number;
   /** Recent action ids (a retried request is answered, not repeated). */
   ids: string[];
   /** Recent ledger op ids (cash-outs, deposits, refunds): applied once each. */
@@ -204,6 +218,7 @@ export function normalizeRow(raw: unknown, rider: string, now: number): TradeRow
     },
     served: r.served && typeof r.served === 'object' ? { ...r.served } : {},
     serveAt: finite(r.serveAt, 0),
+    ...(typeof r.fareAt === 'number' && Number.isFinite(r.fareAt) ? { fareAt: r.fareAt } : {}),
     ids: Array.isArray(r.ids)
       ? r.ids.filter(x => typeof x === 'string').slice(-RULES.IDS_KEEP)
       : [],
@@ -290,6 +305,30 @@ export function travelCheck(row: TradeRow, town: TownId, now: number): string | 
   return `too fast: ${km} km from ${row.last.town} in ${Math.max(0, Math.round(took / 1000))} s (needs ${Math.ceil(need / 1000)} s)`;
 }
 
+/** The most a taxi ride may pay: its metres, bounded by the road between its towns. */
+export function fareCap(a: { from: TownId; town: TownId; metres: number; kind: 'fare' | 'hitch' }) {
+  const road = travelMetres(a.from, a.town) + RULES.FARE_SLACK_M;
+  return maxPay(Math.min(a.metres, road), a.kind);
+}
+
+/** Why a taxi fare in `a.town` at `now` is a teleport (null: it's fine). */
+export function fareCheck(
+  row: TradeRow,
+  a: { from: TownId; town: TownId },
+  now: number,
+): string | null {
+  const grace = RULES.TRAVEL_GRACE_S * 1000;
+  // the ride itself, since the last fare
+  const ride = (travelMetres(a.from, a.town) / RULES.CAR_MAX_SPEED) * 1000 - grace;
+  if (row.fareAt !== undefined && now - row.fareAt < ride) return 'too fast for that ride';
+  // and from wherever the books last saw you
+  if (row.last !== null && row.last.town !== a.town) {
+    const need = (travelMetres(row.last.town, a.town) / RULES.CAR_MAX_SPEED) * 1000 - grace;
+    if (now - row.last.at < need) return `too fast from ${row.last.town}`;
+  }
+  return null;
+}
+
 const CUSTOMER_RE = /^[\w.:-]{1,48}$/;
 /** A spend's recipient: an interior door or resident id (interiors/). */
 const SPEND_TO_RE = /^[\w#,.:-]{1,80}$/;
@@ -323,6 +362,23 @@ export function parseAction(raw: unknown): { a: TradeAction } | { error: string 
       if (r.what !== 'gift' && r.what !== 'meal' && r.what !== 'service')
         return { error: 'bad spend' };
       return { a: { t: 'spend', town: r.town, to: r.to, coin: r.coin as number, what: r.what } };
+    case 'fare':
+      if (!isTown(r.town) || !isTown(r.from)) return { error: 'unknown town' };
+      if (typeof r.who !== 'string' || !CUSTOMER_RE.test(r.who)) return { error: 'bad passenger' };
+      if (!int(r.metres, 0, RULES.MAX_FARE_M)) return { error: 'bad metres' };
+      if (!int(r.coin, 1, maxPay(RULES.MAX_FARE_M))) return { error: 'bad coin' };
+      if (r.kind !== 'fare' && r.kind !== 'hitch') return { error: 'bad kind' };
+      return {
+        a: {
+          t: 'fare',
+          town: r.town,
+          from: r.from,
+          coin: r.coin as number,
+          metres: r.metres as number,
+          who: r.who,
+          kind: r.kind,
+        },
+      };
     case 'order':
     case 'cancel':
       return { error: 'unsupported' };
@@ -370,7 +426,8 @@ export function applyAction(
     return reject('unsupported', 'the Grand Exchange has its own desk');
 
   const town = action.town;
-  const teleport = travelCheck(row, town, now);
+  // A taxi ride is checked at a car's speed (below), not the van's
+  const teleport = action.t === 'fare' ? fareCheck(row, action, now) : travelCheck(row, town, now);
   if (teleport !== null) return reject('travel', teleport);
 
   const live = marketAt(town, markets0[town], now);
@@ -382,6 +439,7 @@ export function applyAction(
   let upgrades = row.upgrades;
   let served = row.served;
   let serveAt = row.serveAt;
+  let fareAt = row.fareAt;
 
   switch (action.t) {
     case 'buy': {
@@ -440,6 +498,25 @@ export function applyAction(
       serveAt = now;
       break;
     }
+    case 'fare': {
+      const { who } = action;
+      if (now - (row.fareAt ?? 0) < RULES.FARE_GAP_MS) return reject('rate', 'one fare at a time');
+      const key = `fare:${who}`;
+      const seen = row.served[key];
+      if (seen !== undefined && now - seen < RULES.CUSTOMER_COOLDOWN_MS)
+        return reject('cooldown', 'already paid');
+      const cap = fareCap(action);
+      if (action.coin > cap) return reject('invalid', `fare over ${cap}`);
+      coin = action.coin;
+      book.earned += action.coin;
+      const next = Object.entries({ ...row.served, [key]: now })
+        .filter(([, at]) => now - at < RULES.CUSTOMER_COOLDOWN_MS)
+        .sort((a, b) => a[1] - b[1])
+        .slice(-RULES.SERVED_KEEP);
+      served = Object.fromEntries(next);
+      fareAt = now;
+      break;
+    }
     case 'spend': {
       // A coin sink: never more than you have, nothing carried away
       if (action.coin > row.coin)
@@ -468,6 +545,7 @@ export function applyAction(
     upgrades,
     served,
     serveAt,
+    ...(fareAt !== undefined ? { fareAt } : {}),
     last: { town, at: now },
     ids: id === undefined ? row.ids : [...row.ids, id].slice(-RULES.IDS_KEEP),
     book,

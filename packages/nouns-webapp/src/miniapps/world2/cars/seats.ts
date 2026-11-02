@@ -57,6 +57,8 @@ export const SEATS: Record<CarId, readonly SeatSpot[]> = {
   bubble: [L(0.2, 0.5, -0.15), L(-0.2, 0.5, -0.15)],
   kaido: [L(0.35, 0.62, -0.25), L(-0.35, 0.62, -0.25)],
   bruiser: [L(0.4, 0.7, -0.2), L(-0.4, 0.7, -0.2)],
+  // NOUN CAB: driver, the front seat, and the back bench (fares ride in the back)
+  cab: [L(0.4, 0.62, 0.1), L(-0.4, 0.62, 0.1), L(0.4, 0.62, -0.9), L(-0.4, 0.62, -0.9)],
 };
 
 export function seatsOf(id: CarId): readonly SeatSpot[] {

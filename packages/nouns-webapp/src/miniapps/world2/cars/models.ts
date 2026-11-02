@@ -492,7 +492,58 @@ function bubble(_s: CarSpec, P: number): Built {
   };
 }
 
+/**
+ * NOUN CAB: a tall four-door sedan, checker band, roof light (TAXI), a
+ * push bar. Closed: fares ride hidden inside, like the Kenney cars.
+ */
+function cab(s: CarSpec, P: number): Built {
+  const k = new Kit();
+  const g = s.geo;
+  const L = g.length / 2;
+  // body: lower slab, bonnet + boot, the cabin glasshouse and its roof
+  k.box(P, [1.98, 0.5, 4.6], [0, 0.6, 0], { noseDrop: 0.08, chin: 0.1, tailLift: 0.08 });
+  k.box(P, [1.9, 0.12, 1.25], [0, 0.9, 1.6], { noseDrop: 0.06, topX: 0.95 });
+  k.box(P, [1.9, 0.12, 0.95], [0, 0.9, -1.85], { topX: 0.95 });
+  k.box(GLASS, [1.78, 0.5, 2.3], [0, 1.18, -0.3], { topX: 0.86, topZ: 0.82, topDz: -0.06 });
+  k.box(P, [1.56, 0.08, 1.9], [0, 1.46, -0.34]);
+  // pillars and the door shut lines
+  for (const x of [-0.9, 0.9]) {
+    k.box(P, [0.06, 0.48, 0.1], [x * 0.96, 1.18, 0.55], { rot: [-0.35, 0, 0] });
+    k.box(P, [0.06, 0.48, 0.12], [x * 0.98, 1.18, -0.32]);
+    k.box(P, [0.06, 0.46, 0.14], [x * 0.95, 1.18, -1.32], { rot: [0.3, 0, 0] });
+    k.box(DARK, [0.02, 0.44, 0.03], [x * 1.1, 0.62, 0.62]);
+    k.box(DARK, [0.02, 0.44, 0.03], [x * 1.1, 0.62, -0.32]);
+    k.box(DARK, [0.02, 0.44, 0.03], [x * 1.1, 0.62, -1.3]);
+    // handles, mirrors
+    k.box(CHROME, [0.03, 0.04, 0.16], [x * 1.11, 0.78, 0.3]);
+    k.box(CHROME, [0.03, 0.04, 0.16], [x * 1.11, 0.78, -0.62]);
+    k.box(DARK, [0.16, 0.1, 0.14], [x * 1.06, 1.0, 0.75]);
+  }
+  // checker band along both sides
+  for (const x of [-1, 1])
+    for (let i = 0; i < 14; i++)
+      for (let r = 0; r < 2; r++)
+        if ((i + r) % 2 === 0)
+          k.box(DARK, [0.02, 0.07, 0.24], [x * 1.0, 0.82 - r * 0.07, -1.55 + i * 0.24]);
+  // bumpers, push bar, grille, lamps
+  k.box(DARK, [2.02, 0.18, 0.16], [0, 0.42, L + 0.02]);
+  k.box(DARK, [2.02, 0.18, 0.16], [0, 0.42, -L - 0.02]);
+  k.box(0x2b2e33, [1.2, 0.08, 0.08], [0, 0.66, L + 0.14]);
+  for (const x of [-0.45, 0.45]) k.box(0x2b2e33, [0.08, 0.4, 0.08], [x, 0.52, L + 0.12]);
+  k.box(DARK, [1.0, 0.2, 0.05], [0, 0.66, L + 0.01]);
+  for (const x of [-0.72, 0.72]) k.box(LAMP, [0.34, 0.14, 0.04], [x, 0.7, L + 0.01], {}, true);
+  for (const x of [-0.75, 0.75]) k.box(TAIL, [0.3, 0.14, 0.04], [x, 0.72, -L - 0.01], {}, true);
+  // the roof light: a lit sign on two feet, TAXI blocks across its faces
+  for (const z of [-0.5, -0.1]) k.box(DARK, [0.5, 0.06, 0.06], [0, 1.52, z]);
+  k.box(0xfff2a8, [0.8, 0.22, 0.34], [0, 1.65, -0.3], { topX: 0.86, topZ: 0.8 }, true);
+  for (const z of [-0.48, -0.12])
+    for (let i = 0; i < 4; i++)
+      k.box(DARK, [0.1, 0.1, 0.02], [-0.24 + i * 0.16, 1.65, z + (z < -0.3 ? -0.005 : 0.005)]);
+  return { body: k.build(), flames: null, doors: [] };
+}
+
 const BUILDERS: Record<CarId, Builder> = {
+  cab,
   roadstar,
   cavallino,
   toro,
