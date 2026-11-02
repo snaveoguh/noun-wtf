@@ -4,6 +4,7 @@ import { BreakRelay } from './breakRelay';
 import { FmRelay } from './fmRelay';
 import { HideSeekRelay } from './hideseekRelay';
 import { HoopsRelay } from './hoopsRelay';
+import { GolfRelay } from './golfRelay';
 import { PoolRelay } from './poolRelay';
 import { WarfareRelay } from './warfareRelay';
 
@@ -41,6 +42,9 @@ import { WarfareRelay } from './warfareRelay';
  *
  * 8. Noun Hide & Seek (hideseek: prefix, world v2): relayed only to the
  *    players a message is for (see hideseekRelay.ts), nothing persisted.
+ *
+ * 9. Noun Golf (golf: prefix, world v2): NOUN LINKS rounds, relayed only to
+ *    the players a message is for (see golfRelay.ts), nothing persisted.
  */
 
 const WARFARE_ROOM = 'noun-warfare';
@@ -98,6 +102,7 @@ interface RoomState {
   _hoops?: HoopsRelay;
   _break?: BreakRelay;
   _pool?: PoolRelay;
+  _golf?: GolfRelay;
   _hideseek?: HideSeekRelay;
   _warfare?: WarfareRelay;
 }
@@ -232,6 +237,14 @@ export const handlers = {
         if (message.length > 8192) return;
         rs._pool ??= new PoolRelay();
         rs._pool.handle(data, connection, room.getConnections());
+        return;
+      }
+
+      // ── Noun Golf (golf: prefix): NOUN LINKS rounds ─────────────────
+      if (typeof data.type === 'string' && data.type.startsWith('golf:')) {
+        if (message.length > 16384) return;
+        rs._golf ??= new GolfRelay();
+        rs._golf.handle(data, connection, room.getConnections());
         return;
       }
 
@@ -596,6 +609,7 @@ export const handlers = {
     rs._hoops?.close(connection.id, room.getConnections());
     rs._break?.close(connection.id, room.getConnections());
     rs._pool?.close(connection.id, room.getConnections());
+    rs._golf?.close(connection.id, room.getConnections());
     rs._hideseek?.close(connection.id, room.getConnections());
     void fmRelays.get(room.id)?.then(fm => fm.close(connection.id));
 

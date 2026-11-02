@@ -16,7 +16,8 @@ export type GameId =
   | 'drop'
   | 'drive'
   | 'parkour'
-  | 'pool';
+  | 'pool'
+  | 'golf';
 
 /**
  * THE BIG DROP's art: placeholders until there are real in-game shots of
@@ -268,6 +269,23 @@ export const GAMES: Game[] = [
     ],
     cta: 'RACK EM',
     loading: 'chalking up. off to the pool hall',
+  },
+  {
+    id: 'golf',
+    name: 'Noun Golf',
+    cover: '/world2/golf-cover.webp',
+    card: '/home/covers/golf.webp',
+    focus: '50% 50%',
+    teaser:
+      'NOUN LINKS: a full-size 19-hole course on the side of the mountain. Real ball flight, spin and wind, sloping greens, an island green, a green shaped like the noggles, and golf buggies to drive between shots.',
+    tagline: 'DRIVE · CHIP · SINK IT',
+    facts: [
+      '19 holes, par 76, full size',
+      'Solo, VS CPU or with players on the course',
+      'Golf buggies, a driving range and the 19th hole bar',
+    ],
+    cta: 'TEE OFF',
+    loading: 'grabbing the clubs. off to the 1st tee',
   },
 ];
 

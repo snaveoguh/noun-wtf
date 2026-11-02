@@ -206,6 +206,19 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
     os.setMode('world');
   }, [gameMounted, navigate]);
 
+  // NOUN GOLF: Noun World on NOUN LINKS' 1st tee with the menu open (`?play=golf`)
+  const goGolf = useCallback(() => {
+    const url = '/world?play=golf';
+    if (gameMounted) {
+      window.location.assign(url);
+      return;
+    }
+    navigate(url);
+    setArena('world');
+    setGameMounted(true);
+    os.setMode('world');
+  }, [gameMounted, navigate]);
+
   // NOUN POOL: Noun World in the pool hall with the menu open (`?play=pool`)
   const goPool = useCallback(() => {
     const url = '/world?play=pool';
@@ -418,6 +431,7 @@ export default function NounOS({ routes }: { routes: ReactNode }) {
           onEnterBreaks={goBreaks}
           onEnterParkour={goParkour}
           onEnterPool={goPool}
+          onEnterGolf={goGolf}
           onEnterHideSeek={goHideSeek}
           onEnterDrive={goDrive}
           onEnterDrop={goDrop}

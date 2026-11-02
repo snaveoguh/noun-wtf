@@ -72,6 +72,7 @@ export default function AgentHome({
   onEnterBreaks,
   onEnterParkour,
   onEnterPool,
+  onEnterGolf,
   onEnterHideSeek,
   onEnterDrive,
   onEnterWarfare,
@@ -88,6 +89,7 @@ export default function AgentHome({
   onEnterBreaks: () => void;
   onEnterParkour: () => void;
   onEnterPool?: () => void;
+  onEnterGolf?: () => void;
   onEnterHideSeek: () => void;
   /** Noun World in a car (`?play=drive`) */
   onEnterDrive: () => void;
@@ -149,6 +151,7 @@ export default function AgentHome({
       else if (id === 'breaks') onEnterBreaks();
       else if (id === 'parkour') onEnterParkour();
       else if (id === 'pool') onEnterPool?.();
+      else if (id === 'golf') onEnterGolf?.();
       else if (id === 'hideseek') onEnterHideSeek();
       else if (id === 'drive') onEnterDrive();
       else if (id === 'warfare') onEnterWarfare();
@@ -166,6 +169,7 @@ export default function AgentHome({
       onEnterBreaks,
       onEnterParkour,
       onEnterPool,
+      onEnterGolf,
       onEnterHideSeek,
       onEnterDrive,
       onEnterWarfare,

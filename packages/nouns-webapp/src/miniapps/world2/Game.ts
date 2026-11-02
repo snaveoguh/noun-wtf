@@ -59,6 +59,7 @@ import { ParkourSystem } from './parkour/ParkourSystem';
 import { perf, perfParam } from './perf/PerfProbe';
 import { CollisionWorld } from './physics/Collision';
 import { RailSet } from './physics/Rails';
+import { GolfMode } from './golf/net/GolfMode';
 import { PoolMode } from './pool/net/PoolMode';
 import { FmSpots } from './radio/FmSpots';
 import { NounFm } from './radio/NounFm';
@@ -393,6 +394,8 @@ export class Game {
   readonly skydive: SkydiveSystem = new SkydiveSystem(this);
   /** Noun Pool (pool/net/PoolMode.ts, PoolApi): bar tables + the pool hall; owns the frame. */
   readonly pool: PoolMode = new PoolMode(this);
+  /** Noun Golf (golf/net/GolfMode.ts, GolfApi): NOUN LINKS; owns the frame while a shot's on. */
+  readonly golf: GolfMode = new GolfMode(this);
   /** Freestyle anywhere (breakdance/freestyle/): dancing on the spot; while active it owns the frame. */
   readonly freestyle: FreestyleMode = new FreestyleMode(this);
   /** Noun Hide & Seek (hideseek/net/HideSeekMode.ts): played in the normal game; hides hiders' tags. */
@@ -1136,6 +1139,20 @@ export class Game {
       this.gfx.render(dt);
       return;
     }
+    // ── Noun Golf: addressing / flying a shot at NOUN LINKS; the mountain streams round the ball ──
+    if (this.golf.active) {
+      this.input.poll(now);
+      this.golf.step(dt);
+      this.updateFm(dt);
+      this.animTime += dt;
+      this.updateNetwork(dt);
+      this.cars.update(dt);
+      this.mountain?.update(this.golf.focus, this.golf.focusVel);
+      this.nature?.update(dt, this.golf.focus);
+      this.gfx.followShadow(this.golf.focus);
+      this.gfx.render(dt);
+      return;
+    }
     // ── Freestyle: breakdancing on the spot; skater parked, skate camera orbiting ──
     if (this.freestyle.active) {
       const fin = this.input.poll(now);
@@ -1295,6 +1312,7 @@ export class Game {
     if (!away) this.hoops.idle(dt);
     if (!away) this.breaks.idle(dt);
     this.pool.idle(dt);
+    this.golf.idle(dt);
     this.hideseek.update(dt);
     perf.lap('modes');
   }
@@ -2582,6 +2600,7 @@ export class Game {
     this.parkour.dispose();
     this.skydive.dispose();
     this.pool.dispose();
+    this.golf.dispose();
     this.freestyle.dispose();
     this.hideseek.dispose();
     this.van2.dispose();

@@ -31,7 +31,8 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint'], full = false): MapS
     mountain: game.mountain !== null,
     drops: game.drops?.mapPoints(),
     towns: game.towns?.mapPoints(full),
-    landmarks: game.landmarks?.mapPoints(full),
+    // NOUN LINKS (golf) gets a pin like a landmark
+    landmarks: [...(game.landmarks?.mapPoints(full) ?? []), game.golf.mapPoint()],
   };
 }
 
@@ -203,6 +204,19 @@ export function WorldMap({
           }}
         >
           <i style={{ background: '#ff3d8b' }} /> secret spot
+        </button>
+      )}
+      {game.mountain !== null && (
+        <button
+          type="button"
+          title="Fast travel to the 1st tee"
+          onClick={() => {
+            const pin = game.golf.mapPoint();
+            goTo(pin.x, pin.z, 0.6);
+            if (game.golf.arrive()) setOpen(false);
+          }}
+        >
+          <i style={{ background: '#3ddc84' }} /> ⛳ noun links: tee off
         </button>
       )}
       {waypoint !== null && (
