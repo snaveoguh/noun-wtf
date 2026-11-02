@@ -4,7 +4,15 @@ import { MOUNTAIN } from '../../world/mountain/config';
 import { tracks, MEGA_SITE, TOWN_SITE } from '../../world/mountain/tracks';
 
 import { STATIONS, STATION_PAD } from './places';
-import { BILLBOARDS, backRows, distRows, roadsideItems, segmentItems, segmentOf } from './roadside';
+import {
+  BILLBOARDS,
+  backRows,
+  distRows,
+  roadsideIn,
+  roadsideItems,
+  segmentOf,
+  segmentSlots,
+} from './roadside';
 
 const UP_TO = 46_000;
 const items = [1, 2, 3].flatMap(t => [...roadsideItems(t, UP_TO)]);
@@ -23,8 +31,8 @@ describe('roadside', () => {
   });
 
   it('is deterministic: growing in steps gives the same items as all at once', () => {
-    const a = roadsideItems(2, 20_000).filter(i => i.s < 19_000);
-    const b = items.filter(i => i.track === 2 && i.s < 19_000);
+    const a = roadsideItems(2, 20_000).filter(i => i.s0 < 19_000);
+    const b = items.filter(i => i.track === 2 && i.s0 < 19_000);
     expect(a.map(i => [i.id, Math.round(i.s), Math.round(i.x), Math.round(i.z)])).toEqual(
       b.map(i => [i.id, Math.round(i.s), Math.round(i.x), Math.round(i.z)]),
     );
@@ -74,10 +82,21 @@ describe('roadside', () => {
     }
   });
 
-  it('segments hold every text sign once', () => {
-    const t1 = items.filter(i => i.track === 1 && i.kind !== 'bb' && i.s < 40_000);
-    const segs = [0, 1, 2, 3].flatMap(s => segmentItems(1, s));
-    expect(segs.map(i => i.id).sort()).toEqual(t1.map(i => i.id).sort());
-    for (const i of segs) expect(segmentOf(i.s)).toBeLessThan(4);
+  it('segments hold every text sign once, by nominal spot', () => {
+    const t1 = items.filter(i => i.track === 1 && i.kind !== 'bb' && i.s0 < 40_000);
+    const segs = [0, 1, 2, 3].flatMap(s => segmentSlots(1, s));
+    const ids = new Set(segs.map(i => i.id));
+    for (const i of t1) expect(ids.has(i.id)).toBe(true);
+    for (const i of segs) expect(segmentOf(i.s0)).toBeLessThan(4);
+  });
+
+  it('a chunk only places the slots near it (and gets the same items)', () => {
+    const it0 = items.find(i => i.track === 2 && i.kind === 'dist' && i.s > 12_000)!;
+    const x0 = Math.floor(it0.x / 128) * 128;
+    const z0 = Math.floor(it0.z / 128) * 128;
+    const got = roadsideIn(2, x0, z0, x0 + 128, z0 + 128, 0, 60_000);
+    expect(got.map(i => i.id)).toContain(it0.id);
+    for (const i of got)
+      expect(i.x >= x0 && i.x < x0 + 128 && i.z >= z0 && i.z < z0 + 128).toBe(true);
   });
 });

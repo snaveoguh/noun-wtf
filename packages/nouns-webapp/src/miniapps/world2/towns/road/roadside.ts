@@ -26,6 +26,7 @@ import {
   SPOT_SITE,
   TOWN_SITE,
   TOWN_SITES,
+  TRACK_STEP,
   tracks,
   type Track,
 } from '../../world/mountain/tracks';
@@ -39,8 +40,9 @@ export interface RoadsideItem {
   id: string;
   kind: RoadsideKind;
   track: number;
-  /** Along-track spot (after nudging) and which side (+1 = left riding out). */
+  /** Along-track spot (after nudging), its nominal spot, and which side (+1 = left riding out). */
   s: number;
+  s0: number;
   side: 1 | -1;
   /** Lateral offset from the line's centre (m). */
   off: number;
@@ -183,7 +185,7 @@ function place(
   side: 1 | -1,
   off: number,
   facing: 1 | -1,
-  rows: (s: number) => string[],
+  rows: string[],
 ): RoadsideItem | null {
   let s = s0;
   for (let i = 0; i < TRIES && blocked(t, s, side, off); i++) s += NUDGE;
@@ -199,56 +201,125 @@ function place(
     kind,
     track: t.id,
     s,
+    s0,
     side,
     off,
     x: p.x + rx * off,
     z: p.z + rz * off,
     yaw: Math.atan2(fx, fz),
-    rows: rows(s),
+    rows,
   };
 }
 
-const cache = new Map<number, { upTo: number; items: RoadsideItem[] }>();
+/**
+ * A nominal spot for an item: everything but where exactly it ends up. Its
+ * text comes from the nominal spot (a nudge of up to 360 m never changes a
+ * km figure much), so a segment's atlas is known without placing anything.
+ */
+export interface RoadsideSlot {
+  id: string;
+  kind: RoadsideKind;
+  track: number;
+  n: number;
+  s0: number;
+  side: 1 | -1;
+  off: number;
+  facing: 1 | -1;
+  rows: string[];
+}
 
-/** Every roadside item on main `track` with s ≤ upTo (grows the line; cached, append-only). */
-export function roadsideItems(track: number, upTo: number): readonly RoadsideItem[] {
-  const want = Math.min(ROADSIDE_MAX, upTo);
-  let c = cache.get(track);
-  if (c === undefined) {
-    c = { upTo: 0, items: [] };
-    cache.set(track, c);
-  }
-  if (want <= c.upTo) return c.items;
-  const t = tracks.tracks.find(q => q.id === track && q.depth === 0);
-  if (t === undefined) return c.items;
-  const from = c.upTo;
-  const add: RoadsideItem[] = [];
+const slotCache = new Map<number, RoadsideSlot[]>();
+
+/** Every slot on main `track` (pure, cheap: no line growth). */
+export function roadsideSlots(track: number): readonly RoadsideSlot[] {
+  const hit = slotCache.get(track);
+  if (hit !== undefined) return hit;
+  const out: RoadsideSlot[] = [];
   const edge = MOUNTAIN.trackHalf;
-  for (let s = KM_STEP; s <= want; s += KM_STEP) {
-    if (s <= from) continue;
-    const it = place(t, 'km', s / KM_STEP, s, -1, edge + 2.2, -1, q => [`${km(q)}`]);
-    if (it !== null) add.push(it);
+  const slot = (
+    kind: RoadsideKind,
+    n: number,
+    s0: number,
+    side: 1 | -1,
+    off: number,
+    facing: 1 | -1,
+    rows: string[],
+  ) => out.push({ id: `${kind}:${track}:${n}`, kind, track, n, s0, side, off, facing, rows });
+  for (let s = KM_STEP; s <= ROADSIDE_MAX; s += KM_STEP)
+    slot('km', s / KM_STEP, s, -1, edge + 2.2, -1, [`${km(s)}`]);
+  for (let s = DIST_FIRST, n = 0; s <= ROADSIDE_MAX; s += DIST_STEP, n++)
+    slot('dist', n, s, -1, edge + 4, -1, distRows(track, s));
+  for (let s = BACK_FIRST, n = 0; s <= ROADSIDE_MAX; s += BACK_STEP, n++)
+    slot('back', n, s, 1, edge + 4, 1, backRows(track, s));
+  for (let s = BB_FIRST, n = 0; s <= ROADSIDE_MAX; s += BB_STEP, n++)
+    slot('bb', n, s, n % 2 === 0 ? -1 : 1, 26, -1, [
+      BILLBOARDS[(n * 7 + track * 3) % BILLBOARDS.length]!,
+    ]);
+  out.sort((a, b) => a.s0 - b.s0);
+  slotCache.set(track, out);
+  return out;
+}
+
+/** Placed items by slot id (null: no room for it anywhere near its spot). */
+const placed = new Map<string, RoadsideItem | null>();
+
+function mainLine(track: number): Track | undefined {
+  return tracks.tracks.find(q => q.id === track && q.depth === 0);
+}
+
+/** Place one slot (cached; the result never depends on when it's asked). */
+export function resolveSlot(sl: RoadsideSlot): RoadsideItem | null {
+  if (placed.has(sl.id)) return placed.get(sl.id)!;
+  const t = mainLine(sl.track);
+  if (t === undefined) return null;
+  const it = place(t, sl.kind, sl.n, sl.s0, sl.side, sl.off, sl.facing, sl.rows);
+  placed.set(sl.id, it);
+  return it;
+}
+
+const _q = { x: 0, z: 0, h: 0, k: 0 };
+
+/**
+ * Items that can stand in the box (chunk). Only slots whose nominal spot is
+ * within reach of it are placed, so a chunk never grows the network far
+ * ahead of where it is. `sMax`: along-track bound (the line's s at the box
+ * is ≤ ~1.45 × its edge distance).
+ */
+export function roadsideIn(
+  track: number,
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  sMin: number,
+  sMax: number,
+): RoadsideItem[] {
+  const t = mainLine(track);
+  if (t === undefined) return [];
+  const out: RoadsideItem[] = [];
+  const reach = NUDGE * TRIES + 40;
+  // Slots past what the line has grown can't be by this box: the network is
+  // always grown out past anything being built (never grow it from here)
+  const grown = t.done ? Infinity : t.s0 + (t.xs.length - 2) * TRACK_STEP;
+  for (const sl of roadsideSlots(track)) {
+    if (sl.s0 < sMin || sl.s0 > sMax || sl.s0 > grown) continue;
+    tracks.pointAt(t, sl.s0, _q);
+    if (_q.x < x0 - reach || _q.x > x1 + reach || _q.z < z0 - reach || _q.z > z1 + reach) continue;
+    const it = resolveSlot(sl);
+    if (it !== null && it.x >= x0 && it.x < x1 && it.z >= z0 && it.z < z1) out.push(it);
   }
-  for (let s = DIST_FIRST, n = 0; s <= want; s += DIST_STEP, n++) {
-    if (s <= from) continue;
-    const it = place(t, 'dist', n, s, -1, edge + 4, -1, q => distRows(track, q));
-    if (it !== null) add.push(it);
+  return out;
+}
+
+/** Every roadside item on main `track` with a nominal spot ≤ upTo (tests; grows the line). */
+export function roadsideItems(track: number, upTo: number): RoadsideItem[] {
+  const out: RoadsideItem[] = [];
+  for (const sl of roadsideSlots(track)) {
+    if (sl.s0 > upTo) continue;
+    const it = resolveSlot(sl);
+    if (it !== null) out.push(it);
   }
-  for (let s = BACK_FIRST, n = 0; s <= want; s += BACK_STEP, n++) {
-    if (s <= from) continue;
-    const it = place(t, 'back', n, s, 1, edge + 4, 1, q => backRows(track, q));
-    if (it !== null) add.push(it);
-  }
-  for (let s = BB_FIRST, n = 0; s <= want; s += BB_STEP, n++) {
-    if (s <= from) continue;
-    const side: 1 | -1 = n % 2 === 0 ? -1 : 1;
-    const design = BILLBOARDS[(n * 7 + track * 3) % BILLBOARDS.length]!;
-    const it = place(t, 'bb', n, s, side, 26, -1, () => [design]);
-    if (it !== null) add.push(it);
-  }
-  c.items = [...c.items, ...add].sort((a, b) => a.s - b.s);
-  c.upTo = want;
-  return c.items;
+  return out.sort((a, b) => a.s - b.s);
 }
 
 /** Signs are painted per 10 km segment of a line (one small atlas each, built when needed). */
@@ -256,9 +327,7 @@ export const SEGMENT = 10_000;
 
 export const segmentOf = (s: number) => Math.floor(s / SEGMENT);
 
-/** A segment's text signs (km / dist / back), for its atlas. */
-export function segmentItems(track: number, seg: number): RoadsideItem[] {
-  return roadsideItems(track, (seg + 1) * SEGMENT + NUDGE * TRIES).filter(
-    i => i.kind !== 'bb' && segmentOf(i.s) === seg,
-  );
+/** A segment's text signs (km / dist / back) by nominal spot, for its atlas (no placing). */
+export function segmentSlots(track: number, seg: number): RoadsideSlot[] {
+  return roadsideSlots(track).filter(sl => sl.kind !== 'bb' && segmentOf(sl.s0) === seg);
 }

@@ -38,7 +38,7 @@ import { SIDE_LOOKS } from './looks';
 import { stationFrame, type StationFrame } from './pads';
 import { SIDE_TOWNS, STATIONS, type SideTownId } from './places';
 import { ROAD_C, billboard } from './props';
-import { roadsideItems, segmentItems, segmentOf, type RoadsideItem } from './roadside';
+import { roadsideIn, segmentOf, segmentSlots, type RoadsideItem } from './roadside';
 import { roadsideSize, roadsideSpec, sharedSigns } from './signs';
 import { stationCtx, stationLook } from './stations';
 
@@ -274,15 +274,22 @@ function populate(ctx: ChunkContext): ChunkDecoration | null {
   // Roadside items standing in this chunk
   for (const track of [1, 2, 3]) {
     // Along-track s is at least the edge distance and, ≤ 45° off outward, at most ~1.45×
-    const items = roadsideItems(track, ed * 1.45 + 800).filter(
-      it => it.s > ed - 300 && inChunk(ctx, it.x, it.z),
+    const items = roadsideIn(
+      track,
+      ctx.origin.x,
+      ctx.origin.z,
+      ctx.origin.x + ctx.size,
+      ctx.origin.z + ctx.size,
+      ed - 400,
+      ed * 1.45 + 800,
     );
     for (const it of items) {
-      const key = it.kind === 'bb' ? 'shared' : `seg:${track}:${segmentOf(it.s)}`;
+      const seg = segmentOf(it.s0);
+      const key = it.kind === 'bb' ? 'shared' : `seg:${track}:${seg}`;
       const a =
         it.kind === 'bb'
           ? atlasFor('shared', sharedSigns, false)
-          : atlasFor(key, () => segmentItems(track, segmentOf(it.s)).map(roadsideSpec), true);
+          : atlasFor(key, () => segmentSlots(track, seg).map(roadsideSpec), true);
       let g = groups.find(q => q.atlasKey === key && q.b.f === WORLD);
       if (g === undefined) {
         g = { b: new TownBuilder(WORLD, ctx.origin, a.atlas), atlasKey: key };

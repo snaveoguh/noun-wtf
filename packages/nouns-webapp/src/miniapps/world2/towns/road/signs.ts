@@ -7,7 +7,7 @@
 //            when none do.
 // Side towns get their own atlas from their look (like the older towns).
 
-import type { RoadsideItem } from './roadside';
+import type { RoadsideItem, RoadsideSlot } from './roadside';
 
 import { BLOCK_FONT, type SignSpec } from '../kit';
 
@@ -16,13 +16,13 @@ import { stationSigns } from './stations';
 const HWY = { bg: '#1f6b3a', fg: '#ffffff' };
 
 /** Sign face size (m) for a roadside item. */
-export function roadsideSize(it: RoadsideItem): { w: number; h: number } {
+export function roadsideSize(it: Pick<RoadsideItem, 'kind' | 'rows'>): { w: number; h: number } {
   if (it.kind === 'km') return { w: 0.6, h: 0.95 };
   if (it.kind === 'bb') return { w: 12, h: 5 };
   return { w: 5.2, h: 0.6 + 0.62 * it.rows.length };
 }
 
-export function roadsideSpec(it: RoadsideItem): SignSpec {
+export function roadsideSpec(it: RoadsideItem | RoadsideSlot): SignSpec {
   const { w, h } = roadsideSize(it);
   if (it.kind === 'km')
     return {
