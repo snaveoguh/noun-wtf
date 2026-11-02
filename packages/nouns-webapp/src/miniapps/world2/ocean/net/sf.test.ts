@@ -10,7 +10,15 @@ describe('the sf pose key', () => {
   it('round-trips every phase and board', () => {
     for (const phase of WIRE_PHASES.slice(1)) {
       for (const board of [null, 'foamie', 'longboard', 'shortboard'] as const) {
-        const a: SurfAnim = { phase, board, lean: -0.42, crouch: 0.8, stroke: 7.5, sit: 0.3, t: 1.234 };
+        const a: SurfAnim = {
+          phase,
+          board,
+          lean: -0.42,
+          crouch: 0.8,
+          stroke: 7.5,
+          sit: 0.3,
+          t: 1.234,
+        };
         const b = decodeSf(JSON.parse(JSON.stringify(encodeSf(a))));
         expect(b).not.toBeNull();
         expect(b!.phase).toBe(phase);
@@ -23,13 +31,40 @@ describe('the sf pose key', () => {
   });
 
   it('ignores junk (older / other clients never crash it)', () => {
-    for (const v of [undefined, null, 3, 'x', [], [1, 2], [0, 1, 0, 0, 0, 0, 0], [99, 1, 0, 0, 0, 0, 0], ['a', 1, 0, 0, 0, 0, 0]])
+    for (const v of [
+      undefined,
+      null,
+      3,
+      'x',
+      [],
+      [1, 2],
+      [0, 1, 0, 0, 0, 0, 0],
+      [99, 1, 0, 0, 0, 0, 0],
+      ['a', 1, 0, 0, 0, 0, 0],
+    ])
       expect(decodeSf(v)).toBeNull();
     // clamps what it does take
-    expect(decodeSf([6, 9, 5, -2, 99, 3, 999])).toMatchObject({ phase: 'ride', board: 'shortboard', lean: 1, crouch: 0, sit: 1, t: 60 });
+    expect(decodeSf([6, 9, 5, -2, 99, 3, 999])).toMatchObject({
+      phase: 'ride',
+      board: 'shortboard',
+      lean: 1,
+      crouch: 0,
+      sit: 1,
+      t: 60,
+    });
   });
 
   it('wire order is append-only', () => {
-    expect(WIRE_PHASES.slice(0, 9)).toEqual(['off', 'wade', 'swim', 'paddle', 'duck', 'pop', 'ride', 'air', 'wipeout']);
+    expect(WIRE_PHASES.slice(0, 9)).toEqual([
+      'off',
+      'wade',
+      'swim',
+      'paddle',
+      'duck',
+      'pop',
+      'ride',
+      'air',
+      'wipeout',
+    ]);
   });
 });

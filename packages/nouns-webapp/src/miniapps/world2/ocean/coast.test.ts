@@ -101,7 +101,7 @@ describe('the coast off Puerto Noun', () => {
   it('stays inside the Lipschitz bound the ray marcher relies on', () => {
     let worst = 0;
     let seed = 7;
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const e = 0.5;
     for (let i = 0; i < 4000; i++) {
       // the beach, the arms, the far ring

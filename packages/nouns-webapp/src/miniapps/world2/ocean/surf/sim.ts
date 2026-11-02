@@ -375,7 +375,11 @@ function sub(s: WaterState, inp: WaterInput, q: SeaQuery, dt: number, ev: WaterE
 
 function bank(s: WaterState, ev: WaterEvent[]) {
   if (s.barrel > 0.35) {
-    ev.push({ type: 'trick', name: `Barrel ${s.barrel.toFixed(1)}s`, points: Math.round(400 * s.barrel) });
+    ev.push({
+      type: 'trick',
+      name: `Barrel ${s.barrel.toFixed(1)}s`,
+      points: Math.round(400 * s.barrel),
+    });
   }
   s.barrel = 0;
   if (s.scored > 0 || s.rideT > 2) ev.push({ type: 'bank' });
@@ -614,7 +618,8 @@ function boardStep(
     const dy = -steer * rate * dt * (s.phase === 'pop' ? 0.3 : 1);
     s.yaw += dy;
     s.lean += (steer - s.lean) * (1 - Math.exp(-8 * dt));
-    s.crouch += ((Math.abs(steer) > 0.3 || inp.duckHeld ? 1 : 0.3) - s.crouch) * (1 - Math.exp(-6 * dt));
+    s.crouch +=
+      ((Math.abs(steer) > 0.3 || inp.duckHeld ? 1 : 0.3) - s.crouch) * (1 - Math.exp(-6 * dt));
     if (s.phase === 'ride' && inp.moveY > 0.3 && Math.abs(along) > 0.08) {
       ax += hx * WATER.pump * inp.moveY;
       az += hz * WATER.pump * inp.moveY;
@@ -708,7 +713,14 @@ function boardStep(
 }
 
 /** Carves: bottom turns, cutbacks, snaps (scored when the turn ends). */
-function trackCarve(s: WaterState, dy: number, pm: number, sp: SeaPoint, ev: WaterEvent[], dt: number) {
+function trackCarve(
+  s: WaterState,
+  dy: number,
+  pm: number,
+  sp: SeaPoint,
+  ev: WaterEvent[],
+  dt: number,
+) {
   if (s.phase !== 'ride') return;
   const v = Math.hypot(s.vx, s.vz);
   const sameWay = s.carve === 0 || Math.sign(dy) === Math.sign(s.carve);
@@ -749,7 +761,14 @@ function trackCarve(s: WaterState, dy: number, pm: number, sp: SeaPoint, ev: Wat
   }
 }
 
-function airStep(s: WaterState, inp: WaterInput, q: SeaQuery, dt: number, spec: BoardSpec, ev: WaterEvent[]) {
+function airStep(
+  s: WaterState,
+  inp: WaterInput,
+  q: SeaQuery,
+  dt: number,
+  spec: BoardSpec,
+  ev: WaterEvent[],
+) {
   s.vy -= WATER.g * dt;
   s.x += s.vx * dt;
   s.z += s.vz * dt;

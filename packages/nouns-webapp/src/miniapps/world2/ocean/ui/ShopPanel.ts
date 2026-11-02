@@ -83,7 +83,10 @@ export class ShopPanel {
       const own = v.owned.includes(id);
       const sel = v.selected === id;
       const st = Object.entries(stats(id))
-        .map(([k, x]) => `<span>${k}</span><u style="width:${Math.round(18 + 82 * Math.max(0, Math.min(1, x)))}%"></u>`)
+        .map(
+          ([k, x]) =>
+            `<span>${k}</span><u style="width:${Math.round(18 + 82 * Math.max(0, Math.min(1, x)))}%"></u>`,
+        )
         .join('');
       const btn = own
         ? `<button type="button" data-pick="${id}" class="${sel ? '' : 'go'}" ${sel ? 'disabled' : ''}>${sel ? 'RIDING IT' : 'RIDE IT'}</button>`

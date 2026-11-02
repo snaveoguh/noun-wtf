@@ -138,7 +138,15 @@ describe('surfing', () => {
       const clock = { t: 40 };
       const q = testSea(clock);
       const s = lineup();
-      const ev = run(s, q, clock, 60, fps, surfer(clock), st => st.phase === 'ride' && st.rideT > 9);
+      const ev = run(
+        s,
+        q,
+        clock,
+        60,
+        fps,
+        surfer(clock),
+        st => st.phase === 'ride' && st.rideT > 9,
+      );
       expect(ev.some(e => e.type === 'catch')).toBe(true);
       expect(ev.some(e => e.type === 'pop')).toBe(true);
       expect(s.phase).toBe('ride');

@@ -45,7 +45,8 @@ export class SurfBot {
     const inp = blankInput();
     const p = q.at(s.x, s.z, this.sp);
     if (p === null) return inp;
-    const steerTo = (want: number, k = 2.2) => Math.max(-1, Math.min(1, -angleDiff(want, s.yaw) * k));
+    const steerTo = (want: number, k = 2.2) =>
+      Math.max(-1, Math.min(1, -angleDiff(want, s.yaw) * k));
     const shoreYaw = Math.atan2(p.sx, p.sz);
     if (s.phase === 'ride' || s.phase === 'pop' || s.phase === 'air') {
       this.going = false;

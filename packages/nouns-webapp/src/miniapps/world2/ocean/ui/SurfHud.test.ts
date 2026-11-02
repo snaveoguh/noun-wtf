@@ -20,8 +20,17 @@ const view = (o: Partial<SurfHudView> = {}): SurfHudView => ({
 describe('SurfHud', () => {
   it('keeps its parts through every update (the touch button never replaces the HUD)', () => {
     const parent = document.createElement('div');
-    const hud = new SurfHud(parent, () => {}, () => {});
-    for (const v of [view(), view({ button: 'pop', prompt: 'pop' }), view({ ride: true, kmh: 38, button: 'pop' }), view({ prompt: 'wipe', button: '' })]) {
+    const hud = new SurfHud(
+      parent,
+      () => {},
+      () => {},
+    );
+    for (const v of [
+      view(),
+      view({ button: 'pop', prompt: 'pop' }),
+      view({ ride: true, kmh: 38, button: 'pop' }),
+      view({ prompt: 'wipe', button: '' }),
+    ]) {
       hud.update(v);
       expect(hud.root.querySelector('.w2surf-hint')).not.toBeNull();
       expect(hud.root.querySelector('.w2surf-btn')).not.toBeNull();
@@ -39,7 +48,11 @@ describe('SurfHud', () => {
 
   it('shows the shop prompt on land', () => {
     const parent = document.createElement('div');
-    const hud = new SurfHud(parent, () => {}, () => {});
+    const hud = new SurfHud(
+      parent,
+      () => {},
+      () => {},
+    );
     hud.update(view({ on: false, shop: 'E · SURF SHOP' }));
     expect(hud.root.className).toContain('on');
     expect(hud.root.querySelector('.w2surf-shop')!.className).toContain('on');

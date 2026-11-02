@@ -37,7 +37,10 @@ export class SurfRig {
     if (!this.driver.ok) return;
     this.t += dt;
     const pose = surfPose(a, this.t);
-    this.ramp = Math.max(0, Math.min(1, this.ramp + (pose !== null ? dt / FADE_IN : -dt / FADE_OUT)));
+    this.ramp = Math.max(
+      0,
+      Math.min(1, this.ramp + (pose !== null ? dt / FADE_IN : -dt / FADE_OUT)),
+    );
     this.w = this.ramp * this.ramp * (3 - 2 * this.ramp);
     if (pose === null) {
       if (this.w < 0.01) {

@@ -8,14 +8,18 @@ import { surfPose } from './poses';
 describe('surf poses', () => {
   it('has a pose for every phase in the sea (the walk clip while wading)', () => {
     for (const phase of WIRE_PHASES) {
-      const p = surfPose({ phase, board: 'foamie', lean: 0.3, crouch: 0.5, stroke: 1, sit: 0, t: 0.2 }, 1);
+      const p = surfPose(
+        { phase, board: 'foamie', lean: 0.3, crouch: 0.5, stroke: 1, sit: 0, t: 0.2 },
+        1,
+      );
       if (phase === 'off' || phase === 'wade') expect(p).toBeNull();
       else expect(p).not.toBeNull();
     }
   });
 
   it('blends prone → stance through the pop', () => {
-    const at = (t: number) => surfPose({ phase: 'pop', board: 'shortboard', lean: 0, crouch: 0, stroke: 0, sit: 0, t }, 0)!;
+    const at = (t: number) =>
+      surfPose({ phase: 'pop', board: 'shortboard', lean: 0, crouch: 0, stroke: 0, sit: 0, t }, 0)!;
     const a = at(0);
     const b = at(10);
     expect(isMix(a) && isMix(b)).toBe(true);

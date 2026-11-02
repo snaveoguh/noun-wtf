@@ -18,7 +18,18 @@ import {
 
 const sw = (): Swell => ({ phi: 0, A: 0, k: 0, Dh: 0, ratio: 0, depth: 0 });
 const ss = (): SeaSample => ({
-  y: 0, d0: 0, a: 0, phi: 0, A: 0, k: 0, c: 0, depth: 0, ratio: 0, broken: 0, foam: 0, flow: 0,
+  y: 0,
+  d0: 0,
+  a: 0,
+  phi: 0,
+  A: 0,
+  k: 0,
+  c: 0,
+  depth: 0,
+  ratio: 0,
+  broken: 0,
+  foam: 0,
+  flow: 0,
 });
 
 /** Crest positions (rest d) along a line a = const at time t, outward from the shore. */
@@ -39,7 +50,8 @@ describe('the swell', () => {
     const c0 = crests(0, 100);
     const c1 = crests(0, 101);
     // the crest ~100 m out moved shoreward
-    const near = (cs: number[], d: number) => cs.reduce((b, x) => (Math.abs(x - d) < Math.abs(b - d) ? x : b));
+    const near = (cs: number[], d: number) =>
+      cs.reduce((b, x) => (Math.abs(x - d) < Math.abs(b - d) ? x : b));
     const a = near(c0, 100);
     const b = near(c1, a);
     expect(b).toBeLessThan(a);

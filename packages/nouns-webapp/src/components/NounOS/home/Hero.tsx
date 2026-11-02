@@ -28,6 +28,7 @@ export const GAME_ACCENT: Record<GameId, string> = {
   parkour: '#20d6ff',
   pool: '#2fe08a',
   drive: '#7fe9ff',
+  surf: '#2ec4b6',
 };
 
 export function GameTitle({ name, accent }: { name: string; accent: string }) {

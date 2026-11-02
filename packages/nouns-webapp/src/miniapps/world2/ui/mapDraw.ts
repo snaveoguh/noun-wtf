@@ -511,7 +511,11 @@ export function drawMap(
     if (!off || o.full || o.edgeMarkers) {
       if (off) p = edge(p, 14);
       pin(ctx, p.x, p.y, C.surf, '🏄');
-      if (o.full) label(ctx, off ? 'SURF BREAK 🏄' : 'SURF BREAK', p.x, p.y - 22, { size: 11, color: C.surf });
+      if (o.full)
+        label(ctx, off ? 'SURF BREAK 🏄' : 'SURF BREAK', p.x, p.y - 22, {
+          size: 11,
+          color: C.surf,
+        });
     }
   }
 

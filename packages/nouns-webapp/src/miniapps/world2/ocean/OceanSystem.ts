@@ -29,7 +29,14 @@ import { SEA_FRONT } from '../towns/beach';
 import { terrainHeight } from '../world/mountain/terrain';
 
 import { SeaSound } from './audio';
-import { COAST, coastAt, coastFrame, coastFrameNow, type CoastFrame, type CoastPoint } from './coast';
+import {
+  COAST,
+  coastAt,
+  coastFrame,
+  coastFrameNow,
+  type CoastFrame,
+  type CoastPoint,
+} from './coast';
 import { decodeSf, encodeSf, NO_SURF, type SurfAnim } from './net/sf';
 import { OceanLife, placeBoard } from './OceanLife';
 import { OCEAN_HIGH, OCEAN_LOW, OceanSurface } from './OceanSurface';
@@ -61,7 +68,8 @@ const HINTS = {
   keyboard: {
     wade: '<b>WASD</b> wade in · deeper and you swim',
     swim: '<b>WASD</b> swim · <b>SHIFT</b> faster · <b>Q</b> dive under',
-    paddle: '<b>W</b> paddle · <b>A/D</b> turn · <b>S</b> sit up · <b>Q</b> duck dive · <b>SHIFT</b> sprint',
+    paddle:
+      '<b>W</b> paddle · <b>A/D</b> turn · <b>S</b> sit up · <b>Q</b> duck dive · <b>SHIFT</b> sprint',
     catch: '<b>W</b> keep paddling! · <b>SPACE</b> pop up',
     ride: '<b>A/D</b> carve · <b>W</b> pump · <b>S</b> stall · <b>SPACE</b> air off the lip',
     air: '<b>A/D</b> spin · <b>Q</b> grab · land it straight',
@@ -322,7 +330,15 @@ export class OceanSystem {
     this.anim =
       s.phase === 'off'
         ? NO_SURF
-        : { phase: s.phase, board: s.board, lean: s.lean, crouch: s.crouch, stroke: s.stroke, sit: s.sit, t: s.t };
+        : {
+            phase: s.phase,
+            board: s.board,
+            lean: s.lean,
+            crouch: s.crouch,
+            stroke: s.stroke,
+            sit: s.sit,
+            t: s.t,
+          };
 
     // the rider + their board
     const me = g.me;
@@ -334,7 +350,8 @@ export class OceanSystem {
         me.board.visible = false;
       }
       this.rig.update(dt, this.anim);
-      const showBoard = s.phase !== 'off' && s.board !== null && s.phase !== 'swim' && s.phase !== 'wipeout';
+      const showBoard =
+        s.phase !== 'off' && s.board !== null && s.phase !== 'swim' && s.phase !== 'wipeout';
       if (showBoard && this.boardMesh === null)
         this.boardMesh = new Surfboard(g.gfx.scene, s.board!, g.gfx.toon);
       if (this.boardMesh !== null) {
@@ -395,6 +412,11 @@ export class OceanSystem {
     );
 
     // life on the water
+    if (g.missions.ud.active) {
+      if (this.life !== null) this.life.group.visible = false;
+      this.updateHud(dt);
+      return;
+    }
     if (this.life === null && this.dCam > -1100 && g.assets) {
       this.life = new OceanLife(g, c);
       g.gfx.scene.add(this.life.group);
@@ -413,7 +435,11 @@ export class OceanSystem {
 
   private updateSurface(c: CoastFrame, dt: number) {
     const g = this.game;
-    const want = this.dCam > SURFACE_AT && g.gfx.camera.position.y < c.sea + 900;
+    // (not in the Big Drop's dimension, nor from a room 4 km up)
+    const above = g.gfx.camera.position.y > c.sea + 900;
+    const want = this.dCam > SURFACE_AT && !above && !g.missions.ud.active;
+    if (this.surface !== null && !this.warming)
+      this.surface.mesh.visible = !above && !g.missions.ud.active;
     if (want && this.surface === null && !this.warming) {
       const low = g.gfx.quality === 'low';
       const surf = new OceanSurface(c, low ? OCEAN_LOW : OCEAN_HIGH);
@@ -422,7 +448,9 @@ export class OceanSystem {
       surf.update(g.gfx.camera.position.x, g.gfx.camera.position.z, this.t);
       // link it hidden, then show (no first-sight hitch)
       this.warming = true;
-      void warmHidden(g.gfx.renderer, surf.mesh, g.gfx.camera, g.gfx.scene, fn => g.gfx.asDrawn(fn)).then(() => {
+      void warmHidden(g.gfx.renderer, surf.mesh, g.gfx.camera, g.gfx.scene, fn =>
+        g.gfx.asDrawn(fn),
+      ).then(() => {
         this.warming = false;
       });
     }
@@ -542,7 +570,12 @@ export class OceanSystem {
             : ph === 'paddle' || ph === 'swim'
               ? 'duck'
               : '',
-      shop: this.nearShop && ph === 'off' && this.shop === null ? (this.mode === 'touch' ? 'SURF SHOP' : 'E · SURF SHOP') : '',
+      shop:
+        this.nearShop && ph === 'off' && this.shop === null
+          ? this.mode === 'touch'
+            ? 'SURF SHOP'
+            : 'E · SURF SHOP'
+          : '',
     });
   }
 
@@ -574,7 +607,8 @@ export class OceanSystem {
   private onKey = (e: KeyboardEvent) => {
     if (e.code !== 'KeyE' && e.code !== 'Escape') return;
     const el = e.target as HTMLElement | null;
-    if (el !== null && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
+    if (el !== null && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable))
+      return;
     if (this.game.paused) return;
     if (e.code === 'Escape') {
       if (this.shop === null) return;
@@ -709,9 +743,13 @@ export class OceanSystem {
     _v.set(0, 0, 1).applyQuaternion(ch.root.quaternion);
     st.yaw = Math.atan2(_v.x, _v.z);
     const show =
-      anim.phase !== 'off' && anim.board !== null && anim.phase !== 'swim' && anim.phase !== 'wipeout';
+      anim.phase !== 'off' &&
+      anim.board !== null &&
+      anim.phase !== 'swim' &&
+      anim.phase !== 'wipeout';
     if (show) ch.board.visible = false;
-    if (show && r.board === null) r.board = new Surfboard(this.game.gfx.scene, anim.board!, this.game.gfx.toon);
+    if (show && r.board === null)
+      r.board = new Surfboard(this.game.gfx.scene, anim.board!, this.game.gfx.toon);
     if (r.board !== null) {
       r.board.mesh.visible = show && ch.root.visible;
       if (show) {

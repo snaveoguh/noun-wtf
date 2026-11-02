@@ -58,7 +58,7 @@ export const BOARDS: Record<BoardId, BoardSpec> = {
   longboard: {
     id: 'longboard',
     name: 'LONGBOARD',
-    blurb: "9'6\" log. Paddles fastest, glides forever, turns slow.",
+    blurb: '9\'6" log. Paddles fastest, glides forever, turns slow.',
     price: 250,
     paddle: 3.0,
     sprint: 3.7,
@@ -76,7 +76,7 @@ export const BOARDS: Record<BoardId, BoardSpec> = {
   shortboard: {
     id: 'shortboard',
     name: 'SHORTBOARD',
-    blurb: "6'0\" thruster. Hard to catch, carves on a dime, flies.",
+    blurb: '6\'0" thruster. Hard to catch, carves on a dime, flies.',
     price: 600,
     paddle: 2.3,
     sprint: 2.9,

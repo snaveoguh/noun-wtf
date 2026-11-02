@@ -165,7 +165,9 @@ export class OceanLife {
       this.boatSpots.push({ x: w.x, z: w.z, yaw });
     }
     const boatCols = [0xff6f61, 0xffd23f, 0x7ac74f];
-    boatCols.forEach((col, i) => this.boats.setColorAt(i, new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.35)));
+    boatCols.forEach((col, i) =>
+      this.boats.setColorAt(i, new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.35)),
+    );
     const gmat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
     gmat.name = 'Gulls';
     this.gulls = new THREE.InstancedMesh(gullGeometry(), gmat, 16);
@@ -213,7 +215,8 @@ export class OceanLife {
     this.group.visible = on;
     if (!on) {
       for (const l of this.locals) if (l.ch !== null) l.ch.root.visible = false;
-      if (this.locals.some(l => l.board !== null)) for (const l of this.locals) if (l.board) l.board.mesh.visible = false;
+      if (this.locals.some(l => l.board !== null))
+        for (const l of this.locals) if (l.board) l.board.mesh.visible = false;
       return;
     }
     this.floatBuoys(t);
@@ -293,7 +296,15 @@ export class OceanLife {
       if (l.board !== null) l.board.mesh.visible = show && l.s.phase !== 'swim';
       if (!show) continue;
       const s = l.s;
-      l.anim = { phase: s.phase, board: s.board, lean: s.lean, crouch: s.crouch, stroke: s.stroke, sit: s.sit, t: s.t };
+      l.anim = {
+        phase: s.phase,
+        board: s.board,
+        lean: s.lean,
+        crouch: s.crouch,
+        stroke: s.stroke,
+        sit: s.sit,
+        t: s.t,
+      };
       ch.root.position.set(s.x, s.y, s.z);
       ch.root.quaternion.setFromAxisAngle(_up, s.yaw);
       ch.play({ clip: 'idle', fade: 0.3 });
@@ -306,7 +317,10 @@ export class OceanLife {
   private build(l: Local) {
     const g = this.game;
     const im = ImageData.images as Record<string, { filename: string }[]>;
-    const head = Math.max(0, im.heads!.findIndex(x => x.filename === l.head));
+    const head = Math.max(
+      0,
+      im.heads!.findIndex(x => x.filename === l.head),
+    );
     const r = (n: number, k: number) => (l.seed * (k + 1) * 2654435761) % n;
     const ch = new NounCharacter(
       {
@@ -353,7 +367,9 @@ export function placeBoard(mesh: THREE.Object3D, s: WaterState, q: SeaQuery, tmp
     const rx = -Math.cos(yaw);
     const rz = Math.sin(yaw);
     mesh.position.set(s.x + rx * 0.5, s.y + 0.85, s.z + rz * 0.5);
-    mesh.quaternion.setFromAxisAngle(_up, yaw).multiply(_q2.setFromAxisAngle(_n.set(0, 0, 1), Math.PI / 2));
+    mesh.quaternion
+      .setFromAxisAngle(_up, yaw)
+      .multiply(_q2.setFromAxisAngle(_n.set(0, 0, 1), Math.PI / 2));
     return;
   }
   const sea = q.at(s.x, s.z, tmp);

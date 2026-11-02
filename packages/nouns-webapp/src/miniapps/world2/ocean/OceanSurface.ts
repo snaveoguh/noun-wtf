@@ -175,8 +175,18 @@ export interface OceanSurfaceOpts {
   swellFade: number;
 }
 
-export const OCEAN_HIGH: OceanSurfaceOpts = { rings: 110, segments: 128, radius: 3000, swellFade: 380 };
-export const OCEAN_LOW: OceanSurfaceOpts = { rings: 78, segments: 88, radius: 2400, swellFade: 260 };
+export const OCEAN_HIGH: OceanSurfaceOpts = {
+  rings: 110,
+  segments: 128,
+  radius: 3000,
+  swellFade: 380,
+};
+export const OCEAN_LOW: OceanSurfaceOpts = {
+  rings: 78,
+  segments: 88,
+  radius: 2400,
+  swellFade: 260,
+};
 
 /** The polar grid: centre vertex + rings (r0 · q^i), CCW from above. */
 export function polarGrid(o: OceanSurfaceOpts): THREE.BufferGeometry {
@@ -247,13 +257,19 @@ export class OceanSurface {
     mat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, u);
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', `#include <common>\n${VERT_PARS}\nfloat uv0a(vec2 L) { return c_uv(L).x - uCoast.y; }`)
+        .replace(
+          '#include <common>',
+          `#include <common>\n${VERT_PARS}\nfloat uv0a(vec2 L) { return c_uv(L).x - uCoast.y; }`,
+        )
         .replace('#include <beginnormal_vertex>', VERT_MAIN)
         .replace('#include <begin_vertex>', 'vec3 transformed = wPos;');
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>\n${FRAG_PARS}`)
         .replace('#include <color_fragment>', `#include <color_fragment>\n${FRAG_COLOR}`)
-        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${FRAG_NORMAL}`);
+        .replace(
+          '#include <normal_fragment_maps>',
+          `#include <normal_fragment_maps>\n${FRAG_NORMAL}`,
+        );
     };
     mat.customProgramCacheKey = () => 'ocean-v1';
     const mesh = new THREE.Mesh(polarGrid(opts), mat);

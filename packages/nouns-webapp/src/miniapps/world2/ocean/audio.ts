@@ -65,7 +65,8 @@ export class SeaSound {
       this.roar.g.gain.setTargetAtTime(near * (0.12 + 0.3 * swell), t, 0.35);
       this.roar.f.frequency.setTargetAtTime(380 + 600 * swell, t, 0.4);
     }
-    if (this.hiss !== null) this.hiss.g.gain.setTargetAtTime(near * (0.025 + 0.12 * rush + 0.05 * swell), t, 0.15);
+    if (this.hiss !== null)
+      this.hiss.g.gain.setTargetAtTime(near * (0.025 + 0.12 * rush + 0.05 * swell), t, 0.15);
     // gulls
     this.gullIn -= dt;
     if (this.gullIn <= 0) {

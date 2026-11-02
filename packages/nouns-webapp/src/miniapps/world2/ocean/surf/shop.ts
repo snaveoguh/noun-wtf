@@ -54,7 +54,10 @@ export function saveBoard(id: BoardId | null) {
 }
 
 /** Buy a board at the shop. */
-export async function buyBoard(game: object, id: BoardId): Promise<{ ok: boolean; reason?: string }> {
+export async function buyBoard(
+  game: object,
+  id: BoardId,
+): Promise<{ ok: boolean; reason?: string }> {
   if (id === 'foamie') return { ok: true };
   if (ownsBoard(game, id)) return { ok: true };
   const t = tradeOf(game);

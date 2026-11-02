@@ -57,7 +57,8 @@ export function stance(lean: number, crouch: number, t: number, grab = 0): PoseS
   const lead = fk(V(1, 0.15 + sway, 0.35), V(1, 0.05, 0.5));
   const back = fk(V(1, -0.25 - sway, -0.1), V(0.9, -0.35, 0.25));
   const reach = fk(V(0.2, -0.95, 0.25), V(0.1, -0.95, 0.3));
-  const backArm = grab > 0 ? fk(back.a.clone().lerp(reach.a, grab), back.b.clone().lerp(reach.b, grab)) : back;
+  const backArm =
+    grab > 0 ? fk(back.a.clone().lerp(reach.a, grab), back.b.clone().lerp(reach.b, grab)) : back;
   s.arms = [lead, { a: mx(backArm.a), b: mx(backArm.b) }];
   // feet planted on the deck: left over the front, right over the tail
   s.legs = [
@@ -92,7 +93,10 @@ export function prone(stroke: number, duck: number, board: SurfAnim['board']): P
     s.arms = [l, { a: mx(r.a), b: mx(r.b) }];
   }
   const kick = Math.sin(stroke * 2) * 0.08;
-  s.legs = [fk(V(0.12, -1, 0.05 + kick), V(0.1, -1, 0.2)), fk(V(-0.12, -1, 0.05 - kick), V(-0.1, -1, 0.2))];
+  s.legs = [
+    fk(V(0.12, -1, 0.05 + kick), V(0.1, -1, 0.2)),
+    fk(V(-0.12, -1, 0.05 - kick), V(-0.1, -1, 0.2)),
+  ];
   s.feet = [null, null];
   return s;
 }
@@ -107,7 +111,10 @@ export function sit(t: number): PoseSpec {
   s.neck.set(-0.12 + Math.sin(t * 0.7) * 0.05, Math.sin(t * 0.4) * 0.35, 0);
   s.arms = pair(fk(V(0.45, -0.85, 0.35), V(0.15, -0.6, 0.75)));
   const sw = Math.sin(t * 1.3) * 0.12;
-  s.legs = [fk(V(0.75, -0.35, 0.55), V(0.25, -1, 0.1 + sw)), fk(V(-0.75, -0.35, 0.55), V(-0.25, -1, 0.1 - sw))];
+  s.legs = [
+    fk(V(0.75, -0.35, 0.55), V(0.25, -1, 0.1 + sw)),
+    fk(V(-0.75, -0.35, 0.55), V(-0.25, -1, 0.1 - sw)),
+  ];
   s.feet = [null, null];
   return s;
 }
@@ -130,7 +137,10 @@ export function swim(stroke: number, moving: number): PoseSpec {
   const r = moving > 0.3 ? arm(stroke + Math.PI) : scull;
   s.arms = [l, { a: mx(r.a), b: mx(r.b) }];
   const kick = Math.sin(stroke * 3) * 0.25;
-  s.legs = [fk(V(0.12, -1, 0.05 + kick), V(0.1, -1, 0.1)), fk(V(-0.12, -1, 0.05 - kick), V(-0.1, -1, 0.1))];
+  s.legs = [
+    fk(V(0.12, -1, 0.05 + kick), V(0.1, -1, 0.1)),
+    fk(V(-0.12, -1, 0.05 - kick), V(-0.1, -1, 0.1)),
+  ];
   s.feet = [null, null];
   return s;
 }
@@ -146,7 +156,10 @@ export function tumble(t: number): PoseSpec {
   s.neck.set(0.3, 0, 0);
   const f = Math.sin(t * 9) * 0.4;
   s.arms = [fk(V(1, 0.6 + f, 0.2), V(0.8, 0.9, -0.3)), fk(V(-1, -0.2 - f, 0.4), V(-0.6, 0.6, 0.6))];
-  s.legs = [fk(V(0.6, -0.6, 0.5 + f), V(0.3, -0.8, -0.4)), fk(V(-0.3, -0.9, -0.5 - f), V(-0.5, -0.4, 0.6))];
+  s.legs = [
+    fk(V(0.6, -0.6, 0.5 + f), V(0.3, -0.8, -0.4)),
+    fk(V(-0.3, -0.9, -0.5 - f), V(-0.5, -0.4, 0.6)),
+  ];
   s.feet = [null, null];
   return s;
 }

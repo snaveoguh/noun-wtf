@@ -508,15 +508,21 @@ function boardwalk(b: TownBuilder) {
   b.add(boxAt(-w / 2, w / 2, deck - 0.14, deck, 0, u1 - u0), C.wood, m, { collide: true });
   // planks: darker seams every 1.2 m
   for (let z = 0.6; z < u1 - u0; z += 1.2)
-    b.add(boxAt(-w / 2, w / 2, deck, deck + 0.004, z - 0.03, z + 0.03), C.woodDark, m, { bucket: 'thin' });
+    b.add(boxAt(-w / 2, w / 2, deck, deck + 0.004, z - 0.03, z + 0.03), C.woodDark, m, {
+      bucket: 'thin',
+    });
   // posts down into the sand
   for (let z = 0; z <= u1 - u0; z += 4)
     for (const x of [-w / 2 + 0.15, w / 2 - 0.15])
       b.add(boxAt(x - 0.1, x + 0.1, -2.4, deck - 0.14, z - 0.1, z + 0.1), C.woodDark, m);
   // a rail on the sea side
-  b.add(boxAt(w / 2 - 0.08, w / 2, deck + 0.95, deck + 1.05, 0, u1 - u0), C.white, m, { bucket: 'thin' });
+  b.add(boxAt(w / 2 - 0.08, w / 2, deck + 0.95, deck + 1.05, 0, u1 - u0), C.white, m, {
+    bucket: 'thin',
+  });
   for (let z = 0; z <= u1 - u0; z += 3)
-    b.add(boxAt(w / 2 - 0.07, w / 2 - 0.01, deck, deck + 0.95, z - 0.03, z + 0.03), C.white, m, { bucket: 'thin' });
+    b.add(boxAt(w / 2 - 0.07, w / 2 - 0.01, deck, deck + 0.95, z - 0.03, z + 0.03), C.white, m, {
+      bucket: 'thin',
+    });
   // ramps down onto the rim at both ends
   for (const [u, dir] of [
     [u0, -1],
@@ -564,10 +570,14 @@ function lagoonBridge(b: TownBuilder) {
   for (let z = 6; z < len; z += 5)
     for (const x of [-half + 0.12, half - 0.12]) {
       b.add(cyl(0.12, 0.12, 2.6, 6, x, deck - 1.4, z), C.woodDark, m);
-      b.add(boxAt(x - 0.04, x + 0.04, deck, deck + 0.9, z - 0.04, z + 0.04), C.woodDark, m, { bucket: 'thin' });
+      b.add(boxAt(x - 0.04, x + 0.04, deck, deck + 0.9, z - 0.04, z + 0.04), C.woodDark, m, {
+        bucket: 'thin',
+      });
     }
   for (const x of [-half + 0.12, half - 0.12])
-    b.add(boxAt(x - 0.04, x + 0.04, deck + 0.86, deck + 0.94, 4, len), C.white, m, { bucket: 'thin' });
+    b.add(boxAt(x - 0.04, x + 0.04, deck + 0.86, deck + 0.94, 4, len), C.white, m, {
+      bucket: 'thin',
+    });
 }
 
 /** A hut on stilts out over the sand, facing the boardwalk (−v'). */
@@ -606,7 +616,9 @@ function stiltHut(
     for (const x of [-w / 2 + 0.25, w / 2 - 0.25])
       for (const z of [z0 + 0.25, z1 - 0.25])
         b.add(cyl(0.11, 0.13, h, 6, x, deck + h / 2, z), C.trunk, m, { collide: true });
-    b.add(boxAt(-w / 2 + 0.8, w / 2 - 0.8, deck, deck + 1.1, -0.4, 0.2), C.wood, m, { collide: true });
+    b.add(boxAt(-w / 2 + 0.8, w / 2 - 0.8, deck, deck + 1.1, -0.4, 0.2), C.wood, m, {
+      collide: true,
+    });
     b.add(boxAt(-w / 2 + 0.7, w / 2 - 0.7, deck + 1.1, deck + 1.18, -0.5, 0.35), C.woodDark, m);
     for (let x = -w / 2 + 1.3; x < w / 2 - 1; x += 1.1) {
       b.add(cyl(0.2, 0.2, 0.08, 8, x, deck + 0.75, 0.9), C.coral, m);
@@ -614,7 +626,11 @@ function stiltHut(
     }
     // bottles on a shelf at the back
     for (let x = -w / 2 + 1; x < w / 2 - 1; x += 0.35)
-      b.add(cyl(0.05, 0.05, 0.28, 5, x, deck + 1.32, -1.2), (x * 7) % 2 > 1 ? C.lime : C.turquoise, m);
+      b.add(
+        cyl(0.05, 0.05, 0.28, 5, x, deck + 1.32, -1.2),
+        (x * 7) % 2 > 1 ? C.lime : C.turquoise,
+        m,
+      );
     b.add(boxAt(-w / 2 + 0.8, w / 2 - 0.8, deck + 1.16, deck + 1.2, -1.35, -1.05), C.woodDark, m);
   }
   // thatch / tin roof overhanging the front
@@ -645,11 +661,23 @@ function surfShop(b: TownBuilder) {
   const cols = [C.coral, C.yellow, 0x5ec8f2, C.pink, C.white, C.lime, 0xf4ead2];
   cols.forEach((c, i) => {
     const x = -4.2 + i * 0.32;
-    b.add(box(0.5, 2.5, 0.07).rotateX(0.12).translate(x, deck + 1.25, 3.9), c, m);
+    b.add(
+      box(0.5, 2.5, 0.07)
+        .rotateX(0.12)
+        .translate(x, deck + 1.25, 3.9),
+      c,
+      m,
+    );
   });
   for (let i = 0; i < 6; i++) {
     const x = 2.2 + (i % 3) * 0.55;
-    b.add(box(0.48, 2.2, 0.07).rotateX(-0.1).translate(x, deck + 1.1, -3.1 + Math.floor(i / 3) * 0.12), cols[(i + 2) % cols.length], m);
+    b.add(
+      box(0.48, 2.2, 0.07)
+        .rotateX(-0.1)
+        .translate(x, deck + 1.1, -3.1 + Math.floor(i / 3) * 0.12),
+      cols[(i + 2) % cols.length],
+      m,
+    );
   }
   // wax + a counter
   b.add(boxAt(-2, 1.2, deck, deck + 1.05, 1.2, 1.8), C.wood, m, { collide: true });

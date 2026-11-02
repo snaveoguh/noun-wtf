@@ -277,7 +277,7 @@ export const GAMES: Game[] = [
     card: '/home/covers/surf.webp',
     focus: '50% 50%',
     teaser:
-      "Paddle out from Puerto Noun, the beach town 25 km down the mountain. Duck the whitewater, catch a set wave, pop up and ride it down the line: carves, cutbacks, airs off the lip, and a wipeout when the lip lands on you.",
+      'Paddle out from Puerto Noun, the beach town 25 km down the mountain. Duck the whitewater, catch a set wave, pop up and ride it down the line: carves, cutbacks, airs off the lip, and a wipeout when the lip lands on you.',
     tagline: 'PADDLE · DROP · SHRED',
     facts: [
       'Foamie, longboard or shortboard',

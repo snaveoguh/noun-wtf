@@ -52,7 +52,10 @@ export function boardGeometry(id: BoardId): THREE.BufferGeometry {
     const z = pos.getZ(i);
     const x = pos.getX(i);
     const k = (2 * z) / L;
-    pos.setY(i, pos.getY(i) + 0.09 * Math.pow(Math.max(0, k), 3) + 0.04 * Math.pow(Math.max(0, -k), 3));
+    pos.setY(
+      i,
+      pos.getY(i) + 0.09 * Math.pow(Math.max(0, k), 3) + 0.04 * Math.pow(Math.max(0, -k), 3),
+    );
     const top = pos.getY(i) > 0;
     const c = top && Math.abs(x) < W * 0.07 ? stripe : top ? deck : bottom;
     c.toArray(col, i * 3);
