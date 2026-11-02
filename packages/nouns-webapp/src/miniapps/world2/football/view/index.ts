@@ -97,7 +97,17 @@ export interface FootballViewDeps {
   reduceMotion?: boolean;
   /** dispose() frees the stadium too (default true). */
   ownStadium?: boolean;
+  /**
+   * The ink outline effect (Graphics.outline). Its depth edges turn a
+   * 40–90 m away Noun's voxel head into a black blob, so while the view
+   * drives the camera the ink fades out by ~INK_FADE[1] m (uniforms only,
+   * restored on dispose); close-ups keep their outlines.
+   */
+  ink?: { uniforms: Map<string, THREE.Uniform> } | null;
 }
+
+/** Ink fade (start, end m) during a match. */
+export const INK_FADE: [number, number] = [16, 52];
 
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
@@ -171,6 +181,7 @@ export class FootballView implements FootballViewApi {
   private viewProj = new THREE.Matrix4();
   private haveCam = false;
   private disposed = false;
+  private inkWas: [number, number] | null = null;
   private warmed = false;
   private live = false;
 
@@ -190,7 +201,7 @@ export class FootballView implements FootballViewApi {
     this.root.add(this.ball.group);
     inkExcluded.add(this.ball.shadow);
     inkExcluded.add(this.ball.trail);
-    this.cam = new FootballCamera(PITCH_11, deps.stand ?? -1);
+    this.cam = new FootballCamera(PITCH_11, deps.stand ?? this.sunSide());
     this.cam.reduceMotion = deps.reduceMotion === true;
     this.audio = new FootballAudio(deps.audio ?? (() => null), deps.audioOut ?? (() => null));
     this.hud = new HudStore(this.initialHud());
@@ -209,6 +220,24 @@ export class FootballView implements FootballViewApi {
       this.root.add(this.blobs);
       inkExcluded.add(this.blobs);
     }
+  }
+
+  /**
+   * The touchline on the sun's side (like hoops): the broadcast camera
+   * then sees lit faces, not backlit silhouettes. Used when no stand is given.
+   */
+  private sunSide(): -1 | 1 {
+    let sun: THREE.DirectionalLight | null = null;
+    this.deps.scene.traverse(x => {
+      const l = x as THREE.DirectionalLight;
+      if (sun === null && l.isDirectionalLight === true && l.castShadow) sun = l;
+    });
+    if (sun === null) return -1;
+    const l = sun as THREE.DirectionalLight;
+    const d = _v.subVectors(l.position, l.target.position);
+    this.root.updateMatrixWorld(true);
+    d.transformDirection(_m.copy(this.root.matrixWorld).invert());
+    return d.x >= 0 ? 1 : -1;
   }
 
   private initialHud(): FootballHudState {
@@ -498,7 +527,7 @@ export class FootballView implements FootballViewApi {
     const { main, extra } = formatClock(s.clock, s.period);
     const end = periodEnd(s.period);
     const local = this.local !== null ? s.players.find(p => p.human === this.local) : undefined;
-    const now = performance.now();
+    const now = this.time * 1000;
     const banners = this.hud.state.banners.filter(b => now - b.at < b.ms);
     const hint =
       s.phase === 'restart' || s.phase === 'kickoff' || s.phase === 'shootout'
@@ -543,7 +572,7 @@ export class FootballView implements FootballViewApi {
       text,
       sub,
       team,
-      at: performance.now(),
+      at: this.time * 1000,
       ms: BANNER_MS[kind],
     };
     const keep = this.hud.state.banners
@@ -662,7 +691,12 @@ export class FootballView implements FootballViewApi {
       }
     }
     // A new half / restart after the goal phase: forget the pending replay
-    if (state.phase === 'live' && this.replayAt >= 0) this.replayAt = -1;
+    if (
+      state.phase === 'live' &&
+      this.replayAt >= 0 &&
+      this.time > this.replayAt - REPLAY_DELAY + 1.5
+    )
+      this.replayAt = -1;
   }
 
   // ── camera ────────────────────────────────────────────────────────────
@@ -694,13 +728,32 @@ export class FootballView implements FootballViewApi {
       cam.aspect = aspect;
       cam.updateProjectionMatrix();
     }
+    this.observe(cam);
+    this.updateTag(cam, s, w, h);
+  }
+
+  /**
+   * Take the LOD eye + frustum from a camera something else drives (camera()
+   * does this itself; a mode with its own camera calls this instead).
+   */
+  observe(cam: THREE.PerspectiveCamera) {
     cam.updateMatrixWorld();
     this.root.updateMatrixWorld();
     // The eye in pitch space (LOD, trail), the view-projection (frustum)
     this.eye.copy(cam.position).applyMatrix4(_m.copy(this.root.matrixWorld).invert());
     this.viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     this.haveCam = true;
-    this.updateTag(cam, s, w, h);
+    this.fadeInk();
+  }
+
+  private fadeInk() {
+    const u = this.deps.ink?.uniforms;
+    const a = u?.get('fadeStart');
+    const b = u?.get('fadeEnd');
+    if (a === undefined || b === undefined) return;
+    if (this.inkWas === null) this.inkWas = [a.value as number, b.value as number];
+    a.value = INK_FADE[0];
+    b.value = INK_FADE[1];
   }
 
   private localPlayer(s: SimState): PlayerState | undefined {
@@ -717,8 +770,11 @@ export class FootballView implements FootballViewApi {
       return;
     }
     _v.set(0, 2.5, 0).add(fb.root.position);
-    _v.applyMatrix4(this.root.matrixWorld).project(cam);
-    if (_v.z > 1 || Math.abs(_v.x) > 1.2 || Math.abs(_v.y) > 1.2) {
+    _v.applyMatrix4(this.root.matrixWorld);
+    // Behind the camera: projection would mirror it onto the screen
+    const behind = _w.copy(_v).applyMatrix4(cam.matrixWorldInverse).z > -0.2;
+    _v.project(cam);
+    if (behind || Math.abs(_v.x) > 1.2 || Math.abs(_v.y) > 1.2) {
       tag.visible = false;
       return;
     }
@@ -771,6 +827,13 @@ export class FootballView implements FootballViewApi {
     }
     this.bank.dispose();
     this.audio.dispose();
+    const u = this.deps.ink?.uniforms;
+    if (this.inkWas !== null && u !== undefined) {
+      const a = u.get('fadeStart');
+      const b = u.get('fadeEnd');
+      if (a !== undefined) a.value = this.inkWas[0];
+      if (b !== undefined) b.value = this.inkWas[1];
+    }
     this.root.removeFromParent();
     if (this.deps.ownStadium !== false) this.deps.stadium.dispose();
     void this.live;

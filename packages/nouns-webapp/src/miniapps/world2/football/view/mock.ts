@@ -541,7 +541,9 @@ export function createMockMatch(): MockMatch {
 /** One footballer per Action on a grid (pitch-local), animated by time: the contact sheet. */
 export function createPoseSheet(
   cols = 7,
-  gap = 3.2,
+  gap = 4.2,
+  /** Which touchline the camera watches from (they face it, turned a little). */
+  stand: -1 | 1 = -1,
 ): { config: MatchConfig; state(time: number): SimState } {
   const actions = ALL_ACTIONS;
   const config = mockConfig();
@@ -566,16 +568,16 @@ export function createPoseSheet(
         return {
           id: fs[i].id,
           team: fs[i].team,
-          x: (c - (cols - 1) / 2) * -gap,
+          x: (r - (rows - 1) / 2) * gap,
           y:
             a === 'gk_dive'
               ? Math.max(0, Math.sin(Math.PI * Math.min(1, ((time / cyc) % 1) * 1.4)) * 0.6)
               : 0,
-          z: ((rows - 1) / 2 - r) * gap,
+          z: (c - (cols - 1) / 2) * gap,
           // Moving ones "run" on the spot: velocity without travel
           vx: 0,
           vz: speed,
-          yaw: -Math.PI / 2 - 0.5,
+          yaw: stand < 0 ? -Math.PI / 2 + 0.35 : Math.PI / 2 + 0.35,
           action: a,
           actionT: (time / cyc) % 1,
           actionDir: a === 'gk_dive' ? 1 : a === 'skill' ? Math.floor(time / cyc) % 4 : undefined,
@@ -599,9 +601,9 @@ export function createPoseSheet(
         restart: null,
         players,
         ball: {
-          x: 0,
+          x: -stand * 40,
           y: 0.11,
-          z: -rows * gap,
+          z: 0,
           vx: 0,
           vy: 0,
           vz: 0,
