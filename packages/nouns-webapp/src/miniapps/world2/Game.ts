@@ -41,6 +41,7 @@ import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
 import { DragonRide } from './dragon/DragonRide';
 import { Drops } from './drops/Drops';
+import { StadiumSystem } from './football/view/stadium/StadiumSystem';
 import { Graffiti } from './graffiti/Graffiti';
 import { MuralMode } from './graffiti/mural/MuralMode';
 import { HideSeekMode } from './hideseek/net/HideSeekMode';
@@ -381,6 +382,8 @@ export class Game {
   readonly camp: CampSystem = new CampSystem(this);
   /** The mural bench (world/bench/): Pipe, SIT, the cinematic shot of the GIF mural. */
   readonly bench: BenchSystem = new BenchSystem(this);
+  /** NOUN STADIUM (football/view/stadium/): built near, 3 km down the −Z side; `.view` for the match. */
+  readonly stadium: StadiumSystem = new StadiumSystem(this);
   /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
   readonly facades: FacadeSystem = new FacadeSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
@@ -733,6 +736,8 @@ export class Game {
       const sp = townSpawn(ts);
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
+    // `?spot=stadium`: outside NOUN STADIUM's main entrance, 3 km down −Z (dev)
+    if (spotParam() === 'stadium' && this.mountain !== null) this.stadium.go();
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
@@ -1265,6 +1270,7 @@ export class Game {
     this.gfx.followShadow(this.player.pos);
     if (this.mountain !== null && !away) {
       this.mountain.update(this.player.pos, this.player.vel);
+      this.stadium.update(dt, this.gfx.camera.position);
       // Out on the slopes (or way up a tower) the sky dome below the horizon
       // turns to haze, since the world falls away below eye level. Down in
       // the streets it stays exactly as it was.
@@ -2576,6 +2582,7 @@ export class Game {
     this.interiors.dispose();
     this.camp.dispose();
     this.bench.dispose();
+    this.stadium.dispose();
     this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
