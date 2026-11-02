@@ -26,6 +26,7 @@ import { warmHidden } from '../render/shaderWarm';
 import { addRunning, addTrick, bailCombo, bankCombo } from '../skate/Tricks';
 import { townToWorld } from '../towns/site';
 import { SEA_FRONT } from '../towns/beach';
+import { edgeDistance } from '../world/mountain/config';
 import { terrainHeight } from '../world/mountain/terrain';
 
 import { SeaSound } from './audio';
@@ -155,6 +156,13 @@ export class OceanSystem {
   private wipeFlash = 0;
   private wipeWhy = 'lip';
   private suspendedStats = false;
+  /**
+   * Fast-travelled here (`?play=surf`, the map's GO SURF): "furthest
+   * downhill" is just how far out you are, so a teleport 25 km down would
+   * claim it. Stats stay suspended until you're back at the city (respawn).
+   */
+  private travelled = false;
+  private travelResp = 0;
   private warming = false;
   private farFor = 0;
   private keyBound = false;
@@ -391,11 +399,14 @@ export class OceanSystem {
       if (sea !== null && cam.y < sea.y + 0.45) cam.y = sea.y + 0.45;
     }
 
-    // stats: nothing in the sea is a record
-    if (s.phase !== 'off' && !this.suspendedStats) {
+    // stats: nothing in the sea is a record (nor anything after a fast travel)
+    if (this.travelled && p.respawns !== this.travelResp && edgeDistance(p.pos.x, p.pos.z) < 300)
+      this.travelled = false;
+    const hold = s.phase !== 'off' || this.travelled;
+    if (hold && !this.suspendedStats) {
       this.suspendedStats = true;
       g.stats.suspended = true;
-    } else if (s.phase === 'off' && this.suspendedStats) {
+    } else if (!hold && this.suspendedStats) {
       this.suspendedStats = false;
       if (!g.missions.ud.active) g.stats.suspended = false;
     }
@@ -698,6 +709,10 @@ export class OceanSystem {
     if (this.board === null) this.board = 'foamie';
     const yaw = Math.atan2(sea.sx, sea.sz);
     g.player.spawn(new THREE.Vector3(w.x, sea.y, w.z), yaw);
+    this.travelled = true;
+    this.travelResp = g.player.respawns;
+    this.suspendedStats = true;
+    g.stats.suspended = true;
     // spawn() settles onto the seabed: put the rider back on the water
     g.player.pos.set(w.x, sea.y, w.z);
     const s = this.water;
