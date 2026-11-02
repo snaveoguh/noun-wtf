@@ -36,16 +36,8 @@ import type {
   SwingInput,
   V3,
 } from '../contract';
-import type { HoleInfo } from '../sim';
-
-import * as THREE from 'three';
-
-import { seedKey } from '../../character/NounAppearance';
-import { toWorld } from '../course/site';
-import { golfCourse, golfCourseBuilt, type GolfCourse } from '../course/surface';
-import { BallView } from '../play/BallView';
-import { Golfer, PUTT, SWING, swingAngle } from '../play/Golfer';
-import {
+import type {
+  HoleInfo,
   CLUBS,
   applyShot,
   ballOf,
@@ -70,6 +62,14 @@ import {
   type MeterState,
   type MeterView,
 } from '../sim';
+
+import * as THREE from 'three';
+
+import { seedKey } from '../../character/NounAppearance';
+import { toWorld } from '../course/site';
+import { golfCourse, golfCourseBuilt, type GolfCourse } from '../course/surface';
+import { BallView } from '../play/BallView';
+import { Golfer, PUTT, SWING, swingAngle } from '../play/Golfer';
 
 import { GolfSession, type GolfTransport, type SessionEvent } from './session';
 import { bumpLife, readBest, saveBest, type GolfBest } from './store';
@@ -247,7 +247,6 @@ export class GolfMode implements GolfApi {
   private emitT = 0;
   private lobbyT = 0;
   private keys = new Set<string>();
-  private dragX: number | null = null;
   readonly focus = new THREE.Vector3();
   readonly focusVel = new THREE.Vector3();
   private warmed = false;
