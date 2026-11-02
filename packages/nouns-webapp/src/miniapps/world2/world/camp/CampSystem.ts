@@ -537,6 +537,32 @@ export class CampSystem {
     for (const l of this.listeners) l();
   }
 
+  /**
+   * Something in a frame threw while the opening shot ran (Game.frame's
+   * FrameGuard): end it, back to the plain game look and the game camera,
+   * even if ending it throws too. Owner, desktop Brave: the picture froze on
+   * the book with the B&W grade still on while the HUD kept working.
+   */
+  abortIntro(): boolean {
+    if (this.intro === null && this.grade === null) return false;
+    try {
+      this.endIntro();
+    } catch (err) {
+      console.error('[camp] ending the intro failed', err);
+      this.intro = null;
+      try {
+        this.endGrade();
+      } catch {
+        this.grade = null;
+      }
+      const g = this.game;
+      if (g.cam.rig === this.introRig) g.cam.rig = null;
+      this.view_ = { ...this.view_, intro: false };
+      for (const l of this.listeners) l();
+    }
+    return true;
+  }
+
   /** The grade's done (or skipped): out of the composer, freed. */
   private endGrade() {
     if (this.grade === null) return;

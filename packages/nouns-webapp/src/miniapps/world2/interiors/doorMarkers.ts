@@ -10,6 +10,7 @@ import type { BuildingDoor } from './contract';
 
 import * as THREE from 'three';
 
+import { releaseAfterUpload } from '../render/textureDiet';
 import { Kit, boxAt, disposeMaterials, kitMaterials, panel } from './kit';
 import { KIND_LABEL } from './names';
 import { hash32, mulberry32, pick } from './rng';
@@ -121,6 +122,8 @@ export function buildDoorMarkers(
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
+  // Never drawn again: on a diet its 2048² canvas (16 MB) goes once it's uploaded
+  releaseAfterUpload(texture);
   const mats = kitMaterials(texture);
   const built = kit.build(mats, false);
   const group = new THREE.Group();
