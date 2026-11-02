@@ -24,8 +24,16 @@ import {
 
 import { flickVariants, NEAR_WALLS_M, worldLoaded } from './worldLoad';
 
-/** The fade into the character select. */
-const FADE_MS = 280;
+/**
+ * The hand-over, in three steps so nothing pops (it used to fade the whole
+ * screen in 280 ms and mount the select after, which read as a glitch and
+ * a blink): the wordmark fades out to black, the select mounts and draws
+ * behind the black, then the black fades away.
+ */
+export const DIM_MS = 380;
+/** The black holds at least this long once the select is mounted (it builds a rider). */
+export const BLACK_MS = 220;
+export const REVEAL_MS = 650;
 /** One letter pops to another of its Pip3 versions this often (ms). */
 const FLICK_MS = 140;
 /** One shimmer pass (ms). */
@@ -50,12 +58,27 @@ function pip3Version(v: number): string {
   return v <= 1 ? 'normal' : `"rand" ${v}`;
 }
 
-export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () => void }) {
+type Stage = 'loading' | 'dimming' | 'black' | 'revealing';
+
+export function WorldLoader({
+  game,
+  onDone,
+  onGone,
+}: {
+  game: Game | null;
+  /** The world's ready: mount what comes next (behind the black). */
+  onDone: () => void;
+  /** The black has faded away: unmount the loader. */
+  onGone?: () => void;
+}) {
   const gameRef = useRef(game);
   gameRef.current = game;
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
-  const [leaving, setLeaving] = useState(false);
+  const goneRef = useRef(onGone);
+  goneRef.current = onGone;
+  const [stage, setStage] = useState<Stage>('loading');
+  const leaving = stage !== 'loading';
   const [still] = useState(reducedMotion);
   // Pip3 drawing per letter (its `rand` feature, 1–5)
   const [variants, setVariants] = useState(() => [...WORDMARK_TEXT].map(() => 1));
@@ -73,7 +96,8 @@ export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () =>
     let lastWallAt = 0;
     let lastDone = -1;
     let raf = 0;
-    let handOver: ReturnType<typeof setTimeout> | undefined;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const after = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms));
     const frame = (now: number) => {
       const g = gameRef.current;
       const gr = g?.graffiti ?? null;
@@ -93,8 +117,21 @@ export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () =>
       if (ready && !hold) {
         if (import.meta.env.DEV)
           console.info('[world] loaded in', Math.round(now - t0), 'ms; walls', gr?.loadProgress);
-        setLeaving(true);
-        handOver = setTimeout(() => doneRef.current(), still ? 0 : FADE_MS);
+        // Wordmark out → (black) mount the select, let it draw → black out
+        setStage('dimming');
+        after(still ? 0 : DIM_MS, () => {
+          setStage('black');
+          doneRef.current();
+          // two frames for the select to mount and the canvas to draw it
+          raf = requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              after(still ? 0 : BLACK_MS, () => {
+                setStage('revealing');
+                after(still ? 0 : REVEAL_MS, () => goneRef.current?.());
+              }),
+            ),
+          );
+        });
         return;
       }
       raf = requestAnimationFrame(frame);
@@ -102,7 +139,7 @@ export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () =>
     raf = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(raf);
-      clearTimeout(handOver);
+      timers.forEach(clearTimeout);
     };
   }, [still]);
 
@@ -112,9 +149,18 @@ export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () =>
       data-w2loader={leaving ? 'leaving' : 'loading'}
       role="status"
       aria-label="loading Noun World"
-      style={{ opacity: leaving && !still ? 0 : 1 }}
+      style={{
+        opacity: stage === 'revealing' ? 0 : 1,
+        transitionDuration: `${still ? 0 : REVEAL_MS}ms`,
+        // the select underneath takes clicks as soon as it shows
+        pointerEvents: stage === 'revealing' ? 'none' : undefined,
+      }}
     >
-      <span className="w2-loader-mark" data-keep-font>
+      <span
+        className="w2-loader-mark"
+        data-keep-font
+        style={{ opacity: leaving ? 0 : 1, transitionDuration: `${still ? 0 : DIM_MS}ms` }}
+      >
         {[...WORDMARK_TEXT].map((ch, i) => {
           const v = variants[i] ?? 1;
           // Keyed by version: a changed letter remounts, which replays its pop
@@ -140,7 +186,8 @@ export function WorldLoader({ game, onDone }: { game: Game | null; onDone: () =>
 }
 
 export const LOADER_CSS = `
-.w2-loader{background:#07070a;transition:opacity ${FADE_MS}ms ease}
+.w2-loader{background:#07070a;transition:opacity ${REVEAL_MS}ms ease}
+.w2-loader-mark{transition:opacity ${DIM_MS}ms ease}
 .w2-loader .w2-loader-mark,.w2-loader .w2-loader-mark *{font-family:${WORDMARK_FONT} !important;text-transform:uppercase !important}
 .w2-loader-mark{font-size:clamp(13px,1.3vw,18px);line-height:1;letter-spacing:${WORDMARK_TRACKING};color:${WORDMARK_INK};font-weight:400;font-style:normal}
 .w2-loader-mark span{display:inline-block;
