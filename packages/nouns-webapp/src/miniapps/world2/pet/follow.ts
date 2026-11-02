@@ -66,6 +66,8 @@ export interface PetBody {
   phase: number;
   gait: Gait;
   mode: PetMode;
+  /** A poof is owed, waiting for the rider to land (never into the air). */
+  owed: boolean;
 }
 
 export function newPetBody(x = 0, y = 0, z = 0): PetBody {
@@ -89,6 +91,7 @@ export function newPetBody(x = 0, y = 0, z = 0): PetBody {
     phase: 0,
     gait: 'idle',
     mode: 'beside',
+    owed: false,
   };
 }
 
@@ -166,6 +169,8 @@ export type PetEvent = 'poof' | 'hop' | 'happy' | 'sleep' | null;
 
 const GRAV = 18;
 const STEP_UP = 0.32;
+/** The body's middle over the feet (the height the pushout keeps clear). */
+const BODY_Y = 0.26;
 const HOP_DOWN = 1.25;
 
 /** Put the pet straight down beside the rider (a poof): always somewhere valid. */
@@ -197,8 +202,13 @@ export function stepPet(b: PetBody, o: Owner, mode: PetMode, w: PetWorld, dt: nu
   let ev: PetEvent = null;
   const prevMode = b.mode;
   // Teleports: the rider moved further in a frame than anyone can
-  const jumped =
-    b.hasLast && Math.hypot(o.x - b.lastX, o.y - b.lastY, o.z - b.lastZ) > PET.teleport;
+  const step = b.hasLast ? Math.hypot(o.x - b.lastX, o.y - b.lastY, o.z - b.lastZ) : 0;
+  const jumped = step > PET.teleport;
+  // the rider's speed as measured (what Player reports can lag a ride, a push)
+  const ownerSpeed =
+    !b.hasLast || jumped
+      ? o.speed
+      : Math.max(o.speed, Math.hypot(o.x - b.lastX, o.z - b.lastZ) / Math.max(dt, 1e-6));
   b.lastX = o.x;
   b.lastY = o.y;
   b.lastZ = o.z;
@@ -206,7 +216,7 @@ export function stepPet(b: PetBody, o: Owner, mode: PetMode, w: PetWorld, dt: nu
   b.ownerGround = o.grounded ? b.ownerGround + dt : 0;
   // Idle → sit → sleep; coming back from a nap is a happy moment
   const wasAsleep = b.idle > PET.sleepAfter;
-  b.idle = o.speed < 0.3 ? b.idle + dt : 0;
+  b.idle = ownerSpeed < 0.3 ? b.idle + dt : 0;
   if (wasAsleep && b.idle === 0) {
     b.happy = PET.happyFor;
     ev = 'happy';
@@ -219,8 +229,11 @@ export function stepPet(b: PetBody, o: Owner, mode: PetMode, w: PetWorld, dt: nu
     b.gait = mode === 'perch' ? 'sleep' : mode === 'ride' ? 'ride' : 'idle';
     return ev;
   }
-  // Back from somewhere (away, a ride): straight to the rider
-  if (prevMode === 'away' || prevMode === 'ride' || prevMode === 'perch' || jumped) {
+  // Back from somewhere (away, a ride), or the rider teleported: straight
+  // to them, once they're stood on something
+  if (prevMode === 'away' || prevMode === 'ride' || prevMode === 'perch' || jumped) b.owed = true;
+  if (b.owed && o.grounded) {
+    b.owed = false;
     poofTo(b, o, w);
     return 'poof';
   }
@@ -301,8 +314,8 @@ export function stepPet(b: PetBody, o: Owner, mode: PetMode, w: PetWorld, dt: nu
   const dx = tx - b.x;
   const dz = tz - b.z;
   const dist = Math.hypot(dx, dz);
-  const cap = dist > 4 ? PET.sprint : Math.max(PET.run, o.speed * 1.15);
-  const sp = dist < 0.12 ? 0 : Math.min(cap, dist * 2.4 + o.speed * 0.9 + 0.4);
+  const cap = dist > 4 ? PET.sprint : Math.max(PET.run, ownerSpeed * 1.15);
+  const sp = dist < 0.12 ? 0 : Math.min(cap, dist * 2.4 + ownerSpeed * 0.9 + 0.4);
   let mx = dist > 1e-6 ? (dx / dist) * sp * dt : 0;
   let mz = dist > 1e-6 ? (dz / dist) * sp * dt : 0;
   if (Math.hypot(mx, mz) > dist) {
@@ -330,20 +343,48 @@ export function stepPet(b: PetBody, o: Owner, mode: PetMode, w: PetWorld, dt: nu
   }
   let nx = b.x + mx;
   let nz = b.z + mz;
-  // ground under the new spot: a step up, a hop down, never off a cliff
-  let g = w.ground(nx, b.y + STEP_UP, nz, HOP_DOWN + STEP_UP);
+  // Ground under the new spot: a step up, a hop down, never off a cliff.
+  // Probed at the centre and at the leading edge, so it's up on a kerb
+  // before its middle gets there.
+  const lead = Math.hypot(mx, mz);
+  const groundAt = (x: number, z: number): number | null => {
+    const c = w.ground(x, b.y + STEP_UP, z, HOP_DOWN + STEP_UP);
+    if (c === null || lead < 1e-6) return c;
+    const e = w.ground(
+      x + (mx / lead) * PET.radius * 0.8,
+      b.y + STEP_UP,
+      z + (mz / lead) * PET.radius * 0.8,
+      HOP_DOWN + STEP_UP,
+    );
+    return e !== null && e > c ? e : c;
+  };
+  let g = groundAt(nx, nz);
   if (g === null) {
     nx = b.x;
     nz = b.z;
-    g = w.ground(nx, b.y + STEP_UP, nz, HOP_DOWN + STEP_UP);
+    g = groundAt(nx, nz);
+  }
+  // Never inside a wall or furniture: push the body (at body height) out,
+  // but never off an edge (the push is dropped if there's no floor there)
+  const [px, pz] = w.pushout(nx, Math.max(b.y, g ?? b.y) + BODY_Y, nz, PET.radius);
+  if (px !== 0 || pz !== 0) {
+    const pg = w.ground(nx + px, Math.max(b.y, g ?? b.y) + STEP_UP, nz + pz, HOP_DOWN + STEP_UP);
+    if (pg !== null) {
+      nx += px;
+      nz += pz;
+      g = pg;
+    } else {
+      nx = b.x;
+      nz = b.z;
+    }
   }
   if (g !== null && g > b.y + 0.12 && b.grounded) ev = ev ?? 'hop';
-  // fall to it (a hop down), or stand on it
+  // fall to it (a hop down), or stand on it; with no floor in reach at all
+  // it stays put (and a poof sorts it out), it never drops into the void
   if (g === null) {
-    b.vy -= GRAV * dt;
-    b.y += b.vy * dt;
-    b.grounded = false;
-  } else if (b.y > g + 0.02 && !(g > b.y)) {
+    b.vy = 0;
+    b.grounded = true;
+  } else if (b.y > g + 0.02) {
     b.vy -= GRAV * dt;
     b.y = Math.max(g, b.y + b.vy * dt);
     b.grounded = b.y <= g + 1e-4;
@@ -353,11 +394,6 @@ export function stepPet(b: PetBody, o: Owner, mode: PetMode, w: PetWorld, dt: nu
     b.vy = 0;
     b.grounded = true;
   }
-  // never inside a wall
-  // (the body above step height: a kerb it's about to step onto doesn't push)
-  const [px, pz] = w.pushout(nx, b.y + STEP_UP + PET.radius, nz, PET.radius);
-  nx += px;
-  nz += pz;
   const moved = Math.hypot(nx - b.x, nz - b.z);
   b.speed = moved / Math.max(dt, 1e-6);
   b.phase = (b.phase + moved / strideOf(b.speed)) % 1;
@@ -373,6 +409,7 @@ export function stepPet(b: PetBody, o: Owner, mode: PetMode, w: PetWorld, dt: nu
 
   b.gait = gaitOf(b, watching);
   if (!watching && shouldPoof(b, o)) {
+    b.owed = false;
     poofTo(b, o, w);
     return 'poof';
   }
@@ -396,8 +433,9 @@ export function gaitOf(b: PetBody, watching: boolean): Gait {
 
 /** Left behind: too far, stuck, or stood above / below a rider who's landed. */
 export function shouldPoof(b: PetBody, o: Owner): boolean {
-  const far = Math.hypot(o.x - b.x, o.y - b.y, o.z - b.z) > PET.poofFar;
-  if (far && o.grounded) return true;
+  // never to a rider in the air (a jump, a fall): it waits till they land
+  if (!o.grounded) return false;
+  if (Math.hypot(o.x - b.x, o.y - b.y, o.z - b.z) > PET.poofFar) return true;
   if (b.stuck > PET.stuckFor) return true;
   return b.ownerGround > 0.4 && Math.abs(o.y - b.y) > PET.poofDrop;
 }
