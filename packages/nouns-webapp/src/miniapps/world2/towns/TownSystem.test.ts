@@ -98,11 +98,16 @@ describe('TownsApi', () => {
       'Shroom Hollow',
       'Neon Nouns',
       'Crater Lil',
+      'Powder Peak',
+      'Loon Lake',
+      'Diesel Flats',
     ]);
     expect(pts[0].km).toBeGreaterThanOrEqual(9);
     expect(pts[1].km).toBeGreaterThanOrEqual(23);
     // The weird towns are all 22+ km out
-    for (const p of pts.slice(2)) expect(p.km).toBeGreaterThanOrEqual(22);
+    for (const p of pts.slice(2, 6)) expect(p.km).toBeGreaterThanOrEqual(22);
+    // The road trip's side towns: the ski village up high, the lake, the truck stop
+    expect(pts.slice(6).map(p => p.km)).toEqual([3, 13, 18]);
     sys.dispose();
   });
 });

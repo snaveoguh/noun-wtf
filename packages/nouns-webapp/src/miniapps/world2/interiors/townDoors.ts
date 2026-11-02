@@ -24,23 +24,41 @@ import * as THREE from 'three';
 import { beachSigns, buildBeach } from '../towns/beach';
 import { buildCowboy, cowboySigns } from '../towns/cowboy';
 import { TownBuilder, type Atlas, type SignSpec } from '../towns/kit';
-import { townToWorld, townYaw, type GrownTown, type TownFrame } from '../towns/site';
+import { buildAll } from '../towns/road/look';
+import { SIDE_LOOKS } from '../towns/road/looks';
+import { isSideTown } from '../towns/road/places';
+import {
+  LAGOON,
+  townToWorld,
+  townYaw,
+  type GrownTown,
+  type LineTown,
+  type PadFrame,
+  type TownFrame,
+} from '../towns/site';
 import { WEIRD_TOWNS } from '../towns/weird';
 import { njToWorld, njYaw } from '../world/mountain/nounJersey';
 
 import { planDoors, reachable, rectKey, type DoorPlan, type Footprint, type Rect } from './doors';
 import { identify } from './names';
 
-interface Look {
+export interface Look {
   signs(): SignSpec[];
   build(b: TownBuilder, ground: (vp: number, u: number) => number): void;
 }
 
-const LOOKS: Record<GrownTown, Look> = {
+const LOOKS: Record<LineTown, Look> = {
   cowboy: { signs: cowboySigns, build: buildCowboy },
   beach: { signs: beachSigns, build: buildBeach },
   ...WEIRD_TOWNS,
 };
+
+/** A town's look: the line towns' builds, or every part of a side town's (road/). */
+export function lookOf(id: GrownTown): Look {
+  if (!isSideTown(id)) return LOOKS[id];
+  const look = SIDE_LOOKS[id];
+  return { signs: look.signs, build: b => buildAll(look, b) };
+}
 
 /** A collided part in town coords. */
 export interface Part extends Rect {
@@ -64,15 +82,20 @@ class Recorder extends TownBuilder {
 }
 
 /** Identity copy of a frame: town (v', u) → (x, z), pad at y 0. */
-export function identityFrame(f: TownFrame): TownFrame {
+export function identityFrame<F extends PadFrame>(f: F): F {
   return { ...f, ox: 0, oz: 0, fx: 0, fz: 1, rx: 1, rz: 0, side: 1, P: 0, yaw: 0 };
 }
 
 /** Run a town's build into a recorder (town coords). */
 export function recordTown(id: GrownTown, f: TownFrame): TownRecord {
+  return recordLook(lookOf(id), f);
+}
+
+/** Run any look's build into a recorder (town coords): towns, stations. */
+export function recordLook(look: Look, f: PadFrame): TownRecord {
   const atlas: Atlas = { texture: null as unknown as THREE.CanvasTexture, slots: new Map() };
   const b = new Recorder(identityFrame(f), new THREE.Vector3(), atlas);
-  LOOKS[id].build(b, () => 0);
+  look.build(b, () => 0);
   const parts: Part[] = [];
   const box = new THREE.Box3();
   for (const g of b.col) {
@@ -92,7 +115,7 @@ export function recordTown(id: GrownTown, f: TownFrame): TownRecord {
     for (const g of b.geo[k]) g.dispose();
   for (const g of b.signs) g.dispose();
   const text = new Map(
-    LOOKS[id].signs().map(s => [s.key, s.lines[0]?.text.replace(/\s+/g, ' ').trim() ?? s.key]),
+    look.signs().map(s => [s.key, s.lines[0]?.text.replace(/\s+/g, ' ').trim() ?? s.key]),
   );
   return {
     parts,
@@ -183,6 +206,18 @@ export function townDoorPlanLocal(
   f: TownFrame,
   rec: TownRecord = recordTown(id, f),
 ): DoorPlan & { footprints: Footprint[] } {
+  return lookDoorPlanLocal(`town:${id}`, f, rec);
+}
+
+/**
+ * Any look's door plan in its own coords (x = v', z = u, y above the pad):
+ * buildings face the street at v' = 0 (a town's main street, a station's road).
+ */
+export function lookDoorPlanLocal(
+  areaId: string,
+  f: PadFrame & { lake?: TownFrame['lake'] },
+  rec: TownRecord,
+): DoorPlan & { footprints: Footprint[] } {
   const buildings = groupBuildings(rec.parts);
   const fps: Footprint[] = buildings.map(b => {
     // The sign on (or just in front of) this building names it
@@ -220,7 +255,7 @@ export function townDoorPlanLocal(
     },
   );
   const plan = planDoors(fps, {
-    area: `town:${id}`,
+    area: areaId,
     street: b => ({ x: 0, z: (b.minZ + b.maxZ) / 2 }),
     blockers,
     clear: (x, z, nx, nz) => walkable(x + nx * 0.9, z + nz * 0.9),
@@ -234,9 +269,10 @@ export function townDoorPlanLocal(
   return { ...plan, footprints: fps };
 }
 
-function inLagoon(f: TownFrame, vp: number, u: number): boolean {
+function inLagoon(f: PadFrame & { lake?: TownFrame['lake'] }, vp: number, u: number): boolean {
   if (!f.lagoon) return false;
-  return vp > 50 && vp < 116 && u > 12 && u < f.Lf - 32;
+  const L = f.lake ?? LAGOON;
+  return vp > L.v0 - 2 && vp < L.v3 + 2 && u > L.uIn0 - 2 && u < f.Lf - L.uIn1 + 2;
 }
 
 const cache = new Map<GrownTown, BuildingDoor[]>();
@@ -245,7 +281,17 @@ const cache = new Map<GrownTown, BuildingDoor[]>();
 export function townDoors(id: GrownTown, f: TownFrame): BuildingDoor[] {
   const hit = cache.get(id);
   if (hit !== undefined) return hit;
-  const plan = townDoorPlanLocal(id, f);
+  const out = planToWorld(townDoorPlanLocal(id, f), f, () => f.P);
+  cache.set(id, out);
+  return out;
+}
+
+/** A local door plan → world doors; `floor(u)` is the pad's height at u. */
+export function planToWorld(
+  plan: DoorPlan,
+  f: PadFrame,
+  floor: (u: number) => number,
+): BuildingDoor[] {
   const p = { x: 0, z: 0 };
   const out = plan.doors.map(d => {
     const w = townToWorld(f, d.x, d.z, p);
@@ -262,7 +308,7 @@ export function townDoors(id: GrownTown, f: TownFrame): BuildingDoor[] {
       ...d,
       x: w.x,
       z: w.z,
-      y: f.P + d.y,
+      y: floor(d.z) + d.y,
       yaw: townYaw(f, nx, nz),
       footprint: {
         minX: Math.min(...corners.map(c => c.x)),
@@ -273,7 +319,6 @@ export function townDoors(id: GrownTown, f: TownFrame): BuildingDoor[] {
       },
     };
   });
-  cache.set(id, out);
   return out;
 }
 

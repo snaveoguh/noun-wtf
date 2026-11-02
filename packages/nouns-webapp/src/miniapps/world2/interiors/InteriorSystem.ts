@@ -34,6 +34,9 @@ import { prefetchGlbHead } from '../character/GlbHead';
 import { NounCharacter } from '../character/NounCharacter';
 import { clearFog, warmHidden } from '../render/shaderWarm';
 import { inkExcluded, toonify } from '../render/Toon';
+import { stationArea, stationDoors } from '../towns/road/doors';
+import { stationFrame, stationToWorld } from '../towns/road/pads';
+import { STATIONS, stationMarket } from '../towns/road/places';
 import { GROWN_TOWNS, placementOf, townFrame, type GrownTown } from '../towns/site';
 import { GOODS, GOOD_ICON, GOOD_IDS } from '../trade/goods';
 import { inCorridor } from '../world/mountain/Alleys';
@@ -473,6 +476,23 @@ export class InteriorSystem implements InteriorsApi {
         }
       } else if (this.areas.has(key) && d > AREA_OUT) this.dropArea(key);
     }
+    // Gas stations, truck stops, rest areas (towns/road/): same streaming
+    for (const st of STATIONS) {
+      const f = stationFrame(st.id);
+      if (f === null) continue;
+      const key = stationArea(st.id);
+      const c = stationToWorld(f, f.vmin + 12, f.Lf / 2, { x: 0, z: 0 });
+      const d = Math.hypot(c.x - p.x, c.z - p.z);
+      if (!this.areas.has(key) && d < AREA_IN) {
+        let doors: BuildingDoor[] = [];
+        try {
+          doors = stationDoors(st.id);
+        } catch (err) {
+          console.warn('[interiors] station doors failed', st.id, err);
+        }
+        this.addArea({ id: key, doors, markers: null, x: c.x, z: c.z, streams: true });
+      } else if (this.areas.has(key) && d > AREA_OUT) this.dropArea(key);
+    }
   }
 
   // ── Per frame ──
@@ -516,8 +536,7 @@ export class InteriorSystem implements InteriorsApi {
       if (this.upperPending) {
         this.upperPending = false;
         const L = this.live;
-        if (L !== null && L.floors.length > 1 && L.floors[1]!.built === null)
-          this.buildFloor(L, 1);
+        if (L !== null && L.floors.length > 1 && L.floors[1]!.built === null) this.buildFloor(L, 1);
       } else if (!this.warming) this.fadeT = Math.min(0, this.fadeT + dt);
       this.setFade(-this.fadeT / FADE_S);
     }
@@ -814,9 +833,7 @@ export class InteriorSystem implements InteriorsApi {
     // phone. Next frame, not this one (this frame is already the room: one
     // 4 s frame on a tablet); the fade holds on black until it's done
     this.upperPending =
-      fromRoof === undefined &&
-      this.live.floors.length > 1 &&
-      this.live.floors[1]!.built === null;
+      fromRoof === undefined && this.live.floors.length > 1 && this.live.floors[1]!.built === null;
     this.applyEffects(effects);
     const s = built.stats;
     if (import.meta.env.DEV)
@@ -2255,6 +2272,7 @@ export class InteriorSystem implements InteriorsApi {
 function townOf(area: string): TownId {
   if (area === 'plaza') return 'city';
   if (area === 'jersey') return 'jersey';
+  if (area.startsWith('road:')) return stationMarket(area.slice(5));
   const t = area.startsWith('town:') ? area.slice(5) : area;
   return (GROWN_TOWNS as string[]).includes(t) ? (t as GrownTown) : 'city';
 }

@@ -27,11 +27,13 @@ import { buildCowboy, cactusGeometry, cowboySigns, tumbleweedGeometry } from './
 import { buildAtlas, TownBuilder, type Atlas, type SignSpec } from './kit';
 import {
   GROWN_TOWNS,
+  LINE_TOWNS,
   LAGOON,
   TOWN,
   townFrameNow,
   townToWorld,
   type GrownTown,
+  type LineTown,
   type TownFrame,
 } from './site';
 import { WEIRD_TOWNS, type TownExtras } from './weird';
@@ -70,7 +72,7 @@ export interface TownLook {
   extras?: (b: TownBuilder, ctx: ChunkContext, root: THREE.Group) => TownExtras;
 }
 
-const LOOKS: Record<GrownTown, TownLook> = {
+const LOOKS: Record<LineTown, TownLook> = {
   cowboy: { signs: cowboySigns, build: buildCowboy, plant: cactusGeometry },
   beach: { signs: beachSigns, build: buildBeach, plant: palmGeometry },
   ...WEIRD_TOWNS,
@@ -119,9 +121,12 @@ function materials() {
   return mats;
 }
 
-const atlases = new Map<GrownTown, { atlas: Atlas; mat: THREE.MeshStandardMaterial }>();
+/** The towns' shared materials (road/ builds its towns and stations with the same ones). */
+export const townMaterials = () => materials();
 
-function signsFor(id: GrownTown) {
+const atlases = new Map<LineTown, { atlas: Atlas; mat: THREE.MeshStandardMaterial }>();
+
+function signsFor(id: LineTown) {
   let a = atlases.get(id);
   if (a === undefined) {
     const atlas = buildAtlas(LOOKS[id].signs());
@@ -133,8 +138,8 @@ function signsFor(id: GrownTown) {
   return a;
 }
 
-const plantGeo = new Map<GrownTown, THREE.BufferGeometry>();
-function plantGeometry(id: GrownTown) {
+const plantGeo = new Map<LineTown, THREE.BufferGeometry>();
+function plantGeometry(id: LineTown) {
   let g = plantGeo.get(id);
   if (g === undefined) {
     g = LOOKS[id].plant();
@@ -146,14 +151,14 @@ function plantGeometry(id: GrownTown) {
 let tumbleGeo: THREE.BufferGeometry | null = null;
 
 /** Approximate distance band from the city (m) a town can sit in: cheap chunk reject. */
-function nearBand(id: GrownTown, ed: number) {
+function nearBand(id: LineTown, ed: number) {
   const at = TOWN_SITES.find(t => t.town === id)!.at;
   return ed > at * 0.7 && ed < at + 1500;
 }
 
 const _w = { x: 0, z: 0 };
 
-function build(id: GrownTown, f: TownFrame, ctx: ChunkContext): ChunkDecoration {
+function build(id: LineTown, f: TownFrame, ctx: ChunkContext): ChunkDecoration {
   const t0 = performance.now();
   const { atlas, mat: signMat } = signsFor(id);
   const b = new TownBuilder(f, ctx.origin, atlas);
@@ -326,7 +331,8 @@ export function townsDecorator(): ChunkDecorator {
       const cx = ctx.origin.x + ctx.size / 2;
       const cz = ctx.origin.z + ctx.size / 2;
       const ed = edgeDistance(cx, cz);
-      for (const id of GROWN_TOWNS) {
+      // (the road trip's side towns build in road/decorator.ts, part by part)
+      for (const id of LINE_TOWNS) {
         if (!nearBand(id, ed)) continue;
         const f = townFrameNow(id);
         if (f === null) continue;

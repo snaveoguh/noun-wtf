@@ -11,6 +11,11 @@
 // are TOWN_SITES in world/mountain/tracks.ts, kept equal by specs.test.ts.
 // The city is the hub: s = 0, every line starts there.
 //
+// The road trip's side towns (Powder Peak, Loon Lake, Diesel Flats) sit
+// BESIDE a main line, joined to it by a short spur (towns/road/places.ts
+// SIDE_TOWNS, kept equal by road/places.test.ts): `s` is the spur
+// junction, so the travel check measures the ride to the turn-off.
+//
 // Biases: > 1 the town pays more than the reference price (it wants it),
 // < 1 it's cheap there. `makes` = produced locally: deep stock, cheap.
 
@@ -165,6 +170,69 @@ export const TOWN_SPECS: Record<TownId, TownSpec> = {
       makes: ['NOGGLES'],
     },
   },
+  peak: {
+    id: 'peak',
+    name: 'Powder Peak',
+    style: 'ski',
+    track: 2,
+    s: 3_600,
+    market: {
+      // The ski village up high: meltwater is free and nobody wants ice
+      // cream in the snow; après-ski fries, pizza and goggles sell high
+      bias: {
+        WATER: 0.55,
+        ICECREAM: 0.85,
+        NOGGLES: 1.9,
+        FRIES: 1.8,
+        PIZZA: 1.6,
+        DRIP: 1.4,
+        FISH: 1.1,
+      },
+      makes: ['WATER'],
+    },
+  },
+  pines: {
+    id: 'pines',
+    name: 'Loon Lake',
+    style: 'lake',
+    track: 1,
+    s: 14_600,
+    market: {
+      // Fish straight off the docks, spring water; everything else comes a
+      // long way through the pines
+      bias: {
+        FISH: 0.45,
+        WATER: 0.75,
+        PIZZA: 1.55,
+        ICECREAM: 1.45,
+        FRIES: 1.3,
+        DRIP: 1.35,
+        NOGGLES: 1.2,
+      },
+      makes: ['FISH'],
+    },
+  },
+  diesel: {
+    id: 'diesel',
+    name: 'Diesel Flats',
+    style: 'truckstop',
+    track: 3,
+    s: 20_500,
+    market: {
+      // The truck stop's grill: fries and pizza come cheap; out in the
+      // desert water and anything cold are worth a lot, shades too
+      bias: {
+        FRIES: 0.6,
+        PIZZA: 0.75,
+        WATER: 2.6,
+        ICECREAM: 2.1,
+        FISH: 1.6,
+        NOGGLES: 1.5,
+        DRIP: 1.2,
+      },
+      makes: ['FRIES', 'PIZZA'],
+    },
+  },
 };
 
 export const TOWN_IDS: TownId[] = [
@@ -176,6 +244,9 @@ export const TOWN_IDS: TownId[] = [
   'neon',
   'shroom',
   'crater',
+  'peak',
+  'pines',
+  'diesel',
 ];
 
 export const isTown = (v: unknown): v is TownId =>

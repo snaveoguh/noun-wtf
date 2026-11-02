@@ -111,6 +111,8 @@ import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { SkydiveSystem } from './skydive/SkydiveSystem';
 import { townsDecorator } from './towns/build';
+import { roadDecorator } from './towns/road/decorator';
+import { stationSpawn } from './towns/road/pads';
 import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
 import { TradeClient } from './trade/TradeClient';
@@ -733,6 +735,9 @@ export class Game {
       const sp = townSpawn(ts);
       if (sp !== null) this.player.spawn(new THREE.Vector3(sp.x, sp.y, sp.z), sp.yaw);
     }
+    // `?spot=gas-1-5` (any towns/road/places.ts STATIONS id): on the road just before it
+    const ss = this.mountain !== null ? stationSpawn(ts) : null;
+    if (ss !== null) this.player.spawn(new THREE.Vector3(ss.x, ss.y, ss.z), ss.yaw);
     this.cam.snap(this.player);
     this.lastPos.copy(this.player.pos);
 
@@ -1407,6 +1412,8 @@ export class Game {
       // Noun Trade towns (Dry Gulch, Noggle City, Puerto Noun, Neon Nouns down
       // the +X line; Shroom Hollow down +Z; Crater Lil down −X)
       m.addDecorator(townsDecorator());
+      // The road trip: side towns, gas stations / truck stops, road signs (towns/road/)
+      m.addDecorator(roadDecorator());
       // Wild landmarks (the Big Noun, Meltdown, the Noggle Wheel, …)
       m.addDecorator(landmarksDecorator());
       // Creatures, hill houses + oddities (also keeps trees out of the houses)

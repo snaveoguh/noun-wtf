@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 
-import { townToWorld, townYaw, type TownFrame } from './site';
+import { townToWorld, townYaw, type PadFrame } from './site';
 
 export type P2 = [number, number];
 
@@ -103,32 +103,38 @@ export interface Atlas {
   slots: Map<string, { u0: number; v0: number; u1: number; v1: number; w: number; h: number }>;
 }
 
-export function buildAtlas(specs: SignSpec[]): Atlas {
+export function buildAtlas(
+  specs: SignSpec[],
+  opts: { w?: number; h?: number; pxPerM?: number } = {},
+): Atlas {
+  const AW = opts.w ?? ATLAS;
+  const AH = opts.h ?? ATLAS;
+  const ppm = opts.pxPerM ?? PX_PER_M;
   const canvas = document.createElement('canvas');
-  canvas.width = ATLAS;
-  canvas.height = ATLAS;
+  canvas.width = AW;
+  canvas.height = AH;
   const g = canvas.getContext('2d')!;
   g.fillStyle = '#808080';
-  g.fillRect(0, 0, ATLAS, ATLAS);
+  g.fillRect(0, 0, AW, AH);
   const slots: Atlas['slots'] = new Map();
   let x = 0;
   let y = 0;
   let rowH = 0;
   const pad = 4;
   for (const s of specs) {
-    const pw = Math.min(ATLAS - 2 * pad, Math.round(s.w * PX_PER_M));
+    const pw = Math.min(AW - 2 * pad, Math.round(s.w * ppm));
     const ph = Math.round(pw * (s.h / s.w));
-    if (x + pw + pad > ATLAS) {
+    if (x + pw + pad > AW) {
       x = 0;
       y += rowH + pad;
       rowH = 0;
     }
     drawSign(g, x + pad, y + pad, pw, ph, s);
     slots.set(s.key, {
-      u0: (x + pad) / ATLAS,
-      u1: (x + pad + pw) / ATLAS,
-      v0: 1 - (y + pad + ph) / ATLAS,
-      v1: 1 - (y + pad) / ATLAS,
+      u0: (x + pad) / AW,
+      u1: (x + pad + pw) / AW,
+      v0: 1 - (y + pad + ph) / AH,
+      v1: 1 - (y + pad) / AH,
       w: s.w,
       h: s.h,
     });
@@ -139,6 +145,26 @@ export function buildAtlas(specs: SignSpec[]): Atlas {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   return { texture, slots };
+}
+
+/** Height (px) the specs need in an atlas `w` px wide at `pxPerM` (no drawing). */
+export function atlasHeight(specs: SignSpec[], w = ATLAS, pxPerM = PX_PER_M): number {
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+  const pad = 4;
+  for (const s of specs) {
+    const pw = Math.min(w - 2 * pad, Math.round(s.w * pxPerM));
+    const ph = Math.round(pw * (s.h / s.w));
+    if (x + pw + pad > w) {
+      x = 0;
+      y += rowH + pad;
+      rowH = 0;
+    }
+    x += pw + pad;
+    rowH = Math.max(rowH, ph);
+  }
+  return y + rowH + 2 * pad;
 }
 
 function drawSign(
@@ -208,7 +234,7 @@ export class TownBuilder {
   readonly plants: THREE.Matrix4[] = [];
 
   constructor(
-    readonly f: TownFrame,
+    readonly f: PadFrame,
     readonly origin: THREE.Vector3,
     readonly atlas: Atlas,
   ) {}

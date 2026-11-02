@@ -7,7 +7,7 @@ import { TERRAIN_LIPSCHITZ, terrainHeight } from '../world/mountain/terrain';
 import { TOWN_SITE, TOWN_SITES, tracks } from '../world/mountain/tracks';
 
 import {
-  GROWN_TOWNS,
+  LINE_TOWNS,
   LAGOON,
   TOWN,
   placementOf,
@@ -22,12 +22,13 @@ import {
 import { TOWNS } from './specs';
 
 const warn = vi.spyOn(console, 'warn');
-const frames = {} as Record<(typeof GROWN_TOWNS)[number], TownFrame>;
-for (const id of GROWN_TOWNS) frames[id] = townFrameNow(id)!;
+// The towns on a reserved stretch of line (the road trip's side towns: road/pads.test.ts)
+const frames = {} as Record<(typeof LINE_TOWNS)[number], TownFrame>;
+for (const id of LINE_TOWNS) frames[id] = townFrameNow(id)!;
 
 describe('town sites', () => {
   it('every town resolves on its main line, with no other line in reach', () => {
-    for (const id of GROWN_TOWNS) {
+    for (const id of LINE_TOWNS) {
       const f = frames[id];
       expect(f).not.toBeNull();
       expect(f.site.track.id).toBe(TOWN_SITES.find(q => q.town === id)!.track);
@@ -162,7 +163,7 @@ describe('town sites', () => {
   });
 
   it('spawns on the line at the top of main street', () => {
-    for (const id of GROWN_TOWNS) {
+    for (const id of LINE_TOWNS) {
       const s = townSpawn(id)!;
       expect(s.y).toBeCloseTo(frames[id].P + 0.05, 4);
       const pl = placementOf(frames[id]);

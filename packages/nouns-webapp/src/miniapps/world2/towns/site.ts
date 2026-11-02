@@ -29,8 +29,21 @@ import type { TownPlacement } from '../trade/contract';
 import { MOUNTAIN, edgeDistance, smoothstep } from '../world/mountain/config';
 import { TOWN_SITES, tracks, type SpotSite } from '../world/mountain/tracks';
 
-export type GrownTown = 'cowboy' | 'beach' | 'noggle' | 'shroom' | 'neon' | 'crater';
-export const GROWN_TOWNS: GrownTown[] = ['cowboy', 'beach', 'noggle', 'shroom', 'neon', 'crater'];
+import {
+  applyRoadPads,
+  liveSideTowns,
+  roadBlocked,
+  setRoadNatural,
+  sideTownFrame,
+} from './road/pads';
+import { SIDE_TOWNS, isSideTown, type SideTownId } from './road/places';
+
+/** Towns on a reserved stretch of line (TOWN_SITES). */
+export type LineTown = 'cowboy' | 'beach' | 'noggle' | 'shroom' | 'neon' | 'crater';
+export const LINE_TOWNS: LineTown[] = ['cowboy', 'beach', 'noggle', 'shroom', 'neon', 'crater'];
+/** Every grown town: the line towns plus the road trip's side towns (road/places.ts). */
+export type GrownTown = LineTown | SideTownId;
+export const GROWN_TOWNS: GrownTown[] = [...LINE_TOWNS, ...SIDE_TOWNS.map(t => t.id)];
 
 export const isGrownTown = (v: unknown): v is GrownTown =>
   typeof v === 'string' && (GROWN_TOWNS as string[]).includes(v);
@@ -57,15 +70,18 @@ export const LAYOUT: Record<GrownTown, { near: number; far: number; lagoon: bool
   shroom: { near: 56, far: 72, lagoon: false },
   neon: { near: 66, far: 66, lagoon: false },
   crater: { near: 60, far: 84, lagoon: false },
+  // Side towns (road/places.ts SIDE_TOWNS is what places them)
+  peak: { near: 40, far: 60, lagoon: false },
+  pines: { near: 40, far: 70, lagoon: true },
+  diesel: { near: 40, far: 60, lagoon: false },
 };
 
 /** Lagoon extent (v', and u inset from the pad ends). */
 export const LAGOON = { v0: 52, v1: 72, v2: 102, v3: 114, uIn0: 14, uIn1: 34 } as const;
 
-export interface TownFrame {
-  id: GrownTown;
-  site: SpotSite;
-  /** Line centre at u = 0, forward + left unit vectors, heading. */
+/** A level-pad frame in town coords: what the builders and coordinate helpers need. */
+export interface PadFrame {
+  /** Origin at u = 0, forward + left unit vectors, heading. */
   ox: number;
   oz: number;
   fx: number;
@@ -89,11 +105,31 @@ export interface TownFrame {
   z1: number;
 }
 
+/** Lagoon / lake rectangle (v', and u inset from the pad ends): LAGOON's shape. */
+export interface LakeSpec {
+  v0: number;
+  v1: number;
+  v2: number;
+  v3: number;
+  uIn0: number;
+  uIn1: number;
+}
+
+export interface TownFrame extends PadFrame {
+  id: GrownTown;
+  site: SpotSite;
+  /** Terrace blends (default TOWN's M_UP / M_DN / M_LAT). */
+  marg?: { up: number; dn: number; lat: number };
+  /** Lagoon shape when `lagoon` (default LAGOON, Puerto Noun's). */
+  lake?: LakeSpec;
+}
+
 /** Natural surface (no terraces), registered by terrain.ts (avoids an import cycle). */
 let natural: ((x: number, z: number) => number) | null = null;
 
 export function setTownNatural(fn: (x: number, z: number) => number) {
   natural = fn;
+  setRoadNatural(fn);
 }
 
 const resolved = new Map<GrownTown, TownFrame>();
@@ -106,6 +142,7 @@ const TOWN_TRACK_IDS = [...new Set(TOWN_SITES.map(q => q.track as number))];
 export function townFrame(id: GrownTown): TownFrame | null {
   const hit = resolved.get(id);
   if (hit !== undefined) return hit;
+  if (isSideTown(id)) return adopt(sideTownFrame(id));
   liveFrames();
   return resolved.get(id) ?? null;
 }
@@ -114,14 +151,23 @@ export function townFrame(id: GrownTown): TownFrame | null {
 export function townFrameNow(id: GrownTown): TownFrame | null {
   const hit = resolved.get(id);
   if (hit !== undefined) return hit;
+  if (isSideTown(id)) return adopt(sideTownFrame(id, true));
   const site = tracks.town(id);
   return site === null ? null : resolve(id, site);
+}
+
+/** A side town's frame joins the list (road/pads.ts resolves it). */
+function adopt(f: TownFrame | null): TownFrame | null {
+  if (f === null || resolved.has(f.id)) return f;
+  resolved.set(f.id, f);
+  frameList = GROWN_TOWNS.map(q => resolved.get(q)).filter((q): q is TownFrame => !!q);
+  return f;
 }
 
 function resolve(id: GrownTown, site: SpotSite): TownFrame {
   if (site.frame !== null) return site.frame as TownFrame;
   const nat = natural!;
-  const L = LAYOUT[id];
+  const L = LAYOUT[id as LineTown];
   const o = tracks.pointAt(site.track, site.s, _pp);
   const ox = o.x;
   const oz = o.z;
@@ -239,7 +285,7 @@ export interface TownCoords {
 const _c: TownCoords = { u: 0, vp: 0 };
 
 /** World → town coords (reused object). */
-export function townCoords(f: TownFrame, x: number, z: number): TownCoords {
+export function townCoords(f: PadFrame, x: number, z: number): TownCoords {
   const dx = x - f.ox;
   const dz = z - f.oz;
   _c.u = dx * f.fx + dz * f.fz;
@@ -248,7 +294,7 @@ export function townCoords(f: TownFrame, x: number, z: number): TownCoords {
 }
 
 /** Town coords (v' across, u down the line) → world x, z. */
-export function townToWorld(f: TownFrame, vp: number, u: number, out: { x: number; z: number }) {
+export function townToWorld(f: PadFrame, vp: number, u: number, out: { x: number; z: number }) {
   const v = vp * f.side;
   out.x = f.ox + f.fx * u + f.rx * v;
   out.z = f.oz + f.fz * u + f.rz * v;
@@ -256,7 +302,7 @@ export function townToWorld(f: TownFrame, vp: number, u: number, out: { x: numbe
 }
 
 /** World yaw of a direction given in town coords (dv' across, du down the line). */
-export function townYaw(f: TownFrame, dvp: number, du: number): number {
+export function townYaw(f: PadFrame, dvp: number, du: number): number {
   const x = f.rx * f.side * dvp + f.fx * du;
   const z = f.rz * f.side * dvp + f.fz * du;
   return Math.atan2(x, z);
@@ -264,26 +310,27 @@ export function townYaw(f: TownFrame, dvp: number, du: number): number {
 
 /** Terrace blend weight (0 = natural … 1 = level pad). */
 function padWeight(f: TownFrame, u: number, vp: number): number {
-  const wu = smoothstep(-TOWN.M_UP, 0, u) * (1 - smoothstep(f.Lf, f.Lf + TOWN.M_DN, u));
+  const up = f.marg?.up ?? TOWN.M_UP;
+  const dn = f.marg?.dn ?? TOWN.M_DN;
+  const lat = f.marg?.lat ?? TOWN.M_LAT;
+  const wu = smoothstep(-up, 0, u) * (1 - smoothstep(f.Lf, f.Lf + dn, u));
   if (wu <= 0) return 0;
-  const wv =
-    smoothstep(f.vmin - TOWN.M_LAT, f.vmin, vp) * (1 - smoothstep(f.vmax, f.vmax + TOWN.M_LAT, vp));
+  const wv = smoothstep(f.vmin - lat, f.vmin, vp) * (1 - smoothstep(f.vmax, f.vmax + lat, vp));
   return wu * wv;
 }
 
 /** Lagoon depth under the pad at (u, v') (0 outside it). */
-export function lagoonDepth(f: TownFrame, u: number, vp: number): number {
+export function lagoonDepth(f: PadFrame & { lake?: LakeSpec }, u: number, vp: number): number {
   if (!f.lagoon) return 0;
-  const lu =
-    smoothstep(LAGOON.uIn0, LAGOON.uIn1, u) *
-    (1 - smoothstep(f.Lf - LAGOON.uIn1, f.Lf - LAGOON.uIn0, u));
+  const L = f.lake ?? LAGOON;
+  const lu = smoothstep(L.uIn0, L.uIn1, u) * (1 - smoothstep(f.Lf - L.uIn1, f.Lf - L.uIn0, u));
   if (lu <= 0) return 0;
-  const lv = smoothstep(LAGOON.v0, LAGOON.v1, vp) * (1 - smoothstep(LAGOON.v2, LAGOON.v3, vp));
+  const lv = smoothstep(L.v0, L.v1, vp) * (1 - smoothstep(L.v2, L.v3, vp));
   return TOWN.lagoonFloor * lu * lv;
 }
 
 /** Height of the town's ground at (u, v') where the pad is at full weight. */
-export function townGround(f: TownFrame, u: number, vp: number): number {
+export function townGround(f: PadFrame & { lake?: LakeSpec }, u: number, vp: number): number {
   return f.P - lagoonDepth(f, u, vp);
 }
 
@@ -293,6 +340,9 @@ let townLines: (typeof tracks.tracks)[number][] | null = null;
 /** Frames resolved so far (cheap: checked on every terrain sample). */
 function liveFrames(): TownFrame[] {
   if (resolved.size === GROWN_TOWNS.length) return frameList;
+  // Side towns: resolved off their line as it grows (road/pads.ts)
+  const sides = liveSideTowns();
+  for (let i = 0; i < sides.length; i++) if (!resolved.has(sides[i].id)) adopt(sides[i]);
   if (townLines === null) {
     const found = TOWN_TRACK_IDS.map(id => tracks.tracks.find(q => q.id === id));
     if (found.some(q => q === undefined)) return frameList;
@@ -323,6 +373,8 @@ export function applyTownPads(x: number, z: number, out: { y: number }) {
     if (w <= 0) continue;
     out.y += w * (townGround(f, c.u, c.vp) - out.y);
   }
+  // Gas stations' forecourts and the side towns' spur roads
+  applyRoadPads(x, z, out);
 }
 
 /** Keep-out for the mountain dressing (trees, rocks, ponds, hill houses): the pad + entrance sign. */
@@ -335,7 +387,7 @@ export function townBlocked(x: number, z: number): boolean {
     if (c.u >= -40 && c.u < 0 && Math.abs(c.vp) <= 16) return true;
     if (c.u >= -10 && c.u <= f.Lf + 10 && c.vp >= f.vmin - 8 && c.vp <= f.vmax + 8) return true;
   }
-  return false;
+  return roadBlocked(x, z);
 }
 
 // ── Placements (TownsApi) ──

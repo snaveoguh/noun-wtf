@@ -92,4 +92,30 @@ export const CAST: Record<GrownTown, CustomerDef[]> = {
     def('crater', 90, [1, 3, 29, 217, 17], 'Magma', 8.6, 172, SIDEWALK_Y), // volcano head
     def('crater', 63, [0, 12, 27, 186, 18], 'Stinger', -8.6, 200, SIDEWALK_Y), // scorpion head
   ],
+  // The road trip's side towns, on their sidewalks; seeds read from
+  // NounsToken.seeds(id) the same way (2026-11-02)
+  peak: [
+    def('peak', 32, [0, 15, 92, 191, 15], 'Chairlift Charlie', -8.6, 30, SIDEWALK_Y), // skilift head
+    def('peak', 456, [1, 2, 20, 238, 10], 'Frosty Fran', 8.6, 52, SIDEWALK_Y), // snowman head
+    def('peak', 165, [1, 22, 121, 194, 11], 'Revvy', -8.6, 66, SIDEWALK_Y), // snowmobile head
+    def('peak', 184, [0, 24, 29, 14, 1], 'Yeti Betty', 8.6, 112, SIDEWALK_Y), // yeti head
+    def('peak', 305, [0, 10, 27, 131, 3], 'Summit Sam', -8.6, 134, SIDEWALK_Y), // snowcap mountain head
+    def('peak', 131, [0, 3, 96, 193, 11], 'Globe', 8.6, 156, SIDEWALK_Y), // snowglobe head
+  ],
+  pines: [
+    def('pines', 105, [0, 10, 102, 129, 7], 'Mo Moose', -8.6, 26, SIDEWALK_Y), // moose head
+    def('pines', 113, [1, 2, 45, 74, 10], 'Mallory', 8.6, 50, SIDEWALK_Y), // duck head
+    def('pines', 274, [1, 26, 119, 10, 4], 'Big Bruin', -8.6, 64, SIDEWALK_Y), // bear head
+    def('pines', 39, [0, 21, 26, 133, 20], 'Java Jo', 8.6, 110, SIDEWALK_Y), // mug head
+    def('pines', 377, [0, 25, 16, 89, 14], 'Croaky', -8.6, 136, SIDEWALK_Y), // frog head
+    def('pines', 208, [1, 5, 80, 228, 0], 'Howler', 8.6, 160, SIDEWALK_Y), // werewolf head
+  ],
+  diesel: [
+    def('diesel', 84, [0, 12, 124, 106, 18], 'Frank', -8.6, 40, SIDEWALK_Y), // hotdog head
+    def('diesel', 8, [1, 20, 7, 202, 19], 'Taco Tina', 8.6, 56, SIDEWALK_Y), // taco head
+    def('diesel', 101, [1, 18, 92, 27, 14], 'Dollar Menu Don', -8.6, 70, SIDEWALK_Y), // burger head
+    def('diesel', 688, [1, 29, 8, 33, 19], 'Gearhead', 8.6, 118, SIDEWALK_Y), // car head
+    def('diesel', 71, [0, 29, 7, 176, 3], 'Highway Hal', -8.6, 140, SIDEWALK_Y), // road head
+    def('diesel', 97, [1, 28, 36, 69, 17], 'Rex', 8.6, 162, SIDEWALK_Y), // dino head
+  ],
 };

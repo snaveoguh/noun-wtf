@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`roadside > is deterministic: growing in steps gives the same items as all at once 1`] = `
+[
+  [
+    "km:1:1",
+    1060,
+    -123,
+    1105,
+  ],
+  [
+    "bb:1:0",
+    1800,
+    138,
+    1777,
+  ],
+  [
+    "km:1:2",
+    2120,
+    92,
+    2092,
+  ],
+  [
+    "dist:1:0",
+    2120,
+    90,
+    2091,
+  ],
+  [
+    "km:1:3",
+    3060,
+    461,
+    2931,
+  ],
+  [
+    "km:1:5",
+    5300,
+    1768,
+    4539,
+  ],
+]
+`;

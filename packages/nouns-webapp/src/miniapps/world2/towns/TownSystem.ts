@@ -95,6 +95,9 @@ const THANKS: Record<GrownTown, string[]> = {
   shroom: ['Far out…', 'Spore-tacular!', 'Grow on, friend.', 'Mmm, earthy.'],
   neon: ['Glowing!', 'Lit!', 'Pixel perfect!', 'Bzzzt, thanks!'],
   crater: ['Out of this world!', 'Lil but mighty!', 'Moon-ready!', 'Gravity, who?'],
+  peak: ['Shred on!', 'Fresh powder!', 'Après time!', 'Stay frosty.'],
+  pines: ['Nice catch!', 'Paddle on!', 'Happy trails.', 'Loon-tastic!'],
+  diesel: ['10-4, good buddy!', 'Keep on truckin’!', 'Fill her up!', 'Much obliged, driver.'],
 };
 const TOO_SLOW = ['Too slow…', 'Forget it.', 'Melted.'];
 

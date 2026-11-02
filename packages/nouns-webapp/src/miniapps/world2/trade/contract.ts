@@ -49,7 +49,11 @@ export type TownId =
   | 'noggle'
   | 'shroom'
   | 'neon'
-  | 'crater';
+  | 'crater'
+  // The road trip's side towns (towns/road/places.ts)
+  | 'peak'
+  | 'pines'
+  | 'diesel';
 export type TownStyle =
   | 'city'
   | 'suburb'
@@ -58,7 +62,10 @@ export type TownStyle =
   | 'noggle'
   | 'shroom'
   | 'neon'
-  | 'crater';
+  | 'crater'
+  | 'ski'
+  | 'lake'
+  | 'truckstop';
 
 export interface TownMarketSpec {
   /** Per good: multiplier on GoodSpec.base for this town (demand > 1, supply < 1). */
