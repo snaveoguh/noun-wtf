@@ -768,12 +768,8 @@ export class GolfMode implements GolfApi {
   private syncBuggies(on: boolean) {
     if (on === this.buggiesOn) return;
     this.buggiesOn = on;
-    const cars = this.game.cars as unknown as {
-      parkBuggies?: (g: string, s: unknown[]) => void;
-      clearBuggies?: (g: string) => void;
-    };
-    if (on) cars.parkBuggies?.('golf', this.course.layout.buggies);
-    else cars.clearBuggies?.('golf');
+    if (on) this.game.cars.parkBuggies('golf', this.course.layout.buggies);
+    else this.game.cars.clearBuggies('golf');
   }
 
   /** While active: owns the frame. */
