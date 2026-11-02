@@ -45,7 +45,7 @@ import {
 import { Geo, linear } from './geo';
 import { STANDS } from './layout';
 import { netGeometry, netMaterial, netUniforms, type NetUniforms } from './nets';
-import { QUIET_SHARE, crowdBudget, seatList, type SeatList } from './seats';
+import { QUIET_SHARE, crowdBudget, seatListSteps, type SeatList } from './seats';
 import {
   adsTexture,
   netTexture,
@@ -125,6 +125,7 @@ export class StadiumView implements StadiumViewApi {
   private fans: THREE.InstancedMesh | null = null;
   private crowdFilled = 0;
   private seats: SeatList | null = null;
+  private seatSteps: Generator<void, SeatList, void> | null = null;
   private budget: number;
 
   private cu: CrowdUniforms = crowdUniforms();
@@ -189,7 +190,11 @@ export class StadiumView implements StadiumViewApi {
     },
     () => this.setPitch(this.pitch),
     () => {
-      this.seats = seatList();
+      this.seatSteps ??= seatListSteps();
+      const r = this.seatSteps.next();
+      if (r.done !== true) return false;
+      this.seats = r.value;
+      this.seatSteps = null;
     },
     () => {
       const n = Math.min(this.budget, this.seats!.count);

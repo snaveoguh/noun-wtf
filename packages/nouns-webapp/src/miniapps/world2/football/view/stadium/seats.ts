@@ -42,6 +42,17 @@ let cached: SeatList | null = null;
 
 /** Every seat in the bowl (shuffled, deterministic). Cached. */
 export function seatList(): SeatList {
+  const it = seatListSteps();
+  let r = it.next();
+  while (r.done !== true) r = it.next();
+  return r.value;
+}
+
+/**
+ * The same, a stand per step (the view runs one step a frame: the whole
+ * list in one go is a ~30 ms hitch on a slow CPU).
+ */
+export function* seatListSteps(): Generator<void, SeatList, void> {
   if (cached !== null) return cached;
   const xs: number[] = [];
   const _p = { x: 0, z: 0 };
@@ -68,6 +79,7 @@ export function seatList(): SeatList {
           xs.push(_p.x, y, _p.z, yaw);
         }
       }
+    yield;
   }
   const count = xs.length / 4;
   // shuffle (Fisher–Yates on a fixed hash)
@@ -79,6 +91,7 @@ export function seatList(): SeatList {
     order[i] = order[j]!;
     order[j] = t;
   }
+  yield;
   const pos = new Float32Array(count * 3);
   const yaw = new Float32Array(count);
   const data = new Float32Array(count * 4);
