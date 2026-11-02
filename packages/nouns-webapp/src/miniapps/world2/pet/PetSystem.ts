@@ -78,6 +78,10 @@ class HeadTop {
   }
 }
 
+/** `?pet=0`: no pets at all, mine or anyone's (a kill switch, and the perf A/B). */
+const PETS_OFF =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pet') === '0';
+
 export class PetSystem {
   private game: Game;
   private world: PetWorld | null = null;
@@ -192,7 +196,7 @@ export class PetSystem {
   /** Once a frame, every branch of Game.step (minigames too: it sits and watches). */
   frame(dt: number) {
     const g = this.game;
-    if (g.me === null || g.showroom) return;
+    if (PETS_OFF || g.me === null || g.showroom) return;
     this.clock += dt;
     if (this.world === null) this.world = collisionPetWorld(g.world);
     if (!this.keyBound) {
@@ -412,6 +416,7 @@ export class PetSystem {
    * placed here from their rider, no positions on the wire.
    */
   remote(id: string, rp: RemotePlayer, ch: NounCharacter, hidden: boolean, dt: number) {
+    if (PETS_OFF) return;
     const info = decodePet(rp.pet);
     let pet = this.remotes.get(id);
     if (info === null || info.mode === 'perch') {
