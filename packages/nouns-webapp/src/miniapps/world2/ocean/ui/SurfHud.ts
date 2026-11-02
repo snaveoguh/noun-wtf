@@ -18,7 +18,7 @@ const CSS = `
 .w2surf-pop.wipe{opacity:1;color:#ff2f8e;animation:none}
 @keyframes w2surfblink{50%{opacity:.4}}
 .w2surf-spd{position:absolute;right:22px;top:50%;transform:translateY(-50%);text-align:right;color:#fff;display:none}
-.w2surf.ride .w2surf-spd{display:block}
+/* (the game's own speedometer already shows km/h: the surf one stays off) */
 .w2surf-spd .w2surf-num{font-size:46px;color:#20d6ff}
 .w2surf-spd small{display:block;font:800 10px/1 system-ui,sans-serif;letter-spacing:.14em;margin-top:4px;text-shadow:0 1px 2px #000}
 .w2surf-btn{position:absolute;right:18px;bottom:40%;width:86px;height:86px;border-radius:50%;border:3px solid #0b0b12;box-shadow:0 0 0 2px #fff,0 4px 0 rgba(0,0,0,.35);background:#20d6ff;color:#0b0b12;font:900 17px/1 'Londrina Solid',system-ui,sans-serif;letter-spacing:.04em;pointer-events:auto;touch-action:none;display:none}
@@ -26,7 +26,7 @@ const CSS = `
 .w2surf-btn.pop{background:#ffd400}
 .w2surf-shop{position:absolute;left:50%;bottom:160px;transform:translateX(-50%);pointer-events:auto;display:none;font:900 15px/1 'Londrina Solid',system-ui,sans-serif;letter-spacing:.04em;color:#0b0b12;background:#ffd23f;border:3px solid #0b0b12;border-radius:999px;padding:9px 16px;box-shadow:0 0 0 2px #fff,0 4px 0 rgba(0,0,0,.35);cursor:pointer}
 .w2surf-shop.on{display:block}
-@media (max-width:640px){.w2surf-pop{font-size:42px}.w2surf-hint{bottom:auto;top:96px;font-size:11px}.w2surf-spd{right:12px;top:38%}.w2surf-spd .w2surf-num{font-size:34px}}
+@media (max-width:640px){.w2surf-pop{font-size:42px}.w2surf-hint{bottom:auto;top:128px;left:12px;right:72px;transform:none;white-space:normal;text-align:center;border-radius:14px;font-size:11px}}
 @media (prefers-reduced-motion:reduce){.w2surf-pop.on{animation:none}.w2surf-pop{transition:none}}
 `;
 
