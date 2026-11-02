@@ -133,7 +133,7 @@ const PropRef: FC<{ dao: AutopilotDao; id: number | string; title?: string | nul
         href={propHref(dao, id)}
         target="_blank"
         rel="noreferrer"
-        className="wp-link wp-ellipsis"
+        className="wp-link wp-ellipsis wp-tap-line"
         title="opens lilnouns.wtf"
       >
         {label}
@@ -141,7 +141,7 @@ const PropRef: FC<{ dao: AutopilotDao; id: number | string; title?: string | nul
     );
   }
   return (
-    <Link to={propHref(dao, id)} className="wp-link wp-ellipsis">
+    <Link to={propHref(dao, id)} className="wp-link wp-ellipsis wp-tap-line">
       {label}
     </Link>
   );

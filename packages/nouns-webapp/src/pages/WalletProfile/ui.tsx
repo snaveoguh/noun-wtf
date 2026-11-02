@@ -198,7 +198,7 @@ export const EtherscanTx: FC<{ hash: string | null | undefined }> = ({ hash }) =
       href={`https://etherscan.io/tx/${hash}`}
       target="_blank"
       rel="noreferrer"
-      className="wp-link text-xs"
+      className="wp-link wp-tap text-xs"
       title={hash}
     >
       tx ↗

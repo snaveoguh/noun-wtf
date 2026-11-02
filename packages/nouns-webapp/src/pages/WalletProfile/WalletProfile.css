@@ -392,8 +392,20 @@
     min-width: 40px;
   }
   .wp-slider,
-  .wp label:has(> .wp-checkbox) {
+  .wp label:has(> .wp-checkbox),
+  .wp label:has(> .wp-slider) {
     min-height: 40px;
+  }
+  .wp label:has(> .wp-checkbox),
+  .wp label:has(> .wp-slider) {
+    min-width: 40px;
+  }
+  /* a one-line link in a row or table cell (autopilot's proposal titles) */
+  .wp-tap-line {
+    display: block;
+    min-height: 40px;
+    min-width: 40px;
+    line-height: 40px;
   }
   /* a Noun card's "#id" link and an activity row's "view" / "tx ↗" */
   .wp .mt-1.flex > .wp-link,
