@@ -50,8 +50,8 @@ export const GANTRY_Y = 25;
 /** The far stand's roof rim: the top of a broadcast frame stays this far under it. */
 export const ROOF_MARGIN = 7;
 /** Width of pitch a broadcast frame fits round its focus: wide … tight (m). */
-export const BROADCAST_WIDE = 58;
-export const BROADCAST_TIGHT = 30;
+export const BROADCAST_WIDE = 46;
+export const BROADCAST_TIGHT = 24;
 
 /** Vertical fov (deg) that shows `width` m across at `dist` m, for an aspect. */
 export function fovForWidth(width: number, dist: number, aspect: number): number {

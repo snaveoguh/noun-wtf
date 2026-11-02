@@ -42,7 +42,7 @@ export async function footballDemo(g: Game, o: FootballDevOptions = {}) {
   const p = g.player.pos;
   const frame = {
     x: Math.round(p.x),
-    y: Math.round(p.y + (o.lift ?? 160)),
+    y: Math.round(p.y + (o.lift ?? 260)),
     z: Math.round(p.z),
     yaw: 0,
   };
@@ -60,12 +60,14 @@ export async function footballDemo(g: Game, o: FootballDevOptions = {}) {
       audio: () => g.audio.ctx,
       audioOut: () => g.audio.master,
       canvas: gfx.renderer.domElement,
+      ink: gfx.outline,
       warm: obj => warmHidden(gfx.renderer, obj, gfx.camera, gfx.scene, f => gfx.asDrawn(f)),
     },
   );
   while (!view.buildStep()) await new Promise(r => setTimeout(r, 0));
   const mock = createMockMatch();
-  const sheet = o.sheet === true ? createPoseSheet() : null;
+  const stand = view.cam.ctx.stand;
+  const sheet = o.sheet === true ? createPoseSheet(7, 3.1, stand) : null;
   view.setMatch(sheet?.config ?? mock.config);
   view.setLocal('me');
   view.setLive(true);
@@ -85,7 +87,7 @@ export async function footballDemo(g: Game, o: FootballDevOptions = {}) {
   /** Fixed camera for the sheet (pitch space). */
   let manual: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null =
     sheet !== null
-      ? { pos: new THREE.Vector3(-17, 6.5, 0), look: new THREE.Vector3(0, 1.0, 0), fov: 46 }
+      ? { pos: new THREE.Vector3(stand * 25, 9, 0), look: new THREE.Vector3(0, 0.6, 0), fov: 50 }
       : null;
   const centre = new THREE.Vector3(frame.x, frame.y, frame.z);
   const toWorld = (v: THREE.Vector3) => v.clone().applyMatrix4(view.root.matrixWorld);
@@ -109,16 +111,9 @@ export async function footballDemo(g: Game, o: FootballDevOptions = {}) {
       cam.fov = manual.fov;
       cam.updateProjectionMatrix();
       cam.updateMatrixWorld();
-      // Still give the view its frustum + eye (LOD) without moving the camera
-      const s = cam.position.clone();
-      const q = cam.quaternion.clone();
-      const f = cam.fov;
-      view.camera(cam, dt, next);
-      cam.position.copy(s);
-      cam.quaternion.copy(q);
-      cam.fov = f;
-      cam.updateProjectionMatrix();
-      cam.updateMatrixWorld();
+      // The view's LOD eye + frustum from this camera (it doesn't drive it).
+      // The contact sheet never observes: every footballer posed every frame.
+      if (sheet === null) view.observe(cam);
     } else view.camera(cam, dt, next);
   };
 
@@ -168,6 +163,14 @@ export async function footballDemo(g: Game, o: FootballDevOptions = {}) {
       view.stopReplay();
     },
     render() {
+      if (manual !== null) {
+        view.root.updateMatrixWorld();
+        cam.position.copy(toWorld(manual.pos));
+        cam.lookAt(toWorld(manual.look));
+        cam.fov = manual.fov;
+        cam.updateProjectionMatrix();
+        cam.updateMatrixWorld();
+      }
       gfx.followShadow(centre);
       gfx.render(1 / 60);
     },
@@ -189,13 +192,30 @@ export async function footballDemo(g: Game, o: FootballDevOptions = {}) {
         };
       });
     },
+    /** The view's costs + one whole frame's renderer counts (every pass). */
     perf() {
       const info = gfx.renderer.info;
+      const auto = info.autoReset;
+      info.autoReset = false;
+      info.reset();
+      api.render();
+      const calls = info.render.calls;
+      const tris = info.render.triangles;
+      // The same frame without the match (footballers + ball): what the view adds
+      view.root.visible = false;
+      info.reset();
+      api.render();
+      const without = info.render.calls;
+      const trisWithout = info.render.triangles;
+      view.root.visible = true;
+      info.autoReset = auto;
       return {
         ...view.stats,
         footballers: view.footballers.size,
-        calls: info.render.calls,
-        triangles: info.render.triangles,
+        matchCalls: calls - without,
+        matchTriangles: tris - trisWithout,
+        calls,
+        triangles: tris,
         programs: info.programs?.length ?? 0,
         textures: info.memory.textures,
         geometries: info.memory.geometries,
