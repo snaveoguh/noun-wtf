@@ -676,12 +676,31 @@ export type FootballMsg =
   | { type: 'football:start'; gid: string; host: string; config: MatchConfig; to?: string }
   /** Human → host, ~30 Hz. */
   | { type: 'football:input'; gid: string; id: string; seq: number; pad: PadInput }
-  /** Host → game, ~15 Hz: quantised snapshot (net/codec.ts), `e` = events since the last. */
-  | { type: 'football:s'; gid: string; d: string; e?: unknown[] }
+  /**
+   * Host → game, ~15 Hz: quantised snapshot (net/codec.ts), `e` = events
+   * (net/codec.ts `packEvents`: a sequence number, then the recent events,
+   * re-sent for a while so a lost snapshot loses none). `a` = the host's
+   * clock (ms) at the snapshot's step.
+   */
+  | { type: 'football:s'; gid: string; d: string; e?: unknown[]; a?: number }
   /** Spectator → host via relay. */
   | { type: 'football:watch'; gid: string; from: string }
   | { type: 'football:leave'; gid: string; id: string }
-  | { type: 'football:end'; gid: string; winner: TeamId | null; score: [number, number] };
+  | {
+      type: 'football:end';
+      gid: string;
+      winner: TeamId | null;
+      score: [number, number];
+      pens?: [number, number];
+      reason?: FootballEndReason;
+    }
+  /** Member → host: clock sync (`c` = the member's clock, ms). */
+  | { type: 'football:ping'; gid: string; from: string; c: number }
+  /** Host → that member: `c` echoed, `a` = the host's clock (ms). */
+  | { type: 'football:pong'; gid: string; to: string; c: number; a: number };
+
+/** Why a match ended (net/sync.ts `ended`). */
+export type FootballEndReason = 'final' | 'host_left' | 'left' | 'timeout';
 
 // ── The mode (game.football) ────────────────────────────────────────────
 
