@@ -23,8 +23,8 @@
 // scheduler (slices.ts) runs them inside a frame budget.
 
 import type { CourseLayout, Ribbon, Shape } from '../contract';
-import type { GolfCourse, GroundSample } from '../course/surface';
 import type { MeshData } from './kit';
+import type { GolfCourse, GroundSample } from '../course/surface';
 
 import { lieColour, type Rgb } from '../course/colors';
 import { ribbonBox, ribbonDist, shapeDist, shapeRadius } from '../course/shapes';
@@ -165,7 +165,8 @@ export function courseRegions(L: CourseLayout): Region[] {
     for (const f of r.fine) growShape(r, f.shape, pad + 6);
     for (const rb of r.ribbons) growRibbon(r, rb, pad);
     for (const rb of r.paths) growRibbon(r, rb, pad);
-    for (const d of r.discs) grow(r, d.x - d.r - pad, d.z - d.r - pad, d.x + d.r + pad, d.z + d.r + pad);
+    for (const d of r.discs)
+      grow(r, d.x - d.r - pad, d.z - d.r - pad, d.x + d.r + pad, d.z + d.r + pad);
     boxOf(r);
   }
   return all;
@@ -186,7 +187,9 @@ class Buf<T extends Float32Array | Uint32Array> {
   constructor(public a: T) {}
   push(...v: number[]) {
     if (this.n + v.length > this.a.length) {
-      const next = new (this.a.constructor as { new (n: number): T })(Math.max(this.a.length * 2, this.n + v.length));
+      const next = new (this.a.constructor as { new (n: number): T })(
+        Math.max(this.a.length * 2, this.n + v.length),
+      );
       next.set(this.a);
       this.a = next;
     }
@@ -225,7 +228,14 @@ const _g: GroundSample = { lie: 'deep', stripe: 0, hole: 0 };
 const _c: Rgb = { r: 0, g: 0, b: 0 };
 const _n = { x: 0, y: 1, z: 0 };
 
-function pushVertex(C: GolfCourse, o: Out, x: number, y: number, z: number, n: { x: number; y: number; z: number }) {
+function pushVertex(
+  C: GolfCourse,
+  o: Out,
+  x: number,
+  y: number,
+  z: number,
+  n: { x: number; y: number; z: number },
+) {
   o.pos.push(x - o.ox, y, z - o.oz);
   o.nrm.push(n.x, n.y, n.z);
   const g = C.ground(x, z, _g);
@@ -296,8 +306,10 @@ export function* gridPatch(
       const d = k > 0 && vid[q - W] !== -1;
       const u = k < nz && vid[q + W] !== -1;
       if ((l || r) && (d || u)) {
-        const dx = ((r ? hy[q + 1] : hy[q]) - (l ? hy[q - 1] : hy[q])) / (h * ((l ? 1 : 0) + (r ? 1 : 0)));
-        const dz = ((u ? hy[q + W] : hy[q]) - (d ? hy[q - W] : hy[q])) / (h * ((d ? 1 : 0) + (u ? 1 : 0)));
+        const dx =
+          ((r ? hy[q + 1] : hy[q]) - (l ? hy[q - 1] : hy[q])) / (h * ((l ? 1 : 0) + (r ? 1 : 0)));
+        const dz =
+          ((u ? hy[q + W] : hy[q]) - (d ? hy[q - W] : hy[q])) / (h * ((d ? 1 : 0) + (u ? 1 : 0)));
         const L = Math.sqrt(dx * dx + 1 + dz * dz);
         _n.x = -dx / L;
         _n.y = 1 / L;
@@ -333,7 +345,17 @@ export function* stripPatch(
 ): Generator<void> {
   const half = rb.half[0];
   const reach = half + OVERLAY_FRINGE;
-  const cols = [-reach, -half - 2.2, -half - 0.08, -half + 0.08, 0, half - 0.08, half + 0.08, half + 2.2, reach];
+  const cols = [
+    -reach,
+    -half - 2.2,
+    -half - 0.08,
+    -half + 0.08,
+    0,
+    half - 0.08,
+    half + 0.08,
+    half + 2.2,
+    reach,
+  ];
   // Split at sharp corners: each run is its own strip, run on past its ends,
   // so the outside of a corner is covered too
   const runs: { x: number; z: number }[][] = [[rb.pts[0]]];
@@ -350,7 +372,8 @@ export function* stripPatch(
       if (turn > 0.45) runs.push([b]);
     }
   }
-  for (const run of runs) if (run.length > 1) yield* stripRun(C, o, run, step, lift, half, reach, cols);
+  for (const run of runs)
+    if (run.length > 1) yield* stripRun(C, o, run, step, lift, half, reach, cols);
 }
 
 function* stripRun(
@@ -534,7 +557,12 @@ export interface RegionBuild {
 }
 
 /** Build one region's overlay mesh at a LOD (positions relative to (r.cx, r.cz)). */
-export function* buildRegion(C: GolfCourse, r: Region, lod: number, out: RegionBuild): Generator<void> {
+export function* buildRegion(
+  C: GolfCourse,
+  r: Region,
+  lod: number,
+  out: RegionBuild,
+): Generator<void> {
   const L = OVERLAY_LOD[lod];
   const o = new Out(r.cx, r.cz);
   const hc = L.coarse;
@@ -566,7 +594,17 @@ export function* buildRegion(C: GolfCourse, r: Region, lod: number, out: RegionB
       x1 = Math.max(x1, f.shape.x + R);
       z1 = Math.max(z1, f.shape.z + R);
     }
-    yield* gridPatch(C, o, x0, z0, x1, z1, hf, LIFT.fine, (x, z) => fineDist(cl, hc, x, z) < hf * 1.5);
+    yield* gridPatch(
+      C,
+      o,
+      x0,
+      z0,
+      x1,
+      z1,
+      hf,
+      LIFT.fine,
+      (x, z) => fineDist(cl, hc, x, z) < hf * 1.5,
+    );
   }
   for (const p of r.paths) yield* stripPatch(C, o, p, L.strip, LIFT.strip);
   for (const d of r.discs) yield* discPatch(C, o, d.x, d.z, d.r, L.disc, LIFT.disc);

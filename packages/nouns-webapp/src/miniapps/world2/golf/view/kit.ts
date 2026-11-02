@@ -79,7 +79,17 @@ export class MeshBuf {
   }
 
   /** Add a vertex in local coordinates (normal local too). */
-  vert(lx: number, ly: number, lz: number, nx: number, ny: number, nz: number, col: Rgb, u = 0, v = 0) {
+  vert(
+    lx: number,
+    ly: number,
+    lz: number,
+    nx: number,
+    ny: number,
+    nz: number,
+    col: Rgb,
+    u = 0,
+    v = 0,
+  ) {
     this.pos.push(this.px(lx, lz), this.fy + ly, this.pz(lx, lz));
     this.nrm.push(nx * this.c + nz * this.s, ny, -nx * this.s + nz * this.c);
     this.col.push(col.r, col.g, col.b);
@@ -247,7 +257,15 @@ export class MeshBuf {
   }
 
   /** A flat ring / disc on the ground (y up), inner radius 0 = a disc. */
-  ring(x: number, y: number, z: number, r0: number, r1: number, sides: number, colour: Colour): this {
+  ring(
+    x: number,
+    y: number,
+    z: number,
+    r0: number,
+    r1: number,
+    sides: number,
+    colour: Colour,
+  ): this {
     const col = rgb(colour);
     const base = this.count;
     for (let i = 0; i <= sides; i++) {
@@ -269,7 +287,16 @@ export class MeshBuf {
    * A gable roof: a triangular prism, ridge along local x at height h over
    * its base (y), width w (along x) and depth d (along z), eaves included.
    */
-  gable(x: number, y: number, z: number, w: number, d: number, h: number, colour: Colour, ends: Colour = colour): this {
+  gable(
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    d: number,
+    h: number,
+    colour: Colour,
+    ends: Colour = colour,
+  ): this {
     const col = rgb(colour);
     const ce = rgb(ends);
     const hw = w / 2;

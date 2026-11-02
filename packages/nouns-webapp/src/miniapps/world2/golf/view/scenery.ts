@@ -56,7 +56,15 @@ const W = { x: 0, z: 0 };
 const AT = { x: 0, z: 0, yaw: 0 };
 
 /** Mini noggles (⌐◨-◨): lens size s, facing local +z, centred on (x, y, z). */
-function noggles(b: MeshBuf, x: number, y: number, z: number, s: number, depth: number, frame = RED) {
+function noggles(
+  b: MeshBuf,
+  x: number,
+  y: number,
+  z: number,
+  s: number,
+  depth: number,
+  frame = RED,
+) {
   const t = s * 0.18;
   const gap = s * 0.3;
   const lx = [x - (s + gap) / 2, x + (s + gap) / 2];
@@ -96,7 +104,13 @@ function boardPanel(
 
 // ── Buildings ───────────────────────────────────────────────────────────
 
-function clubhouse(b: Building, solid: MeshBuf, glass: MeshBuf, signs: MeshBuf, cols: ColliderBox[]) {
+function clubhouse(
+  b: Building,
+  solid: MeshBuf,
+  glass: MeshBuf,
+  signs: MeshBuf,
+  cols: ColliderBox[],
+) {
   const { hw, hl } = b;
   for (const m of [solid, glass, signs]) m.setFrame(b.x, b.y, b.z, b.yaw);
   // Plinth + steps
@@ -108,7 +122,8 @@ function clubhouse(b: Building, solid: MeshBuf, glass: MeshBuf, signs: MeshBuf, 
   for (const s of [-1, 1]) solid.box(s * (hw - 0.3), 0.45 + gh / 2, 0, 0.6, gh, 2 * hl, CREAM);
   solid.box(0, 0.45 + gh / 2 - 0.1, -0.4, 2 * hw - 1.4, gh - 0.3, 2 * hl - 1.8, INSIDE);
   glass.box(0, 0.45 + gh / 2, hl - 0.25, 2 * hw - 1.2, gh - 0.1, 0.12, 0xffffff);
-  for (let x = -hw + 0.6; x <= hw - 0.5; x += 3.1) solid.box(x, 0.45 + gh / 2, hl - 0.15, 0.2, gh, 0.26, DARK);
+  for (let x = -hw + 0.6; x <= hw - 0.5; x += 3.1)
+    solid.box(x, 0.45 + gh / 2, hl - 0.15, 0.2, gh, 0.26, DARK);
   // Doors: a dark gap mid-front
   solid.box(0, 0.45 + 1.3, hl - 0.05, 2.6, 2.6, 0.1, DARK);
   // First floor slab, with a canopy over the front terrace
@@ -124,7 +139,8 @@ function clubhouse(b: Building, solid: MeshBuf, glass: MeshBuf, signs: MeshBuf, 
   for (const s of [-1, 1]) solid.box(s * (uhw - 0.3), uy + uh / 2, uz, 0.6, uh, 2 * uhl, CREAM);
   solid.box(0, uy + uh / 2, uz - 0.3, 2 * uhw - 1.4, uh - 0.2, 2 * uhl - 1.4, INSIDE);
   glass.box(0, uy + uh / 2, uz + uhl - 0.25, 2 * uhw - 1.2, uh - 0.1, 0.12, 0xffffff);
-  for (let x = -uhw + 0.6; x <= uhw - 0.5; x += 2.6) solid.box(x, uy + uh / 2, uz + uhl - 0.15, 0.18, uh, 0.24, DARK);
+  for (let x = -uhw + 0.6; x <= uhw - 0.5; x += 2.6)
+    solid.box(x, uy + uh / 2, uz + uhl - 0.15, 0.18, uh, 0.24, DARK);
   const ry = uy + uh + 0.25;
   solid.box(0, ry, uz, 2 * uhw + 1, 0.5, 2 * uhl + 1, WHITE);
   // Terrace railing round the front of the slab
@@ -151,7 +167,15 @@ function clubhouse(b: Building, solid: MeshBuf, glass: MeshBuf, signs: MeshBuf, 
 }
 
 /** A collider box offset in a building's frame. */
-function frameBox(b: Building, lx: number, lz: number, hw: number, hl: number, y0: number, h: number): ColliderBox {
+function frameBox(
+  b: Building,
+  lx: number,
+  lz: number,
+  hw: number,
+  hl: number,
+  y0: number,
+  h: number,
+): ColliderBox {
   const c = Math.cos(b.yaw);
   const s = Math.sin(b.yaw);
   return { x: b.x + lx * c + lz * s, y: b.y + y0, z: b.z - lx * s + lz * c, hw, hl, h, yaw: b.yaw };
@@ -176,10 +200,11 @@ function simple(
     for (const s of [-1, 1]) solid.box(s * (hw - 0.2), wh / 2, hl - 0.4, 0.4, wh, 0.5, o.trim);
   } else {
     solid.box(0, wh / 2, 0, 2 * hw, wh, 2 * hl, o.wall);
-    if (o.door) solid.box(0, wh * 0.4, hl + 0.02, hw * 1.1, wh * 0.8, 0.06, o.trim);
+    if (o.door === true) solid.box(0, wh * 0.4, hl + 0.02, hw * 1.1, wh * 0.8, 0.06, o.trim);
     else solid.box(0, wh * 0.55, hl + 0.02, hw * 0.9, wh * 0.4, 0.06, 0x9fd3e8);
   }
-  if (o.gable !== undefined) solid.gable(0, wh, 0, 2 * hw + 0.6, 2 * hl + 0.8, o.gable, o.trim, o.wall);
+  if (o.gable !== undefined)
+    solid.gable(0, wh, 0, 2 * hw + 0.6, 2 * hl + 0.8, o.gable, o.trim, o.wall);
   else {
     solid.box(0, wh + 0.2, 0, 2 * hw + 0.8, 0.4, 2 * hl + 0.8, o.trim);
     // Awning over the front
@@ -188,7 +213,17 @@ function simple(
   const top = o.gable !== undefined ? wh + o.gable * 0.45 : wh + 1.1;
   const sw = Math.min(2 * hw - 0.6, 4.2);
   const sz = o.gable !== undefined ? hl + 0.42 : hl + 0.35;
-  boardPanel(signs, solid, 0, o.gable !== undefined ? wh - 0.6 : top, sz, sw, sw / 2, 0, buildingCell(b.id));
+  boardPanel(
+    signs,
+    solid,
+    0,
+    o.gable !== undefined ? wh - 0.6 : top,
+    sz,
+    sw,
+    sw / 2,
+    0,
+    buildingCell(b.id),
+  );
   cols.push({ x: b.x, y: b.y, z: b.z, hw, hl, h, yaw: b.yaw });
 }
 
@@ -204,7 +239,15 @@ function bar19(b: Building, solid: MeshBuf, signs: MeshBuf, cols: ColliderBox[])
   const bottles = [0x2f8f4f, 0xe8a23a, 0x9b2a2a, 0xdedede, 0x3a6fd8];
   for (const y of [1.6, 2.3])
     for (let i = 0; i < 14; i++)
-      solid.box(-hw + 1.2 + i * ((2 * hw - 2.4) / 13), y, 0.08, 0.16, 0.42, 0.16, bottles[(i + y * 3) % 5 | 0]);
+      solid.box(
+        -hw + 1.2 + i * ((2 * hw - 2.4) / 13),
+        y,
+        0.08,
+        0.16,
+        0.42,
+        0.16,
+        bottles[(i + y * 3) % 5 | 0],
+      );
   for (const y of [1.36, 2.06]) solid.box(0, y, 0.12, 2 * hw - 1.6, 0.06, 0.34, WOOD_LT);
   // Counter + stools
   solid.box(0, 0.55, 2.2, 2 * hw - 2.4, 1.1, 0.8, WOOD);
@@ -218,12 +261,23 @@ function bar19(b: Building, solid: MeshBuf, signs: MeshBuf, cols: ColliderBox[])
   const stripes = 9;
   const sw = (2 * hw) / stripes;
   for (let i = 0; i < stripes; i++)
-    solid.box(-hw + sw * (i + 0.5), 3.4, hl / 2 + 0.6, sw, 0.12, hl + 1.2, i % 2 === 0 ? RED : WHITE);
+    solid.box(
+      -hw + sw * (i + 0.5),
+      3.4,
+      hl / 2 + 0.6,
+      sw,
+      0.12,
+      hl + 1.2,
+      i % 2 === 0 ? RED : WHITE,
+    );
   for (const s of [-1, 1]) solid.cyl(s * (hw - 0.3), 0.2, hl + 0.9, 0.08, 0.08, 3.2, 6, WHITE);
   // THE 19TH HOLE up top, a noggles beside it
   boardPanel(signs, solid, -1.2, h + 1.5, bz + hl / 2 + 0.1, 5, 2.5, 0, buildingCell('bar19'), RED);
   noggles(solid, hw - 2.2, h + 1.4, bz + hl / 2, 1.1, 0.25);
-  cols.push(frameBox(b, 0, bz, hw, hl / 2, 0, h + 0.4), frameBox(b, 0, 2.2, hw - 1.2, 0.4, 0, 1.15));
+  cols.push(
+    frameBox(b, 0, bz, hw, hl / 2, 0, h + 0.4),
+    frameBox(b, 0, 2.2, hw - 1.2, 0.4, 0, 1.15),
+  );
 }
 
 // ── Course dressing ─────────────────────────────────────────────────────
@@ -389,7 +443,17 @@ function flagSet(L: CourseLayout, ox: number, oz: number): FlagSet {
         const fu = c / (FLAG.cols - 1);
         const fv = r / (FLAG.rows - 1);
         // Along the flag = local +z (the yaw it flies), down = −y
-        b.vert(0, -FLAG.h * fv, FLAG.w * fu, 1, 0, 0, { r: 1, g: 1, b: 1 }, u0 + (u1 - u0) * fu, v1 - (v1 - v0) * fv);
+        b.vert(
+          0,
+          -FLAG.h * fv,
+          FLAG.w * fu,
+          1,
+          0,
+          0,
+          { r: 1, g: 1, b: 1 },
+          u0 + (u1 - u0) * fu,
+          v1 - (v1 - v0) * fv,
+        );
       }
     for (let r = 0; r < FLAG.rows - 1; r++)
       for (let c = 0; c < FLAG.cols - 1; c++) {
@@ -397,7 +461,14 @@ function flagSet(L: CourseLayout, ox: number, oz: number): FlagSet {
         b.tri(a, a + FLAG.cols, a + 1);
         b.tri(a + 1, a + FLAG.cols, a + FLAG.cols + 1);
       }
-    flags.push({ v0: v, x: x - ox, y: y + pole, z: z - oz, yaw, phase: (x * 0.13 + z * 0.29) % 6.28 });
+    flags.push({
+      v0: v,
+      x: x - ox,
+      y: y + pole,
+      z: z - oz,
+      yaw,
+      phase: (x * 0.13 + z * 0.29) % 6.28,
+    });
   };
   for (const h of L.holes) add(h.pin.x, h.pin.y, h.pin.z, h.n - 1, FLAG.pole);
   for (const t of L.range.targets) add(t.x, t.y, t.z, FLAG_PLAIN, FLAG.pole);
@@ -440,7 +511,12 @@ export function buildScenery(C: GolfCourse, ox: number, oz: number): Scenery {
 }
 
 /** buildScenery in slices: yields after each building and every few holes. */
-export function* sceneryGen(C: GolfCourse, ox: number, oz: number, out: { scenery: Scenery | null }): Generator<void> {
+export function* sceneryGen(
+  C: GolfCourse,
+  ox: number,
+  oz: number,
+  out: { scenery: Scenery | null },
+): Generator<void> {
   const L = C.layout;
   const solid = new MeshBuf(ox, oz);
   const glass = new MeshBuf(ox, oz);
@@ -458,13 +534,24 @@ export function* sceneryGen(C: GolfCourse, ox: number, oz: number, out: { scener
         simple(b, solid, glass, signs, cols, { wall: CREAM, trim: GREEN_DK, glassFront: true });
         break;
       case 'starter':
-        simple(b, solid, glass, signs, cols, { wall: WHITE, trim: RED, glassFront: false, gable: 1.2 });
+        simple(b, solid, glass, signs, cols, {
+          wall: WHITE,
+          trim: RED,
+          glassFront: false,
+          gable: 1.2,
+        });
         break;
       case 'rangehut':
         simple(b, solid, glass, signs, cols, { wall: CREAM, trim: GREEN_DK, glassFront: true });
         break;
       case 'barn':
-        simple(b, solid, glass, signs, cols, { wall: 0xb3372f, trim: WHITE, glassFront: false, gable: 1.8, door: true });
+        simple(b, solid, glass, signs, cols, {
+          wall: 0xb3372f,
+          trim: WHITE,
+          glassFront: false,
+          gable: 1.8,
+          door: true,
+        });
         break;
     }
     yield;

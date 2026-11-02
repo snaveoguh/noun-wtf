@@ -465,6 +465,8 @@ function inPlay(holes: Hole[], x: number, z: number, skip: number): boolean {
     if (unionDist(h.green, x, z) < 4) return true;
     if (h.fairway && ribbonDist(h.fairway, x, z) < 1) return true;
     if (shapeDist(h.tee, x, z) < 2) return true;
+    for (const b of h.bunkers) if (shapeDist(b.shape, x, z) < 3) return true;
+    for (const w of h.water) if (unionDist(w.shapes, x, z) < 3) return true;
   }
   return false;
 }
@@ -488,7 +490,12 @@ function buildPaths(holes: Hole[], clubPad: Shape): Ribbon[] {
       const pts = resample([start, ...along.slice(1, -1), end], 12);
       let bad = 0;
       for (const p of pts)
-        if (inPlay(holes, p.x, p.z, h.n) || unionDist(h.green, p.x, p.z) < 6) bad++;
+        if (
+          inPlay(holes, p.x, p.z, h.n) ||
+          unionDist(h.green, p.x, p.z) < 6 ||
+          h.bunkers.some(b => shapeDist(b.shape, p.x, p.z) < 3)
+        )
+          bad++;
       if (bad < bestBad) {
         bestBad = bad;
         best = pts;
@@ -506,6 +513,22 @@ function buildPaths(holes: Hole[], clubPad: Shape): Ribbon[] {
         : leg;
     out.push({ pts: joined, half: joined.map(() => PATH_HALF) });
   }
+  // Wherever a path still runs into sand or water, step it round the edge
+  const obstacles: Shape[] = [];
+  for (const h of holes) {
+    for (const b of h.bunkers) obstacles.push(b.shape);
+    for (const w of h.water) obstacles.push(...w.shapes);
+  }
+  for (const leg of out)
+    for (const p of leg.pts)
+      for (const o of obstacles)
+        for (let k = 0; k < 120 && shapeDist(o, p.x, p.z) < 3; k++) {
+          const dx = p.x - o.x;
+          const dz = p.z - o.z;
+          const l = Math.hypot(dx, dz) || 1;
+          p.x += (dx / l) * 0.75;
+          p.z += (dz / l) * 0.75;
+        }
   // Home: the clubhouse pad to the 1st, 10th and 19th tees; the 9th, 18th greens back
   const home = { x: clubPad.x, z: clubPad.z };
   for (const k of [0, 9, 18, 8, 17]) {

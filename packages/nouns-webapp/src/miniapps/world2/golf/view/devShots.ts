@@ -12,7 +12,17 @@ import type { CourseLayout, V3 } from '../contract';
 import { toWorld, uYaw } from '../course/site';
 import { golfCourse } from '../course/surface';
 
-export type DevShot = 'mid' | 'top' | 'air' | 'tee1' | 'green' | 'clubhouse' | 'island' | 'noggle' | 'range' | 'entrance';
+export type DevShot =
+  | 'mid'
+  | 'top'
+  | 'air'
+  | 'tee1'
+  | 'green'
+  | 'clubhouse'
+  | 'island'
+  | 'noggle'
+  | 'range'
+  | 'entrance';
 
 export interface DevPose {
   rider: V3 & { yaw: number };
@@ -21,7 +31,10 @@ export interface DevPose {
 }
 
 function along(x: number, z: number, yaw: number, a: number, s: number) {
-  return { x: x + Math.sin(yaw) * a + Math.cos(yaw) * s, z: z + Math.cos(yaw) * a - Math.sin(yaw) * s };
+  return {
+    x: x + Math.sin(yaw) * a + Math.cos(yaw) * s,
+    z: z + Math.cos(yaw) * a - Math.sin(yaw) * s,
+  };
 }
 
 export function devPose(L: CourseLayout, shot: DevShot): DevPose {
@@ -41,8 +54,8 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
       // Straight down over the 1st's fairway
       const m = h1.line[0];
       const e = h1.line[h1.line.length - 1];
-      const x = (m.x * 0.4 + e.x * 0.6);
-      const z = (m.z * 0.4 + e.z * 0.6);
+      const x = m.x * 0.4 + e.x * 0.6;
+      const z = m.z * 0.4 + e.z * 0.6;
       return {
         rider: { x, y: h1.pin.y, z, yaw: 0 },
         cam: { x: x + 0.01, y: h1.pin.y + 190, z },
@@ -54,7 +67,11 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
       const yaw = h1.tee.yaw;
       const c = along(t.x, t.z, yaw, -14, 2);
       const l = along(t.x, t.z, yaw, 120, 0);
-      return { rider: { ...t, yaw }, cam: { x: c.x, y: t.y + 3.2, z: c.z }, look: { x: l.x, y: t.y - 4, z: l.z } };
+      return {
+        rider: { ...t, yaw },
+        cam: { x: c.x, y: t.y + 3.2, z: c.z },
+        look: { x: l.x, y: t.y - 4, z: l.z },
+      };
     }
     case 'mid': {
       // Mid-course: the 7th tee (THE LAKE), ~800 m west of the clubhouse
@@ -63,14 +80,22 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
       const yaw = h.tee.yaw;
       const c = along(t.x, t.z, yaw, -14, 2);
       const l = along(t.x, t.z, yaw, 160, 0);
-      return { rider: { ...t, yaw }, cam: { x: c.x, y: t.y + 4, z: c.z }, look: { x: l.x, y: t.y - 4, z: l.z } };
+      return {
+        rider: { ...t, yaw },
+        cam: { x: c.x, y: t.y + 4, z: c.z },
+        look: { x: l.x, y: t.y - 4, z: l.z },
+      };
     }
     case 'green': {
       const p = h1.pin;
       const yaw = h1.tee.yaw;
       const c = along(p.x, p.z, yaw, -8, 3);
       const r = along(p.x, p.z, yaw, -14, 0);
-      return { rider: { x: r.x, y: p.y, z: r.z, yaw }, cam: { x: c.x, y: p.y + 1.7, z: c.z }, look: { x: p.x, y: p.y + 1.1, z: p.z } };
+      return {
+        rider: { x: r.x, y: p.y, z: r.z, yaw },
+        cam: { x: c.x, y: p.y + 1.7, z: c.z },
+        look: { x: p.x, y: p.y + 1.1, z: p.z },
+      };
     }
     case 'clubhouse': {
       const c = along(club.x, club.z, club.yaw, 52, 14);
@@ -85,7 +110,11 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
       const t = L.range.tee;
       const c = along(t.x, t.z, L.range.yaw, -18, 30);
       const l = along(t.x, t.z, L.range.yaw, 120, 0);
-      return { rider: { x: t.x, y: L.range.bays[4].y, z: t.z, yaw: L.range.yaw }, cam: { x: c.x, y: L.range.bays[4].y + 9, z: c.z }, look: { x: l.x, y: L.range.bays[4].y, z: l.z } };
+      return {
+        rider: { x: t.x, y: L.range.bays[4].y, z: t.z, yaw: L.range.yaw },
+        cam: { x: c.x, y: L.range.bays[4].y + 9, z: c.z },
+        look: { x: l.x, y: L.range.bays[4].y, z: l.z },
+      };
     }
     case 'island':
     case 'noggle': {
@@ -99,7 +128,11 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
       return {
         rider: { x: r.x, y: h.pin.y, z: r.z, yaw },
         cam: { x: c.x, y: h.pin.y + (shot === 'island' ? 20 : 26), z: c.z },
-        look: { x: shot === 'noggle' ? last.x : p.x, y: h.pin.y, z: shot === 'noggle' ? last.z : p.z },
+        look: {
+          x: shot === 'noggle' ? last.x : p.x,
+          y: h.pin.y,
+          z: shot === 'noggle' ? last.z : p.z,
+        },
       };
     }
     case 'entrance':
@@ -110,7 +143,11 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
       const c = along(a.x, a.z, out, 26, 6);
       const r = along(a.x, a.z, out, 12, 0);
       const y = golfCourse().height(a.x, a.z);
-      return { rider: { x: r.x, y, z: r.z, yaw: out + Math.PI }, cam: { x: c.x, y: y + 5, z: c.z }, look: { x: a.x, y: y + 5, z: a.z } };
+      return {
+        rider: { x: r.x, y, z: r.z, yaw: out + Math.PI },
+        cam: { x: c.x, y: y + 5, z: c.z },
+        look: { x: a.x, y: y + 5, z: a.z },
+      };
     }
   }
 }

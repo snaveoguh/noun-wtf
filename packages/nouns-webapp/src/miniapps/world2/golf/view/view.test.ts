@@ -1,8 +1,8 @@
-import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
-
 import type { Lie, Shape } from '../contract';
 import type { MeshData } from './kit';
+
+import * as THREE from 'three';
+import { describe, expect, it } from 'vitest';
 
 import { CollisionWorld } from '../../physics/Collision';
 import { MountainStream } from '../../world/mountain/MountainStream';
@@ -10,10 +10,19 @@ import { coreWeight, courseGroundColour, lieColour, overlapsCourse } from '../co
 import { ribbonDist, shapeDist, shapeRadius } from '../course/shapes';
 import { BOUNDS, SITE, toWorld } from '../course/site';
 import { OVERLAY_FRINGE, golfCourse } from '../course/surface';
+
 import { CourseView } from './CourseView';
 import { devPose } from './devShots';
 import { MeshBuf, colliderTriangles } from './kit';
-import { EDGE_DIP, LIFT, buildRegion, courseRegions, fineClusters, type Region, type RegionBuild } from './overlays';
+import {
+  EDGE_DIP,
+  LIFT,
+  buildRegion,
+  courseRegions,
+  fineClusters,
+  type Region,
+  type RegionBuild,
+} from './overlays';
 import { buildScenery, waveFlags } from './scenery';
 import { SliceQueue } from './slices';
 import { tileTrees, treesWithin, unitTree } from './trees';
@@ -108,7 +117,18 @@ function shapeSamples(s: Shape, out: number): { x: number; z: number }[] {
 
 describe('golf colours', () => {
   it('gives every lie a finite colour', () => {
-    const lies: Lie[] = ['tee', 'fairway', 'fringe', 'green', 'rough', 'deep', 'sand', 'path', 'water', 'ob'];
+    const lies: Lie[] = [
+      'tee',
+      'fairway',
+      'fringe',
+      'green',
+      'rough',
+      'deep',
+      'sand',
+      'path',
+      'water',
+      'ob',
+    ];
     const out = { r: 0, g: 0, b: 0 };
     for (const l of lies)
       for (const s of [0, 1]) {
@@ -189,7 +209,9 @@ describe('golf overlays', () => {
           expect(y, `${id} hole at ${p.x.toFixed(1)},${p.z.toFixed(1)}`).not.toBeNull();
           // Never under the true ground (the sunk mountain sits SINK lower)
           // (a chord over a convex bank can dip a few cm; the mountain is SINK = 0.35 m down)
-          expect(y! - C.height(p.x, p.z), `${id} under at ${p.x},${p.z}`).toBeGreaterThan(EDGE_DIP - 0.03);
+          expect(y! - C.height(p.x, p.z), `${id} under at ${p.x},${p.z}`).toBeGreaterThan(
+            EDGE_DIP - 0.03,
+          );
           n++;
         }
       for (const rb of [...r.ribbons, ...r.paths])
@@ -327,7 +349,9 @@ describe('golf scenery', () => {
     const b = new MeshBuf(0, 0).box(0, 0, 0, 2, 2, 2, 0xffffff, 0.4, true);
     const d = b.data();
     for (let t = 0; t < d.idx.length; t += 3) {
-      const [a, c, e] = [d.idx[t], d.idx[t + 1], d.idx[t + 2]].map(i => new THREE.Vector3().fromArray(d.pos, i * 3));
+      const [a, c, e] = [d.idx[t], d.idx[t + 1], d.idx[t + 2]].map(i =>
+        new THREE.Vector3().fromArray(d.pos, i * 3),
+      );
       const n = new THREE.Vector3().crossVectors(c.clone().sub(a), e.clone().sub(a));
       const centre = a.clone().add(c).add(e).divideScalar(3);
       expect(n.dot(centre)).toBeGreaterThan(0);
@@ -340,7 +364,8 @@ describe('golf water', () => {
     for (const h of L.holes)
       for (const p of h.water)
         for (const s of p.shapes)
-          for (const q of shapeOutline(s, WATER_PAD, 24)) expect(shapeDist(s, q.x, q.z)).toBeCloseTo(WATER_PAD, 1);
+          for (const q of shapeOutline(s, WATER_PAD, 24))
+            expect(shapeDist(s, q.x, q.z)).toBeCloseTo(WATER_PAD, 1);
     const w = pondSurfaces(L, 0, 0, { r: 0, g: 0.3, b: 0.6 });
     expect(w.count).toBeGreaterThan(0);
     for (const v of w.pos) expect(Number.isFinite(v)).toBe(true);
@@ -408,7 +433,10 @@ describe('CourseView', () => {
     // Slices stay near the budget: one can overrun by its last step (~10 ms
     // here unloaded; generous for a busy test machine), and most are ~3 ms
     expect(v.stats.maxSliceMs).toBeLessThan(80);
-    const ms = slow.map(s => s[1]).filter(m => m > 0).sort((a, b) => a - b);
+    const ms = slow
+      .map(s => s[1])
+      .filter(m => m > 0)
+      .sort((a, b) => a - b);
     expect(ms[Math.floor(ms.length / 2)]).toBeLessThan(8);
     cam.position.copy(far);
     v.update(1 / 60, cam, far);
@@ -418,7 +446,16 @@ describe('CourseView', () => {
   }, 120000);
 
   it('has dev poses for every shot', () => {
-    for (const s of ['air', 'tee1', 'green', 'clubhouse', 'island', 'noggle', 'range', 'entrance'] as const) {
+    for (const s of [
+      'air',
+      'tee1',
+      'green',
+      'clubhouse',
+      'island',
+      'noggle',
+      'range',
+      'entrance',
+    ] as const) {
       const p = devPose(L, s);
       for (const v of [p.cam, p.look, p.rider]) expect(Number.isFinite(v.x + v.y + v.z)).toBe(true);
     }

@@ -26,11 +26,19 @@ export const SIGN_CELL = {
 export const FLAG_PLAIN = 19;
 
 /** UV rect (u0, v0, u1, v1; v up, as CanvasTexture flips) of a cell. */
-export function cellUv(cell: number, grid: { cols: number; rows: number }): [number, number, number, number] {
+export function cellUv(
+  cell: number,
+  grid: { cols: number; rows: number },
+): [number, number, number, number] {
   const c = cell % grid.cols;
   const r = Math.floor(cell / grid.cols);
   const e = 0.004;
-  return [c / grid.cols + e, 1 - (r + 1) / grid.rows + e, (c + 1) / grid.cols - e, 1 - r / grid.rows - e];
+  return [
+    c / grid.cols + e,
+    1 - (r + 1) / grid.rows + e,
+    (c + 1) / grid.cols - e,
+    1 - r / grid.rows - e,
+  ];
 }
 
 const FONT = '"Arial Black", "Helvetica Neue", Arial, sans-serif';
@@ -93,7 +101,10 @@ export function paintSigns(L: CourseLayout): HTMLCanvasElement | null {
   if (g === null) return null;
   const cw = size / SIGN_GRID.cols;
   const ch = size / SIGN_GRID.rows;
-  const at = (cell: number) => [(cell % SIGN_GRID.cols) * cw, Math.floor(cell / SIGN_GRID.cols) * ch];
+  const at = (cell: number) => [
+    (cell % SIGN_GRID.cols) * cw,
+    Math.floor(cell / SIGN_GRID.cols) * ch,
+  ];
   g.textBaseline = 'middle';
   // Tee signs: dark green board, white number in a red noggle lens, name, par, metres
   for (const h of L.holes) {

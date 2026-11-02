@@ -32,7 +32,11 @@ function lin(c: number): number {
 
 /** sRGB hex → linear RGB (matches THREE.Color.setHex with colour management on). */
 export function hexLinear(hex: number): Rgb {
-  return { r: lin(((hex >> 16) & 255) / 255), g: lin(((hex >> 8) & 255) / 255), b: lin((hex & 255) / 255) };
+  return {
+    r: lin(((hex >> 16) & 255) / 255),
+    g: lin(((hex >> 8) & 255) / 255),
+    b: lin((hex & 255) / 255),
+  };
 }
 
 /** The palette (sRGB hex), bright like the rest of the game. */

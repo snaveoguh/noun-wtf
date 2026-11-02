@@ -219,6 +219,17 @@ describe('NOUN LINKS layout', () => {
       expect(kinds).toContain(k);
   });
 
+  it('keeps cart paths out of bunkers and ponds', () => {
+    for (const path of L.paths)
+      for (const p of path.pts)
+        for (const h of L.holes) {
+          for (const b of h.bunkers)
+            expect(shapeDist(b.shape, p.x, p.z), `path in a bunker on ${h.n}`).toBeGreaterThan(0.5);
+          for (const w of h.water)
+            expect(unionDist(w.shapes, p.x, p.z), `path in a pond on ${h.n}`).toBeGreaterThan(0.5);
+        }
+  });
+
   it('builds quickly', () => {
     const t0 = performance.now();
     const c2 = new (C.constructor as new () => typeof C)();

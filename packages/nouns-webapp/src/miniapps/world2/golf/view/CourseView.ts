@@ -26,18 +26,33 @@ import type { Quality } from '../../render/Graphics';
 import * as THREE from 'three';
 
 import { getToonRamp } from '../../render/Toon';
-import { BOUNDS, DATUM, SITE, outsideCore, toCourse } from '../course/site';
-import { golfCourse, type GolfCourse } from '../course/surface';
 import { dressingWaterMaterial } from '../../world/mountain/DressingWater';
 import { hexLinear } from '../course/colors';
+import { BOUNDS, DATUM, SITE, outsideCore, toCourse } from '../course/site';
+import { golfCourse, type GolfCourse } from '../course/surface';
 
 import { paintFlags, paintSigns } from './atlas';
 import { devPose, type DevPose, type DevShot } from './devShots';
 import { colliderTriangles, type MeshData } from './kit';
-import { OVERLAY_LOD, buildRegion, courseRegions, regionDist, type Region, type RegionBuild } from './overlays';
+import {
+  OVERLAY_LOD,
+  buildRegion,
+  courseRegions,
+  regionDist,
+  type Region,
+  type RegionBuild,
+} from './overlays';
 import { sceneryGen, waveFlags, type FlagSet, type Scenery } from './scenery';
 import { SliceQueue } from './slices';
-import { TREE_TILE, tileTrees, treeMatrix, treeVariety, treesWithin, unitTree, type TreeIndex } from './trees';
+import {
+  TREE_TILE,
+  tileTrees,
+  treeMatrix,
+  treeVariety,
+  treesWithin,
+  unitTree,
+  type TreeIndex,
+} from './trees';
 import { pondSurfaces } from './water';
 
 /** Start building within this distance of the course's bounds (m). */
@@ -176,7 +191,10 @@ export class CourseView {
 
   update(dt: number, camera: THREE.Camera, focus: THREE.Vector3) {
     if (!this.host.enabled()) return;
-    const d = Math.min(CourseView.distance(focus.x, focus.z), CourseView.distance(camera.position.x, camera.position.z));
+    const d = Math.min(
+      CourseView.distance(focus.x, focus.z),
+      CourseView.distance(camera.position.x, camera.position.z),
+    );
     if (!this.active) {
       if (d > ACTIVATE || this.host.away()) return;
       this.activate(camera);
@@ -201,7 +219,8 @@ export class CourseView {
     this.stats.buildMs += ms;
     this.stats.queue = this.queue.length;
     this.stats.worstStep = this.queue.worstStep;
-    if (this.trees !== null && this.trees.from.distanceToSquared(focus) > 25 * 25) this.packTrees(focus, tune);
+    if (this.trees !== null && this.trees.from.distanceToSquared(focus) > 25 * 25)
+      this.packTrees(focus, tune);
     this.colT -= dt;
     if (this.colT <= 0) {
       this.colT = 0.5;
@@ -209,7 +228,12 @@ export class CourseView {
     }
     if (this.flags !== null && d < 700) {
       const pos = this.flags.mesh.geometry.attributes.position as THREE.BufferAttribute;
-      waveFlags(this.flags.set, pos.array as Float32Array, this.t, 0.8 + 0.2 * Math.sin(this.t * 0.31));
+      waveFlags(
+        this.flags.set,
+        pos.array as Float32Array,
+        this.t,
+        0.8 + 0.2 * Math.sin(this.t * 0.31),
+      );
       pos.needsUpdate = true;
     }
   }
@@ -296,7 +320,12 @@ export class CourseView {
       m.dispose();
       return t;
     };
-    const overlay = lit({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+    const overlay = lit({
+      vertexColors: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2,
+    });
     overlay.name = 'GolfOverlay';
     const solid = lit({ vertexColors: true });
     solid.name = 'GolfSolid';
@@ -471,7 +500,10 @@ export class CourseView {
     yield;
     // Buildings + the entrance arch collide
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(colliderTriangles(sc.colliders, this.ox, this.oz), 3));
+    geo.setAttribute(
+      'position',
+      new THREE.BufferAttribute(colliderTriangles(sc.colliders, this.ox, this.oz), 3),
+    );
     this.host.world().setDynamic('golf:buildings', geo, new THREE.Vector3(this.ox, 0, this.oz));
     this.colliderIds.push('golf:buildings');
   }
@@ -514,7 +546,10 @@ export class CourseView {
       const m = new THREE.InstancedMesh(g, this.mats!.solid, Math.max(1, counts[k]));
       m.name = `golf:trees:${['pine', 'broadleaf', 'palm'][k]}`;
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, counts[k]) * 3), 3);
+      m.instanceColor = new THREE.InstancedBufferAttribute(
+        new Float32Array(Math.max(1, counts[k]) * 3),
+        3,
+      );
       m.count = 0;
       m.castShadow = !low;
       m.receiveShadow = true;
@@ -643,4 +678,3 @@ export function createCourseView(game: Game): CourseView {
     enabled: () => game.mountain !== null,
   });
 }
-

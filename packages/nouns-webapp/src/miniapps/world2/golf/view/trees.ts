@@ -48,7 +48,13 @@ export function tileTrees(trees: Tree[], size = TREE_TILE): TreeIndex {
  * Indices of trees in tiles whose centre is within r (+ half a tile's
  * diagonal) of (x, z), nearest tile first, into `out`.
  */
-export function treesWithin(ix: TreeIndex, x: number, z: number, r: number, out: number[]): number[] {
+export function treesWithin(
+  ix: TreeIndex,
+  x: number,
+  z: number,
+  r: number,
+  out: number[],
+): number[] {
   out.length = 0;
   const reach = r + ix.size * 0.71;
   const near = ix.keys
@@ -104,7 +110,17 @@ export function unitTree(kind: 0 | 1 | 2, low = false): MeshData {
     for (let i = 0; i < segs; i++) {
       const y = (i / segs) * 0.74;
       const nx = 0.035 * (i + 1) * (i + 1) * 0.25;
-      b.cyl(px, y, 0, 0.05 - i * 0.006, 0.045 - i * 0.006, 0.74 / segs + 0.01, s - 1, BARK_PALM, i === segs - 1);
+      b.cyl(
+        px,
+        y,
+        0,
+        0.05 - i * 0.006,
+        0.045 - i * 0.006,
+        0.74 / segs + 0.01,
+        s - 1,
+        BARK_PALM,
+        i === segs - 1,
+      );
       px = nx;
     }
     const top = { x: px, y: 0.74 };
@@ -121,7 +137,8 @@ export function unitTree(kind: 0 | 1 | 2, low = false): MeshData {
       const sx = -sa * w;
       const sz = ca * w;
       const col = rgbHex(FROND);
-      const v = (p: number[], k: number) => b.vert(p[0] + sx * k, p[1], p[2] + sz * k, 0, 1, 0, col);
+      const v = (p: number[], k: number) =>
+        b.vert(p[0] + sx * k, p[1], p[2] + sz * k, 0, 1, 0, col);
       const a0 = v(p0, 0.2);
       const a1 = v(p0, -0.2);
       const b0 = v(p1, 1);
@@ -147,7 +164,11 @@ export function unitTree(kind: 0 | 1 | 2, low = false): MeshData {
 }
 
 function rgbHex(h: number) {
-  return { r: lin(((h >> 16) & 255) / 255), g: lin(((h >> 8) & 255) / 255), b: lin((h & 255) / 255) };
+  return {
+    r: lin(((h >> 16) & 255) / 255),
+    g: lin(((h >> 8) & 255) / 255),
+    b: lin((h & 255) / 255),
+  };
 }
 
 function lin(c: number) {
@@ -155,7 +176,16 @@ function lin(c: number) {
 }
 
 /** A squashed low-poly sphere (lat/long), centred at (x, y, z). */
-function blob(b: MeshBuf, x: number, y: number, z: number, r: number, ry: number, hex: number, sides: number) {
+function blob(
+  b: MeshBuf,
+  x: number,
+  y: number,
+  z: number,
+  r: number,
+  ry: number,
+  hex: number,
+  sides: number,
+) {
   const col = rgbHex(hex);
   const rows = Math.max(3, Math.floor(sides / 2));
   const base = b.count;

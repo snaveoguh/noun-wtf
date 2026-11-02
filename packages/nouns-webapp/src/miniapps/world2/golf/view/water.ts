@@ -45,7 +45,12 @@ export interface WaterData {
 }
 
 /** Every pond as fans, positions relative to (ox, oz). */
-export function pondSurfaces(L: CourseLayout, ox: number, oz: number, colour: { r: number; g: number; b: number }): WaterData {
+export function pondSurfaces(
+  L: CourseLayout,
+  ox: number,
+  oz: number,
+  colour: { r: number; g: number; b: number },
+): WaterData {
   const pos: number[] = [];
   const idx: number[] = [];
   for (const h of L.holes)

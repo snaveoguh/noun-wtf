@@ -56,7 +56,10 @@ export class SliceQueue {
   /** Re-rank the queue (a started job keeps going first). */
   sort(rank?: (j: SliceJob) => number) {
     if (rank !== undefined) for (const j of this.jobs) if (j.it === undefined) j.priority = rank(j);
-    this.jobs.sort((a, b) => (a.it !== undefined ? -1 : 0) - (b.it !== undefined ? -1 : 0) || a.priority - b.priority);
+    this.jobs.sort(
+      (a, b) =>
+        (a.it !== undefined ? -1 : 0) - (b.it !== undefined ? -1 : 0) || a.priority - b.priority,
+    );
   }
 
   /** Step jobs for at most `budgetMs`. Returns ms spent. */
