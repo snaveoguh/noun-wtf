@@ -96,6 +96,8 @@ export interface CourseViewStats {
   sliceMs: number;
   maxSliceMs: number;
   buildMs: number;
+  /** The longest single build step (between two yields), and whose. */
+  worstStep: { id: string; ms: number };
   /** Overlay vertices currently built. */
   verts: number;
   trees: number;
@@ -119,6 +121,7 @@ export class CourseView {
     sliceMs: 0,
     maxSliceMs: 0,
     buildMs: 0,
+    worstStep: { id: '', ms: 0 },
     verts: 0,
     trees: 0,
     builds: 0,
@@ -197,6 +200,7 @@ export class CourseView {
     this.stats.maxSliceMs = Math.max(this.stats.maxSliceMs, ms);
     this.stats.buildMs += ms;
     this.stats.queue = this.queue.length;
+    this.stats.worstStep = this.queue.worstStep;
     if (this.trees !== null && this.trees.from.distanceToSquared(focus) > 25 * 25) this.packTrees(focus, tune);
     this.colT -= dt;
     if (this.colT <= 0) {

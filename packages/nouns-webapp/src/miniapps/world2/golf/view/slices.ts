@@ -27,6 +27,8 @@ export class SliceQueue {
   finished = 0;
   /** How long the last finished job took, summed over its slices (ms). */
   lastJobMs = 0;
+  /** The longest single step (between two yields) seen, and whose. */
+  worstStep = { id: '', ms: 0 };
 
   constructor(private now: () => number = () => performance.now()) {}
 
@@ -66,7 +68,10 @@ export class SliceQueue {
       j.it ??= j.start();
       let finished = false;
       while (true) {
+        const a = this.now();
         const r = j.it.next();
+        const step = this.now() - a;
+        if (step > this.worstStep.ms) this.worstStep = { id: j.id, ms: step };
         if (r.done === true) {
           finished = true;
           break;
@@ -78,7 +83,10 @@ export class SliceQueue {
         this.jobs.shift();
         this.finished++;
         this.lastJobMs = j.ms;
+        const a = this.now();
         j.done?.();
+        const step = this.now() - a;
+        if (step > this.worstStep.ms) this.worstStep = { id: `${j.id}:done`, ms: step };
       }
       if (this.now() - t0 >= budgetMs) break;
     }

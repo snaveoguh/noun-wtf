@@ -44,6 +44,12 @@ export const OVERLAY_LOD: OverlayLod[] = [
 
 /** Lift over the true surface (m): fine over coarse, paths and discs over both. */
 export const LIFT = { coarse: 0.025, fine: 0.04, strip: 0.06, disc: 0.07 } as const;
+/**
+ * An overlay's outermost vertices dip this far under the true surface, so
+ * its edge slides under the mountain mesh instead of standing on it: no
+ * step for the ink pass to outline, nothing to see but one colour.
+ */
+export const EDGE_DIP = -0.12;
 
 export interface FineShape {
   shape: Shape;
@@ -239,22 +245,28 @@ export function* gridPatch(
         cells[k * nx + i] = 1;
         any = true;
       }
-    if ((k & 3) === 3) yield;
+    yield;
   }
   if (!any) return;
   const W = nx + 1;
   const vid = new Int32Array(W * (nz + 1)).fill(-1);
   const hy = new Float32Array(W * (nz + 1));
+  // Vertex use count: 4 = interior, fewer = on the patch's edge
+  const uses = new Uint8Array(W * (nz + 1));
   for (let k = 0; k < nz; k++)
     for (let i = 0; i < nx; i++) {
       if (cells[k * nx + i] === 0) continue;
       vid[k * W + i] = vid[k * W + i + 1] = vid[(k + 1) * W + i] = vid[(k + 1) * W + i + 1] = 0;
+      uses[k * W + i]++;
+      uses[k * W + i + 1]++;
+      uses[(k + 1) * W + i]++;
+      uses[(k + 1) * W + i + 1]++;
     }
   // Heights first (normals read neighbours)
   for (let k = 0; k <= nz; k++) {
     const z = z0 + k * h;
     for (let i = 0; i <= nx; i++) if (vid[k * W + i] === 0) hy[k * W + i] = C.height(x0 + i * h, z);
-    if ((k & 3) === 3) yield;
+    yield;
   }
   for (let k = 0; k <= nz; k++) {
     const z = z0 + k * h;
@@ -275,9 +287,9 @@ export function* gridPatch(
         _n.z = -dz / L;
       } else C.normal(x, z, _n);
       vid[q] = o.count;
-      pushVertex(C, o, x, hy[q] + lift, z, _n);
+      pushVertex(C, o, x, hy[q] + (uses[q] < 4 ? EDGE_DIP : lift), z, _n);
     }
-    if ((k & 1) === 1) yield;
+    yield;
   }
   for (let k = 0; k < nz; k++)
     for (let i = 0; i < nx; i++) {
@@ -372,13 +384,15 @@ function* stripRun(
   const base = o.count;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
+    const end = i === 0 || i === pts.length - 1;
     for (const c of cols) {
       const x = p.x + p.sx * c;
       const z = p.z + p.sz * c;
       C.normal(x, z, _n);
-      pushVertex(C, o, x, C.height(x, z) + lift, z, _n);
+      const edge = end || c === cols[0] || c === cols[cols.length - 1];
+      pushVertex(C, o, x, C.height(x, z) + (edge ? EDGE_DIP : lift), z, _n);
     }
-    if ((i & 7) === 7) yield;
+    if ((i & 3) === 3) yield;
   }
   const nc = cols.length;
   for (let i = 0; i < pts.length - 1; i++)
@@ -539,6 +553,7 @@ export function* buildRegion(C: GolfCourse, r: Region, lod: number, out: RegionB
   }
   for (const p of r.paths) yield* stripPatch(C, o, p, L.strip, LIFT.strip);
   for (const d of r.discs) yield* discPatch(C, o, d.x, d.z, d.r, L.disc, LIFT.disc);
+  yield;
   out.data = o.count > 0 ? o.data() : null;
   out.verts = o.count;
 }

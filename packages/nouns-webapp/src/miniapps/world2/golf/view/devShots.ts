@@ -9,7 +9,7 @@
 
 import type { CourseLayout, V3 } from '../contract';
 
-export type DevShot = 'air' | 'tee1' | 'green' | 'clubhouse' | 'island' | 'noggle' | 'range' | 'entrance';
+export type DevShot = 'mid' | 'top' | 'air' | 'tee1' | 'green' | 'clubhouse' | 'island' | 'noggle' | 'range' | 'entrance';
 
 export interface DevPose {
   rider: V3 & { yaw: number };
@@ -26,11 +26,24 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
   const h1 = L.holes[0];
   switch (shot) {
     case 'air': {
-      const c = along(club.x, club.z, club.yaw, 330, -120);
+      const c = along(club.x, club.z, club.yaw, 300, -140);
+      const l = along(club.x, club.z, club.yaw, 120, 0);
       return {
         rider: { x: L.spawn.x, y: L.spawn.y, z: L.spawn.z, yaw: L.spawn.yaw },
-        cam: { x: c.x, y: club.y + 230, z: c.z },
-        look: { x: club.x, y: club.y, z: club.z },
+        cam: { x: c.x, y: club.y + 150, z: c.z },
+        look: { x: l.x, y: club.y - 10, z: l.z },
+      };
+    }
+    case 'top': {
+      // Straight down over the 1st's fairway
+      const m = h1.line[0];
+      const e = h1.line[h1.line.length - 1];
+      const x = (m.x * 0.4 + e.x * 0.6);
+      const z = (m.z * 0.4 + e.z * 0.6);
+      return {
+        rider: { x, y: h1.pin.y, z, yaw: 0 },
+        cam: { x: x + 0.01, y: h1.pin.y + 190, z },
+        look: { x, y: h1.pin.y, z },
       };
     }
     case 'tee1': {
@@ -39,6 +52,15 @@ export function devPose(L: CourseLayout, shot: DevShot): DevPose {
       const c = along(t.x, t.z, yaw, -14, 2);
       const l = along(t.x, t.z, yaw, 120, 0);
       return { rider: { ...t, yaw }, cam: { x: c.x, y: t.y + 3.2, z: c.z }, look: { x: l.x, y: t.y - 4, z: l.z } };
+    }
+    case 'mid': {
+      // Mid-course: the 7th tee (THE LAKE), ~800 m west of the clubhouse
+      const h = L.holes[6];
+      const t = h.teeSpot;
+      const yaw = h.tee.yaw;
+      const c = along(t.x, t.z, yaw, -14, 2);
+      const l = along(t.x, t.z, yaw, 160, 0);
+      return { rider: { ...t, yaw }, cam: { x: c.x, y: t.y + 4, z: c.z }, look: { x: l.x, y: t.y - 4, z: l.z } };
     }
     case 'green': {
       const p = h1.pin;

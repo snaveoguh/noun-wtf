@@ -13,7 +13,7 @@ import { OVERLAY_FRINGE, golfCourse } from '../course/surface';
 import { CourseView } from './CourseView';
 import { devPose } from './devShots';
 import { MeshBuf, colliderTriangles } from './kit';
-import { LIFT, buildRegion, courseRegions, fineClusters, type Region, type RegionBuild } from './overlays';
+import { EDGE_DIP, LIFT, buildRegion, courseRegions, fineClusters, type Region, type RegionBuild } from './overlays';
 import { buildScenery, waveFlags } from './scenery';
 import { SliceQueue } from './slices';
 import { tileTrees, treesWithin, unitTree } from './trees';
@@ -63,6 +63,8 @@ function coverage(d: MeshData, ox: number, oz: number) {
     const z = wz - oz;
     const l = hash.get(`${Math.floor(x / cell)},${Math.floor(z / cell)}`);
     if (l === undefined) return null;
+    // The top surface wins (what you'd see)
+    let best: number | null = null;
     for (const t of l) {
       const a = d.idx[t] * 3;
       const b = d.idx[t + 1] * 3;
@@ -82,9 +84,12 @@ function coverage(d: MeshData, ox: number, oz: number) {
       if (Math.abs(den) < 1e-12) continue;
       const u = (d11 * d20 - d01 * d21) / den;
       const v = (d00 * d21 - d01 * d20) / den;
-      if (u >= -1e-6 && v >= -1e-6 && u + v <= 1 + 1e-6) return P[a + 1] + u * (P[c + 1] - P[a + 1]) + v * (P[b + 1] - P[a + 1]);
+      if (u >= -1e-6 && v >= -1e-6 && u + v <= 1 + 1e-6) {
+        const y = P[a + 1] + u * (P[c + 1] - P[a + 1]) + v * (P[b + 1] - P[a + 1]);
+        if (best === null || y > best) best = y;
+      }
     }
-    return null;
+    return best;
   };
 }
 
@@ -163,7 +168,7 @@ describe('golf overlays', () => {
         const x = d.pos[i * 3] + r.cx;
         const z = d.pos[i * 3 + 2] + r.cz;
         const dy = d.pos[i * 3 + 1] - C.height(x, z);
-        expect(dy, `${r.id} @${i}`).toBeGreaterThan(LIFT.coarse - 0.005);
+        expect(dy, `${r.id} @${i}`).toBeGreaterThan(EDGE_DIP - 0.005);
         expect(dy, `${r.id} @${i}`).toBeLessThan(LIFT.disc + 0.005);
       }
     }
@@ -184,7 +189,7 @@ describe('golf overlays', () => {
           expect(y, `${id} hole at ${p.x.toFixed(1)},${p.z.toFixed(1)}`).not.toBeNull();
           // Never under the true ground (the sunk mountain sits SINK lower)
           // (a chord over a convex bank can dip a few cm; the mountain is SINK = 0.35 m down)
-          expect(y! - C.height(p.x, p.z), `${id} under at ${p.x},${p.z}`).toBeGreaterThan(-0.12);
+          expect(y! - C.height(p.x, p.z), `${id} under at ${p.x},${p.z}`).toBeGreaterThan(EDGE_DIP - 0.03);
           n++;
         }
       for (const rb of [...r.ribbons, ...r.paths])

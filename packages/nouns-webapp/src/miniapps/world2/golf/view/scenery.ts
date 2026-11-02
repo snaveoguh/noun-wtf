@@ -472,7 +472,7 @@ export function* sceneryGen(C: GolfCourse, ox: number, oz: number, out: { scener
   for (const h of L.holes) {
     teeStuff(C, h, solid, signs);
     pinStuff(C, h, solid);
-    if (h.n % 4 === 0) yield;
+    yield;
   }
   range(C, L, solid, signs);
   entrance(C, solid, signs, cols);
