@@ -180,6 +180,38 @@ describe('the CAMP layout', () => {
     }
   });
 
+  it("MOCHI's perch is on top of the fridge, facing the room, with room overhead and a spot to stand and adopt it", () => {
+    const l = L;
+    const fridge = l.pieces.find(q => q.type === 'fridge')!;
+    const b = solidBox(fridge);
+    expect(l.pet.y).toBeCloseTo(fridge.y + fridge.h, 6);
+    expect(l.pet.x).toBeGreaterThan(b.minX);
+    expect(l.pet.x).toBeLessThan(b.maxX);
+    expect(l.pet.z).toBeGreaterThan(b.minZ);
+    expect(l.pet.z).toBeLessThan(b.maxZ);
+    // a 0.54 m mouse under a 3.5 m ceiling
+    expect(l.h - l.pet.y).toBeGreaterThan(0.54 + 0.3);
+    // it looks out into the room (toward the window wall, z = 0)
+    expect(Math.cos(l.pet.yaw)).toBeLessThan(-0.5);
+    // somewhere within reach (pet/contract PET.adoptReach = 2.4 m) a rider can stand: no solid there
+    const solids = l.pieces.filter(q => q.solid).map(solidBox);
+    let standable = 0;
+    for (let a = 0; a < 24; a++)
+      for (const r of [1.0, 1.5, 2.0]) {
+        const x = l.pet.x + Math.sin((a / 24) * Math.PI * 2) * r;
+        const z = l.pet.z + Math.cos((a / 24) * Math.PI * 2) * r;
+        if (Math.abs(x) > l.w / 2 - 0.4 || z < 0.4 || z > l.d - 0.4) continue;
+        if (
+          solids.some(
+            s => x > s.minX - 0.35 && x < s.maxX + 0.35 && z > s.minZ - 0.35 && z < s.maxZ + 0.35,
+          )
+        )
+          continue;
+        standable++;
+      }
+    expect(standable).toBeGreaterThan(4);
+  });
+
   it('is the same room every time (every client sees the same mess)', () => {
     expect(campLayout(site.w, site.d, site.h, win.x0, win.x1)).toEqual(L);
   });
