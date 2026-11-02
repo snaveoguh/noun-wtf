@@ -105,9 +105,14 @@ export function streetParts(
       u: um,
       build(b: TownBuilder, ctx: PartCtx) {
         const v = roadEdge + 3;
+        // Before the turn for each direction, facing the riders coming; the
+        // arrow points the side the town is on for them (+v' is left of
+        // riders heading down the line when side is +1)
+        const downKey = site.side > 0 ? 'junctionL' : 'junction';
+        const upKey = site.side > 0 ? 'junction' : 'junctionL';
         for (const [du, key, u] of [
-          [-1, 'junction', um + 14],
-          [1, 'junctionL', um - 14],
+          [-1, downKey, um - 30],
+          [1, upKey, um + 30],
         ] as const) {
           const y = ctx.ground(v, u) - b.f.P;
           const m = b.at(v, u, y, 0, du);

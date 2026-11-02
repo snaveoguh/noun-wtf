@@ -316,3 +316,14 @@ export function stationLook(st: StationSite): RoadLook {
 export function stationCtx(f: StationFrame, low: boolean, ground: PartCtx['ground']): PartCtx {
   return { ground, lift: u => f.grade * u, grade: f.grade, low };
 }
+
+/** Where the pumps are (station coords): one spot per island, for fuel.ts. */
+export function pumpSpots(f: PadFrame, st: StationSite): { vp: number; u: number }[] {
+  if (st.kind === 'gas') return [6, 12].map(a => ({ vp: V(f, a), u: f.Lf / 2 - 6 }));
+  if (st.kind === 'truckstop')
+    return [
+      ...[6, 12].map(a => ({ vp: V(f, a), u: 20 })),
+      ...[5.5, 11, 16.5].map(a => ({ vp: V(f, a), u: 62 })),
+    ];
+  return [];
+}

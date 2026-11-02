@@ -1265,6 +1265,12 @@ export class CarSystem {
     );
     c.handbrake = input.crouch || tc.handbrake || (pad && input.push);
     c.boost = input.sprint || tc.boost;
+    // Fuel (off unless turned on, towns/road/fuel.ts): an empty tank limps
+    const fuel = this.game.fuel;
+    if (fuel !== null) {
+      c.throttle *= fuel.throttleScale();
+      if (fuel.empty) c.boost = false;
+    }
     if (this.entering > 0) {
       this.entering -= dt;
       c.throttle = c.brake = 0;

@@ -112,6 +112,8 @@ import { comboLabel, comboScore } from './skate/Tricks';
 import { SkydiveSystem } from './skydive/SkydiveSystem';
 import { townsDecorator } from './towns/build';
 import { roadDecorator } from './towns/road/decorator';
+import { FuelSystem } from './towns/road/FuelSystem';
+import { FUEL_KEY, fuelEnabled } from './towns/road/fuel';
 import { stationSpawn } from './towns/road/pads';
 import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
@@ -156,6 +158,15 @@ import { PipBillboards } from './world/PipBillboards';
 /** `?megaramp=` dev param: '1' = city boulevard ramp, 'mtn' = spawn on the hero mountain ramp. */
 function megaParam(): string | null {
   return new URLSearchParams(window.location.search).get('megaramp');
+}
+
+/** The saved fuel choice (towns/road/fuel.ts), null when unset or unreadable. */
+function savedFuel(): string | null {
+  try {
+    return localStorage.getItem(FUEL_KEY);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -373,6 +384,8 @@ export class Game {
   crew: JerseyCrew | null = null;
   /** Noun Trade towns + their customers (towns/): the TownsApi (trade/contract.ts). */
   towns: TownSystem | null = null;
+  /** Car fuel (towns/road/fuel.ts): null unless turned on (`?fuel=1`). */
+  fuel: FuelSystem | null = null;
   /** Nounish landmarks (world/landmarks/): discoveries, compass, map pins. */
   landmarks: LandmarkSystem | null = null;
   /** Missions: the Oracle and the cast, progress, the Big Drop (missions/). */
@@ -668,6 +681,20 @@ export class Game {
           if (d < 32) this.voice.speak({ text, voice: seedVoice(seed), gain: 1 - (d / 32) * 0.75 });
         },
         sound: (id, gain) => this.sfx.play(id, { gain }),
+      });
+    if (this.mountain !== null && fuelEnabled(location.search, savedFuel()))
+      this.fuel = new FuelSystem({
+        labelLayer: this.labelLayer,
+        car: () => {
+          const c = this.cars.current;
+          if (c === null) return null;
+          return {
+            x: c.sim.pos.x,
+            z: c.sim.pos.z,
+            speed: Math.abs(c.sim.speed),
+            boosting: c.sim.boosting || c.flying,
+          };
+        },
       });
     if (this.mountain !== null)
       this.landmarks = new LandmarkSystem({
@@ -1322,6 +1349,7 @@ export class Game {
     if (!away) this.crew?.update(wdt, this.player.pos);
     this.missions.update(wdt);
     if (!away) this.towns?.update(wdt);
+    if (!away) this.fuel?.update(wdt);
     this.particles.update(wdt, () => null);
     this.sfx.update(dt);
     this.gfx.followShadow(this.player.pos);
@@ -2616,6 +2644,7 @@ export class Game {
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
     this.crew?.dispose();
     this.towns?.dispose();
+    this.fuel?.dispose();
     this.respect.dispose();
     this.gfx.dispose();
     this.world.dispose();

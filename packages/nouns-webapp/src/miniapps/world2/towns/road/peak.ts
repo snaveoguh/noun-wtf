@@ -187,9 +187,10 @@ function chairlift(b: TownBuilder, ctx: PartCtx) {
   }
   // Base station hut + the lift sign
   const hm = b.at(vp - 6, 176, 0, -1, 0);
-  b.add(boxAt(-5, 5, 0, 4, -4, 4), C.red, hm, { collide: true });
-  b.add(boxAt(-5.6, 5.6, 4, 4.6, -4.6, 4.6), C.snow, hm, { collide: true });
-  b.sign('lift', hm, 0, 3.2, 4.02);
+  // (narrow: a shelter, not a building with a door)
+  b.add(boxAt(-1.4, 1.4, 0, 4, -3, 3), C.red, hm, { collide: true });
+  b.add(boxAt(-3, 3, 4, 4.5, -3.6, 3.6), C.snow, hm, { collide: true });
+  b.sign('lift', hm, 0, 5.4, 3.62, 0.9);
 }
 
 const IDENTITY = new THREE.Matrix4();

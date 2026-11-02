@@ -85,6 +85,9 @@ function nearRow(b: TownBuilder, ctx: PartCtx, first: boolean) {
   }
 }
 
+/** The travel center's pump islands (town coords), for fuel.ts. */
+export const DIESEL_PUMPS = [-5, 0, 5].map(a => ({ vp: 28 + a, u: 50 }));
+
 /** Far side: the travel center under its canopy. */
 function travelCenter(b: TownBuilder) {
   const m = b.at(28, 50, 0, -1, 0);
