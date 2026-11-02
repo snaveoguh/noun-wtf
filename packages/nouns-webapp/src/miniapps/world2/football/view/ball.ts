@@ -188,7 +188,7 @@ export class BallView {
     for (let i = 0; i < TRAIL_N; i++) {
       const p = pts[Math.min(i, n - 1)];
       const q = pts[Math.min(i + 1, n - 1)];
-      _d.subVectors(i + 1 < n ? p : pts[Math.max(0, i - 1)], i + 1 < n ? q : p);
+      _d.subVectors(i + 1 < n ? p : (pts[Math.max(0, Math.min(i, n) - 2)] ?? p), i + 1 < n ? q : p);
       if (_d.lengthSq() < 1e-8) _d.set(0, 0, 1);
       _s.subVectors(eye, p).cross(_d).normalize();
       const u = i / (TRAIL_N - 1);

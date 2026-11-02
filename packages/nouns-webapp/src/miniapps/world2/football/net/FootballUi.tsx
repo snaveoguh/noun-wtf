@@ -736,7 +736,7 @@ body[data-football] [data-nounfm="off"]{display:none!important}
 .fb-s{width:78px;height:40px;border-radius:12px;background:rgba(0,0,0,.6);font-size:11px}
 .fb-s b{font-size:11px;letter-spacing:.08em}
 @media (max-width:640px){
-  .fb-btns{width:160px;height:160px}
+  .fb-btns{width:160px;height:160px;bottom:calc(120px + var(--w2-safe-bottom, env(safe-area-inset-bottom)))}
   .fb-btns .fb-tb{width:60px;height:60px}
   .fb-a{left:50px}.fb-b{top:50px}.fb-xb{top:50px}.fb-y{left:50px}
   .fb-side{right:auto;left:calc(12px + var(--w2-safe-left, env(safe-area-inset-left)));bottom:auto;top:calc(110px + var(--w2-safe-top, env(safe-area-inset-top)))}

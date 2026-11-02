@@ -42,6 +42,7 @@ import type { FootballFrame } from './sync';
 import * as THREE from 'three';
 
 import { randomSeed, seedKey } from '../../character/NounAppearance';
+import { perf } from '../../perf/PerfProbe';
 import { warmHidden } from '../../render/shaderWarm';
 import { FootballSim } from '../sim/FootballSim';
 import { KITS, makeMatch } from '../sim/setup';
@@ -751,7 +752,9 @@ export class FootballMode implements FootballApi {
   step(dt: number) {
     const g = this.game;
     const cam = g.gfx.camera;
+    perf.lap('other');
     g.stadium.update(dt, cam.position);
+    perf.lap('fb-stadium');
     const view = this.view;
     if (this.input.device !== this.ui.device) this.set({ device: this.input.device });
     // Building: the stadium, then the view, then its footballers (one a frame)
@@ -803,6 +806,7 @@ export class FootballMode implements FootballApi {
         events = this.attract.drainEvents();
       }
     }
+    perf.lap('fb-sim');
     if (fr !== null) {
       this.lastFrame = fr;
       if (events.length > 0) view.events(events, fr.next);
@@ -810,6 +814,7 @@ export class FootballMode implements FootballApi {
       view.camera(cam, dt, fr.next);
       if (s !== null) for (const e of events) if (e.type === 'final') this.finalWhistle(e, fr.next);
     } else view.buildStep();
+    perf.lap('fb-view');
     g.gfx.followShadow(this.focusPoint(fr));
     // Presence + lobbies
     this.announceAcc += dt;

@@ -1155,7 +1155,9 @@ export class Game {
       this.updateFm(dt);
       this.animTime += dt;
       this.updateNetwork(dt);
+      perf.lap('other');
       this.gfx.render(dt);
+      perf.lap('render');
       return;
     }
     // ── Freestyle: breakdancing on the spot; skater parked, skate camera orbiting ──

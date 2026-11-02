@@ -205,6 +205,18 @@ export function WorldMap({
           <i style={{ background: '#ff3d8b' }} /> secret spot
         </button>
       )}
+      {game.mountain !== null && (
+        <button
+          type="button"
+          title="Fast travel to NOUN STADIUM and play football"
+          onClick={() => {
+            setOpen(false);
+            game.football.arrive();
+          }}
+        >
+          <i style={{ background: '#8cff3d' }} /> ⚽ stadium · play
+        </button>
+      )}
       {waypoint !== null && (
         <button type="button" onClick={() => goTo(waypoint.x, waypoint.z)}>
           <i style={{ background: '#b6ef3a' }} /> waypoint
