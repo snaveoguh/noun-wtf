@@ -555,6 +555,39 @@ export const STADIUM = {
   apron: 30,
 } as const;
 
+// ── The stadium shell (football/view/stadium, StadiumView) ──────────────
+
+/** What the match view needs from the stadium (football/view/stadium builds it). */
+export interface StadiumViewApi {
+  /** Everything static, already placed at the StadiumFrame (pitch-local children). */
+  readonly root: import('three').Object3D;
+  /** Build a slice (call once a frame until true). */
+  buildStep(): boolean;
+  readonly built: boolean;
+  /** Mark out this pitch (lines, goals + nets moved to its goal lines). */
+  setPitch(spec: PitchSpec): void;
+  /** Crowd colours at each end, ad boards, the big screen's team names. */
+  setKits(kits: [TeamKit, TeamKit]): void;
+  /** The big screen + scoreboard (call when something changes; it redraws ≤ 2 Hz). */
+  board(info: {
+    home: string;
+    away: string;
+    score: [number, number];
+    clock: string;
+    text?: string;
+  }): void;
+  /**
+   * Crowd mood: 0 calm … 1 goal frenzy; `end` = whose fans are going wild
+   * (null = everyone). Cheap: uniforms only.
+   */
+  crowd(excite: number, end: TeamId | null, dt: number): void;
+  /** Net ripple when the ball hits it (pitch-local point, strength 0..1). */
+  netHit?(px: number, py: number, pz: number, strength: number): void;
+  /** Floodlights + crowd on (a match), or a quiet empty-ish stadium. */
+  setLive(on: boolean): void;
+  dispose(): void;
+}
+
 // ── The view (football/view exports createFootballView) ─────────────────
 
 export type CamMode = 'broadcast' | 'player' | 'high' | 'replay' | 'cinematic';
