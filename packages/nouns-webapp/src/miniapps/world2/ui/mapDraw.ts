@@ -8,6 +8,8 @@
 //
 // Screen: +X right, +Z down (a true top-down view, -Z is "north").
 
+import { STADIUM } from '../football/contract';
+import { SITE as STADIUM_SITE, STADIUM_KM, stadiumMapPoint } from '../football/site';
 import { ALLEYS, ALLEY_O0, MOUNTAIN, alleyToWorld, edgeDistance } from '../world/mountain/config';
 import { bowlMapPoint, bowlOutline } from '../world/mountain/noggleBowl';
 import { NJ, njFrameNow, njToWorld, type NjFrame } from '../world/mountain/nounJersey';
@@ -58,6 +60,7 @@ const C = {
   mega: '#ff7a1a',
   nj: '#ff3d8b',
   bowl: '#8f6bff',
+  stadium: '#3fd16b',
   town: '#ffb000',
   landmark: '#ff4fd8',
   landmarkUnseen: '#c9c4d6',
@@ -350,6 +353,31 @@ export function drawMap(
     ctx.lineWidth = 3 * px;
     ctx.stroke();
   }
+  // NOUN STADIUM's outer wall (football/site.ts: fixed, needs nothing grown)
+  if (scene.mountain) {
+    const c = Math.cos(STADIUM_SITE.yaw);
+    const sn = Math.sin(STADIUM_SITE.yaw);
+    ctx.beginPath();
+    [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].forEach(([a, b], i) => {
+      const px0 = a! * STADIUM.halfX;
+      const pz0 = b! * STADIUM.halfZ;
+      const x = STADIUM_SITE.x + px0 * c + pz0 * sn;
+      const z = STADIUM_SITE.z - px0 * sn + pz0 * c;
+      if (i === 0) ctx.moveTo(x, z);
+      else ctx.lineTo(x, z);
+    });
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(63,209,107,.35)';
+    ctx.fill();
+    ctx.strokeStyle = C.stadium;
+    ctx.lineWidth = 3 * px;
+    ctx.stroke();
+  }
   ctx.restore();
 
   // ── Screen-space markers (never rotated) ──
@@ -448,6 +476,22 @@ export function drawMap(
         label(ctx, off ? 'NOGGLE BOWL ◎ 42 km' : 'NOGGLE BOWL', p.x, p.y - 22, {
           size: 11,
           color: C.bowl,
+        });
+    }
+  }
+
+  // NOUN STADIUM (Noun Football, 3 km down the −Z side)
+  if (scene.mountain) {
+    const st = stadiumMapPoint();
+    let p = S(st.x, st.z);
+    const off = !inside(p, 14);
+    if (!off || o.full || o.edgeMarkers) {
+      if (off) p = edge(p, 14);
+      pin(ctx, p.x, p.y, C.stadium, '⚽');
+      if (o.full)
+        label(ctx, off ? `NOUN STADIUM ⚽ ${STADIUM_KM} km` : 'NOUN STADIUM', p.x, p.y - 22, {
+          size: 11,
+          color: C.stadium,
         });
     }
   }
