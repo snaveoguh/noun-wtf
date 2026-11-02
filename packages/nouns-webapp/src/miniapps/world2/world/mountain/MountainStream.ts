@@ -22,6 +22,7 @@ import type { Quality } from '../../render/Graphics';
 
 import * as THREE from 'three';
 
+import { courseGroundColour, overlapsCourse, type Rgb } from '../../golf/course/colors';
 import { toonify } from '../../render/Toon';
 
 import { RERUN_MOVE, ringHides, type Aabb } from './ringOcclusion';
@@ -158,6 +159,8 @@ interface GenJob {
   alley: Float32Array;
   side: Float32Array;
   tint: Float32Array;
+  /** NOUN LINKS ground colour + weight per vertex (rgbw), on chunks over the course. */
+  golf: Float32Array | null;
   ms: number;
 }
 
@@ -212,6 +215,7 @@ const DIRT_DARK = new THREE.Color(0x9a6337);
 const CONCRETE = new THREE.Color(0x9a95a6);
 const _c = new THREE.Color();
 const _c2 = new THREE.Color();
+const _golf: Rgb = { r: 0, g: 0, b: 0 };
 
 export class MountainStream {
   readonly group = new THREE.Group();
@@ -359,7 +363,7 @@ export class MountainStream {
     for (const w of work) {
       if (performance.now() - t0 > budget) break;
       const c = w.c;
-      if (c.job === null || c.job.lod !== w.want) c.job = this.newJob(w.want);
+      if (c.job === null || c.job.lod !== w.want) c.job = this.newJob(w.want, c.origin);
       if (this.advance(c, t0)) this.finish(c);
     }
     // Props on near chunks (after their terrain mesh exists), nearest first.
@@ -494,11 +498,13 @@ export class MountainStream {
     return LOD_RANGE.length - 1;
   }
 
-  private newJob(lod: number): GenJob {
+  private newJob(lod: number, origin: THREE.Vector3): GenJob {
     const n = this.segs[lod];
     const g = n + 3;
     const v = (n + 1) * (n + 1);
+    const golf = overlapsCourse(origin.x, origin.z, origin.x + CHUNK, origin.z + CHUNK);
     return {
+      golf: golf ? new Float32Array(v * 4) : null,
       lod,
       n,
       row: 0,
@@ -534,6 +540,10 @@ export class MountainStream {
           j.alley[vi] = s.alley;
           j.side[vi] = s.side;
           j.tint[vi] = tintNoise(wx, wz);
+          if (j.golf !== null) {
+            const w = courseGroundColour(wx, wz, _golf);
+            j.golf.set([_golf.r, _golf.g, _golf.b, w], vi * 4);
+          }
         }
       }
       j.row++;
@@ -613,6 +623,10 @@ export class MountainStream {
         }
         const al = j.alley[vi];
         if (al > 0) _c.lerp(CONCRETE, al);
+        // NOUN LINKS: the course's own ground (rough, deep rough, under the overlays)
+        const gf = j.golf;
+        if (gf !== null && gf[vi * 4 + 3] > 0)
+          _c.lerp(_c2.setRGB(gf[vi * 4], gf[vi * 4 + 1], gf[vi * 4 + 2]), gf[vi * 4 + 3]);
         col[vi * 3] = _c.r;
         col[vi * 3 + 1] = _c.g;
         col[vi * 3 + 2] = _c.b;

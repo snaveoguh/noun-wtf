@@ -110,6 +110,7 @@ import { settings } from './settings/store';
 import { Player } from './skate/Player';
 import { comboLabel, comboScore } from './skate/Tricks';
 import { SkydiveSystem } from './skydive/SkydiveSystem';
+import { createCourseView } from './golf/view/CourseView';
 import { townsDecorator } from './towns/build';
 import { isGrownTown, townSpawn } from './towns/site';
 import { TownSystem } from './towns/TownSystem';
@@ -381,6 +382,8 @@ export class Game {
   readonly camp: CampSystem = new CampSystem(this);
   /** The mural bench (world/bench/): Pipe, SIT, the cinematic shot of the GIF mural. */
   readonly bench: BenchSystem = new BenchSystem(this);
+  /** NOUN LINKS drawn (golf/view/): built in slices when near, freed when far. */
+  readonly golfView = createCourseView(this);
   /** The plaza's buildings re-dressed: styles, detailing, walkable fire escapes (world/facades/). */
   readonly facades: FacadeSystem = new FacadeSystem(this);
   /** Noun Hoops (hoops/net/HoopsMode.ts): while active it owns the frame; the skater stays parked. */
@@ -1256,6 +1259,7 @@ export class Game {
       this.towns?.update(dt);
       this.landmarks?.update(dt);
     }
+    this.golfView.update(dt, this.gfx.camera, this.player.pos);
     perf.lap('towns');
     this.particles.update(dt, p => {
       const hit = this.world.raycast(_v.set(p.x, p.y + 0.5, p.z), DOWN, 1);
@@ -2576,6 +2580,7 @@ export class Game {
     this.interiors.dispose();
     this.camp.dispose();
     this.bench.dispose();
+    this.golfView.dispose();
     this.facades.dispose();
     this.hoops.dispose();
     this.breaks.dispose();
