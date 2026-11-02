@@ -23,6 +23,7 @@ import type { Game } from '../../Game';
 import type { InteriorsApi } from '../../interiors/contract';
 import type { TownId } from '../../trade/contract';
 import type { MapScene } from '../../ui/mapDraw';
+import type { ChatterUi } from '../chatter/ChatterSystem';
 import type { TaxiWire } from '../net/wire';
 import type { Destination } from '../sim/destinations';
 import type { LineEvent } from '../sim/lines';
@@ -41,6 +42,8 @@ import { inkExcluded, toonify } from '../../render/Toon';
 import { TOWN_SPECS } from '../../trade/towns';
 import { terrainHeight, terrainInDomain } from '../../world/mountain/terrain';
 import { tracks } from '../../world/mountain/tracks';
+import { ChatterSystem } from '../chatter/ChatterSystem';
+import { chatterHost } from '../chatter/gameHost';
 import { encodeTaxi } from '../net/wire';
 import { growSome, mainTrack, onLine, registerBuiltins, setGrowAllowed } from '../sim/builtin';
 import { allDestinations, registerDestinations, payTown } from '../sim/destinations';
@@ -112,6 +115,9 @@ export interface TaxiUi {
   /** Shift over: totals + bests. */
   results: { totals: ShiftTotals; bests: TaxiBests; beat: string[] } | null;
   coin: number | null;
+  /** Taxi chatter (chatter/): who's talking and what they're saying, mute, radio hold. */
+  chat: ChatterUi | null;
+  chatMuted: boolean;
 }
 
 const IDLE: TaxiUi = {
@@ -126,6 +132,8 @@ const IDLE: TaxiUi = {
   receipt: null,
   results: null,
   coin: null,
+  chat: null,
+  chatMuted: false,
 };
 
 // ── People at the roadside ──
@@ -218,9 +226,15 @@ export class TaxiSystem {
   private registered = false;
   private bests: TaxiBests;
   private gone = false;
+  /** Endless cab talk (chatter/): `game.taxi.chatter.start(...)` / `stop()`. */
+  readonly chatter: ChatterSystem;
+  /** The person this system started the chatter for (others, e.g. a hired cab, run their own). */
+  private chatFor: string | null = null;
 
   constructor(private game: Game) {
     this.bests = parseBests(load(BESTS_KEY));
+    this.chatter = new ChatterSystem(chatterHost(game));
+    this.chatter.subscribe(() => this.push(true));
     this.group.name = 'taxi-guide';
     // Arrow: a chunky chevron, pointing +Z
     const shape = new THREE.Shape();
@@ -470,6 +484,12 @@ export class TaxiSystem {
     const a = this.cabRider ?? this.solo;
     if (a !== null && sim !== null && cur !== null) this.rideAlong(a, dt, cur, sim, cab);
     else this.clearRoute();
+    // Chatter: theirs ends when they're out
+    if (this.chatFor !== null && (a === null || a.person.id !== this.chatFor)) {
+      this.chatter.stop();
+      this.chatFor = null;
+    }
+    this.chatter.tick();
 
     this.stepPeople(dt, pos);
     this.stepLeaving(dt);
@@ -807,6 +827,17 @@ export class TaxiSystem {
     this.results = null;
     g.sfx.play('mission-accept', { gain: 0.5 });
     const long = route.road;
+    // they talk the whole way (chatter/), the greeting first
+    this.chatFor = p.id;
+    this.chatter.start({
+      speaker: 'passenger',
+      seed: p.seed,
+      name: p.name,
+      context: () => ({
+        dest: (this.cabRider ?? this.solo)?.ride.dest.name ?? p.dest.name,
+        kmh: (g.cars.current?.sim?.speed ?? 0) * 3.6,
+      }),
+    });
     this.say(p, kind === 'hitch' ? 'hitchHi' : long ? 'greetLong' : 'greet', true);
     this.airWas = 0;
     this.driftT = 0;
@@ -907,7 +938,7 @@ export class TaxiSystem {
       this.say(p, 'fast', false);
     }
     if (cab && r.allow - r.t < 12 && r.allow - r.t > 11.5) this.say(p, 'slow', false);
-    if (r.kind === 'hitch') {
+    if (r.kind === 'hitch' && !this.chatter.talking) {
       this.chatAcc += dt;
       if (this.chatAcc > 22) {
         this.chatAcc = 0;
@@ -947,6 +978,15 @@ export class TaxiSystem {
 
   private stunt(e: StuntEvent | null, a: Aboard, line: LineEvent) {
     if (e === null) return;
+    this.chatter.note(
+      e.stunt === 'near-miss'
+        ? 'nearMiss'
+        : e.stunt === 'air'
+          ? 'air'
+          : e.stunt === 'drift'
+            ? 'drift'
+            : 'crash',
+    );
     if (a.ride.kind === 'hitch' && e.stunt !== 'crash') {
       // hitchhikers love it but don't tip for it
       this.pop(e.label, true);
@@ -1157,6 +1197,9 @@ export class TaxiSystem {
     const to = (this.cabRider ?? this.solo)?.ride.dest.name ?? p.dest.name;
     const text = lineFor(ev, to, this.rand);
     this.said = { name: p.name, text, at: performance.now() };
+    // the chatter says it in their chatter voice (and resumes after); muted: words only
+    if (this.chatFor === p.id && this.chatter.event(text)) return;
+    if (this.chatter.muted) return;
     const s = p.seed;
     try {
       this.game.voice.speak({
@@ -1243,6 +1286,8 @@ export class TaxiSystem {
       receipt: this.receipt !== null && now - this.receipt.at < 5000 ? this.receipt : null,
       results: this.results,
       coin: g.trade.state?.coin ?? null,
+      chat: this.chatter.ui,
+      chatMuted: this.chatter.muted,
     };
     if (
       !force &&
@@ -1250,7 +1295,10 @@ export class TaxiSystem {
       !this.ui.cab &&
       next.results === this.ui.results &&
       next.hitch === null &&
-      this.ui.hitch === null
+      this.ui.hitch === null &&
+      next.chat === null &&
+      this.ui.chat === null &&
+      next.chatMuted === this.ui.chatMuted
     )
       return;
     this.ui = next;
@@ -1259,6 +1307,7 @@ export class TaxiSystem {
 
   dispose() {
     this.gone = true;
+    this.chatter.dispose();
     for (const p of [...this.waiting, ...this.hitchers.values()]) this.free(p);
     for (const a of [this.cabRider, this.solo]) if (a !== null) this.free(a.person);
     for (const l of this.leaving) this.free(l.person);
@@ -1385,6 +1434,17 @@ export class TaxiSystem {
               for: this.routeFor,
             },
       destinations: allDestinations().length,
+      chatter: {
+        ...this.chatter.voiceLoad,
+        talking: this.chatter.talking,
+        muted: this.chatter.muted,
+        state: this.chatter.ui?.state ?? 'off',
+        lines: this.chatter.log.lines,
+        house: this.chatter.log.house,
+        fallback: this.chatter.log.fallback,
+        events: this.chatter.log.events,
+        last: this.chatter.log.last,
+      },
       ring: RING.R,
     };
   }

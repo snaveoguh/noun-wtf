@@ -181,6 +181,22 @@ export class TtsEngine {
     return p;
   }
 
+  /**
+   * Drop a line's audio from the cache once it's been played (taxi chatter:
+   * a line is never said twice, so keeping ~200 of them would hold ~80 MB).
+   * Harmless for a line still being synthesized: it just isn't kept.
+   */
+  forget(text: string, voice: TtsVoice) {
+    const key = lineKey(text, voice);
+    this.cache.delete(key);
+    this.done.delete(key);
+  }
+
+  /** Lines held in the cache (dev / browser checks). */
+  get cachedLines(): number {
+    return this.done.size;
+  }
+
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -234,7 +250,8 @@ export class TtsEngine {
           if (m.pcm.length > 0) {
             buf = job.ctx.createBuffer(1, m.pcm.length, m.sampleRate);
             buf.copyToChannel(m.pcm as Float32Array<ArrayBuffer>, 0);
-            this.done.set(job.key, buf);
+            // (forgotten meanwhile: hand it over, don't keep it)
+            if (this.cache.has(job.key)) this.done.set(job.key, buf);
           }
           this.log.synths++;
           this.log.lastMs = m.ms;

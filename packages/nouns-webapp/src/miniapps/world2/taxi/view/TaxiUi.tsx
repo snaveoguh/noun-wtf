@@ -33,14 +33,29 @@ const BEST_NAME: Record<string, string> = {
 
 export function TaxiUi({ game, touch }: { game: Game; touch: boolean }) {
   const v = useTaxi(game);
-  if (v === null || (!v.cab && v.results === null && v.hitch === null)) return null;
+  if (v === null || (!v.cab && v.results === null && v.hitch === null && v.chat === null))
+    return null;
   const r = v.ride;
   const low = r !== null && r.kind === 'fare' && r.clock < 10;
+  const chat = v.chat;
+  const mute = (
+    <button
+      type="button"
+      className="tx-mute pointer-events-auto"
+      aria-pressed={v.chatMuted}
+      aria-label={v.chatMuted ? 'Unmute cab chatter' : 'Mute cab chatter'}
+      title={v.chatMuted ? 'chatter muted · tap to unmute' : 'mute the chatter'}
+      onClick={() => game.taxi.chatter.setMuted(!v.chatMuted)}
+    >
+      {v.chatMuted ? '🔇' : '🗣'}
+    </button>
+  );
   return (
     <div className="tx-ui pointer-events-none" data-touch={touch ? '1' : '0'}>
       <style>{CSS}</style>
       {v.cab && (
         <div className={`tx-meter${low ? 'low' : ''}`}>
+          {mute}
           <div className="tx-light">
             {r === null
               ? 'NOUN CAB · FOR HIRE'
@@ -108,11 +123,26 @@ export function TaxiUi({ game, touch }: { game: Game; touch: boolean }) {
           them
         </div>
       )}
-      {v.said !== null && (
+      {!v.cab && chat !== null && (
+        <div className="tx-meter tx-mini">
+          {mute}
+          <span>🚕 {chat.name}</span>
+        </div>
+      )}
+      {v.said !== null ? (
         <div className="tx-said" key={v.said.at}>
           <span>{v.said.name}</span> {v.said.text}
         </div>
-      )}
+      ) : chat !== null && chat.state === 'radio' ? (
+        <div className="tx-said tx-quiet" data-chat="radio">
+          📻 radio on · {chat.name} goes quiet
+        </div>
+      ) : chat !== null && !chat.muted && chat.text !== null ? (
+        <div className="tx-said tx-chat" key={chat.at} data-chat="line">
+          <span>{chat.name}</span> {chat.text}
+          {chat.voice === 'loading' && <em>voice loading…</em>}
+        </div>
+      ) : null}
       <div className="tx-pops">
         {v.pops.map(p => (
           <b key={p.at} className={p.good ? '' : 'bad'}>
@@ -198,6 +228,13 @@ const CSS = `
 .tx-mult{color:#3ee86a;font-weight:900}
 .tx-help{font:600 10px/1.3 system-ui,sans-serif;opacity:.65;text-align:center;margin-top:4px}
 .tx-coin{position:absolute;right:8px;top:5px;font:800 10px/1 system-ui,sans-serif;opacity:.8}
+.tx-mute{position:absolute;left:4px;top:2px;width:30px;height:24px;padding:0;border:0;border-radius:8px;background:transparent;font:16px/24px system-ui,sans-serif;cursor:pointer;color:#fff}
+.tx-mute[aria-pressed="true"]{background:rgba(255,93,93,.25)}
+.tx-mini{display:flex;align-items:center;justify-content:center;min-width:180px;padding:4px 12px 4px 38px;font:800 12px/24px system-ui,sans-serif}
+.tx-mini .tx-mute{top:0}
+.tx-chat{line-height:1.35}
+.tx-chat em{display:block;font:600 10px/1.2 system-ui,sans-serif;opacity:.55;margin-top:2px}
+.tx-quiet{background:rgba(14,12,6,.62);color:#ffd400;font-size:11px}
 .tx-hint{font:700 12px/1.3 system-ui,sans-serif;text-align:center;border-color:#3ee86a;box-shadow:0 3px 0 #1e8a3c}
 .tx-said{position:absolute;left:50%;transform:translateX(-50%);top:calc(178px + var(--w2-safe-top, env(safe-area-inset-top)));max-width:min(360px,calc(100vw - 32px));background:#fff;color:#111;border-radius:12px;padding:5px 10px;font:700 13px/1.3 system-ui,sans-serif;animation:txin .2s ease-out}
 .tx-said span{font-weight:900;color:#c48f00;margin-right:4px}
