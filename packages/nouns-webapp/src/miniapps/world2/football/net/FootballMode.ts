@@ -326,6 +326,9 @@ export class FootballMode implements FootballApi {
         canvas: gfx.renderer.domElement,
         warm: obj => warmHidden(gfx.renderer, obj, gfx.camera, gfx.scene, f => gfx.asDrawn(f)),
         ownStadium: false,
+        ink: gfx.outline,
+        // the TV gantry sits on the main stand (the tunnel side, pitch −x)
+        stand: -1,
         reduceMotion: matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
       },
     );
@@ -790,7 +793,10 @@ export class FootballMode implements FootballApi {
           ? this.input.sample(this.camFwd.x, this.camFwd.z, this.frame)
           : null;
       if (s.role === 'host') {
-        if (!(this.ui.paused && s.kind !== 'online')) {
+        // Local matches hold on the goal while its replay plays (the replay
+        // stops when play goes live); online the match never waits
+        const hold = s.kind !== 'online' && (this.ui.paused || view.replaying);
+        if (!hold) {
           fr = s.host.frame(dt, pad);
           events = s.host.drainEvents();
         } else fr = this.lastFrame;

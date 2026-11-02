@@ -215,7 +215,9 @@ export class StadiumView implements StadiumViewApi {
       return this.crowdFilled >= c.instanceMatrix.count;
     },
     () => {
-      this.mesh(this.shell.toGeometry(), this.shellMat, 'shell', true);
+      // No cast shadow: low sun put the roofs' hard angular shadows across the
+      // pitch, which read as a glitch on TV (and it's a shadow-pass draw saved)
+      this.mesh(this.shell.toGeometry(), this.shellMat, 'shell', false);
       this.shell = new Geo();
     },
     () => this.finishSeats(),

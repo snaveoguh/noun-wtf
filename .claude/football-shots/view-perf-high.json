@@ -1,0 +1,17 @@
+{
+ "drawMs": 1.7213710431127154,
+ "poseMs": 1.600015076322424,
+ "posed": 3,
+ "visible": 10,
+ "frames": 228,
+ "footballers": 22,
+ "matchCalls": 344,
+ "matchTriangles": 239034,
+ "calls": 406,
+ "triangles": 252349,
+ "programs": 76,
+ "textures": 444,
+ "geometries": 303,
+ "loopMs": 12.963333333345751,
+ "tickMs": 2.5
+}
