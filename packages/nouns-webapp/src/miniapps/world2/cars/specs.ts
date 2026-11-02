@@ -19,7 +19,8 @@ export type CarId =
   | 'stompa'
   | 'bubble'
   | 'kaido'
-  | 'bruiser';
+  | 'bruiser'
+  | 'buggy';
 
 /** What X (or the SPECIAL button) does in this car. */
 export type CarSpecial = 'fly' | 'hop' | 'stomp' | null;
@@ -80,6 +81,12 @@ export interface CarSpec {
   paints: number[];
   /** Engine voice: pitch multiplier for the shared synth (van/VanAudio.ts). */
   engine: number;
+  /** What the engine sounds like: combustion (the van's synth, default) or an electric motor's whine. */
+  voice?: 'combustion' | 'electric';
+  /** Joins the plaza's kerbside fleet and traffic (default true; the golf buggy waits at the course). */
+  traffic?: boolean;
+  /** Air drag override (VanSim `drag`); slow cars use it to reach their top speed briskly. */
+  drag?: number;
   horn: 'beep' | 'deep' | 'toot' | 'tune' | 'air';
   /** Handling: everything VanSim reads, worked out by simParams(). */
   mass: number;
@@ -455,9 +462,57 @@ export const CARS: Record<CarId, CarSpec> = {
     downforce: 0.0012,
     comH: 0.56,
   },
+  buggy: {
+    id: 'buggy',
+    name: 'GOLF BUGGY',
+    tagline: 'Electric two-seater with a bag on the back. Whirrs along at 32 km/h.',
+    inspiration: 'the electric golf cart, canopy roof and all',
+    source: 'procedural',
+    geo: {
+      length: 2.5,
+      width: 1.36,
+      height: 2.02,
+      axleF: 0.85,
+      axleR: -0.8,
+      halfTrack: 0.52,
+      wheelR: 0.24,
+      wheelW: 0.2,
+      seat: [0.34, 0.66, -0.2],
+    },
+    doors: 'none',
+    open: true,
+    special: null,
+    traffic: false,
+    paints: [0xefe6cf, 0xf7f5ee, 0x2f7d4a, 0x1f5a36],
+    engine: 1,
+    voice: 'electric',
+    horn: 'beep',
+    mass: 480,
+    topKmh: 32,
+    boostKmh: 40,
+    accel: 3.2,
+    // brisk to its top speed, and it slows quickly off the pedal (like regen)
+    drag: 0.018,
+    mu: 0.95,
+    slide: 0.8,
+    sag: 0.1,
+    zeta: 0.34,
+    travel: 0.18,
+    restLen: 0.26,
+    frontDrive: 0,
+    steerMax: 0.62,
+    steerFade: 8,
+    hbGrip: 0.45,
+    hbYaw: 1.0,
+    downforce: 0,
+    comH: 0.48,
+  },
 };
 
 export const CAR_IDS = Object.keys(CARS) as CarId[];
+
+/** The cars that join the plaza's kerbside fleet and traffic (not the golf buggy). */
+export const TRAFFIC_IDS = CAR_IDS.filter(id => CARS[id].traffic !== false);
 
 export function isCarId(v: unknown): v is CarId {
   return typeof v === 'string' && Object.prototype.hasOwnProperty.call(CARS, v);
@@ -476,7 +531,7 @@ export function simParams(s: CarSpec): VanParams {
   const rolling = 0.012;
   // At top speed the drive (power / v) just covers the drag (+ rolling), and
   // must sit under the launch cap (accel), so fast cars get slipperier bodies
-  const drag = Math.min(0.0032, (0.75 * s.accel - rolling * 14) / (top * top));
+  const drag = s.drag ?? Math.min(0.0032, (0.75 * s.accel - rolling * 14) / (top * top));
   // (downforce loads the tyres: more rolling resistance at speed)
   const resist = (v: number) => drag * v ** 3 + rolling * (14 + s.downforce * v * v) * v;
   const power = resist(top);

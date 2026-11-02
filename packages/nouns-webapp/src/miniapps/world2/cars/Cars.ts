@@ -23,6 +23,12 @@
 // the next stop. Their client decides who sits where (`ps`), so a seat
 // never holds two; if they get out or go, you're put out beside the car.
 // Open cars show everyone in their seats; closed cars hide them.
+//
+// Golf buggies (buggy.ts) aren't fleet: the course parks them where it wants
+// with `parkBuggies(group, spots)` / `clearBuggies(group)` (golf/contract.ts
+// BuggyApi). They're built one a frame and only within BUGGY_FAR of the
+// camera; further out they sleep (hidden, no collider, nothing stepped).
+// Taken, they drive like any car; left, they're an ordinary left car (`lc`).
 
 import type { InputFrame } from '../core/Input';
 import type { Game } from '../Game';
@@ -38,6 +44,15 @@ import { substeps, VanSim, type VanControls } from '../van/physics';
 import { VanCamera } from '../van/VanCamera';
 import { terrainSurface } from '../world/mountain/terrain';
 
+import {
+  BUGGY_FAR,
+  buggyAsleep,
+  buggyPaint,
+  cleanSpots,
+  restOn,
+  spotsKey,
+  type BuggySpot,
+} from './buggy';
 import { CarAudio } from './CarAudio';
 import { DOOR_OPEN, DoorAnim, enterDelay } from './doors';
 import { canLiftOff, FlightSim } from './flight';
@@ -82,7 +97,7 @@ import {
   type RideCheck,
   type SeatAsk,
 } from './seats';
-import { CAR_IDS, CARS, simParams, type CarId, type CarSpec } from './specs';
+import { CARS, simParams, TRAFFIC_IDS, type CarId, type CarSpec } from './specs';
 
 /** CollisionWorld dynamic-body ids: `car|<n>|`. */
 const COLLIDER = 'car|';
@@ -96,6 +111,8 @@ const DRAW_DIST = 190;
 const BOARD_SPEED = 8;
 /** A driver silent this long (ms) has gone (a frozen tab, a dropped line): passengers get out. */
 const DRIVER_GONE_MS = 8000;
+/** A buggy already standing this close (m) to a spot is adopted, not doubled. */
+const ADOPT_DIST = 1.5;
 
 export interface CarUi {
   driving: boolean;
@@ -194,6 +211,25 @@ interface TCar {
   spin: number;
   /** Where it lives in the traffic plan (it goes back there if another rider takes it). */
   home: TrafficPlan | null;
+  /** A course buggy (null for the fleet). */
+  buggy: BuggyTag | null;
+  /** Parked on a slope: its whole orientation (null = upright on `yaw`). */
+  tilt: THREE.Quaternion | null;
+}
+
+interface BuggyTag {
+  /** The parkBuggies group, or null once cleared while in use (removed when you're done with it). */
+  group: string | null;
+  /** Where it waits (it goes back there if another rider takes it), null for one made on the spot. */
+  spot: BuggySpot | null;
+  /** Far from the camera: hidden, no collider, skipped. */
+  asleep: boolean;
+}
+
+interface PendingBuggy {
+  group: string;
+  spot: BuggySpot;
+  paint: number;
 }
 
 interface Hopper {
@@ -302,6 +338,13 @@ export class CarSystem {
   private look = { x: 0, y: 0, now: 0 };
   private notice = '';
   private noticeT = 0;
+  /** Collider / fleet numbers (never reused: cars come and go now). */
+  private nextN = 0;
+  /** parkBuggies groups → the key of their spot list (idempotency). */
+  private buggyGroups = new Map<string, string>();
+  /** Buggies asked for but not built yet (one a frame, only near the camera). */
+  private pendingBuggies: PendingBuggy[] = [];
+  private buggyWarmed = false;
 
   constructor(private game: Game) {
     this.ground = new WorldGround(game.world);
@@ -421,10 +464,10 @@ export class CarSystem {
     if (!level.baked || this.started || !carsOn()) return;
     this.started = true;
     const low = this.game.gfx.quality === 'low';
-    const specs = CAR_IDS.map(id => CARS[id]);
+    const specs = TRAFFIC_IDS.map(id => CARS[id]);
     void preloadKenney(specs).then(() => {
       if (this.gone) return;
-      const plan = planTraffic(CAR_IDS, {
+      const plan = planTraffic(TRAFFIC_IDS, {
         seed: 4217,
         cruisers: low ? 2 : 3,
         paints: id => CARS[id].paints.length,
@@ -464,7 +507,7 @@ export class CarSystem {
     if (this.game.gfx.toon) toonify(model.group);
     model.group.visible = false;
     this.game.gfx.scene.add(model.group);
-    const n = this.fleet.length;
+    const n = this.nextN++;
     const t: TCar = {
       n,
       col: `${COLLIDER}${n}|`,
@@ -488,9 +531,208 @@ export class CarSystem {
       colPos: new THREE.Vector3(),
       spin: 0,
       home: null,
+      buggy: null,
+      tilt: null,
     };
     this.fleet.push(t);
     return t;
+  }
+
+  /** Take a car out of the world for good (a cleared buggy). */
+  private removeCar(t: TCar) {
+    const g = this.game;
+    g.gfx.scene.remove(t.model.group);
+    if (t.still !== null) g.gfx.scene.remove(t.still);
+    g.world.setDynamic(t.col, null);
+    t.colGeo?.dispose();
+    t.colGeo = null;
+    const i = this.fleet.indexOf(t);
+    if (i >= 0) this.fleet.splice(i, 1);
+    if (this.left === t) this.left = null;
+  }
+
+  // ── Golf buggies (golf/contract.ts BuggyApi) ──
+
+  /**
+   * Park buggies at these world spots (y = the ground there). Idempotent per
+   * group: the same spots again do nothing; different spots replace the
+   * group's (any buggy in use is left alone). Built one a frame, near the
+   * camera first; takeable with E like any parked car.
+   */
+  parkBuggies(group: string, spots: BuggySpot[]): void {
+    const clean = cleanSpots(Array.isArray(spots) ? spots : []);
+    const key = spotsKey(clean);
+    if (this.buggyGroups.get(group) === key) return;
+    if (this.buggyGroups.has(group)) this.clearBuggies(group);
+    this.buggyGroups.set(group, key);
+    const paints = CARS.buggy.paints.length;
+    clean.forEach((sp, i) =>
+      this.pendingBuggies.push({
+        group,
+        spot: { x: sp.x, y: sp.y, z: sp.z, yaw: sp.yaw },
+        paint: buggyPaint(i, paints),
+      }),
+    );
+  }
+
+  /**
+   * Take the group's buggies away. One someone is driving (or the one you
+   * just got out of, your `lc`) stays until you're done with it.
+   */
+  clearBuggies(group: string): void {
+    this.buggyGroups.delete(group);
+    this.pendingBuggies = this.pendingBuggies.filter(p => p.group !== group);
+    for (const t of [...this.fleet]) {
+      const b = t.buggy;
+      if (b === null || b.group !== group) continue;
+      if (t.mode === 'driven' || t === this.left) b.group = null;
+      else this.removeCar(t);
+    }
+  }
+
+  /** The course buggies (dev / tests): where they are and what they're doing. */
+  get buggies(): {
+    group: string | null;
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
+    mode: TCar['mode'];
+    asleep: boolean;
+    paint: number;
+  }[] {
+    const out = [];
+    for (const t of this.fleet) {
+      const b = t.buggy;
+      if (b === null) continue;
+      out.push({
+        group: b.group,
+        x: t.pos.x,
+        y: t.pos.y,
+        z: t.pos.z,
+        yaw: t.yaw,
+        mode: t.mode,
+        asleep: b.asleep,
+        paint: t.paint,
+      });
+    }
+    return out;
+  }
+
+  /** Buggies asked for but not built yet (dev / tests). */
+  get buggiesPending(): number {
+    return this.pendingBuggies.length;
+  }
+
+  /** At most one buggy a frame: the nearest one waiting within BUGGY_FAR of the camera. */
+  private buildBuggy(cam: THREE.Vector3) {
+    if (this.pendingBuggies.length === 0) return;
+    let best = -1;
+    let bestD = BUGGY_FAR * BUGGY_FAR;
+    for (let i = 0; i < this.pendingBuggies.length; i++) {
+      const sp = this.pendingBuggies[i].spot;
+      const d = (sp.x - cam.x) ** 2 + (sp.y - cam.y) ** 2 + (sp.z - cam.z) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    if (best < 0) return;
+    const p = this.pendingBuggies.splice(best, 1)[0];
+    // One already standing there (you got out of it right here): it joins the group
+    const there = this.fleet.find(
+      t =>
+        t.buggy !== null &&
+        t.buggy.group === null &&
+        t.mode === 'parked' &&
+        Math.hypot(t.pos.x - p.spot.x, t.pos.z - p.spot.z) < ADOPT_DIST,
+    );
+    if (there !== undefined && there.buggy !== null) {
+      there.buggy.group = p.group;
+      there.buggy.spot = p.spot;
+      return;
+    }
+    const t = this.spawn(CARS.buggy, p.paint);
+    t.buggy = { group: p.group, spot: p.spot, asleep: false };
+    this.placeBuggy(t, p.spot);
+    this.warmBuggy(t);
+  }
+
+  /** Sit a buggy on the ground at a spot: four wheel probes, tilted to the slope. */
+  private placeBuggy(t: TCar, sp: BuggySpot) {
+    const g = t.spec.geo;
+    const c = Math.cos(sp.yaw);
+    const s = Math.sin(sp.yaw);
+    const h: [number, number, number, number] = [sp.y, sp.y, sp.y, sp.y];
+    const at: [number, number][] = [
+      [g.halfTrack, g.axleF],
+      [-g.halfTrack, g.axleF],
+      [g.halfTrack, g.axleR],
+      [-g.halfTrack, g.axleR],
+    ];
+    // (its own collider is out while it's probed)
+    this.setCollider(t, false);
+    for (let i = 0; i < 4; i++) {
+      const [lx, lz] = at[i];
+      const x = sp.x + lx * c + lz * s;
+      const z = sp.z - lx * s + lz * c;
+      const hit = this.game.world.raycast(_v.set(x, sp.y + 1.2, z), DOWN, 2.4);
+      if (hit !== null && hit.normal.y > 0.6) h[i] = hit.point.y;
+    }
+    const r = restOn(h, g);
+    t.pos.set(sp.x, r.y, sp.z);
+    t.yaw = sp.yaw;
+    t.tilt =
+      Math.abs(r.pitch) + Math.abs(r.roll) > 0.004
+        ? new THREE.Quaternion().setFromEuler(new THREE.Euler(-r.pitch, sp.yaw, r.roll, 'YXZ'))
+        : null;
+    this.park(t);
+  }
+
+  /** The first buggy: link its programs now (they're the shared car materials, so it's quick). */
+  private warmBuggy(t: TCar) {
+    if (this.buggyWarmed) return;
+    this.buggyWarmed = true;
+    const gfx = this.game.gfx;
+    const still = t.still;
+    if (gfx.renderer === undefined || still === null) return;
+    const grp = t.model.group;
+    const was = [grp.visible, still.visible];
+    grp.visible = true;
+    still.visible = true;
+    try {
+      gfx.asDrawn(() => {
+        gfx.renderer.compile(grp, gfx.camera, gfx.scene);
+        gfx.renderer.compile(still, gfx.camera, gfx.scene);
+      });
+    } catch {
+      // (a lost context: it links on first sight instead)
+    }
+    grp.visible = was[0];
+    still.visible = was[1];
+  }
+
+  /** Is one of our parked buggies standing at (x, z)? */
+  private buggyAt(x: number, z: number): boolean {
+    for (const t of this.fleet)
+      if (
+        t.buggy !== null &&
+        t.mode === 'parked' &&
+        Math.hypot(t.pos.x - x, t.pos.z - z) < ADOPT_DIST
+      )
+        return true;
+    return false;
+  }
+
+  /** A buggy goes to sleep far from the camera (hidden, collider out) or wakes up. */
+  private sleepBuggy(t: TCar, asleep: boolean) {
+    if (t.buggy === null) return;
+    t.buggy.asleep = asleep;
+    if (asleep) {
+      if (t.still !== null) t.still.visible = false;
+      t.model.group.visible = false;
+      this.setCollider(t, false);
+    } else this.setCollider(t, !this.hidden);
   }
 
   /** Ground height under (x, z) (the level's rays), or `fallback`. */
@@ -508,7 +750,8 @@ export class CarSystem {
     const m = t.model;
     m.driver.visible = false;
     m.group.position.copy(t.pos);
-    m.group.quaternion.setFromAxisAngle(UP, t.yaw);
+    if (t.tilt !== null) m.group.quaternion.copy(t.tilt);
+    else m.group.quaternion.setFromAxisAngle(UP, t.yaw);
     m.group.updateMatrixWorld(true);
     if (t.still === null) {
       const key = `${t.spec.id}:${t.paint}`;
@@ -710,7 +953,7 @@ export class CarSystem {
     if (this.driving) return true;
     const t =
       this.fleet.find(x => x.spec.id === id && x.mode === 'parked') ??
-      this.fleet.find(x => x.mode === 'parked');
+      this.fleet.find(x => x.mode === 'parked' && x.buggy === null);
     if (t === undefined || this.hidden) return false;
     const p = this.game.player;
     const side = t.spec.geo.width / 2 + 0.8;
@@ -774,7 +1017,7 @@ export class CarSystem {
     for (const [owner, pr] of this.parkedRemotes) {
       const p = pr.p;
       const spec = CARS[p.id];
-      if (!this.fleet.some(t => t.spec.id === p.id)) continue;
+      if (p.id !== 'buggy' && !this.fleet.some(t => t.spec.id === p.id)) continue;
       const d = this.besideAt(p.x, p.y, p.z, p.yaw, spec);
       if (d !== null && d < bestD) {
         bestD = d;
@@ -789,10 +1032,14 @@ export class CarSystem {
     const pr = this.parkedRemotes.get(owner);
     if (pr === undefined) return;
     const p = pr.p;
+    // A buggy: a fresh one of ours right there (the course's stay at their spots)
     const t =
-      this.fleet.find(x => x.spec.id === p.id && x.mode === 'parked') ??
-      this.fleet.find(x => x.spec.id === p.id && x.mode !== 'driven');
+      p.id === 'buggy'
+        ? this.orphanBuggy(p.paint)
+        : (this.fleet.find(x => x.spec.id === p.id && x.mode === 'parked') ??
+          this.fleet.find(x => x.spec.id === p.id && x.mode !== 'driven'));
     if (t === undefined) return;
+    t.tilt = null;
     if (t.paint !== p.paint) this.repaint(t, p.paint);
     if (t.ai) {
       // its cruising driver just isn't there any more (it's somewhere else now)
@@ -807,6 +1054,13 @@ export class CarSystem {
     this.releaseRemote(pr);
     this.parkedRemotes.delete(owner);
     this.enter(t);
+  }
+
+  /** A buggy that belongs to no group (removed once you're done with it). */
+  private orphanBuggy(paint: number): TCar {
+    const t = this.spawn(CARS.buggy, paint);
+    t.buggy = { group: null, spot: null, asleep: false };
+    return t;
   }
 
   /** Rebuild a fleet car in another paint. */
@@ -847,6 +1101,11 @@ export class CarSystem {
 
   /** Back to its place in the traffic plan (or just off the road, if it never had one). */
   private rehome(t: TCar) {
+    if (t.buggy !== null) {
+      if (t.buggy.spot !== null && t.buggy.group !== null) this.placeBuggy(t, t.buggy.spot);
+      else this.removeCar(t);
+      return;
+    }
     if (t.home === null) return;
     if (t.home.kind === 'cruise' && t.still !== null) t.still.visible = false;
     this.placeHome(t, t.home);
@@ -1077,10 +1336,12 @@ export class CarSystem {
     t.mode = 'driven';
     this.setCollider(t, false);
     if (t.still !== null) t.still.visible = false;
+    if (t.buggy !== null) t.buggy.asleep = false;
     const m = t.model;
     m.group.visible = true;
     m.group.position.copy(t.pos);
-    m.group.quaternion.setFromAxisAngle(UP, t.yaw);
+    if (t.tilt !== null) m.group.quaternion.copy(t.tilt);
+    else m.group.quaternion.setFromAxisAngle(UP, t.yaw);
     m.group.updateMatrixWorld(true);
     let sim = this.sims.get(t.spec.id);
     if (sim === undefined) {
@@ -1137,7 +1398,14 @@ export class CarSystem {
     this.syncModel(t, sim);
     t.yaw = sim.heading;
     sim.origin(_v);
-    t.pos.set(_v.x, this.groundY(_v.x, _v.z, _v.y), _v.z);
+    if (t.buggy !== null) {
+      // As it came to rest (the course is hilly): the sim's own pose
+      t.pos.copy(_v);
+      t.tilt = new THREE.Quaternion(sim.q.x, sim.q.y, sim.q.z, sim.q.w);
+    } else {
+      t.pos.set(_v.x, this.groundY(_v.x, _v.z, _v.y), _v.z);
+      t.tilt = null;
+    }
     t.v = 0;
     poseWheelsFlat(t.model, 0);
     for (const w of t.model.wheels) {
@@ -1379,7 +1647,10 @@ export class CarSystem {
     for (const wh of sim.wheels) slip = Math.max(slip, wh.slip);
     if (this.flying && this.flight !== null)
       this.audio.update(0.4 + this.flight.thrust * 0.6, 3, this.flight.thrust, 0, c.boost, true);
-    else this.audio.update(sim.rpm, sim.gear, c.throttle, slip, sim.boosting, sim.grounded === 0);
+    else {
+      this.audio.speed = sim.forwardSpeed;
+      this.audio.update(sim.rpm, sim.gear, c.throttle, slip, sim.boosting, sim.grounded === 0);
+    }
     if (impact > 3) this.audio.thud(Math.min(1, impact / 20));
     else if (landing > 6) this.audio.thud(Math.min(1, landing / 25));
     if (landing > 6) g.particles.dustAt(this.origin, Math.min(1, landing / 18));
@@ -1497,7 +1768,14 @@ export class CarSystem {
     if (!away) {
       const cam = g.gfx.camera.position;
       this.camPos.copy(cam);
+      this.buildBuggy(cam);
       for (const t of this.fleet) {
+        if (t.buggy !== null && t.mode === 'parked') {
+          // Far buggies cost nothing: asleep, skipped
+          const asleep = buggyAsleep(cam.distanceToSquared(t.pos), t.buggy.asleep);
+          if (asleep !== t.buggy.asleep) this.sleepBuggy(t, asleep);
+          if (asleep) continue;
+        }
         if (t.mode === 'cruise') this.cruise(t, dt);
         if (t.mode !== 'driven' && t.doors.phase !== 'shut') {
           t.doors.step(dt);
@@ -1512,6 +1790,7 @@ export class CarSystem {
         } else t.model.group.visible = !far;
       }
       this.updateHoppers(dt);
+      this.dropOrphans();
     }
     this.seatCrew();
     this.updateRemotes(dt);
@@ -1526,16 +1805,29 @@ export class CarSystem {
     } else if (this.uiAcc >= 1 / 8) this.pushUi();
   }
 
+  /** Cleared buggies nobody's using any more (not driven, not your `lc`, doors shut) go. */
+  private dropOrphans() {
+    for (let i = this.fleet.length - 1; i >= 0; i--) {
+      const t = this.fleet[i];
+      const b = t.buggy;
+      if (b === null || b.group !== null || t.mode !== 'parked' || t === this.left) continue;
+      if (t.doors.phase !== 'shut') continue;
+      this.removeCar(t);
+    }
+  }
+
   private setHidden(h: boolean) {
     this.hidden = h;
     for (const t of this.fleet) {
-      if (t.mode === 'driven') continue;
+      if (t.mode === 'driven' || t.buggy?.asleep === true) continue;
       t.model.group.visible = !h && t.mode !== 'parked';
       if (t.still !== null) t.still.visible = !h && t.mode === 'parked';
       this.setCollider(t, !h);
       if (!h) t.colYaw = NaN;
     }
-    if (!h) for (const t of this.fleet) if (t.mode !== 'driven') this.setCollider(t, true);
+    if (!h)
+      for (const t of this.fleet)
+        if (t.mode !== 'driven' && t.buggy?.asleep !== true) this.setCollider(t, true);
   }
 
   private pushUi() {
@@ -1771,6 +2063,8 @@ export class CarSystem {
         if (p !== null && parkedKey(p) === claim) p = null;
         else if (!hideAll) this.claimed.delete(id);
       }
+      // A buggy they left at one of the course's spots: ours already stands there
+      if (p !== null && p.id === 'buggy' && this.buggyAt(p.x, p.z)) p = null;
       const key = p !== null ? `${p.id}:${p.paint}` : '';
       let pr = this.parkedRemotes.get(id);
       if (pr !== undefined && pr.key !== key) {

@@ -20,7 +20,7 @@ import {
   type LanePoint,
 } from './lanes';
 import { decodeCar, decodeParked, encodeCar, encodeParked, parkedKey, takenFrom } from './netCar';
-import { CAR_IDS, CARS, isCarId, simParams } from './specs';
+import { CAR_IDS, CARS, isCarId, simParams, TRAFFIC_IDS } from './specs';
 
 const flat = heightGround(() => 0);
 const kmh = (s: VanSim) => s.forwardSpeed * 3.6;
@@ -302,14 +302,14 @@ describe('ring road lanes', () => {
   });
 
   it('planTraffic parks every car once, spreads a few cruisers, deterministically', () => {
-    const plan = planTraffic(CAR_IDS, { seed: 7, cruisers: 3, paints: () => 4 });
+    const plan = planTraffic(TRAFFIC_IDS, { seed: 7, cruisers: 3, paints: () => 4 });
     const parked = plan.filter(p => p.kind === 'parked');
     const cruise = plan.filter(p => p.kind === 'cruise');
-    expect(new Set(parked.map(p => p.car)).size).toBe(CAR_IDS.length);
+    expect(new Set(parked.map(p => p.car)).size).toBe(TRAFFIC_IDS.length);
     expect(new Set(parked.map(p => (p.kind === 'parked' ? p.spot : -1))).size).toBe(parked.length);
     expect(cruise.length).toBe(3);
     expect(cruise.every(c => c.kind === 'cruise' && c.car !== 'stompa' && c.speed <= 8)).toBe(true);
-    expect(planTraffic(CAR_IDS, { seed: 7, cruisers: 3, paints: () => 4 })).toEqual(plan);
+    expect(planTraffic(TRAFFIC_IDS, { seed: 7, cruisers: 3, paints: () => 4 })).toEqual(plan);
   });
 
   it('following: full speed with room, easing, stopped close behind', () => {

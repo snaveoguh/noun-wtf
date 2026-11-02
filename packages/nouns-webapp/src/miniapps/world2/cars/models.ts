@@ -1,7 +1,7 @@
 // ── The fleet's models: box-and-wedge cars in the house style ──────────────
 //
-// Six cars are built here from chunky flat-coloured parts (kit.ts); two
-// more are converted Kenney Car Kit bodies (kenneyModel.ts, CC0) wearing
+// Seven cars are built from chunky flat-coloured parts (kit.ts; the GOLF
+// BUGGY's body is in buggy.ts); two more are converted Kenney Car Kit bodies (kenneyModel.ts, CC0) wearing
 // these same wheels. Every model has the same rig, so driving, traffic and
 // the network treat them alike:
 //   group     origin on the ground between the axles' midpoint, +Z forward,
@@ -19,6 +19,7 @@ import * as THREE from 'three';
 
 import { inkExcluded } from '../render/Toon';
 
+import { buggyBody, buggyWheel } from './buggy';
 import { carMaterials, Kit } from './kit';
 
 export interface WheelRig {
@@ -56,7 +57,7 @@ const FLAME = 0x7fe9ff;
 
 type V3 = [number, number, number];
 
-interface Built {
+export interface Built {
   body: THREE.BufferGeometry;
   doors: { geo: THREE.BufferGeometry; at: V3; left: boolean }[];
   flames: THREE.BufferGeometry | null;
@@ -203,6 +204,10 @@ function wheelGeo(spec: CarSpec): THREE.BufferGeometry {
           },
         );
       }
+      break;
+    }
+    case 'buggy': {
+      buggyWheel(k, r, w);
       break;
     }
     default: {
@@ -499,6 +504,7 @@ const BUILDERS: Record<CarId, Builder> = {
   dip,
   stompa,
   bubble,
+  buggy: buggyBody,
   // Kenney bodies come from kenneyModel.ts; these are fallbacks if the GLB fails
   kaido: (s, p) => fallbackBody(s, p),
   bruiser: (s, p) => fallbackBody(s, p),
