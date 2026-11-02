@@ -4,6 +4,7 @@ import { formatEther, parseEther } from 'viem';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 import { Noun } from '@/components/Noun';
+import { OddsLabel } from '@/components/Predictions/MarketCard';
 import { apiFetch } from '@/lib/api';
 import {
   AUCTION_PRICE_MARKET_ABI,
@@ -165,11 +166,12 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
 
   return (
     <div className="min-w-0 border-2 border-[var(--rule)] bg-[var(--paper)] p-4">
-      <div className="mb-3 flex items-start gap-3">
+      {/* The badge drops under the title when the card is too narrow for all three. */}
+      <div className="mb-3 flex flex-wrap items-start gap-3">
         <div className="h-16 w-16 shrink-0 overflow-hidden border border-[var(--rule-light)]">
           <Noun nounId={nounId} className="h-full w-full" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[min(100%,10rem)] flex-1">
           <p className="font-mono text-xs uppercase tracking-wider text-[var(--ink-faint)]">
             Auction, Noun #{nounId.toString()}
           </p>
@@ -193,16 +195,16 @@ function AuctionMarketCardInner({ nounId, currentBid, avgWei, endTime, sampleSiz
       {/* Odds bar */}
       <div className="mb-2 flex h-6 w-full overflow-hidden border border-[var(--rule-light)]">
         <div
-          className="flex items-center justify-center bg-[var(--ink)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
+          className="flex items-center justify-center overflow-hidden whitespace-nowrap bg-[var(--ink)] font-mono text-xs font-bold leading-none text-[var(--paper)] transition-all [container-type:inline-size]"
           style={{ width: `${higherPercent}%` }}
         >
-          {higherPercent > 10 ? `HIGHER ${higherPercent}%` : ''}
+          {higherPercent > 10 && <OddsLabel word="HIGHER" pct={higherPercent} />}
         </div>
         <div
-          className="flex items-center justify-center bg-[var(--accent-red)] font-mono text-xs font-bold text-[var(--paper)] transition-all"
+          className="flex items-center justify-center overflow-hidden whitespace-nowrap bg-[var(--accent-red)] font-mono text-xs font-bold leading-none text-[var(--paper)] transition-all [container-type:inline-size]"
           style={{ width: `${lowerPercent}%` }}
         >
-          {lowerPercent > 10 ? `LOWER ${lowerPercent}%` : ''}
+          {lowerPercent > 10 && <OddsLabel word="LOWER" pct={lowerPercent} />}
         </div>
       </div>
 
@@ -348,7 +350,7 @@ function InlineWager({
           type="button"
           onClick={handleCreateMarket}
           disabled={isPending || isConfirming}
-          className="w-full border border-[var(--rule)] bg-[var(--paper)] py-2 font-mono text-xs font-bold uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+          className="w-full border border-[var(--rule)] bg-[var(--paper)] py-2 font-mono text-xs font-bold uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
         >
           {isPending
             ? 'Confirming in wallet…'
@@ -371,7 +373,7 @@ function InlineWager({
         <button
           type="button"
           onClick={() => setSide('higher')}
-          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors [@media(pointer:coarse)]:min-h-10 ${
             side === 'higher'
               ? 'border-green-600 bg-green-600 text-white'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -382,7 +384,7 @@ function InlineWager({
         <button
           type="button"
           onClick={() => setSide('lower')}
-          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+          className={`flex-1 border py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors [@media(pointer:coarse)]:min-h-10 ${
             side === 'lower'
               ? 'border-red-500 bg-red-500 text-white'
               : 'border-[var(--rule-light)] text-[var(--ink-faint)] hover:border-[var(--rule)] hover:text-[var(--ink)]'
@@ -400,7 +402,7 @@ function InlineWager({
               type="button"
               onClick={() => handleQuickStake(amt)}
               disabled={isPending || isConfirming}
-              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-xs text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+              className="flex-1 border border-[var(--rule)] py-1.5 font-mono text-xs text-[var(--ink-light)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
             >
               {isPending || isConfirming ? '...' : `${amt} ETH`}
             </button>
@@ -445,7 +447,7 @@ function ResolveButton({ nounId, onSuccess }: { nounId: bigint; onSuccess: () =>
           })
         }
         disabled={isPending || isConfirming}
-        className="w-full border border-[var(--rule)] bg-[var(--paper)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50"
+        className="w-full border border-[var(--rule)] bg-[var(--paper)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
       >
         {isPending ? 'Signing…' : isConfirming ? 'Confirming…' : 'Resolve Market'}
       </button>
@@ -481,7 +483,7 @@ function ClaimButton({ nounId }: { nounId: bigint }) {
         })
       }
       disabled={isPending || isConfirming}
-      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50"
+      className="w-full border border-[var(--rule)] bg-[var(--ink)] py-1.5 font-mono text-xs uppercase tracking-wider text-[var(--paper)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:opacity-50 [@media(pointer:coarse)]:min-h-10"
     >
       {isPending ? 'Signing…' : isConfirming ? 'Confirming…' : 'Claim Winnings'}
     </button>

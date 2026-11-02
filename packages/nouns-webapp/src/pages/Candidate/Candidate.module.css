@@ -168,7 +168,7 @@
   text-decoration: underline;
 }
 
-@media (max-width: 1200px) {
+@container page (max-width: 1023.98px) {
   .toggleDelegateVoteView {
     display: none;
   }
@@ -211,7 +211,7 @@
   align-items: center;
   margin-bottom: 2rem;
   gap: 1rem;
-  @media (max-width: 992px) {
+  @container page (max-width: 759.98px) {
     text-align: center;
     flex-direction: column;
   }
@@ -223,8 +223,24 @@
   justify-content: flex-end;
   gap: 1rem;
   width: 30%;
-  @media (max-width: 992px) {
+  @container page (max-width: 759.98px) {
     width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Proposer / sponsor action buttons: full width below md, 40px on touch. */
+@container page (max-width: 559.98px) {
+  .editCandidate .buttons > * {
+    flex: 1;
+    text-align: center;
+  }
+}
+@media (pointer: coarse) {
+  .editCandidate .buttons > * {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
   }
 }
@@ -278,7 +294,7 @@ a.primaryButton:hover {
 
 .proposerOptions p,
 .objection p {
-  @media (max-width: 992px) {
+  @container page (max-width: 759.98px) {
     padding-top: 0;
     margin: 0 0 5px;
   }
@@ -309,8 +325,34 @@ a.primaryButton:hover {
 
 .sidebar {
   margin-top: 1rem;
-  @media (min-width: 993px) {
+  min-width: 0;
+  @container page (min-width: 760px) {
     margin-top: 1.5rem;
+  }
+}
+
+/* Content + feedback: stacked below lg, 2 : 1 from lg (was bootstrap
+   col-lg-8 / col-lg-4, picked by the viewport). */
+.layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.layout > * {
+  max-width: 100%;
+}
+.full {
+  grid-column: 1 / -1;
+}
+.main {
+  min-width: 0;
+  /* .wrapper's auto margins would shrink a grid item to its content. */
+  margin-left: 0;
+  margin-right: 0;
+}
+@container page (min-width: 760px) {
+  .layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   }
 }
 
@@ -333,7 +375,14 @@ a.primaryButton:hover {
   font-weight: bold;
   text-decoration: none;
   font-family: 'Londrina Solid';
-  @media (min-width: 991px) {
+  @container page (min-width: 760px) {
     display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .jump {
+    min-height: 40px;
+    justify-content: center;
   }
 }

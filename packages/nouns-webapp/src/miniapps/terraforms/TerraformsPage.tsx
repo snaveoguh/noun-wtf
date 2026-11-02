@@ -76,7 +76,9 @@ const TERRAFORMS_ABI = [
 // Public RPC client (mainnet, read-only)
 const publicClient = createPublicClient({
   chain: mainnet,
-  transport: http(import.meta.env.VITE_MAINNET_JSONRPC || 'https://mainnet.rpc.buidlguidl.com'),
+  transport: http(
+    (import.meta.env.VITE_MAINNET_JSONRPC as string) || 'https://mainnet.rpc.buidlguidl.com',
+  ),
 });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -101,7 +103,7 @@ function useTerraformData(tokenId: number | null) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!tokenId || tokenId < 1 || tokenId > TOTAL_SUPPLY) {
+    if (tokenId === null || tokenId < 1 || tokenId > TOTAL_SUPPLY) {
       setHtml(null);
       setMeta(null);
       setError(null);
@@ -133,7 +135,16 @@ function useTerraformData(tokenId: number | null) {
         if (cancelled) return;
 
         setHtml(htmlResult as string);
-        const m = metaResult as any;
+        const m = metaResult as {
+          tokenId: bigint;
+          level: bigint;
+          xCoordinate: bigint;
+          yCoordinate: bigint;
+          elevation: bigint;
+          zoneName: string;
+          zoneColors: readonly string[];
+          characterSet: readonly string[];
+        };
         setMeta({
           tokenId: Number(m.tokenId),
           level: Number(m.level),
@@ -144,9 +155,10 @@ function useTerraformData(tokenId: number | null) {
           zoneColors: [...m.zoneColors].filter((c: string) => c.length > 0),
           characterSet: [...m.characterSet].filter((c: string) => c.length > 0),
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(err?.message?.slice(0, 120) || 'Failed to fetch token data');
+          const msg = err instanceof Error ? err.message.slice(0, 120) : '';
+          setError(msg !== '' ? msg : 'Failed to fetch token data');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -356,7 +368,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
   }, [navigate]);
 
   const goPrev = useCallback(() => {
-    if (tokenId && tokenId > 1) {
+    if (tokenId !== null && tokenId > 1) {
       const next = tokenId - 1;
       setInputValue(String(next));
       navigate(`/terraforms/${next}`);
@@ -364,7 +376,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
   }, [tokenId, navigate]);
 
   const goNext = useCallback(() => {
-    if (tokenId && tokenId < TOTAL_SUPPLY) {
+    if (tokenId !== null && tokenId < TOTAL_SUPPLY) {
       const next = tokenId + 1;
       setInputValue(String(next));
       navigate(`/terraforms/${next}`);
@@ -431,7 +443,13 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
           flexWrap: 'wrap',
         }}
       >
-        <button onClick={goPrev} disabled={!tokenId || tokenId <= 1} style={navBtnStyle}>
+        <button
+          type="button"
+          onClick={goPrev}
+          disabled={tokenId === null || tokenId <= 1}
+          className="[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10"
+          style={navBtnStyle}
+        >
           ←
         </button>
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 6 }}>
@@ -442,6 +460,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
             placeholder="Token ID (1–9910)"
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
+            className="[@media(pointer:coarse)]:min-h-10"
             style={{
               width: 160,
               padding: '8px 14px',
@@ -457,16 +476,25 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
           />
           <button
             type="submit"
+            className="[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10"
             style={{ ...navBtnStyle, padding: '8px 16px', fontSize: '0.75rem' }}
           >
             Go
           </button>
         </form>
-        <button onClick={goNext} disabled={!tokenId || tokenId >= TOTAL_SUPPLY} style={navBtnStyle}>
+        <button
+          type="button"
+          onClick={goNext}
+          disabled={tokenId === null || tokenId >= TOTAL_SUPPLY}
+          className="[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10"
+          style={navBtnStyle}
+        >
           →
         </button>
         <button
+          type="button"
           onClick={goRandom}
+          className="[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-10"
           style={{ ...navBtnStyle, padding: '8px 14px', fontSize: '0.75rem' }}
         >
           Random
@@ -515,7 +543,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
         )}
 
         {/* No token selected */}
-        {!tokenId && !loading && (
+        {tokenId === null && !loading && (
           <div
             style={{
               textAlign: 'center',
@@ -529,7 +557,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
         )}
 
         {/* Token display */}
-        {html && tokenId && (
+        {html !== null && html !== '' && tokenId !== null && (
           <>
             {/* Title */}
             <div style={{ textAlign: 'center' }}>
@@ -546,8 +574,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
               </h2>
               {meta && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)' }}>
-                  Level {meta.level}, {meta.zoneName}, ({meta.x}, {meta.y}), Elev{' '}
-                  {meta.elevation}
+                  Level {meta.level}, {meta.zoneName}, ({meta.x}, {meta.y}), Elev {meta.elevation}
                 </span>
               )}
             </div>
@@ -587,6 +614,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
                 href={`https://opensea.io/assets/ethereum/${TERRAFORMS_ADDRESS}/${tokenId}`}
                 target="_blank"
                 rel="noreferrer"
+                className="inline-flex items-center [@media(pointer:coarse)]:min-h-10"
                 style={linkStyle}
               >
                 OpenSea &#8599;
@@ -595,6 +623,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
                 href={`https://etherscan.io/nft/${TERRAFORMS_ADDRESS}/${tokenId}`}
                 target="_blank"
                 rel="noreferrer"
+                className="inline-flex items-center [@media(pointer:coarse)]:min-h-10"
                 style={linkStyle}
               >
                 Etherscan &#8599;
@@ -603,6 +632,7 @@ const TerraformDetailView: FC<{ id: string }> = ({ id }) => {
                 href={`https://tokens.mathcastles.xyz/terraforms/token-html/${tokenId}`}
                 target="_blank"
                 rel="noreferrer"
+                className="inline-flex items-center [@media(pointer:coarse)]:min-h-10"
                 style={linkStyle}
               >
                 Mathcastles &#8599;

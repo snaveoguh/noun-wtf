@@ -238,6 +238,8 @@ const SettlersPage: FC = () => {
           <button
             key={t.key}
             type="button"
+            className="[@media(pointer:coarse)]:min-h-10"
+            aria-pressed={tab === t.key}
             onClick={() => setTab(t.key)}
             style={{
               padding: '6px 14px',
@@ -333,8 +335,9 @@ const SettlersPage: FC = () => {
                 key={row.address}
                 style={{
                   display: 'flex',
+                  flexWrap: 'wrap',
                   alignItems: 'center',
-                  gap: '12px',
+                  gap: '4px 12px',
                   padding: '10px 16px',
                   borderRadius: '12px',
                   border: '1px solid transparent',
@@ -417,14 +420,17 @@ const SettlersPage: FC = () => {
                   href={`https://etherscan.io/address/${row.address}`}
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="block [@media(pointer:coarse)]:leading-10"
                   style={{
                     fontFamily: 'monospace',
                     fontSize: '0.8rem',
                     fontWeight: 600,
                     color: 'var(--theme-text-primary)',
                     textDecoration: 'none',
-                    flex: 1,
-                    minWidth: 0,
+                    // Narrow rows wrap the address (and what follows) under the
+                    // thumbnails instead of squeezing it to nothing.
+                    flex: '1 1 7rem',
+                    minWidth: '7rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap' as const,

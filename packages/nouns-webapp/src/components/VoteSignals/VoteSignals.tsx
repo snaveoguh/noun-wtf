@@ -194,7 +194,7 @@ function VoteSignals({
           <div
             className={clsx(
               'flex flex-col items-center justify-between overflow-hidden rounded-xl border border-[#e6e6e6]',
-              !isCandidate && 'lg:sticky lg:top-5',
+              !isCandidate && '@lg:sticky @lg:top-5',
             )}
           >
             {!feedbackList ? (
@@ -245,7 +245,7 @@ function VoteSignals({
                             <p className="m-0 p-0 text-base font-bold leading-tight">
                               <Trans>Add your feedback</Trans>
                             </p>
-                            <div className="flex flex-row gap-2 md:w-full md:flex-col">
+                            <div className="@lg:w-full @lg:flex-col flex flex-row gap-2">
                               <button
                                 type="button"
                                 className={clsx(
@@ -312,7 +312,7 @@ function VoteSignals({
                               />
                               <button
                                 className={clsx(
-                                  'duration-125 cursor-pointer rounded-[10px] border-0 border-2 border-transparent bg-black px-4 py-2.5 text-sm font-bold leading-none text-white outline-2 outline-transparent transition-all ease-in-out md:w-full',
+                                  'duration-125 w-full cursor-pointer rounded-[10px] border-0 border-2 border-transparent bg-black px-4 py-2.5 text-sm font-bold leading-none text-white outline-2 outline-transparent transition-all ease-in-out',
                                   'disabled:cursor-not-allowed disabled:opacity-20',
                                   'disabled:hover:border-2 disabled:hover:border-transparent disabled:hover:opacity-20 disabled:hover:outline-2 disabled:hover:outline-transparent',
                                 )}

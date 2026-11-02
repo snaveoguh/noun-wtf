@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { gaussian, parseRgb, POSTER_STEP, softenAtlas } from './softenAtlas';
 
 /** A w×h RGBA atlas with one opaque colour block (x0..x1, y0..y1 inclusive). */
-function block(w: number, h: number, rgb: [number, number, number], x0: number, y0: number, x1: number, y1: number) {
+function block(
+  w: number,
+  h: number,
+  rgb: [number, number, number],
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+) {
   const a = new Uint8ClampedArray(w * h * 4);
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
@@ -46,7 +54,8 @@ describe('softenAtlas', () => {
 
   it('posterises colour to steps of 12 and blends across a colour edge', () => {
     const src = block(8, 4, [250, 0, 0], 0, 0, 3, 3);
-    for (let y = 0; y < 4; y++) for (let x = 4; x < 8; x++) src.set([0, 0, 250, 255], (y * 8 + x) * 4);
+    for (let y = 0; y < 4; y++)
+      for (let x = 4; x < 8; x++) src.set([0, 0, 250, 255], (y * 8 + x) * 4);
     const out = softenAtlas(src, 8, 4, 8, 1.6, true);
     const W = 64;
     for (let i = 0; i < out.length; i += 4)

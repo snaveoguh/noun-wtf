@@ -465,8 +465,7 @@ export class Game {
     // 'low' picked automatically: a weak phone boots lighter and the ladder
     // may keep stepping down (an explicit Low / ?q=low stays as chosen)
     if (quality === 'low' && opts.quality === undefined) {
-      this.weakDevice =
-        afterLoss || isWeakDevice(readDevice(this.gfx.renderer.getContext()));
+      this.weakDevice = afterLoss || isWeakDevice(readDevice(this.gfx.renderer.getContext()));
       // A tablet draws a phone's worth of pixels, not 3× (deviceTier budgetScale)
       const scale = Math.min(
         this.gfx.lite.scale,

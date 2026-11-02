@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isHitch,
-  percentile,
-  Ring,
-  summarize,
-  summarizeBuckets,
-  topSystems,
-} from './perfStats';
+import { isHitch, percentile, Ring, summarize, summarizeBuckets, topSystems } from './perfStats';
 
 describe('Ring', () => {
   it('keeps the last `size` samples, oldest first', () => {

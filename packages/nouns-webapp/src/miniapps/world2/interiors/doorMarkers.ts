@@ -11,6 +11,7 @@ import type { BuildingDoor } from './contract';
 import * as THREE from 'three';
 
 import { releaseAfterUpload } from '../render/textureDiet';
+
 import { Kit, boxAt, disposeMaterials, kitMaterials, panel } from './kit';
 import { KIND_LABEL } from './names';
 import { hash32, mulberry32, pick } from './rng';

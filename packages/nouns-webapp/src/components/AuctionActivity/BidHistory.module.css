@@ -120,7 +120,7 @@
   color: var(--brand-cool-dark-text);
 }
 
-@media (max-width: 992px) {
+@container page (max-width: 759.98px) {
   .bidRow {
     border-radius: 10px;
   }

@@ -149,6 +149,12 @@ function clampRect(r: Pick<OSWin, 'x' | 'y' | 'w' | 'h'>) {
   };
 }
 
+// Dev builds: the responsive width harness (scripts/responsive) resizes the
+// navigator live through this handle, e.g. `__nos.move('navigator', { w: 390 })`.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __nos?: typeof os }).__nos = os;
+}
+
 export function useOS(): State {
   return useSyncExternalStore(os.subscribe, os.get, os.get);
 }

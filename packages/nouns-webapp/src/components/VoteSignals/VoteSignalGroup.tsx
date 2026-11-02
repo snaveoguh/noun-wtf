@@ -18,7 +18,7 @@ type Props = {
 const VoteSignalGroup = (props: Props) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   useEffect(() => {
-    if (props.isExpanded) {
+    if (props.isExpanded === true) {
       setIsExpanded(true);
     } else {
       // expand on render if there are any vote signals (for For, Against, or Abstain)
@@ -31,8 +31,9 @@ const VoteSignalGroup = (props: Props) => {
   return (
     <div className="border-b border-[#e6e6e6] py-2.5 last:border-none">
       <button
+        type="button"
         className={clsx(
-          'flex w-full flex-row items-center justify-between gap-2.5 border-none bg-transparent',
+          'flex w-full flex-row items-center justify-between gap-2.5 border-none bg-transparent [@media(pointer:coarse)]:min-h-10',
           props.support === 1 && '[&>p]:text-[var(--brand-color-green)]',
           props.support === 0 && '[&>p]:text-[var(--brand-color-red)]',
           props.support === 2 && '[&>p]:text-[var(--brand-gray-light-text)]',

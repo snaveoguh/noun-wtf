@@ -142,7 +142,7 @@
   min-width: 0;
 }
 
-@media (max-width: 640px) {
+@container page (max-width: 559.98px) {
   .bar {
     padding-bottom: 1.1rem;
   }
@@ -151,5 +151,16 @@
 @media (prefers-reduced-motion: reduce) {
   .links a {
     transition: none;
+  }
+}
+
+/* Touch: the quick links get 40 px tap targets. */
+@media (pointer: coarse) {
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    min-width: 2.5rem;
   }
 }

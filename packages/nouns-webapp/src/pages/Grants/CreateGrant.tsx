@@ -238,31 +238,14 @@ export default function CreateGrantPage() {
         >
           <button
             type="button"
+            className={classes.toggle}
             onClick={() => setAdvanced(a => !a)}
-            style={{
-              position: 'relative',
-              width: 40,
-              height: 22,
-              borderRadius: 11,
-              border: 'none',
-              background: advanced ? '#22d3ee' : 'var(--theme-bg-tertiary)',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-              flexShrink: 0,
-            }}
+            aria-pressed={advanced}
+            aria-label="Advanced"
           >
-            <span
-              style={{
-                position: 'absolute',
-                top: 2,
-                left: advanced ? 20 : 2,
-                width: 18,
-                height: 18,
-                borderRadius: '50%',
-                background: 'var(--theme-bg-card)',
-                transition: 'left 0.2s',
-              }}
-            />
+            <span className={classes.toggleTrack}>
+              <span className={classes.toggleKnob} />
+            </span>
           </button>
           <span
             style={{
@@ -300,15 +283,7 @@ export default function CreateGrantPage() {
               navigator.clipboard.writeText(SMALL_GRANTS_TREASURY_ADDRESS);
               toast.success('Address copied');
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0 4px',
-              fontSize: '0.75rem',
-              color: 'var(--theme-text-muted)',
-              textTransform: 'none',
-            }}
+            className={classes.copyBtn}
             title="Copy full address"
           >
             <CopyIcon size={13} />

@@ -21,19 +21,12 @@
 .amount {
   font-family: 'PT Root UI';
   font-weight: bold;
-  font-size: 48px !important;
+  /* 48 px at full size, scaling down with the auction column (container
+     units) so the bid never clips in a narrow window or phone. */
+  font-size: clamp(32px, 14cqi, 48px) !important;
   margin: 0;
   color: var(--theme-text-primary) !important;
   white-space: nowrap;
   line-height: 0.9;
 }
 
-@media (max-width: 640px) {
-  .amount {
-    font-size: 38px !important;
-  }
-
-  .label {
-    font-size: 12px !important;
-  }
-}

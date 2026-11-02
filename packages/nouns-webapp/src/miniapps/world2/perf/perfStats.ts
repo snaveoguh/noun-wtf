@@ -130,11 +130,7 @@ export function isHitch(frameMs: number, cpuMs: number, medianFrameMs: number): 
 }
 
 /** The systems worth naming in a hitch: over `min` ms, biggest first, at most `n`. */
-export function topSystems(
-  acc: ReadonlyMap<string, number>,
-  n = 5,
-  min = 2,
-): [string, number][] {
+export function topSystems(acc: ReadonlyMap<string, number>, n = 5, min = 2): [string, number][] {
   const out: [string, number][] = [];
   for (const [k, v] of acc) if (v >= min) out.push([k, Math.round(v * 10) / 10]);
   return out.sort((a, b) => b[1] - a[1]).slice(0, n);

@@ -1,0 +1,1393 @@
+{
+  "url": "/cc0",
+  "route": "cc0",
+  "group": "art",
+  "kind": "page",
+  "label": "before",
+  "generated": "2026-11-01T10:08:53.431Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 3.2,
+    "worst": [
+      "window@360:9",
+      "window@430:9",
+      "page@320:8.7"
+    ],
+    "clean": 10,
+    "total": 26,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "window",
+      "width": 320,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "2 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "header.relative.overflow-hidden > h1.m-0.mb-5 > span.cc0-title.cc0-pip3 > span.is-acc",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full > header.relative.overflow-hidden",
+            "text": "LIBRARY",
+            "px": 191
+          },
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "IMAGE 4,049",
+            "px": 11
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-320.png",
+        "window-320-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 360,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": false,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 3,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "3 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "header.relative.overflow-hidden > h1.m-0.mb-5 > span.cc0-title.cc0-pip3 > span.is-acc",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full > header.relative.overflow-hidden",
+            "text": "LIBRARY",
+            "px": 151
+          },
+          {
+            "kind": "text",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "GIF",
+            "px": 14
+          },
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "GIF 2",
+            "px": 45
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-360.png",
+        "window-360-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 390,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": false,
+      "score": 6,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "2 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "header.relative.overflow-hidden > h1.m-0.mb-5 > span.cc0-title.cc0-pip3 > span.is-acc",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full > header.relative.overflow-hidden",
+            "text": "LIBRARY",
+            "px": 121
+          },
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "GIF 2",
+            "px": 15
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-390.png",
+        "window-390-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 430,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": false,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 3,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "3 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "header.relative.overflow-hidden > h1.m-0.mb-5 > span.cc0-title.cc0-pip3 > span.is-acc",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full > header.relative.overflow-hidden",
+            "text": "LIBRARY",
+            "px": 81
+          },
+          {
+            "kind": "text",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "3D",
+            "px": 12
+          },
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "3D 182",
+            "px": 57
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-430.png",
+        "window-430-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 520,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "EVERY SOURCE",
+            "px": 107
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-520.png",
+        "window-520-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 640,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "UPLOADED",
+            "px": 83
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-640.png",
+        "window-640-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 768,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "ARCHIVE",
+            "px": 28
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-768.png",
+        "window-768-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 900,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-900.png",
+        "window-900-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1024,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1024.png",
+        "window-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1280,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1280.png",
+        "window-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1440,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1440.png",
+        "window-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1920,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1920.png",
+        "window-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 2560,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-2560.png",
+        "window-2560-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 8.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 9
+      },
+      "line": "2 clipped · 9 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0 > span.opacity-60",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "4,049",
+            "px": 11
+          },
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "IMAGE 4,049",
+            "px": 27
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > select.h-[30px].w-auto",
+            "w": 137,
+            "h": 30,
+            "label": "Creator"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 54,
+            "h": 30,
+            "label": "ALL"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 112,
+            "h": 30,
+            "label": "IMAGE 4,049"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 68,
+            "h": 30,
+            "label": "GIF 2"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 76,
+            "h": 30,
+            "label": "3D 182"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 119,
+            "h": 30,
+            "label": "EVERY SOURCE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 90,
+            "h": 30,
+            "label": "UPLOADED"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "ARCHIVE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "CC0-LIB"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png",
+        "page-320-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 5.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 9
+      },
+      "line": "1 clipped · 9 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "GIF 2",
+            "px": 61
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > select.h-[30px].w-auto",
+            "w": 137,
+            "h": 30,
+            "label": "Creator"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 54,
+            "h": 30,
+            "label": "ALL"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 112,
+            "h": 30,
+            "label": "IMAGE 4,049"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 68,
+            "h": 30,
+            "label": "GIF 2"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 76,
+            "h": 30,
+            "label": "3D 182"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 119,
+            "h": 30,
+            "label": "EVERY SOURCE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 90,
+            "h": 30,
+            "label": "UPLOADED"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "ARCHIVE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "CC0-LIB"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png",
+        "page-360-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 5.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 9
+      },
+      "line": "1 clipped · 9 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "GIF 2",
+            "px": 31
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > select.h-[30px].w-auto",
+            "w": 137,
+            "h": 30,
+            "label": "Creator"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 54,
+            "h": 30,
+            "label": "ALL"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 112,
+            "h": 30,
+            "label": "IMAGE 4,049"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 68,
+            "h": 30,
+            "label": "GIF 2"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 76,
+            "h": 30,
+            "label": "3D 182"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 119,
+            "h": 30,
+            "label": "EVERY SOURCE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 90,
+            "h": 30,
+            "label": "UPLOADED"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "ARCHIVE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "CC0-LIB"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png",
+        "page-390-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 5.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 9
+      },
+      "line": "1 clipped · 9 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "3D 182",
+            "px": 73
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > select.h-[30px].w-auto",
+            "w": 137,
+            "h": 30,
+            "label": "Creator"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 54,
+            "h": 30,
+            "label": "ALL"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 112,
+            "h": 30,
+            "label": "IMAGE 4,049"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 68,
+            "h": 30,
+            "label": "GIF 2"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 76,
+            "h": 30,
+            "label": "3D 182"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 119,
+            "h": 30,
+            "label": "EVERY SOURCE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 90,
+            "h": 30,
+            "label": "UPLOADED"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "ARCHIVE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "CC0-LIB"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png",
+        "page-430-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 2.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 9
+      },
+      "line": "9 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > select.h-[30px].w-auto",
+            "w": 137,
+            "h": 30,
+            "label": "Creator"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 54,
+            "h": 30,
+            "label": "ALL"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 112,
+            "h": 30,
+            "label": "IMAGE 4,049"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 68,
+            "h": 30,
+            "label": "GIF 2"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 76,
+            "h": 30,
+            "label": "3D 182"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 119,
+            "h": 30,
+            "label": "EVERY SOURCE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 90,
+            "h": 30,
+            "label": "UPLOADED"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "ARCHIVE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "CC0-LIB"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png",
+        "page-520-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 5.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 9
+      },
+      "line": "1 clipped · 9 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "UPLOADED",
+            "px": 83
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > select.h-[30px].w-auto",
+            "w": 137,
+            "h": 30,
+            "label": "Creator"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 54,
+            "h": 30,
+            "label": "ALL"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 112,
+            "h": 30,
+            "label": "IMAGE 4,049"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 68,
+            "h": 30,
+            "label": "GIF 2"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 76,
+            "h": 30,
+            "label": "3D 182"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 119,
+            "h": 30,
+            "label": "EVERY SOURCE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 90,
+            "h": 30,
+            "label": "UPLOADED"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "ARCHIVE"
+          },
+          {
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "w": 83,
+            "h": 30,
+            "label": "CC0-LIB"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png",
+        "page-640-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 507,
+      "tier": "sm",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png",
+        "page-768-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 594,
+      "tier": "md",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "EVERY SOURCE",
+            "px": 17
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png",
+        "page-900-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 676,
+      "tier": "md",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "UPLOADED",
+            "px": 31
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png",
+        "page-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 845,
+      "tier": "lg",
+      "touch": false,
+      "score": 3,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "1 clipped",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.cc0-root.min-h-full > div.sticky.top-0 > div.-mx-4.mt-2.5 > button.cc0-mono.shrink-0",
+            "clipper": "div.nos-page > div.cc0-root.min-h-full",
+            "text": "CC0-LIB",
+            "px": 39
+          }
+        ],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png",
+        "page-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 950,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png",
+        "page-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1267,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png",
+        "page-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 1690,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png",
+        "page-2560-s2.png"
+      ]
+    }
+  ]
+}
