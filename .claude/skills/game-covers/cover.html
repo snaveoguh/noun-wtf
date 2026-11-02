@@ -46,6 +46,8 @@ const CUE = '<svg viewBox="0 0 400 24"><rect x="2" y="5" width="396" height="14"
 // Two big eyes peeking over a wall (hide & seek)
 const PEEK = '<svg viewBox="-70 -60 140 120"><g stroke="#0b0b0f" stroke-width="5" stroke-linejoin="round"><ellipse cx="-24" cy="-14" rx="22" ry="26" fill="#fff"/><ellipse cx="24" cy="-14" rx="22" ry="26" fill="#fff"/></g><circle cx="-16" cy="-8" r="10" fill="#0b0b0f"/><circle cx="32" cy="-8" r="10" fill="#0b0b0f"/><circle cx="-13" cy="-12" r="3" fill="#fff"/><circle cx="35" cy="-12" r="3" fill="#fff"/><g stroke="#0b0b0f" stroke-width="5"><rect x="-66" y="4" width="132" height="54" fill="#ff7a4a"/><path d="M-66 22H66M-66 40H66M-30 4V22M14 4V22M40 4V22M-52 22V40M-8 22V40M30 22V40M-30 40V58M14 40V58M52 40V58" fill="none"/></g></svg>';
 const TYRE = '<svg viewBox="-60 -60 120 120"><circle r="54" fill="#232624" stroke="#0b0b0f" stroke-width="6"/><g stroke="#0b0b0f" stroke-width="6">' + [0,30,60,90,120,150,180,210,240,270,300,330].map(a => '<path d="M0-54V-44" transform="rotate(' + a + ')"/>').join('') + '</g><circle r="32" fill="#d7dde2" stroke="#0b0b0f" stroke-width="5"/><g fill="#0b0b0f">' + [0,72,144,216,288].map(a => '<circle cx="0" cy="-19" r="5" transform="rotate(' + a + ')"/>').join('') + '</g><circle r="9" fill="#ffd400" stroke="#0b0b0f" stroke-width="4"/><path d="M-36-30a46 46 0 0 1 26-16" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".5"/></svg>';
+const GBALL = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="#fff" stroke="#0b0b0f" stroke-width="7"/>' + [[34,32],[52,26],[68,36],[30,52],[50,46],[70,56],[38,70],[58,68]].map(([x,y])=>'<circle cx="'+x+'" cy="'+y+'" r="5" fill="#d9dde3" stroke="#0b0b0f" stroke-width="2"/>').join('') + '</svg>';
+const FLAGPIN = '<svg viewBox="0 0 120 260"><rect x="22" y="10" width="9" height="240" fill="#fff" stroke="#0b0b0f" stroke-width="6"/><path d="M31 14 L112 40 L31 70 Z" fill="#ff2f8e" stroke="#0b0b0f" stroke-width="7" stroke-linejoin="round"/><text x="52" y="52" font-family="Bowlby One" font-size="30" fill="#fff" stroke="#0b0b0f" stroke-width="2">19</text><ellipse cx="27" cy="250" rx="26" ry="8" fill="#0b0b0f"/></svg>';
 const K = {
   hoops: { bg: 'linear-gradient(150deg,#ff8a1f 0%,#ff5a3c 45%,#7b3cff 100%)', accent: '#ffe23a', badge: '#20d6ff',
     t1: 'NOUN', t2: 'HOOPS', tag: 'DUNK · CROSS · SWISH', url: 'NOUN.WTF/WORLD', bdg: '3 ON 3',
@@ -89,6 +91,12 @@ const K = {
     prop: '<div class="speed" style="left:40px;top:470px;width:120px;transform:rotate(-14deg)"></div><div class="speed" style="left:30px;top:530px;width:150px;transform:rotate(-14deg)"></div><div class="prop" style="left:150px;top:400px;width:260px;transform:rotate(-14deg)">' + TYRE + '</div>',
     portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '132px', l2x: '24px', cap: ['doors UP!', 'left:500px;top:330px', '6deg'],
       prop: '<div class="prop" style="left:560px;top:860px;width:190px;transform:rotate(14deg)">' + TYRE + '</div>' } },
+  golf: { bg: 'linear-gradient(160deg,#5fd3ff 0%,#3ddc84 48%,#0e6b3a 100%)', accent: '#ffe23a', badge: '#ff2f8e',
+    t1: 'NOUN', t2: 'GOLF', tag: 'DRIVE · CHIP · SINK IT', url: 'NOUN.WTF/WORLD', bdg: '19 HOLES',
+    sx: '430px', sy: '262px', sw: '715px', sr: '2.5deg', cap: ['fore!', 'left:880px;top:200px', '6deg'], ts: '210px', l2x: '120px', br: '1.1',
+    prop: '<div class="prop" style="left:110px;top:330px;width:170px;transform:rotate(-8deg)">' + FLAGPIN + '</div><div class="prop" style="left:250px;top:600px;width:110px;transform:rotate(10deg)">' + GBALL + '</div>',
+    portrait: { sx: '52px', sy: '380px', sw: '640px', sr: '-2.5deg', ts: '150px', l2x: '40px', cap: ['fore!', 'left:540px;top:330px', '6deg'],
+      prop: '<div class="prop" style="left:560px;top:820px;width:130px;transform:rotate(10deg)">' + FLAGPIN + '</div>' } },
 }[kind];
 const img = q.get('img');
 const c = document.getElementById('c');
