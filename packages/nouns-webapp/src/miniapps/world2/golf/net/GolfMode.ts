@@ -1125,12 +1125,15 @@ export class GolfMode implements GolfApi {
       );
       return;
     }
-    const back = putt ? 3.2 : 5.2;
-    const up = putt ? 1.5 : 2.1;
+    const back = putt ? 3.4 : 5.6;
+    const up = putt ? 1.7 : 2.6;
     const ahead = putt ? Math.min(12, flat(from, info.pin)) : 40;
+    // Off to the side away from the golfer, so their head isn't in the way
+    const sx = Math.sin(aim + Math.PI / 2) * (putt ? 1.1 : 1.6);
+    const sz = Math.cos(aim + Math.PI / 2) * (putt ? 1.1 : 1.6);
     this.setCam(
       dt,
-      _v.set(from.x - fx * back, from.y + up, from.z - fz * back),
+      _v.set(from.x - fx * back + sx, from.y + up, from.z - fz * back + sz),
       _w.set(from.x + fx * ahead, from.y + (putt ? 0 : 3), from.z + fz * ahead),
       8,
     );

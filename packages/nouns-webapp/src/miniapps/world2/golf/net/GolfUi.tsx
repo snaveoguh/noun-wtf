@@ -478,7 +478,7 @@ const CSS = `
 .gf-wind i{display:inline-block;font-style:normal;color:#9fe3ff}
 .gf-line{position:absolute;left:50%;top:18px;transform:translateX(-50%);font-weight:800;font-size:14px;letter-spacing:.06em;text-shadow:0 2px 4px #000;white-space:nowrap}
 .gf-drag{position:absolute;inset:80px 0 150px 0;touch-action:none}
-.gf-bottom{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:rgba(14,40,22,.88);border-radius:16px;padding:10px 12px;width:min(720px,calc(100vw - 24px))}
+.gf-bottom{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:rgba(14,40,22,.88);border-radius:16px;padding:10px 12px;width:min(720px,calc(100vw - 24px))}
 .gf-bag{display:flex;align-items:center;gap:6px}
 .gf-bag button{width:34px;height:42px;border-radius:9px;background:#ffffff1a;color:#fff;font-weight:800}
 .gf-bag div{display:flex;flex-direction:column;align-items:center;min-width:70px;line-height:1.1}.gf-bag b{font-size:16px}.gf-bag span{font-size:11px;opacity:.75}
@@ -489,8 +489,8 @@ const CSS = `
 .gf-needle{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-2px;background:#fff;box-shadow:0 0 6px #fff}
 .gf-swing{min-width:96px;height:52px;border-radius:14px;background:#ffe14a;color:#14321c;font-weight:900;font-size:16px;touch-action:none}
 .gf-cam{width:44px;height:44px;border-radius:12px;background:#ffffff1a}
-.gf-ff{position:absolute;right:20px;bottom:24px;border-radius:12px;padding:10px 14px;background:rgba(14,40,22,.85);font-weight:800;touch-action:none}
-.gf-choice{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);display:flex;gap:10px}
+.gf-ff{position:absolute;right:20px;bottom:84px;border-radius:12px;padding:10px 14px;background:rgba(14,40,22,.85);font-weight:800;touch-action:none}
+.gf-choice{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);display:flex;gap:10px}
 .gf-call{position:absolute;left:50%;top:30%;transform:translateX(-50%);font-weight:900;font-size:30px;letter-spacing:.06em;text-shadow:0 3px 0 #14321c,0 0 18px #000a;white-space:nowrap;animation:gf-pop .35s ease-out}
 .gf-call-big{font-size:56px;color:#ffe14a}
 @keyframes gf-pop{from{transform:translateX(-50%) scale(.6);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
