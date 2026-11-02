@@ -111,6 +111,18 @@
 .wp-tabs::-webkit-scrollbar {
   display: none;
 }
+/* Below lg the tab row snaps and fades at its end; the end padding is as wide
+   as the fade, so the last tab isn't faded when everything fits. */
+@container page (max-width: 759.98px) {
+  .wp-tabs {
+    scroll-snap-type: x proximity;
+    padding-right: 24px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  .wp-tab {
+    scroll-snap-align: start;
+  }
+}
 .wp-tab {
   flex-shrink: 0;
   padding: 5px 12px;
@@ -358,10 +370,59 @@
 .wp-row > .flex > .wp-link.wp-ellipsis {
   flex: 1 1 0;
 }
-@media (max-width: 640px) {
+@container page (max-width: 559.98px) {
   .wp-row > .flex {
     flex-wrap: wrap;
     row-gap: 4px;
+  }
+}
+
+/* Touch: 40 px tap targets. Buttons, tabs and inputs grow; header links and
+   card-header links ("all →", "detail →") become inline-flex boxes. */
+@media (pointer: coarse) {
+  .wp-btn,
+  .wp-tab,
+  .wp-seg button,
+  .wp-input,
+  .wp-select {
+    min-height: 40px;
+  }
+  .wp-btn {
+    justify-content: center;
+    min-width: 40px;
+  }
+  .wp-slider,
+  .wp label:has(> .wp-checkbox),
+  .wp label:has(> .wp-slider) {
+    min-height: 40px;
+  }
+  .wp label:has(> .wp-checkbox),
+  .wp label:has(> .wp-slider) {
+    min-width: 40px;
+  }
+  /* a one-line link in a row or table cell (autopilot's proposal titles) */
+  .wp-tap-line,
+  .wp-row > .flex > .wp-link.wp-ellipsis {
+    display: block;
+    min-height: 40px;
+    min-width: 40px;
+    line-height: 40px;
+  }
+  /* a Noun card's "#id" link and an activity row's "view" / "tx ↗" */
+  .wp .mt-1.flex > .wp-link,
+  .wp-row .wp-muted > .wp-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    min-width: 40px;
+  }
+  .wp-card-head > .wp-link,
+  .wp-tap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 40px;
+    min-width: 40px;
   }
 }
 
@@ -396,6 +457,10 @@
 .wp-seg button.active {
   background: var(--theme-text-primary);
   color: var(--theme-bg-primary);
+}
+/* a step's body can carry a raw address or calldata: let it break */
+.wp-step .min-w-0 > .text-xs {
+  overflow-wrap: anywhere;
 }
 .wp-step {
   display: grid;

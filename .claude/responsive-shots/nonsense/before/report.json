@@ -1,0 +1,1796 @@
+{
+  "url": "/nonsense",
+  "route": "nonsense",
+  "group": "stats",
+  "kind": "page",
+  "label": "before",
+  "generated": "2026-11-01T12:44:24.633Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 8.4,
+    "worst": [
+      "window@320:20",
+      "window@360:20",
+      "window@390:20"
+    ],
+    "clean": 11,
+    "total": 26,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "window",
+      "width": 320,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": false,
+      "score": 20,
+      "counts": {
+        "overflowPx": 441,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 441px · ⚠ 3",
+      "warnings": [
+        "squeezed (4 lines, 38px): table.nz-table.nz-hold-table > thead > tr > th.hide-sm \"share of ETH total\"",
+        "squeezed (6 lines, 47px): div.nz > section.nz-tiles > div.nz-tile.is-usdc > span.nz-tile-s \"sold for USDC to pay grants in dollars\"",
+        "squeezed (4 lines, 55px): div.nz-flow-narrow > ul.nz-barlist > li > span.nz-bl-label \"sold for USDC (dollar grants)\""
+      ],
+      "issues": {
+        "overflow": {
+          "px": 441,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 440,
+              "text": "who ETH ↓ USDC how props last pa"
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 167,
+              "text": "token amount ≈ ETH share of ETH "
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 95,
+              "text": "token amount ≈ ETH share of ETH "
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 80,
+              "text": "token amount ≈ ETH share of ETH "
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-320.png",
+        "window-320-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 360,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": false,
+      "score": 20,
+      "counts": {
+        "overflowPx": 401,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 401px · ⚠ 1",
+      "warnings": [
+        "squeezed (4 lines, 38px): table.nz-table.nz-hold-table > thead > tr > th.hide-sm \"share of ETH total\""
+      ],
+      "issues": {
+        "overflow": {
+          "px": 401,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 400,
+              "text": "who ETH ↓ USDC how props last pa"
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 127,
+              "text": "token amount ≈ ETH share of ETH "
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 55,
+              "text": "token amount ≈ ETH share of ETH "
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 40,
+              "text": "token amount ≈ ETH share of ETH "
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-360.png",
+        "window-360-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 390,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": false,
+      "score": 20,
+      "counts": {
+        "overflowPx": 371,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 371px · ⚠ 1",
+      "warnings": [
+        "squeezed (4 lines, 38px): table.nz-table.nz-hold-table > thead > tr > th.hide-sm \"share of ETH total\""
+      ],
+      "issues": {
+        "overflow": {
+          "px": 371,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 370,
+              "text": "who ETH ↓ USDC how props last pa"
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 97,
+              "text": "token amount ≈ ETH share of ETH "
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 25,
+              "text": "token amount ≈ ETH share of ETH "
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 10,
+              "text": "token amount ≈ ETH share of ETH "
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-390.png",
+        "window-390-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 430,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": false,
+      "score": 20,
+      "counts": {
+        "overflowPx": 331,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 331px · ⚠ 1",
+      "warnings": [
+        "squeezed (4 lines, 38px): table.nz-table.nz-hold-table > thead > tr > th.hide-sm \"share of ETH total\""
+      ],
+      "issues": {
+        "overflow": {
+          "px": 331,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 330,
+              "text": "who ETH ↓ USDC how props last pa"
+            },
+            {
+              "selector": "section.nz-card.nz-now > div.nz-holders > div.nz-holder > table.nz-table.nz-hold-table",
+              "px": 57,
+              "text": "token amount ≈ ETH share of ETH "
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-430.png",
+        "window-430-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 520,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": false,
+      "score": 17.6,
+      "counts": {
+        "overflowPx": 241,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 241px",
+      "warnings": [],
+      "issues": {
+        "overflow": {
+          "px": 241,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 240,
+              "text": "who ETH ↓ USDC how props last pa"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-520.png",
+        "window-520-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 640,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": false,
+      "score": 12.8,
+      "counts": {
+        "overflowPx": 121,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 121px",
+      "warnings": [],
+      "issues": {
+        "overflow": {
+          "px": 121,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 120,
+              "text": "who ETH ↓ USDC how props last pa"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-640.png",
+        "window-640-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 768,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-768.png",
+        "window-768-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 900,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-900.png",
+        "window-900-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1024,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1024.png",
+        "window-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1280,
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1280.png",
+        "window-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1440,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1440.png",
+        "window-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 1920,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-1920.png",
+        "window-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "window",
+      "width": 2560,
+      "viewport": {
+        "width": 2600,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "window-2560.png",
+        "window-2560-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 17.9,
+      "counts": {
+        "overflowPx": 23,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 31
+      },
+      "line": "overflow 23px · 31 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": {
+          "px": 23,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 22,
+              "text": "who ETH ↓ USDC Nouns Fork #0 tre"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 149,
+            "h": 22,
+            "label": "nouns.eth (treasury)"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 39,
+            "h": 16,
+            "label": "WETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "stETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 48,
+            "h": 16,
+            "label": "wstETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 31,
+            "h": 16,
+            "label": "rETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 38,
+            "h": 16,
+            "label": "mETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 26,
+            "h": 16,
+            "label": "ENS"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 151,
+            "h": 22,
+            "label": "Timelock V1 (legacy)"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 104,
+            "h": 22,
+            "label": "DAO Governor"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 88,
+            "h": 22,
+            "label": "USDC Payer"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 90,
+            "h": 22,
+            "label": "Token Buyer"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > label.nz-search > input",
+            "w": 218,
+            "h": 40,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip.is-on",
+            "w": 77,
+            "h": 28,
+            "label": "all years"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 54,
+            "h": 28,
+            "label": "2021"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2022"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2023"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2024"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2025"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png",
+        "page-320-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 31
+      },
+      "line": "31 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 149,
+            "h": 22,
+            "label": "nouns.eth (treasury)"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 39,
+            "h": 16,
+            "label": "WETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "stETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 48,
+            "h": 16,
+            "label": "wstETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 31,
+            "h": 16,
+            "label": "rETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 38,
+            "h": 16,
+            "label": "mETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 26,
+            "h": 16,
+            "label": "ENS"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 151,
+            "h": 22,
+            "label": "Timelock V1 (legacy)"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 104,
+            "h": 22,
+            "label": "DAO Governor"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 88,
+            "h": 22,
+            "label": "USDC Payer"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 90,
+            "h": 22,
+            "label": "Token Buyer"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > label.nz-search > input",
+            "w": 258,
+            "h": 40,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip.is-on",
+            "w": 77,
+            "h": 28,
+            "label": "all years"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 54,
+            "h": 28,
+            "label": "2021"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2022"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2023"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2024"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2025"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png",
+        "page-360-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 33
+      },
+      "line": "33 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 149,
+            "h": 22,
+            "label": "nouns.eth (treasury)"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 39,
+            "h": 16,
+            "label": "WETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "stETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 48,
+            "h": 16,
+            "label": "wstETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 31,
+            "h": 16,
+            "label": "rETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 38,
+            "h": 16,
+            "label": "mETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 26,
+            "h": 16,
+            "label": "ENS"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 151,
+            "h": 22,
+            "label": "Timelock V1 (legacy)"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 104,
+            "h": 22,
+            "label": "DAO Governor"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 88,
+            "h": 22,
+            "label": "USDC Payer"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 90,
+            "h": 22,
+            "label": "Token Buyer"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button.is-on",
+            "w": 179,
+            "h": 34,
+            "label": "WHO GOT PAID"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button",
+            "w": 144,
+            "h": 34,
+            "label": "WHO PAID IN"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > label.nz-search > input",
+            "w": 288,
+            "h": 40,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip.is-on",
+            "w": 77,
+            "h": 28,
+            "label": "all years"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 54,
+            "h": 28,
+            "label": "2021"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2022"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2023"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png",
+        "page-390-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 33
+      },
+      "line": "33 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 149,
+            "h": 22,
+            "label": "nouns.eth (treasury)"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 39,
+            "h": 16,
+            "label": "WETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "stETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 48,
+            "h": 16,
+            "label": "wstETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 31,
+            "h": 16,
+            "label": "rETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 38,
+            "h": 16,
+            "label": "mETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 26,
+            "h": 16,
+            "label": "ENS"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 151,
+            "h": 22,
+            "label": "Timelock V1 (legacy)"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 104,
+            "h": 22,
+            "label": "DAO Governor"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 88,
+            "h": 22,
+            "label": "USDC Payer"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 90,
+            "h": 22,
+            "label": "Token Buyer"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button.is-on",
+            "w": 179,
+            "h": 34,
+            "label": "WHO GOT PAID"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button",
+            "w": 144,
+            "h": 34,
+            "label": "WHO PAID IN"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > label.nz-search > input",
+            "w": 318,
+            "h": 40,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip.is-on",
+            "w": 77,
+            "h": 28,
+            "label": "all years"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 54,
+            "h": 28,
+            "label": "2021"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2022"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2023"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png",
+        "page-430-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 33
+      },
+      "line": "33 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 149,
+            "h": 22,
+            "label": "nouns.eth (treasury)"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 39,
+            "h": 16,
+            "label": "WETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "stETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 48,
+            "h": 16,
+            "label": "wstETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 31,
+            "h": 16,
+            "label": "rETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 38,
+            "h": 16,
+            "label": "mETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 26,
+            "h": 16,
+            "label": "ENS"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 151,
+            "h": 22,
+            "label": "Timelock V1 (legacy)"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 104,
+            "h": 22,
+            "label": "DAO Governor"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 88,
+            "h": 22,
+            "label": "USDC Payer"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 90,
+            "h": 22,
+            "label": "Token Buyer"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button.is-on",
+            "w": 179,
+            "h": 34,
+            "label": "WHO GOT PAID"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button",
+            "w": 144,
+            "h": 34,
+            "label": "WHO PAID IN"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > label.nz-search > input",
+            "w": 318,
+            "h": 40,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip.is-on",
+            "w": 77,
+            "h": 28,
+            "label": "all years"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 54,
+            "h": 28,
+            "label": "2021"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2022"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2023"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png",
+        "page-520-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 9,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 33
+      },
+      "line": "33 small taps",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 149,
+            "h": 22,
+            "label": "nouns.eth (treasury)"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 39,
+            "h": 16,
+            "label": "WETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "stETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 48,
+            "h": 16,
+            "label": "wstETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 31,
+            "h": 16,
+            "label": "rETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 38,
+            "h": 16,
+            "label": "mETH"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 26,
+            "h": 16,
+            "label": "ENS"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 151,
+            "h": 22,
+            "label": "Timelock V1 (legacy)"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 104,
+            "h": 22,
+            "label": "DAO Governor"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 88,
+            "h": 22,
+            "label": "USDC Payer"
+          },
+          {
+            "selector": "tbody > tr > td > a",
+            "w": 37,
+            "h": 16,
+            "label": "USDC"
+          },
+          {
+            "selector": "div.nz-holders > div.nz-holder > div.nz-holder-head > a",
+            "w": 90,
+            "h": 22,
+            "label": "Token Buyer"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button.is-on",
+            "w": 179,
+            "h": 34,
+            "label": "WHO GOT PAID"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > div.nz-tabs > button",
+            "w": 144,
+            "h": 34,
+            "label": "WHO PAID IN"
+          },
+          {
+            "selector": "section.nz-card.nz-who-card > div.nz-who-head > label.nz-search > input",
+            "w": 198,
+            "h": 40,
+            "label": "INPUT"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip.is-on",
+            "w": 77,
+            "h": 28,
+            "label": "all years"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 54,
+            "h": 28,
+            "label": "2021"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2022"
+          },
+          {
+            "selector": "div.nz > section.nz-card.nz-who-card > div.nz-filters > button.nz-chip",
+            "w": 57,
+            "h": 28,
+            "label": "2023"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png",
+        "page-640-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 507,
+      "tier": "sm",
+      "touch": false,
+      "score": 18.2,
+      "counts": {
+        "overflowPx": 254,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 254px",
+      "warnings": [],
+      "issues": {
+        "overflow": {
+          "px": 254,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 253,
+              "text": "who ETH ↓ USDC how props last pa"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png",
+        "page-768-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 594,
+      "tier": "md",
+      "touch": false,
+      "score": 14.7,
+      "counts": {
+        "overflowPx": 167,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 167px",
+      "warnings": [],
+      "issues": {
+        "overflow": {
+          "px": 167,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 166,
+              "text": "who ETH ↓ USDC how props last pa"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png",
+        "page-900-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 676,
+      "tier": "md",
+      "touch": false,
+      "score": 11.4,
+      "counts": {
+        "overflowPx": 85,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "overflow 85px",
+      "warnings": [],
+      "issues": {
+        "overflow": {
+          "px": 85,
+          "offenders": [
+            {
+              "selector": "div.nos-page > div.nz > section.nz-card.nz-who-card > table.nz-table",
+              "px": 84,
+              "text": "who ETH ↓ USDC how props last pa"
+            }
+          ]
+        },
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png",
+        "page-1024-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 845,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png",
+        "page-1280-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 950,
+      "tier": "lg",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png",
+        "page-1440-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1267,
+      "tier": "xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png",
+        "page-1920-s2.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 1690,
+      "tier": "2xl",
+      "touch": false,
+      "score": 0,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 0,
+        "overlaps": 0,
+        "smallTargets": 0
+      },
+      "line": "clean",
+      "warnings": [],
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [],
+        "overlaps": [],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png",
+        "page-2560-s2.png"
+      ]
+    }
+  ]
+}

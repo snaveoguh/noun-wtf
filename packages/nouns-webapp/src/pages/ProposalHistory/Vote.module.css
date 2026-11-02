@@ -167,7 +167,7 @@
   text-decoration: underline;
 }
 
-@media (max-width: 1200px) {
+@container page (max-width: 1023.98px) {
   .toggleDelegateVoteView {
     display: none;
   }
@@ -201,11 +201,55 @@
 }
 
 /* // Proposal History */
+/* Content + version list side by side from lg (760) of the window, stacked below. */
+.historyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 1.5rem;
+}
+
+@container page (min-width: 760px) {
+  .historyGrid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
 .versionHistory {
-  position: sticky;
-  top: 20px;
-  @media (max-width: 992px) {
-    position: relative;
+  position: relative;
+}
+
+@container page (min-width: 760px) {
+  .versionHistory {
+    position: sticky;
+    top: 20px;
+  }
+}
+
+/* Back to the proposal: in the flow, in the gutter only where the window has one. */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  font-weight: bold;
+  text-decoration: none;
+  margin-bottom: 0.5rem;
+}
+
+@media (pointer: coarse) {
+  .backLink {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
+
+@container page (min-width: 1440px) {
+  .backLink {
+    position: absolute;
+    left: -3rem;
+    margin-bottom: 0;
   }
 }
 
@@ -287,6 +331,7 @@
 }
 
 .versionHistory .message p {
+  overflow-wrap: anywhere;
   margin: 0;
   padding: 0;
   font-size: 14px;
@@ -312,16 +357,40 @@
   color: var(--theme-text-primary);
   border: 3px solid #000;
 }
+.diffsWrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .diffsWrapper table:first-of-type {
   margin-left: -10px;
-  @media (min-width: 992px) {
+}
+
+@container page (min-width: 760px) {
+  .diffsWrapper table:first-of-type {
     margin-left: -30px;
   }
 }
 
+/* Long hashes, addresses and calldata break instead of widening the page. */
 .diffsWrapper :global(pre) {
   min-width: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
+
 .proposalTitle {
   width: 100%;
+  min-width: 0;
+}
+
+.proposalTitle h1 {
+  font-size: clamp(28px, 8cqi, 42px);
+  overflow-wrap: anywhere;
+}
+
+@media (pointer: coarse) {
+  .diffsLink {
+    min-height: 40px;
+  }
 }

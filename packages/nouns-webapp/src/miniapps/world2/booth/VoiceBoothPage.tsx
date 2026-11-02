@@ -6,7 +6,7 @@ import VoiceBooth from './VoiceBooth';
 export default function VoiceBoothPage() {
   return (
     <div
-      className="flex min-h-[calc(100vh-160px)] w-full justify-center bg-[#0a0c14] px-4 py-5"
+      className="@sm:px-4 flex min-h-full w-full justify-center bg-[#0a0c14] px-3 py-5"
       style={{ fontFamily: 'system-ui, sans-serif' }}
     >
       <VoiceBooth />

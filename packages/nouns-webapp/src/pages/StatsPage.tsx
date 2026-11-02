@@ -8,13 +8,18 @@ const TreasuryCorridor = React.lazy(() => import('@/components/TreasuryCorridor'
 
 const StatsPage: React.FC = () => {
   return (
-    <div style={{ width: '100%', minHeight: '100vh', background: 'transparent' }}>
+    // data-page-fill: the window's exact height, the corridor fills it below its HUD bar.
+    <div
+      data-page-fill
+      style={{ width: '100%', display: 'flex', flexDirection: 'column', background: 'transparent' }}
+    >
       <Suspense
         fallback={
           <div
             style={{
               width: '100%',
-              height: '100vh',
+              flex: '1 1 auto',
+              minHeight: 360,
               background: 'transparent',
               display: 'flex',
               alignItems: 'center',

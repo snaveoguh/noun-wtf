@@ -7,6 +7,17 @@
   transition: all 0.2s ease-in-out;
 }
 
+/* A real <button>: reset the browser chrome, keep the link look. */
+.bidHistoryWrapperCool,
+.bidHistoryWrapperWarm {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 2.5rem;
+  align-items: center;
+  white-space: nowrap;
+}
+
 .bidHistoryWrapperCool {
   display: flex;
   border-radius: 10px !important;

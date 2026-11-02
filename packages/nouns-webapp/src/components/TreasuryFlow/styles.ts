@@ -9,7 +9,7 @@ export const NONSENSE_CSS = `
 .nz a:hover{text-decoration:underline}
 .nz-head{max-width:1100px;margin:0 auto 18px}
 .nz-head h1,.nz-h,.nz-state h2{font-family:'Pip3',var(--site-font);font-weight:normal;letter-spacing:.04em;text-transform:uppercase;margin:0}
-.nz-head h1{font-size:clamp(40px,8vw,72px);line-height:.95;color:var(--nz-acid)}
+.nz-head h1{font-size:clamp(40px,8cqi,72px);line-height:.95;color:var(--nz-acid)}
 .nz-head p{margin:8px 0 0;color:var(--nz-dim);max-width:640px}
 .nz>section,.nz>.nz-banner,.nz>.nz-loading,.nz>.nz-state{max-width:1100px;margin-left:auto;margin-right:auto}
 .nz-banner{background:rgba(212,255,58,.08);color:var(--nz-ink);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:14px}
@@ -20,7 +20,7 @@ export const NONSENSE_CSS = `
 .nz-tile.is-out .nz-tile-k{color:var(--nz-pink)}
 .nz-tile.is-net-pos .nz-tile-k{color:var(--nz-acid)}
 .nz-tile.is-net-neg .nz-tile-k{color:var(--nz-red)}
-.nz-tile-v{font-size:clamp(26px,4.4vw,40px);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;overflow-wrap:anywhere}
+.nz-tile-v{font-size:clamp(26px,4.4cqi,40px);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;overflow-wrap:anywhere}
 .nz-tile-v small{font-size:.55em;font-weight:600;color:var(--nz-ink);white-space:nowrap}
 .nz-tile-s{color:var(--nz-dim);font-size:13px}
 .nz-tile.is-skel{height:118px;background:linear-gradient(90deg,#141518,#1d1e23,#141518);background-size:200% 100%;animation:nz-sh 1.4s infinite linear}
@@ -44,8 +44,8 @@ export const NONSENSE_CSS = `
 /* treasury now */
 .nz-now-hero{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 28px;margin-bottom:6px}
 .nz-now-hero>div{display:flex;flex-direction:column;gap:2px;min-width:0}
-.nz-now-v{font-size:clamp(40px,8vw,68px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--nz-acid);overflow-wrap:anywhere}
-.nz-now-v.is-usd{font-size:clamp(26px,4.6vw,40px);color:var(--nz-ink)}
+.nz-now-v{font-size:clamp(40px,8cqi,68px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--nz-acid);overflow-wrap:anywhere}
+.nz-now-v.is-usd{font-size:clamp(26px,4.6cqi,40px);color:var(--nz-ink)}
 .nz-now-k{color:var(--nz-dim);font-size:14px;display:flex;align-items:center;gap:6px}
 .nz-holders{display:flex;flex-direction:column;gap:14px;margin-top:16px}
 .nz-holder{background:rgba(255,255,255,.03);border-radius:14px;padding:10px 12px}
@@ -183,7 +183,9 @@ export const NONSENSE_CSS = `
 .nz-legend-card dt{font-weight:600;display:flex;align-items:center;gap:8px}
 .nz-legend-card dt i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .nz-legend-card dd{margin:2px 0 0;color:var(--nz-dim);font-size:13px}
-@media (max-width:720px){
+/* Narrow layout: from the page container (a NounOS window can be phone-width on a
+   wide screen), below lg (760). */
+@container page (max-width:759.98px){
   .nz-tiles{grid-template-columns:1fr}
   .nz-tile{padding:14px 16px}
   .nz-table .hide-sm{display:none}
@@ -196,6 +198,26 @@ export const NONSENSE_CSS = `
   .nz-hold-table th:nth-child(3){width:24%}
   .nz-hold-table .num{white-space:normal;overflow-wrap:anywhere}
   .nz-row-meta .nz-share{display:block}
+  .nz-table td:first-child{min-width:0}
+  .nz-tip:hover::after,.nz-tip:focus::after{width:min(280px,calc(100cqi - 32px))}
+}
+@container page (max-width:399.98px){
+  .nz{padding-left:12px;padding-right:12px}
+  .nz-card,.nz-legend-card{padding:12px}
+  .nz-table{font-size:13px}
+  .nz-table th,.nz-table td{padding-left:4px;padding-right:4px}
+}
+/* Touch: the tooltip as a sheet over the bottom of the screen (phones get a full-screen
+   window, so the viewport is the page), and 40 px targets. */
+@media (hover:none) and (max-width:720px){
   .nz-tip:hover::after,.nz-tip:focus::after{position:fixed;left:16px;right:16px;top:auto;bottom:84px;transform:none;width:auto;z-index:60}
+}
+@media (pointer:coarse){
+  .nz-chip,.nz-tabs button,.nz-search input{min-height:40px}
+  .nz-chip{display:inline-flex;align-items:center;justify-content:center}
+  .nz-holder-head>a,.nz-hold-table td>a{display:inline-flex;align-items:center;min-height:40px;min-width:40px}
+  .nz-table th button,.nz-who{min-height:40px}
+  .nz-table th button{min-width:40px}
+  .nz-icon-btn{width:40px;height:40px}
 }
 `;

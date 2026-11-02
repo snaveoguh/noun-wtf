@@ -37,7 +37,7 @@ function Chip({
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`cc0-mono shrink-0 rounded-full border-0 px-3 py-1.5 text-[11px] font-bold transition ${on ? 'bg-[#d4ff3a] text-[#0b0b0f]' : 'bg-white/[.07] text-[#f4f2ea] hover:bg-white/15'}`}
+      className={`cc0-mono shrink-0 rounded-full border-0 px-3 py-1.5 text-[11px] font-bold transition [@media(pointer:coarse)]:min-h-10 ${on ? 'bg-[#d4ff3a] text-[#0b0b0f]' : 'bg-white/[.07] text-[#f4f2ea] hover:bg-white/15'}`}
     >
       {children}
     </button>
@@ -131,12 +131,12 @@ export default function Cc0LibraryPage() {
 
   return (
     <div
-      className="cc0-root min-h-full w-full max-w-full overflow-x-hidden bg-[#07070a] text-[#f4f2ea]"
+      className="cc0-root min-h-full w-full max-w-full bg-[#07070a] text-[#f4f2ea]"
       data-cc0-library
     >
       <style>{CC0_CSS}</style>
 
-      <header className="relative overflow-hidden px-4 pb-6 pt-8 sm:px-8 sm:pt-10">
+      <header className="@md:px-8 @md:pt-10 relative overflow-hidden px-4 pb-6 pt-8">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ff2f8e]/20 blur-3xl"
@@ -152,7 +152,7 @@ export default function Cc0LibraryPage() {
             <span className="is-acc">LIBRARY</span>
           </span>
         </h1>
-        <p className="relative m-0 max-w-[560px] text-[15px] leading-relaxed text-[#c9c7bd] sm:text-[16px]">
+        <p className="@md:text-[16px] relative m-0 max-w-[560px] text-[15px] leading-relaxed text-[#c9c7bd]">
           Free Nouns art, voxels, sounds and models. Everything here is CC0: take it, remix it, sell
           it, no credit needed. Made something nounish? Put it on the pile.
         </p>
@@ -173,7 +173,7 @@ export default function Cc0LibraryPage() {
         </div>
       </header>
 
-      <div className="sticky top-0 z-10 border-y border-white/[.06] bg-[#07070a]/90 px-4 py-3 backdrop-blur-md sm:px-8">
+      <div className="@md:px-8 sticky top-0 z-10 border-y border-white/[.06] bg-[#07070a]/90 px-4 py-3 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search the library</span>
@@ -203,12 +203,12 @@ export default function Cc0LibraryPage() {
             )}
           </button>
         </div>
-        <div className="-mx-4 mt-2.5 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:-mx-8 sm:px-8">
+        <div className="@max-lg:pr-6 @md:-mx-[24px] @md:px-[24px] -mx-4 mt-2.5 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none]">
           <select
             aria-label="Creator"
             value={filters.creator}
             onChange={e => set('creator', e.target.value)}
-            className="h-[30px] w-auto max-w-[180px] shrink-0 !rounded-full px-2.5 text-[12.5px]"
+            className="h-[30px] w-auto max-w-[180px] shrink-0 !rounded-full px-2.5 text-[12.5px] [@media(pointer:coarse)]:h-10"
           >
             <option value="all">All creators</option>
             {creators.map(c => (
@@ -238,7 +238,7 @@ export default function Cc0LibraryPage() {
         </div>
       </div>
 
-      <main className="px-4 pb-16 pt-4 sm:px-8">
+      <main className="@md:px-8 px-4 pb-16 pt-4">
         <div className="cc0-mono mb-3 flex flex-wrap items-center justify-between gap-2 text-[10.5px] text-[#9b998f]">
           <span data-cc0-count>
             {loading
@@ -249,7 +249,7 @@ export default function Cc0LibraryPage() {
             <button
               type="button"
               onClick={() => setFilters(NO_FILTERS)}
-              className="border-0 bg-transparent p-0 text-[10.5px] text-[#d4ff3a] hover:underline"
+              className="border-0 bg-transparent p-0 text-[10.5px] text-[#d4ff3a] hover:underline [@media(pointer:coarse)]:min-h-10"
             >
               CLEAR FILTERS
             </button>
@@ -282,7 +282,7 @@ export default function Cc0LibraryPage() {
             <button
               type="button"
               onClick={() => setShown(n => n + PAGE)}
-              className="rounded-full border-0 bg-white/[.08] px-5 py-2.5 text-[13.5px] font-semibold text-white hover:bg-white/15"
+              className="rounded-full border-0 bg-white/[.08] px-5 py-2.5 text-[13.5px] font-semibold text-white hover:bg-white/15 [@media(pointer:coarse)]:min-h-10"
             >
               Load more
             </button>

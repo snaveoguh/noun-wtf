@@ -406,21 +406,11 @@ export default function GrantDetailPage() {
         <div className={classes.description} style={{ marginTop: '1.5rem', paddingTop: '1rem' }}>
           <h3>Requested Funds — {totalEthRequested} ETH</h3>
           {grantTransactions.map((tx, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0.5rem 0',
-                borderBottom: '1px solid var(--theme-divider)',
-                fontSize: '0.85rem',
-              }}
-            >
-              <span style={{ fontFamily: 'monospace', color: 'var(--theme-text-muted)' }}>
+            <div key={i} className={classes.fundRow}>
+              <span className={classes.fundTarget}>
                 → {tx.target.slice(0, 6)}...{tx.target.slice(-4)}
               </span>
-              <span style={{ fontWeight: 700 }}>{formatEther(tx.value as bigint)} ETH</span>
+              <span className={classes.fundValue}>{formatEther(tx.value as bigint)} ETH</span>
             </div>
           ))}
         </div>
@@ -528,7 +518,8 @@ export default function GrantDetailPage() {
                   href={`https://etherscan.io/tx/${(v as any).createdAtTransaction}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ fontSize: '0.75rem', color: 'var(--theme-text-muted)', marginLeft: 8 }}
+                  className={classes.rowLink}
+                  style={{ marginLeft: 8 }}
                 >
                   tx
                 </a>
@@ -549,11 +540,7 @@ export default function GrantDetailPage() {
                 href={`https://etherscan.io/tx/${grant.createdAtTransaction}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--theme-text-muted)',
-                  fontFamily: 'monospace',
-                }}
+                className={`${classes.rowLink} ${classes.rowLinkMono}`}
               >
                 {grant.createdAtTransaction.slice(0, 18)}...
               </a>
@@ -579,11 +566,7 @@ export default function GrantDetailPage() {
                 href={`https://etherscan.io/tx/${sc.createdAtTransaction}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--theme-text-muted)',
-                  fontFamily: 'monospace',
-                }}
+                className={`${classes.rowLink} ${classes.rowLinkMono}`}
               >
                 {sc.createdAtTransaction.slice(0, 18)}...
               </a>

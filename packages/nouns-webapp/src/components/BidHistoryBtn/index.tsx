@@ -14,14 +14,15 @@ const BidHistoryBtn: React.FC<BidHistoryBtnProps> = ({ onClick }) => {
   const isCool = useAppSelector(state => state.application.stateBackgroundColor) === '#d5d7e1';
 
   return (
-    <div
+    <button
+      type="button"
       className={isCool ? bidBtnClasses.bidHistoryWrapperCool : bidBtnClasses.bidHistoryWrapperWarm}
       onClick={onClick}
     >
-      <div className={bidBtnClasses.bidHistory}>
+      <span className={bidBtnClasses.bidHistory}>
         <Trans>View all bids</Trans>
-      </div>
-    </div>
+      </span>
+    </button>
   );
 };
 export default BidHistoryBtn;

@@ -244,6 +244,13 @@
   border-radius: 6px;
   box-shadow: 3px 3px 0 #111;
 }
+.gx3d-btn {
+  white-space: nowrap;
+}
+/* Long / short label pairs (ORDER BOOK → BOOK): the short one shows in narrow windows */
+.gx3d-short {
+  display: none;
+}
 .gx3d-btn:active,
 .gx3d-cam:active {
   transform: translate(2px, 2px);
@@ -443,9 +450,15 @@
   .gx3d-legend {
     display: none;
   }
+  /* One row of tools across the top, never wrapping into tall blocks over the title */
   .gx3d-tools {
-    left: 10px;
-    right: auto;
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    gap: 4px;
+  }
+  .gx3d-btn {
+    padding: 5px 7px;
   }
   /* Clear of the site's NOUN FM chip, five buttons across a phone */
   .gx3d-cams {
@@ -487,6 +500,48 @@
 @container gx3d (max-width: 640px) {
   .gx3d-book {
     width: 100%;
+  }
+}
+/* Narrow: short tool labels, camera keys hidden (they squeezed WALK to WAL) */
+@container gx3d (max-width: 559.98px) {
+  .gx3d-long {
+    display: none;
+  }
+  .gx3d-short {
+    display: inline;
+  }
+  .gx3d-cam kbd {
+    display: none;
+  }
+}
+@container gx3d (max-width: 399.98px) {
+  .gx3d-ico {
+    display: none;
+  }
+}
+/* Touch: 40 px tap targets; the header moves down under the taller tool row */
+@media (pointer: coarse) {
+  .gx3d-btn,
+  .gx3d-cam {
+    min-height: 40px;
+  }
+  .gx3d-btn,
+  .gx3d-x {
+    min-width: 40px;
+  }
+  .gx3d-x {
+    min-height: 40px;
+  }
+  .gx3d-trade input,
+  .gx3d-trade select {
+    min-height: 40px;
+  }
+}
+@container gx3d (max-width: 640px) {
+  @media (pointer: coarse) {
+    .gx3d-top {
+      top: 56px;
+    }
   }
 }
 

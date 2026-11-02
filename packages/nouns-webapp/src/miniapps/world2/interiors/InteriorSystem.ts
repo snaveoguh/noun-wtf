@@ -516,8 +516,7 @@ export class InteriorSystem implements InteriorsApi {
       if (this.upperPending) {
         this.upperPending = false;
         const L = this.live;
-        if (L !== null && L.floors.length > 1 && L.floors[1]!.built === null)
-          this.buildFloor(L, 1);
+        if (L !== null && L.floors.length > 1 && L.floors[1]!.built === null) this.buildFloor(L, 1);
       } else if (!this.warming) this.fadeT = Math.min(0, this.fadeT + dt);
       this.setFade(-this.fadeT / FADE_S);
     }
@@ -814,9 +813,7 @@ export class InteriorSystem implements InteriorsApi {
     // phone. Next frame, not this one (this frame is already the room: one
     // 4 s frame on a tablet); the fade holds on black until it's done
     this.upperPending =
-      fromRoof === undefined &&
-      this.live.floors.length > 1 &&
-      this.live.floors[1]!.built === null;
+      fromRoof === undefined && this.live.floors.length > 1 && this.live.floors[1]!.built === null;
     this.applyEffects(effects);
     const s = built.stats;
     if (import.meta.env.DEV)

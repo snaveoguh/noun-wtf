@@ -36,6 +36,7 @@ import {
   type CharacterAssets,
 } from './character/NounCharacter';
 import { encodeOutfit, type Outfit } from './character/outfit';
+import { FrameGuard } from './core/frameGuard';
 import { Input, type InputFrame } from './core/Input';
 import { CutscenePlayer } from './cutscene/CutscenePlayer';
 import { gameHost } from './cutscene/host';
@@ -95,8 +96,11 @@ import {
 import { ShaderWarmer } from './render/shaderWarm';
 import { SkateCamera } from './render/SkateCamera';
 import {
+  bootsAfterLoss,
   capUploads,
   checkTextureBudget,
+  lastLoss,
+  LIGHT_CAP,
   textureDiet,
   watchContextLoss,
 } from './render/textureDiet';
@@ -457,14 +461,17 @@ export class Game {
     this.seed = opts.seed ?? randomSeed();
     this.nounId = opts.nounId ?? 0;
     this.name = opts.name ?? `noun ${seedKey(this.seed).split('-')[3]}`;
-    const quality = opts.quality ?? autoQuality(readDevice());
+    // A page loaded right after a lost context boots lighter (render/textureDiet.ts)
+    const afterLoss = bootsAfterLoss(Date.now(), lastLoss());
+    const auto = autoQuality(readDevice());
+    const quality = opts.quality ?? (afterLoss && auto === 'high' ? 'medium' : auto);
     this.gfx = new Graphics(opts.canvas, quality);
     // Low: only the rider's own Noun casts a shadow (NPCs, customers, remotes don't)
     NounCharacter.castShadows = quality !== 'low';
     // 'low' picked automatically: a weak phone boots lighter and the ladder
     // may keep stepping down (an explicit Low / ?q=low stays as chosen)
     if (quality === 'low' && opts.quality === undefined) {
-      this.weakDevice = isWeakDevice(readDevice(this.gfx.renderer.getContext()));
+      this.weakDevice = afterLoss || isWeakDevice(readDevice(this.gfx.renderer.getContext()));
       // A tablet draws a phone's worth of pixels, not 3× (deviceTier budgetScale)
       const scale = Math.min(
         this.gfx.lite.scale,
@@ -479,17 +486,20 @@ export class Game {
         DESKTOP_TUNING,
       );
     }
-    // A weak phone also goes on the texture diet (render/textureDiet.ts)
+    // A weak phone goes on the texture diet, every other auto-'low' phone /
+    // tablet on the light one (render/textureDiet.ts). Set before anything loads.
     textureDiet.on = this.weakDevice;
+    textureDiet.light = !this.weakDevice && quality === 'low' && opts.quality === undefined;
     if (this.weakDevice) {
       capUploads(this.gfx.renderer);
       this.gfx.sun.shadow.mapSize.set(512, 512);
-      this.unwatchLoss = watchContextLoss(opts.canvas);
-    }
+    } else if (textureDiet.light) capUploads(this.gfx.renderer, LIGHT_CAP);
+    // Every device: a lost context reloads (lighter) instead of a black world
+    this.unwatchLoss = watchContextLoss(opts.canvas);
     const perfOpts = perfParam();
     if (perfOpts !== null) {
       perf.enable(this.gfx.renderer, perfOpts);
-      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}`;
+      perf.extra.quality = `${quality}${this.weakDevice ? ' (weak)' : ''}${textureDiet.light ? ' (light diet)' : ''}${afterLoss ? ' (after a lost context)' : ''}`;
     }
     this.input = new Input(opts.canvas);
     this.player = new Player(this.world, this.rails);
@@ -1037,11 +1047,35 @@ export class Game {
     if (raw > 0 && raw < 1000 && this.frameMs.length < 600) this.frameMs.push(raw);
     if (dt <= 0) return;
     perf.frameStart(now);
-    this.warmer?.tick(dt);
-    perf.lap('warm');
-    this.step(dt, now);
+    try {
+      this.warmer?.tick(dt);
+      perf.lap('warm');
+      this.step(dt, now);
+      this.frameGuard.ok();
+    } catch (err) {
+      this.frameFailed(err, dt);
+    }
     perf.frameEnd();
   };
+
+  /** Errors in a frame (core/frameGuard.ts): the loop goes on, the picture too. */
+  readonly frameGuard = new FrameGuard();
+
+  private frameFailed(err: unknown, dt: number) {
+    const a = this.frameGuard.failed(err);
+    if (a.report) {
+      console.error('[noun world] a frame failed; carrying on', err);
+      perf.extra.frameError = String(err).slice(0, 160);
+    }
+    // The opening shot's grade / camera / book are the newest moving parts:
+    // drop them, so a throw there leaves the plain game, not a frozen frame
+    if (a.abortIntro) this.camp.abortIntro();
+    try {
+      this.gfx.render(dt);
+    } catch {
+      // the render itself is what failed: nothing more to do this frame
+    }
+  }
 
   /** Dev: Noun Breaks' battle view on its mock battle, in front of the skater (breakdance/view/dev.ts). */
   breakDev = (o?: import('./breakdance/view/dev').BreakDevOptions) =>

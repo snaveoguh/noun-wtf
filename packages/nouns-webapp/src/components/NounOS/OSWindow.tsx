@@ -133,7 +133,7 @@ export default function OSWindow({
         </span>
       </header>
       {toolbar}
-      <div className="nos-content" {...contentProps}>
+      <div className="nos-content" data-container="page" {...contentProps}>
         {children}
       </div>
       {/* Depth haze: windows further back sink into the dark */}

@@ -3,6 +3,9 @@
   flex-direction: column;
   min-height: 100vh;
   max-width: 100vw;
+  /* The full-page shell is the outermost "page" size container, so container
+     queries still resolve outside a NounOS window (src/lib/responsive). */
+  container: page / inline-size;
 }
 
 @media (max-width: 992px) {
