@@ -90,6 +90,8 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
   // every graffiti piece are in: ui/WorldLoader.tsx) → select (character
   // select over the live showroom) → play. No title / PRESS START screen.
   const [phase, setPhase] = useState<'loading' | 'select' | 'play'>('loading');
+  // The loader stays over what comes next until its black has faded away
+  const [loaderUp, setLoaderUp] = useState(true);
   // Browsers lock audio until a gesture. PRESS START used to be that
   // gesture; now the first click, tap or key anywhere (the character select
   // included) unlocks it, and NOUN FM's start-of-game intro starts then.
@@ -527,7 +529,9 @@ export default function World2Page({ paused = false }: World2PageProps = {}) {
         />
       )}
       {game && deckOpen && <DeckDesigner game={game} onClose={closeDeck} />}
-      {phase === 'loading' && !error && <WorldLoader game={game} onDone={loaded} />}
+      {loaderUp && !error && (
+        <WorldLoader game={game} onDone={loaded} onGone={() => setLoaderUp(false)} />
+      )}
       {game && searchParams.get('diag') === '1' && <Diagnostics game={game} />}
 
       {error && (
