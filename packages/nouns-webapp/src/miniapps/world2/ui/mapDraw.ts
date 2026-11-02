@@ -8,6 +8,8 @@
 //
 // Screen: +X right, +Z down (a true top-down view, -Z is "north").
 
+import { COAST, coastFrame, shoreDistUV, type CoastFrame } from '../ocean/coast';
+import { townToWorld } from '../towns/site';
 import { ALLEYS, ALLEY_O0, MOUNTAIN, alleyToWorld, edgeDistance } from '../world/mountain/config';
 import { bowlMapPoint, bowlOutline } from '../world/mountain/noggleBowl';
 import { NJ, njFrameNow, njToWorld, type NjFrame } from '../world/mountain/nounJersey';
@@ -41,6 +43,8 @@ export interface MapScene {
   towns?: { x: number; z: number; name: string; km: number }[];
   /** Nounish landmarks (world/landmarks/LandmarkSystem.ts → mapPoints). */
   landmarks?: { x: number; z: number; name: string; icon: string; found: boolean }[];
+  /** The surf break off Puerto Noun (ocean/OceanSystem.ts → mapPoint). */
+  surf?: { x: number; z: number } | null;
 }
 
 const C = {
@@ -59,6 +63,9 @@ const C = {
   nj: '#ff3d8b',
   bowl: '#8f6bff',
   town: '#ffb000',
+  sea: '#2fa9d6',
+  seaEdge: '#f2dfa6',
+  surf: '#20d6ff',
   landmark: '#ff4fd8',
   landmarkUnseen: '#c9c4d6',
   me: '#ffd400',
@@ -75,6 +82,41 @@ const DROP_COLOR: Record<string, string> = {
 };
 
 // ── Cached geometry ─────────────────────────────────────────────────────
+
+let seaCache: { c: CoastFrame; path: Path2D } | null = null;
+
+/** The ocean's outline (ocean/coast.ts): rays out from a point at sea to the shore. */
+function seaPath(c: CoastFrame): Path2D {
+  if (seaCache !== null && seaCache.c === c) return seaCache.path;
+  const path = new Path2D();
+  const u0 = c.uB;
+  const v0 = COAST.shore + 1200;
+  const w = { x: 0, z: 0 };
+  const N = 240;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const du = Math.cos(a);
+    const dv = Math.sin(a);
+    // bisect the first shore crossing along the ray
+    let lo = 0;
+    let hi = 50;
+    while (hi < COAST.far * 2 && shoreDistUV(u0 + du * hi, v0 + dv * hi, c.uB) > 0) {
+      lo = hi;
+      hi *= 1.4;
+    }
+    for (let k = 0; k < 18; k++) {
+      const m = (lo + hi) / 2;
+      if (shoreDistUV(u0 + du * m, v0 + dv * m, c.uB) > 0) lo = m;
+      else hi = m;
+    }
+    townToWorld(c.town, v0 + dv * lo, u0 + du * lo, w);
+    if (i === 0) path.moveTo(w.x, w.z);
+    else path.lineTo(w.x, w.z);
+  }
+  path.closePath();
+  seaCache = { c, path };
+  return path;
+}
 
 const trackPaths = new Map<
   Track,
@@ -287,6 +329,16 @@ export function drawMap(
       ctx.lineWidth = t.main ? roadW : roadW * 0.75;
       ctx.stroke(t.path);
     }
+    // The ocean off Puerto Noun (over the lines it drowns), a sandy shore
+    const coast = coastFrame();
+    if (coast !== null && coast.x1 > vx0 && coast.x0 < vx1 && coast.z1 > vz0 && coast.z0 < vz1) {
+      const sea = seaPath(coast);
+      ctx.strokeStyle = C.seaEdge;
+      ctx.lineWidth = Math.max(4 * px, 30);
+      ctx.stroke(sea);
+      ctx.fillStyle = C.sea;
+      ctx.fill(sea);
+    }
   }
 
   // The city: ring of blocks around the plaza, alleys cut through it
@@ -449,6 +501,17 @@ export function drawMap(
           size: 11,
           color: C.bowl,
         });
+    }
+  }
+
+  // The surf break
+  if (scene.surf) {
+    let p = S(scene.surf.x, scene.surf.z);
+    const off = !inside(p, 14);
+    if (!off || o.full || o.edgeMarkers) {
+      if (off) p = edge(p, 14);
+      pin(ctx, p.x, p.y, C.surf, '🏄');
+      if (o.full) label(ctx, off ? 'SURF BREAK 🏄' : 'SURF BREAK', p.x, p.y - 22, { size: 11, color: C.surf });
     }
   }
 

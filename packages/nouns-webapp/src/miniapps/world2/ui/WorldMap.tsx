@@ -32,6 +32,7 @@ function sceneOf(game: Game, waypoint: MapScene['waypoint'], full = false): MapS
     drops: game.drops?.mapPoints(),
     towns: game.towns?.mapPoints(full),
     landmarks: game.landmarks?.mapPoints(full),
+    surf: game.ocean.mapPoint(),
   };
 }
 
@@ -203,6 +204,29 @@ export function WorldMap({
           }}
         >
           <i style={{ background: '#ff3d8b' }} /> secret spot
+        </button>
+      )}
+      {game.mountain !== null && (
+        <button
+          type="button"
+          onClick={() => {
+            const sp = game.ocean.mapPoint();
+            if (sp !== null) goTo(sp.x, sp.z, 0.35);
+          }}
+        >
+          <i style={{ background: '#20d6ff' }} /> surf break
+        </button>
+      )}
+      {game.mountain !== null && (
+        <button
+          type="button"
+          className="w2-map-go"
+          title="Fast travel: on a board at Puerto Noun's line-up"
+          onClick={() => {
+            if (game.ocean.arrive()) setOpen(false);
+          }}
+        >
+          🏄 GO SURF
         </button>
       )}
       {waypoint !== null && (

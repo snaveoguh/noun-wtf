@@ -107,11 +107,16 @@ uniform vec3 uMid;
 uniform vec3 uShallow;
 uniform vec3 uFoam;
 uniform float uT;
+uniform float uDebug;
 float o_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float o_noise(vec2 p) {
   vec2 i = floor(p); vec2 fr = fract(p);
-  vec2 u = fr * fr * (3.0 - 2.0 * fr);
+  vec2 u = fr * fr * fr * (fr * (fr * 6.0 - 15.0) + 10.0);
   return mix(mix(o_hash(i), o_hash(i + vec2(1.0, 0.0)), u.x), mix(o_hash(i + vec2(0.0, 1.0)), o_hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+// streaky foam: three octaves, stretched along the crest
+float o_foamNoise(vec2 p) {
+  return o_noise(p) * 0.5 + o_noise(p * 2.13 + 7.1) * 0.3 + o_noise(p * 4.7 - 3.3) * 0.2;
 }
 `;
 
@@ -123,16 +128,24 @@ const FRAG_COLOR = /* glsl */ `
   vec3 water = mix(uShallow, uMid, smoothstep(0.3, 3.5, depth));
   water = mix(water, uDeep, deepK);
   // foam: the wave's own (crest / bore / trail) broken up by drifting noise
-  vec2 fp = vL * 0.35 + vec2(uT * 0.21, -uT * 0.13);
-  float n = o_noise(fp) * 0.6 + o_noise(fp * 2.7 + 3.1) * 0.4;
-  float foam = smoothstep(0.35, 0.75, vOc.z * (0.55 + 0.9 * n));
+  vec2 fp = vL * 0.55 + vec2(uT * 0.21, -uT * 0.13);
+  float n = o_foamNoise(fp);
+  float foam = smoothstep(0.5, 0.8, vOc.z * (0.35 + 0.95 * n));
   // the waterline: a lace of foam where the swash runs up
-  float lace = (1.0 - smoothstep(0.0, 0.35, depth)) * smoothstep(0.35, 0.65, n);
+  float lace = (1.0 - smoothstep(0.0, 0.3, depth)) * smoothstep(0.45, 0.7, n);
   foam = max(foam, lace);
   diffuseColor.rgb = mix(water, uFoam, foam);
+  totalEmissiveRadiance += uFoam * foam * 0.3;
   // see the sand in the shallows; never a hard edge where it meets the beach
-  diffuseColor.a = mix(smoothstep(0.0, 0.6, depth) * 0.55 + smoothstep(0.6, 3.0, depth) * 0.42, 1.0, foam);
+  diffuseColor.a = mix(mix(0.25, 0.96, smoothstep(0.05, 1.4, depth)), 1.0, foam);
   diffuseColor.a *= smoothstep(-8.0, -1.0, od) * 0.999 + 0.001;
+  // dev: 1 = coast distance bands (red: inland), 2 = water depth, 3 = foam
+  if (uDebug > 0.5) {
+    diffuseColor.a = 1.0;
+    if (uDebug < 1.5) diffuseColor.rgb = od < 0.0 ? vec3(1.0, 0.0, 0.0) : vec3(fract(od / 50.0), 0.2, 1.0 - fract(od / 50.0));
+    else if (uDebug < 2.5) diffuseColor.rgb = vec3(depth / 5.0);
+    else diffuseColor.rgb = vec3(vOc.z);
+  }
 `;
 
 const FRAG_NORMAL = /* glsl */ `
@@ -147,8 +160,8 @@ const FRAG_NORMAL = /* glsl */ `
     dn += vec2(2.3, 1.1) * 0.012 * cos(2.3 * q.x + 1.1 * q.y - 5.3 * t + 0.4);
     dn += vec2(-1.4, 2.6) * 0.009 * cos(-1.4 * q.x + 2.6 * q.y - 6.1 * t + 2.2);
     dn *= rk * (1.0 - vOc.z * 0.6);
-    vec3 nw = normalize(vec3(-dn.x, 1.0, -dn.y));
-    vec3 nv = normalize((viewMatrix * vec4(nw - vec3(0.0, 1.0, 0.0), 0.0)).xyz);
+    // (the tilt itself, in view space: never normalised, it's small)
+    vec3 nv = (viewMatrix * vec4(-dn.x, 0.0, -dn.y, 0.0)).xyz;
     normal = normalize(normal + nv);
   }
 `;
@@ -208,6 +221,7 @@ export class OceanSurface {
     uCoast: { value: new THREE.Vector4() },
     uGrid: { value: new THREE.Vector2() },
     uT: { value: 0 },
+    uDebug: { value: 0 },
     uDeep: { value: new THREE.Color(0x0a3550) },
     uMid: { value: new THREE.Color(0x11708c) },
     uShallow: { value: new THREE.Color(0x45d6cf) },
@@ -220,8 +234,9 @@ export class OceanSurface {
   ) {
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.12,
+      roughness: 0.16,
       metalness: 0.02,
+      envMapIntensity: 0.7,
       transparent: true,
       depthWrite: true,
     });
@@ -249,6 +264,11 @@ export class OceanSurface {
     mesh.renderOrder = 1;
     inkExcluded.add(mesh);
     this.mesh = mesh;
+  }
+
+  /** Dev: 0 off, 1 coast distance, 2 depth, 3 foam. */
+  set debug(v: number) {
+    this.uniforms.uDebug.value = v;
   }
 
   /** Follow the camera, advance the clock (t: seaClock seconds). */

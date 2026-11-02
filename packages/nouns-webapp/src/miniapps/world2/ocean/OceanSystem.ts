@@ -35,6 +35,7 @@ import { OceanLife, placeBoard } from './OceanLife';
 import { OCEAN_HIGH, OCEAN_LOW, OceanSurface } from './OceanSurface';
 import { blankSea, seaAt, seaClock, type SeaPoint } from './sea';
 import { BOARDS, type BoardId } from './surf/boards';
+import { SurfBot } from './surf/bot';
 import { buyBoard, coinOf, ownedBoards, savedBoard, saveBoard } from './surf/shop';
 import {
   enterWater,
@@ -115,6 +116,14 @@ export class OceanSystem {
   board: BoardId | null;
   /** Sea clock (s). */
   t = 0;
+  /**
+   * Dev / headless: a sea clock that advances with the game's own steps
+   * (frame dt) instead of wall time, so stepped runs see the waves move
+   * with the sim. Null: the shared wall clock (every client the same).
+   */
+  manualClock: number | null = null;
+  /** Dev / sizzle: the bot surfs your rider (surf/bot.ts) instead of your input. */
+  autopilot: SurfBot | null = null;
   /** Camera's coast distance (m, < 0 inland), last frame. */
   dCam = -1e9;
   private ev: WaterEvent[] = [];
@@ -162,6 +171,20 @@ export class OceanSystem {
     this.board = v === 'none' ? null : (saved ?? 'foamie');
   }
 
+  private clock(): number {
+    return this.manualClock ?? seaClock();
+  }
+
+  /** Dev: surf by yourself (the bot at a spot in the line-up). */
+  surfAuto(on = true) {
+    if (!on) {
+      this.autopilot = null;
+      return;
+    }
+    const s = this.water;
+    this.autopilot = new SurfBot(s.x, s.z, 5, blankSea);
+  }
+
   /** In the sea right now (any phase but 'off'). */
   get inWater() {
     return this.water.phase !== 'off';
@@ -204,7 +227,7 @@ export class OceanSystem {
       if (s.phase !== 'off') this.leave();
       return false;
     }
-    this.t = seaClock();
+    this.t = this.clock();
     if (s.phase !== 'off' && Math.hypot(p.pos.x - s.x, p.pos.z - s.z) > 3) {
       // teleported (respawn, fast travel): out of the water
       this.leave();
@@ -236,15 +259,18 @@ export class OceanSystem {
       }
       this.ev.push({ type: 'enter' });
     }
-    const winp = {
-      moveX: input.moveX,
-      moveY: input.moveY,
-      camYaw,
-      jump: input.jumpPressed || this.popQueued,
-      duck: input.duckPressed === true || this.duckQueued,
-      duckHeld: input.duck === true,
-      sprint: input.sprint || input.push,
-    };
+    const winp =
+      this.autopilot !== null && s.phase !== 'off'
+        ? this.autopilot.input(s, this.query)
+        : {
+            moveX: input.moveX,
+            moveY: input.moveY,
+            camYaw,
+            jump: input.jumpPressed || this.popQueued,
+            duck: input.duckPressed === true || this.duckQueued,
+            duckHeld: input.duck === true,
+            sprint: input.sprint || input.push,
+          };
     this.popQueued = false;
     this.duckQueued = false;
     const still = stepWater(s, winp, this.query, dt, this.ev);
@@ -284,7 +310,8 @@ export class OceanSystem {
     this.mode = input.mode;
     if (c === null) return;
     const cam = g.gfx.camera.position;
-    this.t = seaClock();
+    if (this.manualClock !== null) this.manualClock += dt;
+    this.t = this.clock();
     this.dCam =
       cam.x < c.x0 || cam.x > c.x1 || cam.z < c.z0 || cam.z > c.z1
         ? -1e9
@@ -324,8 +351,16 @@ export class OceanSystem {
     const on = s.phase !== 'off' && s.phase !== 'wade';
     cc.k += ((on ? 1 : 0) - cc.k) * (1 - Math.exp(-(on ? 2.5 : 4) * dt));
     if (on) {
-      cc.yaw = s.yaw;
       const ride = s.phase === 'ride' || s.phase === 'air' || s.phase === 'pop';
+      // riding: look along your line turned out to sea, so the camera sits on
+      // the beach side of you and the wave's face fills the frame
+      const sea = ride ? seaAt(s.x, s.z, this.t, this.sp) : null;
+      if (sea !== null) {
+        const out = Math.atan2(-sea.sx, -sea.sz);
+        let d = out - s.yaw;
+        d -= Math.PI * 2 * Math.round(d / (Math.PI * 2));
+        cc.yaw = s.yaw + Math.max(-0.75, Math.min(0.75, d * 0.55));
+      } else cc.yaw = s.yaw;
       const v = Math.hypot(s.vx, s.vz);
       cc.dist = ride ? 6.2 : s.phase === 'wipeout' ? 6.5 : 4.6;
       cc.pitch = ride ? 0.2 : 0.16;
@@ -607,16 +642,23 @@ export class OceanSystem {
     this.renderShop();
   }
 
+  /** The surf break for the map (the line-up), or null before the town is placed. */
+  mapPoint(): { x: number; z: number } | null {
+    const c = coastFrame();
+    if (c === null) return null;
+    return townToWorld(c.town, COAST.shore + 165, c.uB - 30, { x: 0, z: 0 });
+  }
+
   // ── Launch ──
 
   /** `?play=surf`: on a board at the line-up, facing the beach. */
   arrive(): boolean {
     const g = this.game;
-    if (g.me === null || g.level === null) return false;
+    if (g.me === null || g.level === null || !this.allowed()) return false;
     const c = coastFrameNow();
     if (c === null) return false;
     const w = townToWorld(c.town, COAST.shore + 165, c.uB - 30, { x: 0, z: 0 });
-    const t = seaClock();
+    const t = this.clock();
     const sea = seaAt(w.x, w.z, t, this.sp, c);
     if (sea === null) return false;
     if (this.board === null) this.board = 'foamie';

@@ -53,8 +53,8 @@ export const COAST = {
 } as const;
 
 export const SEABED = {
-  /** Surf zone: depth = slope · d out to surfEnd (3.1 m there). */
-  slope: 0.022,
+  /** Surf zone: depth = slope · d out to surfEnd (4.2 m there). */
+  slope: 0.03,
   surfEnd: 140,
   /** Then down to `deep` by deepEnd. */
   deep: 28,

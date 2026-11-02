@@ -212,8 +212,8 @@ const GRASS_DRY = new THREE.Color(0x9ccf4f);
 const DIRT = new THREE.Color(0xc58a4e);
 const DIRT_DARK = new THREE.Color(0x9a6337);
 const CONCRETE = new THREE.Color(0x9a95a6);
-const SAND = new THREE.Color(0xead7a4);
-const SAND_WET = new THREE.Color(0xc9b07c);
+const SAND = new THREE.Color(0xf6e6b8);
+const SAND_WET = new THREE.Color(0xdcc690);
 const _c = new THREE.Color();
 const _c2 = new THREE.Color();
 

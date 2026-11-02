@@ -36,7 +36,7 @@ export const SWELL = {
   /** Along-coast wavenumber (the angle the swell comes in at). */
   kA: 0.065,
   /** Offshore height (crest to trough, m) of an average wave. */
-  H0: 1.5,
+  H0: 1.9,
   /** Breaking: H > γ·depth. */
   gamma: 0.78,
   /** Swash: the smallest height the surface keeps at the waterline. */
@@ -141,7 +141,7 @@ export function foamAt(broken: number, phi: number, d0: number): number {
   const pm = wrap(phi);
   // front of the crest (pm → 2π) is the bore; behind it (pm small) the trail
   const front = pm > Math.PI ? Math.exp(-(TAU - pm) * 1.6) : 0;
-  const trail = pm <= Math.PI ? Math.exp(-pm * 0.9) * 0.8 : 0;
+  const trail = pm <= Math.PI ? Math.exp(-pm * 2.2) * 0.6 : 0;
   const crest = Math.exp(-Math.min(pm, TAU - pm) * 3);
   const shore = Math.exp(-Math.max(0, d0) / 5) * 0.7;
   return Math.min(1, broken * Math.max(front, trail, crest) + shore);
@@ -267,7 +267,7 @@ float w_broken(float d0, float a, float t, float phi, float k) {
 float w_foam(float broken, float phi, float d0) {
   float pm = w_wrap(phi);
   float front = pm > 3.14159265 ? exp(-(W_TAU - pm) * 1.6) : 0.0;
-  float trail = pm <= 3.14159265 ? exp(-pm * 0.9) * 0.8 : 0.0;
+  float trail = pm <= 3.14159265 ? exp(-pm * 2.2) * 0.6 : 0.0;
   float crest = exp(-min(pm, W_TAU - pm) * 3.0);
   float shore = exp(-max(0.0, d0) / 5.0) * 0.7;
   return min(1.0, broken * max(max(front, trail), crest) + shore);

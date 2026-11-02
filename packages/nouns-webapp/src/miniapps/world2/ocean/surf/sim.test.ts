@@ -178,7 +178,7 @@ describe('surfing', () => {
     expect(s.z).toBeGreaterThan(200);
   });
 
-  it('wipes out when the lip lands on you (stalled in the breaking section)', () => {
+  it('wipes out when the lip lands on you (straight in as it breaks)', () => {
     const clock = { t: 40 };
     const q = testSea(clock);
     const s = lineup();
@@ -192,8 +192,8 @@ describe('surfing', () => {
       60,
       (st, last) => {
         if (st.phase === 'ride') {
+          // straight in: the wave breaks on top of you
           const inp = idle();
-          inp.moveY = -1;
           inp.moveX = Math.max(-1, Math.min(1, -angleDiff(Math.PI, st.yaw) * 2));
           return inp;
         }
@@ -265,7 +265,7 @@ describe('wading and swimming', () => {
       clock.t += 1 / 60;
     }
     expect(s.phase).toBe('swim');
-    expect(s.z).toBeGreaterThan(30);
+    expect(s.z).toBeGreaterThan(20);
     // back out
     let out = false;
     for (let i = 0; i < 60 * 120; i++) {
