@@ -21,7 +21,9 @@ export function parseSavedPet(raw: string | null): SavedPet | null {
     const o = JSON.parse(raw) as Partial<SavedPet>;
     if (o === null || typeof o !== 'object' || o.v !== 1) return null;
     const look =
-      PET_LOOKS.includes(o.look as PetLook) && o.look !== '' ? (o.look as PetLook) : DEFAULT_LOOK;
+      PET_LOOKS.includes(o.look as PetLook) && (o.look as string) !== ''
+        ? (o.look as PetLook)
+        : DEFAULT_LOOK;
     const nm = checkPetName(typeof o.name === 'string' ? o.name : '');
     const follow = FOLLOW_PREFS.includes(o.follow as FollowPref)
       ? (o.follow as FollowPref)

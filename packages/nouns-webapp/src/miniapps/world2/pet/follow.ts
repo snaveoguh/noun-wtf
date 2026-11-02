@@ -165,7 +165,7 @@ export function spotBeside(o: Owner, side: number, w: PetWorld, fly: boolean) {
 export type PetEvent = 'poof' | 'hop' | 'happy' | 'sleep' | null;
 
 const GRAV = 18;
-const STEP_UP = 0.42;
+const STEP_UP = 0.32;
 const HOP_DOWN = 1.25;
 
 /** Put the pet straight down beside the rider (a poof): always somewhere valid. */

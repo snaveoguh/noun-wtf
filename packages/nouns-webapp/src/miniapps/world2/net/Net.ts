@@ -34,11 +34,14 @@
 // Indoors (interiors/roomNet.ts): `in: [doorId, level, seat]` only while
 // inside a building, so riders are drawn in the room they're in and not in
 // the street (a room's positions are already a frame every client shares).
+// CAMP pet (pet/wire.ts): `pt: [look, mode, name]` only once the rider has
+// adopted one; others place the pet beside the rider they draw.
 // The relay passes the blob through untouched and older clients ignore
 // unknown keys, so nothing changes for them.
 
 import type { BreakMsg } from '../breakdance/contract';
 import type { HoopsMsg } from '../hoops/contract';
+import type { PetWire } from '../pet/wire';
 import type { PoolMsg } from '../pool/contract';
 
 import PartySocket from 'partysocket';
@@ -163,6 +166,8 @@ export interface RemotePlayer {
   room?: RoomKey | null;
   /** Sat on the mural bench (`bn`): which seat (world/bench/rules.ts), null = not. */
   bench?: number | null;
+  /** Their CAMP pet (`pt`), raw: pet/wire.ts decodes it where it's drawn. */
+  pet?: unknown;
   speaking: boolean;
   transcript: string;
   transcriptAt: number;
@@ -244,6 +249,8 @@ export class Net {
   crew: string[] | null = null;
   /** The room I'm in (interiors/roomNet.ts), relayed as `in` while inside. */
   room: RoomWire | null = null;
+  /** My CAMP pet (pet/wire.ts `encodePet`), null = none adopted. */
+  pet: PetWire | null = null;
   /** My seat on the mural bench (world/bench/rules.ts), relayed as `bn` while sat. */
   bench: BenchWire | null = null;
 
@@ -425,6 +432,7 @@ export class Net {
     rp.ride = decodeRide(blob.rd);
     rp.crew = decodeCrew(blob.ps);
     rp.room = decodeRoom(blob.in);
+    rp.pet = Array.isArray(blob.pt) ? blob.pt : undefined;
     rp.bench = decodeBench(blob.bn);
     if (co !== null && co.seq !== rp.coSeq) {
       rp.coSeq = co.seq;
@@ -524,6 +532,7 @@ export class Net {
       ...(this.crew !== null ? { ps: this.crew } : {}),
       ...(this.room !== null ? { in: this.room } : {}),
       ...(this.bench !== null ? { bn: this.bench } : {}),
+      ...(this.pet !== null ? { pt: this.pet } : {}),
     });
     const msg = JSON.stringify({
       type: 'world:move',

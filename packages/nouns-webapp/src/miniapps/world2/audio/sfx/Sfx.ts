@@ -133,6 +133,18 @@ export class Sfx {
     return p;
   }
 
+  /**
+   * A system's own synth voice (the CAMP pet's squeaks): `fn` builds nodes
+   * on the context and connects them to `out`, the sfx bus, so the mixer's
+   * volume and mute apply. Nothing happens before audio is unlocked.
+   */
+  voice(fn: (ctx: AudioContext, out: AudioNode) => void) {
+    const ctx = this.ctx();
+    const out = this.out();
+    if (ctx === null || out === null) return;
+    fn(ctx, out);
+  }
+
   /** Play a sound (a sample, or one of the synthesized ones). */
   play(id: SfxId, o: PlayOpts = {}) {
     const ctx = this.ctx();

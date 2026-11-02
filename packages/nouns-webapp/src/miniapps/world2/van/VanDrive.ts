@@ -135,6 +135,19 @@ export class VanDrive implements VanDriveApi {
 
   // ── VanDriveApi ──
 
+  private roofH: number | null = null;
+
+  /** The van's roof over its origin (m), measured off the model once (the CAMP pet rides up there). */
+  get roofHeight(): number {
+    if (this.roofH === null && this.group !== null) {
+      this.group.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(this.group);
+      if (!box.isEmpty())
+        this.roofH = box.max.y - this.group.getWorldPosition(new THREE.Vector3()).y;
+    }
+    return this.roofH ?? 2.6;
+  }
+
   get heading() {
     if (this.driving) return this.sim.heading;
     if (this.group === null) return 0;
