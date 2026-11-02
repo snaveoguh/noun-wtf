@@ -1,0 +1,91 @@
+{
+ "mode": "loss",
+ "engine": "webkit",
+ "boot": {
+  "quality": "low",
+  "lite": {
+   "scale": 0.75,
+   "shadows": true,
+   "post": true
+  },
+  "weak": false,
+  "buffer": [
+   885,
+   615
+  ],
+  "shadowMap": 1024,
+  "diet": null
+ },
+ "samples": [
+  {
+   "at": 9,
+   "name": "boot",
+   "glMB": 184.3,
+   "texMB": 173,
+   "rbMB": 6,
+   "bufMB": 5.3,
+   "nTex": 116,
+   "canvases": 66,
+   "canvasMB": 70,
+   "bitmaps": 69,
+   "bitmapMB": 61.9,
+   "heapMB": null,
+   "tex": 108,
+   "geo": 154,
+   "progs": 47,
+   "rss": {
+    "web": 1925
+   }
+  },
+  {
+   "at": 23,
+   "name": "before-loss",
+   "glMB": 210,
+   "texMB": 192.9,
+   "rbMB": 6,
+   "bufMB": 11.1,
+   "nTex": 155,
+   "canvases": 69,
+   "canvasMB": 70.1,
+   "bitmaps": 83,
+   "bitmapMB": 62,
+   "heapMB": null,
+   "tex": 147,
+   "geo": 242,
+   "progs": 55,
+   "rss": {
+    "web": 2080
+   }
+  },
+  {
+   "at": 41,
+   "name": "after-restore",
+   "glMB": 169.7,
+   "texMB": 160.1,
+   "rbMB": 0,
+   "bufMB": 9.6,
+   "nTex": 116,
+   "canvases": 64,
+   "canvasMB": 63.4,
+   "bitmaps": 79,
+   "bitmapMB": 58.7,
+   "heapMB": null,
+   "tex": 112,
+   "geo": 179,
+   "progs": 33,
+   "rss": {
+    "web": 2019
+   }
+  }
+ ],
+ "errors": [],
+ "lost": {
+  "lost": true,
+  "running": true
+ },
+ "restored": {
+  "lost": false,
+  "running": true
+ },
+ "loads": 1
+}

@@ -58,6 +58,8 @@ import { useProposalFeedback } from '@/wrappers/nounsData';
 import { useUserVotesAsOfBlock } from '@/wrappers/nounToken';
 import { delegateNounsAtBlockQuery, proposalVotesQuery } from '@/wrappers/subgraph';
 
+import classes from './VotePage.module.css';
+
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(advanced);
@@ -407,6 +409,7 @@ const VotePage = () => {
       <div style={{ paddingTop: 20, marginBottom: 12 }}>
         <Link
           to="/vote"
+          className={classes.tap}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -463,9 +466,9 @@ const VotePage = () => {
         </div>
 
         <h1
+          className={classes.title}
           style={{
             fontFamily: "'Londrina Solid'",
-            fontSize: '2rem',
             fontWeight: 400,
             margin: '0 0 8px',
             lineHeight: 1.2,
@@ -495,6 +498,7 @@ const VotePage = () => {
               href={buildEtherscanAddressLink(proposal.proposer || '')}
               target="_blank"
               rel="noreferrer"
+              className={classes.tap}
               style={{
                 fontWeight: 700,
                 color: 'var(--theme-text-primary)',
@@ -516,6 +520,8 @@ const VotePage = () => {
               href={buildEtherscanTxLink(proposal.transactionHash)}
               target="_blank"
               rel="noreferrer"
+              aria-label="View proposal transaction on Etherscan"
+              className={classes.tapIcon}
               style={{ color: '#b0b0b8' }}
             >
               <ExternalLink size={12} />
@@ -537,6 +543,7 @@ const VotePage = () => {
                       href={buildEtherscanAddressLink(signer.id)}
                       target="_blank"
                       rel="noreferrer"
+                      className={classes.tap}
                       style={{
                         fontWeight: 700,
                         color: 'var(--theme-text-primary)',
@@ -590,6 +597,7 @@ const VotePage = () => {
 
         {/* Time info bar */}
         <div
+          className={classes.timeRow}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -599,20 +607,24 @@ const VotePage = () => {
             color: 'var(--theme-text-muted)',
           }}
         >
-          <Clock size={12} />
-          <span>{startOrEndTimeCopy()}</span>
-          {startOrEndTimeTime() && (
-            <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>
-              {i18n.date(new Date(startOrEndTimeTime()?.toISOString() || 0), {
-                dateStyle: 'long',
-                timeStyle: 'short',
-              })}
-            </span>
-          )}
+          <span className={classes.nowrap}>
+            <Clock size={12} />
+            <span>{startOrEndTimeCopy()}</span>
+            {startOrEndTimeTime() && (
+              <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>
+                {i18n.date(new Date(startOrEndTimeTime()?.toISOString() || 0), {
+                  dateStyle: 'long',
+                  timeStyle: 'short',
+                })}
+              </span>
+            )}
+          </span>
           <span style={{ color: '#d0d0d4' }}>|</span>
-          <span>Snapshot block</span>
-          <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>
-            {String(proposal.voteSnapshotBlock)}
+          <span className={classes.nowrap}>
+            <span>Snapshot block</span>
+            <span style={{ fontWeight: 600, color: 'var(--theme-text-primary)' }}>
+              {String(proposal.voteSnapshotBlock)}
+            </span>
           </span>
         </div>
       </div>
@@ -641,7 +653,7 @@ const VotePage = () => {
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {isAwaitingStateChange() && (
               <button
                 type="button"
@@ -715,11 +727,12 @@ const VotePage = () => {
       </div>
 
       {/* ── Two-column layout: left = content, right = vote panel ─── */}
-      <div className="vote-page-grid">
+      <div className={classes.grid}>
         {/* ── Left column ──────────────────────────────────────────── */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           {/* Tabs */}
           <div
+            className={classes.tabs}
             style={{
               display: 'flex',
               gap: 0,
@@ -730,18 +743,22 @@ const VotePage = () => {
             {(['description', 'vote'] as const).map(tab => (
               <button
                 key={tab}
+                type="button"
+                className={classes.tab}
                 onClick={() => setActiveTab(tab)}
                 style={{
-                  padding: '10px 20px',
                   background: 'none',
                   border: 'none',
-                  borderBottom: activeTab === tab ? '2px solid #14141f' : '2px solid transparent',
+                  borderBottom:
+                    activeTab === tab
+                      ? '2px solid var(--theme-text-primary)'
+                      : '2px solid transparent',
                   marginBottom: -2,
                   cursor: 'pointer',
                   fontFamily: "'PT Root UI'",
                   fontWeight: activeTab === tab ? 700 : 500,
                   fontSize: '0.85rem',
-                  color: activeTab === tab ? '#14141f' : '#8c8d92',
+                  color: activeTab === tab ? 'var(--theme-text-primary)' : '#8c8d92',
                   transition: 'all 0.15s',
                   display: 'flex',
                   alignItems: 'center',
@@ -787,6 +804,7 @@ const VotePage = () => {
                   }}
                 >
                   <button
+                    type="button"
                     onClick={() => setShowTransactions(!showTransactions)}
                     style={{
                       width: '100%',
@@ -828,6 +846,7 @@ const VotePage = () => {
           ) : (
             /* Description tab */
             <div
+              className={classes.card}
               style={{
                 background: 'var(--theme-bg-card)',
                 borderRadius: 16,
@@ -918,7 +937,7 @@ const VotePage = () => {
         </div>
 
         {/* ── Right column (sticky vote panel) ─────────────────────── */}
-        <div id="inline-vote-panel" className="vote-page-side">
+        <div id="inline-vote-panel" className={classes.side}>
           <InlineVotePanel
             proposalId={proposal.id}
             availableVotes={userVotes ?? 0}

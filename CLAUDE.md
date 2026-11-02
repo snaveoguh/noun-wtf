@@ -215,6 +215,11 @@ A weak device (`render/deviceTier.ts` `isWeakDevice`, e.g. a 4 GB Mali-G52 Andro
   - entering a room builds the floor above on the next frame (still black), and the z-fight pass bins each plane along one axis (byte-identical output);
   - a breaks battle's stage links hidden during the countdown (`warmHidden`, 1.5 s cap).
   - `?perf=quiet`'s snapshot has a `hitchLog`: each frame over 50 ms CPU (or a gap 3× the median), with the systems that ran in it. WebKit (iPad) runs: `.claude/perf-shots/tablet/` (`session.cjs`, `ladder.cjs`).
+- **iPad black screens / crashes (2026-11-02, `.claude/perf-shots/ipad-memory/README.md`):**
+  - A lost WebGL context on any device shows a notice and reloads once (`watchContextLoss` in `render/textureDiet.ts`). For 30 min after, the page boots lighter (`bootsAfterLoss`): phones / tablets on the weak path, desktop High → Medium. A second loss within 2 min stops on a RELOAD button. three's own restore came back with dead textures: the black world, heads gone.
+  - Every non-weak auto-`low` phone / tablet is on the light diet (`textureDiet.light`): uploads capped at 1024 (`LIGHT_CAP`), env map 128, CAMP art at half size, the door-sign canvas freed after upload (`releaseAfterUpload`; only static textures nobody redraws or shares). iPad GL 274 → 213 MB, canvases 129 → 97 MB.
+  - `Game.frame` catches a throwing frame (`core/frameGuard.ts`): it reports once, still draws, and the first error ends the CAMP intro (`camp.abortIntro()`). A throw used to repeat every frame and freeze the canvas (the desktop "freezes on the book").
+  - Measuring GPU memory: `.claude/perf-shots/ipad-memory/glmem.js` (real GL bytes per allocation, named by path from `window.__w2`, plus a canvas census).
 - **Desktop heat (2026-10-28, `.claude/perf-shots/desktop/README.md`):**
   - `render/framePacer.ts` caps `Game.frame` at 60 fps by default (Settings → Frame rate 30 / 60 / max). It drops to 30 while the window is blurred or a menu covers the game (`game.coverGame(reason, opaque)`; an opaque one sets `gfx.hold`). The sim still steps on the interval since the last run frame: a capped 144 Hz screen plays like a 60 Hz one.
   - High draws at 1.5 on Retina (`bootScale`). Settings → Sharp restores 2. The ink thickness follows the render scale.
@@ -479,6 +484,17 @@ AI agents keep Noun World's economy moving while nobody's online. Design: `docs/
 ### Share previews (og:image)
 
 `/vote/:id`, `/candidates/:id`, `/noun/:id` and `/v2/noun/:id` go through `netlify/functions/og-proposal.ts` (see `public/_redirects`), which serves the SPA shell with og / twitter tags spliced in. A Noun's card is `/og/noun/:id.png` / `/og/v2/noun/:id.png` (`og-noun-image.ts`): a 1200 × 630 PNG of the Noun big on its own background, standing on the bottom edge, drawn from its seed (`seeds(id)`; `ownerOf` 404s unminted or burned ones) and the bundled trait art, encoded with node's zlib (`netlify/lib/nounOg.ts`, tested). The on-chain renderers (`tokenURI`, `generateSVGImage`) revert over public RPCs (gas caps), so they aren't used. Cached a year (a seed never changes).
+
+### Responsive (container queries)
+
+Every page renders in a NounOS window, and a window can be phone-width on a 2560 px desktop, so pages lay out from their **container**, never the viewport. `.nos-content` (each window's content) and the app shell (`App.module.css .wrapper`) are size containers named `page` (`data-container="page"`); `container-type` doesn't capture `position: fixed` children, so modals are unaffected.
+- **Tokens** (`src/lib/responsive/breakpoints.ts`, band lower edges): xs < 400, sm 400, md 560, lg 760, xl 1024, 2xl 1440.
+- **Tailwind:** `@sm:` … `@2xl:` (from that tier up), `@max-sm:` … (below it), `@container` (make a container); a local plugin in `tailwind.config.ts`. Viewport `sm:`/`md:` stay for the OS chrome only.
+- **CSS modules:** `@container page (min-width: 760px) { … }` / `(max-width: 559.98px)` with the literal values; fluid type with `clamp(min, Ncqi, max)`.
+- **JS:** `useContainerWidth()` (`src/hooks/useContainerWidth.ts`: `{ ref, width, tier, atLeast, below }`, ResizeObserver on the nearest `[data-container]`, viewport fallback) instead of `window.innerWidth`. Touch / hover choices use `(pointer: coarse)` / `(hover: none)`, not a width. `osStore.isMobile()` stays viewport-based: it's the window manager deciding full-screen windows.
+- **Harness:** `node scripts/responsive/harness.mjs --route /noun/2062` (from `packages/nouns-webapp`, against a no-HMR dev server with `VITE_CHAIN_ID=1`): 13 widths (320 … 2560) in a navigator window (resized live via the dev-only `window.__nos`) and full-page, checks horizontal overflow, clipped text / controls, covered controls, controls on artwork, overlapping controls and tap targets < 40 px on touch; `report.json` + `contact-sheet.jpg` in `.claude/responsive-shots/<slug>/`. `--all --jobs 3` refreshes `index.json`; `--fail-on-issues` for a green check. New routes must be added to `ROUTES` in `scripts/responsive/lib.mjs` (a test fails otherwise).
+- **Shared helpers:** `<PageFab>` (`src/components/responsive/PageFab.tsx`) instead of `position: fixed` buttons in pages; `data-page-fill` on a page root makes `.nos-page` the window's exact height; `data-surface="light"` keeps a light panel's inputs out of the noir theme's forced light text; `data-responsive-art-ok` exempts a deliberate overlay hero from the harness's "on art" check. The phone tray's height is `--nos-tray-h`; NOUN FM's off button is a tray chip on the desk (`NounFmTrayChip`).
+- **Rules:** no new viewport media queries / `innerWidth` in page code; a page is done when the harness is clean at all 26 shots and wide layouts look as before. Inventory and work units: `docs/responsive/pages.md`; step by step with the Noun page as the worked example: `docs/responsive/PLAYBOOK.md`.
 
 ### Play-as links, share + Farcaster mini app (growth)
 

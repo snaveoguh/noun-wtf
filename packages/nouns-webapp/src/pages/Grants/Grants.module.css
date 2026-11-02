@@ -551,3 +551,164 @@
   border-radius: 999px;
   font-weight: 600;
 }
+
+/* ─── Responsive (container queries; see docs/responsive/PLAYBOOK.md) ─── */
+
+.titleRow,
+.detailHeader {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+}
+.title {
+  font-size: clamp(1.5rem, 7cqi, 2rem);
+}
+.detailTitle {
+  font-size: clamp(1.25rem, 5.5cqi, 1.5rem);
+}
+.cardHeader,
+.cardMeta {
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+.voteSummary {
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+}
+.voteRow {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+}
+.voteReason {
+  min-width: 12ch;
+}
+
+.fundRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--theme-divider);
+  font-size: 0.85rem;
+}
+.fundTarget {
+  font-family: monospace;
+  color: var(--theme-text-muted);
+}
+.fundValue {
+  font-weight: 700;
+}
+
+.rowLink {
+  font-size: 0.75rem;
+  color: var(--theme-text-muted);
+}
+.rowLinkMono {
+  font-family: monospace;
+}
+
+/* Advanced toggle: the button is the hit area, the track is drawn inside it. */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.toggleTrack {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--theme-bg-tertiary);
+  transition: background 0.2s;
+}
+.toggle[aria-pressed='true'] .toggleTrack {
+  background: #22d3ee;
+}
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--theme-bg-card);
+  transition: left 0.2s;
+}
+.toggle[aria-pressed='true'] .toggleKnob {
+  left: 20px;
+}
+
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+  color: var(--theme-text-muted);
+}
+
+/* Below sm: a tighter gutter. */
+@container page (max-width: 399.98px) {
+  .container {
+    padding: 0 1rem;
+    margin-top: 1.25rem;
+  }
+}
+
+/* Below md: primary actions full width. */
+@container page (max-width: 559.98px) {
+  .header .createBtn {
+    display: flex;
+    justify-content: center;
+    text-align: center;
+  }
+  .actionBtn,
+  .cancelBtn {
+    width: 100%;
+    margin: 0 0 0.5rem;
+  }
+}
+
+/* Touch: 40 px targets. */
+@media (pointer: coarse) {
+  .createBtn,
+  .backLink,
+  .rowLink,
+  .voteStatusTx,
+  .txLink a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+  .createBtn {
+    justify-content: center;
+  }
+  .voteBtn,
+  .submitVote,
+  .actionBtn,
+  .cancelBtn,
+  .addTxBtn,
+  .removeTx {
+    min-height: 40px;
+  }
+  .rowLink {
+    min-width: 40px;
+    justify-content: center;
+  }
+  .toggle {
+    min-height: 40px;
+  }
+  .copyBtn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}

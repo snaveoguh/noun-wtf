@@ -1,0 +1,2344 @@
+{
+  "url": "/",
+  "route": "/",
+  "group": "home",
+  "kind": "home",
+  "label": "before",
+  "generated": "2026-11-01T08:28:53.228Z",
+  "widths": [
+    320,
+    360,
+    390,
+    430,
+    520,
+    640,
+    768,
+    900,
+    1024,
+    1280,
+    1440,
+    1920,
+    2560
+  ],
+  "severity": {
+    "score": 21.5,
+    "worst": [
+      "page@520:30.7",
+      "page@640:30.7",
+      "page@430:27.7"
+    ],
+    "clean": 0,
+    "total": 13,
+    "errors": 0
+  },
+  "shots": [
+    {
+      "mode": "page",
+      "width": 320,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "contentWidth": 320,
+      "tier": "xs",
+      "touch": true,
+      "score": 23.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 1,
+        "overArt": 11,
+        "overlaps": 1,
+        "smallTargets": 29
+      },
+      "line": "1 clipped · 1 covered · 11 on art · 1 overlaps · 29 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "control",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "NOUN 2062 no bids yet 18h 55m",
+            "px": 110
+          }
+        ],
+        "covered": [
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun Parkour",
+            "by": "body > div#root > div._wrapper > button.fixed.bottom-[72px]"
+          }
+        ],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > div.nh-ask > button.nh-ask-toggle",
+            "label": "Search or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "fries",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "label": "⌐◨-◨ NOUN.WTF",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "label": "TERMINAL `",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "label": "NOUN FM: our jingles between dee",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 66
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "w": 64,
+            "h": 12,
+            "label": "noun.wtf home"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "w": 32,
+            "h": 16,
+            "label": "Noun WTF"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun World"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "The Big Drop"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Breaks"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Grand Exchange"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Parkour"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Pool"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Hoops"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Warfare"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 75,
+            "h": 32,
+            "label": "README"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 62,
+            "h": 32,
+            "label": "INDEX"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 86,
+            "h": 32,
+            "label": "TERMINAL"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 69,
+            "h": 36,
+            "label": "Games"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 47,
+            "h": 36,
+            "label": "Art"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Freedom"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 82,
+            "h": 36,
+            "label": "The DAO"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Market"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Network"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Clients"
+          }
+        ]
+      },
+      "shots": [
+        "page-320.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 360,
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "contentWidth": 360,
+      "tier": "xs",
+      "touch": true,
+      "score": 23.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 3,
+        "covered": 0,
+        "overArt": 13,
+        "overlaps": 0,
+        "smallTargets": 29
+      },
+      "line": "3 clipped · 13 on art · 29 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "no bids yet",
+            "px": 15
+          },
+          {
+            "kind": "control",
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "clipper": "div#root > div._wrapper > div.nos-root.mode-desk > div.nh",
+            "text": "Market",
+            "px": 29
+          },
+          {
+            "kind": "control",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "NOUN 2062 no bids yet 18h 55m",
+            "px": 70
+          }
+        ],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > div.nh-ask > button.nh-ask-toggle",
+            "label": "Search or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "fries",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "label": "⌐◨-◨ NOUN.WTF",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "label": "TERMINAL `",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "label": "NOUN 2062 no bids yet 18h 55m",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "label": "NOUN FM: our jingles between dee",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [],
+        "smallTargets": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "w": 64,
+            "h": 12,
+            "label": "noun.wtf home"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "w": 32,
+            "h": 16,
+            "label": "Noun WTF"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun World"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "The Big Drop"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Breaks"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Grand Exchange"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Parkour"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Pool"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Hoops"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Warfare"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 75,
+            "h": 32,
+            "label": "README"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 62,
+            "h": 32,
+            "label": "INDEX"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 86,
+            "h": 32,
+            "label": "TERMINAL"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 69,
+            "h": 36,
+            "label": "Games"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 47,
+            "h": 36,
+            "label": "Art"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Freedom"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 82,
+            "h": 36,
+            "label": "The DAO"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Market"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Network"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Clients"
+          }
+        ]
+      },
+      "shots": [
+        "page-360.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 390,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "contentWidth": 390,
+      "tier": "xs",
+      "touch": true,
+      "score": 26.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 1,
+        "overArt": 14,
+        "overlaps": 1,
+        "smallTargets": 29
+      },
+      "line": "2 clipped · 1 covered · 14 on art · 1 overlaps · 29 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "18h 55m",
+            "px": 32
+          },
+          {
+            "kind": "control",
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "NOUN 2062 no bids yet 18h 55m",
+            "px": 40
+          }
+        ],
+        "covered": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "The DAO",
+            "by": "body > div#root > div._wrapper > button.fixed.bottom-[72px]"
+          }
+        ],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > div.nh-ask > button.nh-ask-toggle",
+            "label": "Search or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Games",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "fries",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "label": "⌐◨-◨ NOUN.WTF",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "label": "TERMINAL `",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "label": "NOUN 2062 no bids yet 18h 55m",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "label": "NOUN FM: our jingles between dee",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 40
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "w": 64,
+            "h": 12,
+            "label": "noun.wtf home"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "w": 32,
+            "h": 16,
+            "label": "Noun WTF"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun World"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "The Big Drop"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Breaks"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Grand Exchange"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Parkour"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Pool"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Hoops"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Warfare"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 75,
+            "h": 32,
+            "label": "README"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 62,
+            "h": 32,
+            "label": "INDEX"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 86,
+            "h": 32,
+            "label": "TERMINAL"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 69,
+            "h": 36,
+            "label": "Games"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 47,
+            "h": 36,
+            "label": "Art"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Freedom"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 82,
+            "h": 36,
+            "label": "The DAO"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Market"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Network"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Clients"
+          }
+        ]
+      },
+      "shots": [
+        "page-390.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 430,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "contentWidth": 430,
+      "tier": "sm",
+      "touch": true,
+      "score": 27.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 1,
+        "covered": 0,
+        "overArt": 14,
+        "overlaps": 5,
+        "smallTargets": 29
+      },
+      "line": "1 clipped · 14 on art · 5 overlaps · 29 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "clipper": "div#root > div._wrapper > div.nos-root.mode-desk > div.nh",
+            "text": "Network",
+            "px": 33
+          }
+        ],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > div.nh-ask > button.nh-ask-toggle",
+            "label": "Search or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Games",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "fries",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "label": "⌐◨-◨ NOUN.WTF",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "label": "TERMINAL `",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "label": "NOUN 2062 no bids yet 18h 55m",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "label": "NOUN FM: our jingles between dee",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 92
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 38
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 43
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 83
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 92
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "w": 64,
+            "h": 12,
+            "label": "noun.wtf home"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "w": 32,
+            "h": 16,
+            "label": "Noun WTF"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun World"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "The Big Drop"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Breaks"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Grand Exchange"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Parkour"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Pool"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Hoops"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Warfare"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 75,
+            "h": 32,
+            "label": "README"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 62,
+            "h": 32,
+            "label": "INDEX"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 86,
+            "h": 32,
+            "label": "TERMINAL"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 69,
+            "h": 36,
+            "label": "Games"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 47,
+            "h": 36,
+            "label": "Art"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Freedom"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 82,
+            "h": 36,
+            "label": "The DAO"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Market"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Network"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Clients"
+          }
+        ]
+      },
+      "shots": [
+        "page-430.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 520,
+      "viewport": {
+        "width": 520,
+        "height": 900
+      },
+      "contentWidth": 520,
+      "tier": "sm",
+      "touch": true,
+      "score": 30.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 14,
+        "overlaps": 5,
+        "smallTargets": 29
+      },
+      "line": "2 clipped · 14 on art · 5 overlaps · 29 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "clipper": "div#root > div._wrapper > div.nos-root.mode-desk > div.nh",
+            "text": "Clients",
+            "px": 23
+          },
+          {
+            "kind": "text",
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "CONNECT",
+            "px": 21
+          }
+        ],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > div.nh-ask > button.nh-ask-toggle",
+            "label": "Search or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Games",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "fries",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "label": "⌐◨-◨ NOUN.WTF",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "label": "TERMINAL `",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "label": "NOUN 2062 no bids yet 18h 55m",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "label": "NOUN FM: our jingles between dee",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 88
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 52
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 53
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 41
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "w": 64,
+            "h": 12,
+            "label": "noun.wtf home"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "w": 32,
+            "h": 16,
+            "label": "Noun WTF"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun World"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "The Big Drop"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Breaks"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Grand Exchange"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Parkour"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Pool"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Hoops"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Warfare"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 75,
+            "h": 32,
+            "label": "README"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 62,
+            "h": 32,
+            "label": "INDEX"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 86,
+            "h": 32,
+            "label": "TERMINAL"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 69,
+            "h": 36,
+            "label": "Games"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 47,
+            "h": 36,
+            "label": "Art"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Freedom"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 82,
+            "h": 36,
+            "label": "The DAO"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Market"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Network"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Clients"
+          }
+        ]
+      },
+      "shots": [
+        "page-520.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 640,
+      "viewport": {
+        "width": 640,
+        "height": 960
+      },
+      "contentWidth": 640,
+      "tier": "md",
+      "touch": true,
+      "score": 30.7,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 2,
+        "covered": 0,
+        "overArt": 11,
+        "overlaps": 5,
+        "smallTargets": 29
+      },
+      "line": "2 clipped · 11 on art · 5 overlaps · 29 small taps",
+      "issues": {
+        "overflow": null,
+        "clipped": [
+          {
+            "kind": "text",
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "clipper": "div#root > div._wrapper > div.nos-root.mode-desk > div.nh",
+            "text": "Community",
+            "px": 12
+          },
+          {
+            "kind": "text",
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > span.nos-clock",
+            "clipper": "body > div#root > div._wrapper > div.nos-root.mode-desk",
+            "text": "08:27 AM",
+            "px": 22
+          }
+        ],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > div.nh-ask > button.nh-ask-toggle",
+            "label": "Search or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Games",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "label": "noun world: Skate a pixel plaza ",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "fries",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 84
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 57
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 55
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 100
+          }
+        ],
+        "smallTargets": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "w": 64,
+            "h": 12,
+            "label": "noun.wtf home"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "w": 32,
+            "h": 16,
+            "label": "Noun WTF"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun World"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "The Big Drop"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Breaks"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Grand Exchange"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Parkour"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Pool"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Hoops"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "w": 32,
+            "h": 16,
+            "label": "Noun Warfare"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 75,
+            "h": 32,
+            "label": "README"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 62,
+            "h": 32,
+            "label": "INDEX"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "w": 86,
+            "h": 32,
+            "label": "TERMINAL"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 69,
+            "h": 36,
+            "label": "Games"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 47,
+            "h": 36,
+            "label": "Art"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Freedom"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 82,
+            "h": 36,
+            "label": "The DAO"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Market"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 81,
+            "h": 36,
+            "label": "Network"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "w": 70,
+            "h": 36,
+            "label": "Clients"
+          }
+        ]
+      },
+      "shots": [
+        "page-640.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 768,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "contentWidth": 768,
+      "tier": "lg",
+      "touch": false,
+      "score": 20,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 1,
+        "overArt": 11,
+        "overlaps": 6,
+        "smallTargets": 0
+      },
+      "line": "1 covered · 11 on art · 6 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "by": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > span.nh-tap-hint"
+          }
+        ],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Games",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "label": "noun world: Skate a pixel plaza ",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 94
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 35
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 57
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 88
+          },
+          {
+            "a": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 41
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-768.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 900,
+      "viewport": {
+        "width": 900,
+        "height": 1000
+      },
+      "contentWidth": 900,
+      "tier": "lg",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 10,
+        "overlaps": 6,
+        "smallTargets": 0
+      },
+      "line": "10 on art · 6 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Games",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "label": "noun world: Skate a pixel plaza ",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 96
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 86
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 57
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 32
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 58
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-900.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1024,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "contentWidth": 1024,
+      "tier": "xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 13,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "13 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > nav.nh-jumps > button",
+            "label": "Games",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "label": "⌐◨-◨ NOUN.WTF",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "label": "TERMINAL `",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "label": "NOUN 2062 no bids yet 18h 54m",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 68
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 98
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 57
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 58
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 28
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1024.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1280,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "contentWidth": 1280,
+      "tier": "xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 13,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "13 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div#root > div._wrapper > div.nos-root.mode-desk > button.nos-icon",
+            "label": "1n",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "label": "⌐◨-◨ NOUN.WTF",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "label": "TERMINAL `",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "label": "NOUN 2062 no bids yet 18h 54m",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 87
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 41
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 45
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 86
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 83
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1280.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1440,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "contentWidth": 1440,
+      "tier": "2xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 10,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "10 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > div.nh-manifesto > div.nh-manifesto-links > button",
+            "label": "README",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "label": "noun world: Skate a pixel plaza ",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 71
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 43
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 96
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1440.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 1920,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "contentWidth": 1920,
+      "tier": "2xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 10,
+        "overlaps": 6,
+        "smallTargets": 0
+      },
+      "line": "10 on art · 6 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "label": "noun world: Skate a pixel plaza ",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          },
+          {
+            "selector": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "label": "the big drop (locked: unlock the",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 74
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 44
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 70
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card.is-locked",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 86
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-1920.png"
+      ]
+    },
+    {
+      "mode": "page",
+      "width": 2560,
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "contentWidth": 2560,
+      "tier": "2xl",
+      "touch": false,
+      "score": 16,
+      "counts": {
+        "overflowPx": 0,
+        "clipped": 0,
+        "covered": 0,
+        "overArt": 9,
+        "overlaps": 5,
+        "smallTargets": 0
+      },
+      "line": "9 on art · 5 overlaps",
+      "issues": {
+        "overflow": null,
+        "clipped": [],
+        "covered": [],
+        "overArt": [
+          {
+            "selector": "div.nos-root.mode-desk > div.nh > header.nh-head > a.nh-brand",
+            "label": "noun.wtf home",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh > header.nh-head > nav.nh-nav > button",
+            "label": "Games",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "header.nh-head > div.nh-ask > form.nh-ask-form > input",
+            "label": "Search noun.wtf or ask NounIRL",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-play",
+            "label": "▶ PLAY NOUN WORLD",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-hero-frame > div.nh-hero-copy > div.nh-hero-cta > button.nh-more",
+            "label": "▾ BROWSE EVERYTHING",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-hero-side > button.nh-sound.is-on",
+            "label": "Turn sound off",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button.is-on",
+            "label": "Noun WTF",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "section.nh-hero > div.nh-hero-frame > div.nh-pips > button",
+            "label": "Noun World",
+            "art": "section.nh-hero > div.nh-hero-frame > div.nh-hero-slide.is-on > video"
+          },
+          {
+            "selector": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "label": "meme value: the book by lil 67. ",
+            "art": "div#root > div._wrapper > div.nos-root.mode-desk > canvas.nos-water"
+          }
+        ],
+        "overlaps": [
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-brand",
+            "pct": 42
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip",
+            "pct": 100
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div.nos-root.mode-desk > nav.nos-tray > span.nos-auction > button.nos-chip",
+            "pct": 78
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "div._wrapper > div.nos-root.mode-desk > nav.nos-tray > button.nos-chip.is-mode",
+            "pct": 42
+          },
+          {
+            "a": "div.nh-strip-wrap > div.nh-strip > div.nh-slot > a.nh-card",
+            "b": "body > div#root > div._wrapper > button.fixed.bottom-[72px]",
+            "pct": 68
+          }
+        ],
+        "smallTargets": []
+      },
+      "shots": [
+        "page-2560.png"
+      ]
+    }
+  ]
+}

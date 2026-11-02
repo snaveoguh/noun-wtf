@@ -300,8 +300,8 @@ const DreamsTab: FC = () => {
   return (
     <div className="py-4">
       {/* Sub-tabs + create button */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
           {[
             {
               key: 'archive' as const,
@@ -318,7 +318,7 @@ const DreamsTab: FC = () => {
             <button
               key={t.key}
               onClick={() => setSubTab(t.key)}
-              className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${
+              className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors [@media(pointer:coarse)]:min-h-10 ${
                 subTab === t.key
                   ? 'bg-gray-800 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -328,7 +328,10 @@ const DreamsTab: FC = () => {
             </button>
           ))}
         </div>
-        <Button onClick={() => setShowCreate(true)} className="gap-1">
+        <Button
+          onClick={() => setShowCreate(true)}
+          className="gap-1 [@media(pointer:coarse)]:min-h-10"
+        >
           <Plus className="h-4 w-4" />
           Create Dream
         </Button>
@@ -342,7 +345,7 @@ const DreamsTab: FC = () => {
               <p className="text-muted-foreground">Loading dreams...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="@sm:grid-cols-3 @md:grid-cols-4 @lg:grid-cols-5 @xl:grid-cols-6 grid grid-cols-2 gap-4">
               {probeDreams.map(dream => (
                 <ProbeDreamCard
                   key={dream.id}
@@ -387,13 +390,16 @@ const DreamsTab: FC = () => {
               <p className="text-muted-foreground mb-4">
                 Dream up a Noun and it will appear here. Propose it to make it real.
               </p>
-              <Button onClick={() => setShowCreate(true)} className="gap-1">
+              <Button
+                onClick={() => setShowCreate(true)}
+                className="gap-1 [@media(pointer:coarse)]:min-h-10"
+              >
                 <Plus className="h-4 w-4" />
                 Create Your First Dream
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="@sm:grid-cols-3 @md:grid-cols-4 @lg:grid-cols-5 @xl:grid-cols-6 grid grid-cols-2 gap-4">
               {sortedDrafts.map(dream => (
                 <DreamDraftCard
                   key={dream.id}
@@ -463,7 +469,7 @@ const DreamsTab: FC = () => {
               <p className="text-muted-foreground">Create a dream and propose it to see it here.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="@sm:grid-cols-3 @md:grid-cols-4 @lg:grid-cols-5 @xl:grid-cols-6 grid grid-cols-2 gap-4">
               {onChainDreams.map(dream => (
                 <OnChainDreamCard
                   key={dream.id}

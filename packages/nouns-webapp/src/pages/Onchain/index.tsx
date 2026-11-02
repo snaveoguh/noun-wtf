@@ -258,7 +258,7 @@ function VersionPanel({ version, initialQuery }: { version: LedgerVersion; initi
   const isGraffiti = KIND_NAME[version.kind] === 'graffiti';
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[.03] p-4 sm:p-6">
+    <section className="@sm:p-6 rounded-2xl border border-white/10 bg-white/[.03] p-4">
       <div className="flex flex-wrap items-center gap-2">
         <KindBadge kind={version.kind} />
         <h2 className="oc-pip3 m-0 text-2xl">Version #{version.index}</h2>
@@ -286,7 +286,7 @@ function VersionPanel({ version, initialQuery }: { version: LedgerVersion; initi
       </ul>
 
       {check?.ok === true && (
-        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="@lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] mt-5 grid gap-5">
           <div className="min-w-0">
             <label className="block">
               <span className="oc-mono text-[11px] text-[#9b998f]">
@@ -298,7 +298,7 @@ function VersionPanel({ version, initialQuery }: { version: LedgerVersion; initi
                 value={q}
                 onChange={e => setQ(e.target.value)}
                 placeholder={isGraffiti ? 'g3:AdnY… or d9d879b97523 or plaza|' : 'name or 0x…'}
-                className="oc-mono mt-1 w-full px-3 py-2 text-[13px]"
+                className="oc-mono mt-1 w-full px-3 py-2 text-[13px] [@media(pointer:coarse)]:min-h-10"
               />
             </label>
             <ul className="m-0 mt-3 max-h-[420px] list-none space-y-1 overflow-y-auto p-0 pr-1">
@@ -351,7 +351,7 @@ export default function OnchainPage() {
   return (
     <div className="oc-root min-h-full w-full max-w-full overflow-x-hidden bg-[#07070a] text-[#f4f2ea]">
       <style>{ONCHAIN_CSS}</style>
-      <header className="px-4 pb-6 pt-8 sm:px-8 sm:pt-10">
+      <header className="@md:px-8 @md:pt-10 px-4 pb-6 pt-8">
         <div>
           <span className="oc-strap oc-mono">
             NOUN WORLD · ON {CHAIN_NAME[target.chainId].toUpperCase()}
@@ -386,7 +386,7 @@ export default function OnchainPage() {
         </div>
       </header>
 
-      <main className="space-y-6 px-4 pb-16 sm:px-8">
+      <main className="@md:px-8 space-y-6 px-4 pb-16">
         {target.address && (
           <section>
             <h2 className="oc-pip3 mb-3 text-xl">Versions</h2>
@@ -433,7 +433,7 @@ export default function OnchainPage() {
           />
         )}
 
-        <section className="grid gap-4 sm:grid-cols-3">
+        <section className="@lg:grid-cols-3 grid gap-4">
           {[
             [
               '1 · Snapshot',

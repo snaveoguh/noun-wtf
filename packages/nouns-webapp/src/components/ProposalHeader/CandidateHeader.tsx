@@ -10,9 +10,9 @@ import HoverCard from '@/components/HoverCard';
 import { transactionIconLink } from '@/components/ProposalContent';
 import ShortAddress from '@/components/ShortAddress';
 import { useActiveLocale } from '@/hooks/useActivateLocale';
+import { useContainerWidth } from '@/hooks/useContainerWidth';
 import { Locales } from '@/i18n/locales';
 import { buildEtherscanAddressLink } from '@/utils/etherscan';
-import { isMobileScreen } from '@/utils/isMobile';
 import { relativeTimestamp } from '@/utils/timeUtils';
 import { useUserVotesAsOfBlock } from '@/wrappers/nounToken';
 
@@ -45,7 +45,8 @@ const CandidateHeader: React.FC<CandidateHeaderProps> = props => {
     isWalletConnected,
     isUpdateToProposal,
   } = props;
-  const isMobile = isMobileScreen();
+  const { ref: containerRef, below } = useContainerWidth<HTMLDivElement>();
+  const isMobile = below('lg');
   const { data: currentBlock } = useBlockNumber();
   const availableVotes = useUserVotesAsOfBlock(Number(currentBlock)) ?? 0;
   const activeLocale = useActiveLocale();
@@ -86,13 +87,16 @@ const CandidateHeader: React.FC<CandidateHeaderProps> = props => {
   return (
     <>
       <div className={classes.backButtonWrapper}>
-        <Link to={props.isCandidate === true ? '/candidates' : '/vote'}>
+        <Link
+          to={props.isCandidate === true ? '/candidates' : '/vote'}
+          className={classes.backLink}
+        >
           <button type="button" className={clsx(classes.backButton, navBarButtonClasses.whiteInfo)}>
             ←
           </button>
         </Link>
       </div>
-      <div className="d-flex justify-content-between align-items-center">
+      <div ref={containerRef} className="d-flex justify-content-between align-items-center">
         <div className="d-flex justify-content-start align-items-start">
           <div className={classes.headerRow}>
             <span>

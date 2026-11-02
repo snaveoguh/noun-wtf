@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { API_BASE } from '@/lib/api';
 import { shortAddr } from '@/lib/format';
@@ -346,6 +346,7 @@ const GasLeaderboardPage: FC = () => {
             }}
           >
             <select
+              className="[@media(pointer:coarse)]:min-h-10"
               value={actionFilter}
               onChange={e => setActionFilter(e.target.value as GasAction | 'all')}
               style={{
@@ -367,6 +368,7 @@ const GasLeaderboardPage: FC = () => {
             </select>
 
             <input
+              className="[@media(pointer:coarse)]:min-h-10"
               type="text"
               placeholder="Search address or ENS..."
               value={search}
@@ -393,7 +395,7 @@ const GasLeaderboardPage: FC = () => {
           </div>
 
           {/* Table (scrollable on mobile) */}
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <ScrollX>
             {/* Table header */}
             <div
               style={{
@@ -493,6 +495,7 @@ const GasLeaderboardPage: FC = () => {
                       href={`https://etherscan.io/address/${entry.address}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      className="block [@media(pointer:coarse)]:leading-10"
                       style={{
                         fontFamily: 'monospace',
                         fontSize: '0.8rem',
@@ -552,7 +555,7 @@ const GasLeaderboardPage: FC = () => {
                 );
               })}
             </div>
-          </div>
+          </ScrollX>
           {/* end scroll wrapper */}
 
           {/* Pagination */}
@@ -569,6 +572,7 @@ const GasLeaderboardPage: FC = () => {
             >
               <button
                 type="button"
+                className="[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-16"
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
                 style={{
@@ -588,6 +592,7 @@ const GasLeaderboardPage: FC = () => {
               </span>
               <button
                 type="button"
+                className="[@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:min-w-16"
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
                 style={{
@@ -653,18 +658,79 @@ function SortHeader({
   indicator: (f: SortField) => string;
 }) {
   return (
-    <span
+    <button
+      type="button"
       onClick={() => onClick(field)}
+      aria-pressed={current === field}
+      className="[@media(pointer:coarse)]:min-h-10"
       style={{
         cursor: 'pointer',
         userSelect: 'none',
         color: current === field ? '#333' : '#888',
         fontWeight: current === field ? 900 : 700,
+        background: 'none',
+        border: 0,
+        padding: 0,
+        font: 'inherit',
+        letterSpacing: 'inherit',
+        textTransform: 'inherit',
+        textAlign: 'left',
       }}
     >
       {label}
       {indicator(field)}
-    </span>
+    </button>
+  );
+}
+
+/**
+ * Sideways scroll box for the table: when the rows are wider than the box,
+ * the edge they run under fades so it's plain there's more to scroll to.
+ */
+function ScrollX({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState<'none' | 'end' | 'start' | 'both'>('none');
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 1) return setEdge('none');
+      const atStart = el.scrollLeft <= 1;
+      const atEnd = el.scrollLeft >= max - 1;
+      setEdge(atStart ? 'end' : atEnd ? 'start' : 'both');
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    el.addEventListener('scroll', update, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('scroll', update);
+    };
+  }, []);
+  const mask =
+    edge === 'end'
+      ? 'linear-gradient(90deg,#000 calc(100% - 32px),transparent)'
+      : edge === 'start'
+        ? 'linear-gradient(90deg,transparent,#000 32px)'
+        : edge === 'both'
+          ? 'linear-gradient(90deg,transparent,#000 32px,#000 calc(100% - 32px),transparent)'
+          : undefined;
+  return (
+    <div
+      ref={ref}
+      data-scroll-edge={edge}
+      style={{
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        maskImage: mask,
+        WebkitMaskImage: mask,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 

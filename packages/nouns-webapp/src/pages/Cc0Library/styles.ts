@@ -13,7 +13,7 @@ export const CC0_CSS = `
 .cc0-root .cc0-mono,.cc0-root .cc0-mono *,body .cc0-layer .cc0-mono,body .cc0-layer .cc0-mono *{font-family:${MONO} !important;letter-spacing:.06em}
 .cc0-root .cc0-pip3,.cc0-root .cc0-pip3 *,body .cc0-layer .cc0-pip3,body .cc0-layer .cc0-pip3 *{font-family:${PIP3} !important;text-transform:uppercase !important}
 .cc0-root ::selection,body .cc0-layer ::selection{background:var(--acid);color:#000}
-.cc0-title{display:inline-flex;flex-wrap:wrap;gap:0 .22em;font-size:clamp(48px,9vw,104px);line-height:.86;color:#fff;transform:rotate(-3deg);transform-origin:0 100%;
+.cc0-title{display:inline-flex;flex-wrap:wrap;gap:0 .22em;font-size:clamp(48px,11cqi,104px);line-height:.86;color:#fff;transform:rotate(-3deg);transform-origin:0 100%;
   -webkit-text-stroke:.07em var(--ink);paint-order:stroke fill;text-shadow:.045em .045em 0 var(--pink),.09em .09em 0 var(--cyan),.13em .13em 0 var(--ink)}
 .cc0-title .is-acc{color:var(--acid)}
 .cc0-strap{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.16em !important;color:var(--acid);background:var(--ink);padding:6px 12px 5px;box-shadow:4px 4px 0 var(--pink)}

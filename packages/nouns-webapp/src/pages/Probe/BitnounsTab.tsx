@@ -257,14 +257,14 @@ const BitnounsTab: FC = () => {
           placeholder="Search ID..."
           value={searchId}
           onChange={e => setSearchId(e.target.value)}
-          className="h-8 w-24 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none focus:border-gray-400"
+          className="h-8 w-24 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none focus:border-gray-400 [@media(pointer:coarse)]:min-h-10"
         />
 
         <div ref={ownerRef} className="relative">
           <button
             type="button"
             onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
-            className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs ${
+            className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-xs [@media(pointer:coarse)]:min-h-10 ${
               ownerFilter !== ''
                 ? 'border-black bg-black text-white'
                 : 'border-gray-200 bg-white text-gray-600'
@@ -318,7 +318,7 @@ const BitnounsTab: FC = () => {
           <button
             type="button"
             onClick={() => setTraitFilter(null)}
-            className="flex h-8 items-center gap-1 rounded-lg border border-black bg-black px-2 text-xs font-semibold text-white"
+            className="flex h-8 items-center gap-1 rounded-lg border border-black bg-black px-2 text-xs font-semibold text-white [@media(pointer:coarse)]:min-h-10"
           >
             <span className="font-mono text-xs uppercase opacity-60">{traitFilter.layer}:</span>
             <span>{traitFilter.label}</span>
@@ -329,7 +329,7 @@ const BitnounsTab: FC = () => {
         <select
           value={sort}
           onChange={e => setSort(e.target.value as SortOption)}
-          className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none"
+          className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none [@media(pointer:coarse)]:min-h-10"
         >
           {sortOptions.map(o => (
             <option key={o.value} value={o.value}>

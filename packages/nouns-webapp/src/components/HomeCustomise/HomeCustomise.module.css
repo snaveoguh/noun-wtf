@@ -236,8 +236,9 @@
   }
 }
 
-/* Mobile: a bottom sheet with a scrim instead of an anchored popover. */
-@media (max-width: 640px) {
+/* Narrow page (phone or narrow window): a bottom sheet with a scrim instead
+   of an anchored popover. In a desktop window, fixed resolves to the window. */
+@container page (max-width: 559.98px) {
   .scrim {
     display: block;
     position: fixed;
@@ -266,5 +267,13 @@
   .trigger,
   .pill {
     transition: none;
+  }
+}
+
+/* Touch: a 40 px tap target without changing the look (the negative margin
+   keeps the bar's rhythm). */
+@media (pointer: coarse) {
+  .trigger {
+    min-height: 2.5rem;
   }
 }
