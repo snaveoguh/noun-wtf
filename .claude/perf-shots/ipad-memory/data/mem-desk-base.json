@@ -1,0 +1,1217 @@
+{
+ "mode": "session",
+ "engine": "chromium",
+ "boot": {
+  "quality": "medium",
+  "lite": {
+   "scale": 1.5,
+   "shadows": true,
+   "post": true,
+   "aa": true,
+   "shadowMap": 2048
+  },
+  "weak": false,
+  "buffer": [
+   2160,
+   1350
+  ],
+  "shadowMap": 2048,
+  "diet": null
+ },
+ "samples": [
+  {
+   "at": 29,
+   "name": "boot",
+   "glMB": 608.8,
+   "texMB": 566.3,
+   "rbMB": 28.2,
+   "bufMB": 14.3,
+   "nTex": 197,
+   "canvases": 69,
+   "canvasMB": 83.9,
+   "bitmaps": 69,
+   "bitmapMB": 170.2,
+   "heapMB": 112.3,
+   "tex": 189,
+   "geo": 303,
+   "progs": 61,
+   "rss": {
+    "browser": 189,
+    "zygote": 133,
+    "gpu-process": 946,
+    "utility": 273,
+    "renderer": 888
+   }
+  },
+  {
+   "at": 45,
+   "name": "camp+reading",
+   "glMB": 636.8,
+   "texMB": 592.7,
+   "rbMB": 28.2,
+   "bufMB": 15.9,
+   "nTex": 227,
+   "canvases": 75,
+   "canvasMB": 85.8,
+   "bitmaps": 85,
+   "bitmapMB": 167,
+   "heapMB": 123,
+   "tex": 219,
+   "geo": 317,
+   "progs": 64,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1037,
+    "utility": 277,
+    "renderer": 842
+   }
+  },
+  {
+   "at": 55,
+   "name": "plaza",
+   "glMB": 638.6,
+   "texMB": 592.7,
+   "rbMB": 28.2,
+   "bufMB": 17.7,
+   "nTex": 233,
+   "canvases": 75,
+   "canvasMB": 85.8,
+   "bitmaps": 85,
+   "bitmapMB": 167,
+   "heapMB": 132.8,
+   "tex": 225,
+   "geo": 338,
+   "progs": 71,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1038,
+    "utility": 277,
+    "renderer": 860
+   }
+  },
+  {
+   "at": 80,
+   "name": "16 riders",
+   "glMB": 673.6,
+   "texMB": 619.7,
+   "rbMB": 28.2,
+   "bufMB": 25.7,
+   "nTex": 354,
+   "canvases": 118,
+   "canvasMB": 110.1,
+   "bitmaps": 113,
+   "bitmapMB": 167.1,
+   "heapMB": 192.9,
+   "tex": 346,
+   "geo": 393,
+   "progs": 72,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1061,
+    "utility": 283,
+    "renderer": 968
+   }
+  },
+  {
+   "at": 83,
+   "name": "riders gone",
+   "glMB": 673.6,
+   "texMB": 619.7,
+   "rbMB": 28.2,
+   "bufMB": 25.7,
+   "nTex": 354,
+   "canvases": 118,
+   "canvasMB": 110.1,
+   "bitmaps": 113,
+   "bitmapMB": 167.1,
+   "heapMB": 197.5,
+   "tex": 346,
+   "geo": 393,
+   "progs": 73,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1066,
+    "utility": 282,
+    "renderer": 970
+   }
+  },
+  {
+   "at": 107,
+   "name": "room 1 in",
+   "glMB": 679.9,
+   "texMB": 617.1,
+   "rbMB": 30.8,
+   "bufMB": 32,
+   "nTex": 412,
+   "canvases": 127,
+   "canvasMB": 121.4,
+   "bitmaps": 119,
+   "bitmapMB": 167.1,
+   "heapMB": 193.9,
+   "tex": 404,
+   "geo": 533,
+   "progs": 77,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1111,
+    "utility": 283,
+    "renderer": 930
+   }
+  },
+  {
+   "at": 120,
+   "name": "room 1 out",
+   "glMB": 660.7,
+   "texMB": 601.1,
+   "rbMB": 28.2,
+   "bufMB": 31.4,
+   "nTex": 389,
+   "canvases": 125,
+   "canvasMB": 113.4,
+   "bitmaps": 119,
+   "bitmapMB": 167.1,
+   "heapMB": 151.1,
+   "tex": 381,
+   "geo": 520,
+   "progs": 75,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1119,
+    "utility": 283,
+    "renderer": 919
+   }
+  },
+  {
+   "at": 147,
+   "name": "room 2 in",
+   "glMB": 683.6,
+   "texMB": 619.2,
+   "rbMB": 30.8,
+   "bufMB": 33.6,
+   "nTex": 423,
+   "canvases": 136,
+   "canvasMB": 126.3,
+   "bitmaps": 127,
+   "bitmapMB": 167.1,
+   "heapMB": 180.7,
+   "tex": 415,
+   "geo": 568,
+   "progs": 77,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1130,
+    "utility": 284,
+    "renderer": 909
+   }
+  },
+  {
+   "at": 159,
+   "name": "room 2 out",
+   "glMB": 662.4,
+   "texMB": 600.9,
+   "rbMB": 28.2,
+   "bufMB": 33.2,
+   "nTex": 387,
+   "canvases": 134,
+   "canvasMB": 118.3,
+   "bitmaps": 127,
+   "bitmapMB": 167.1,
+   "heapMB": 154.2,
+   "tex": 379,
+   "geo": 552,
+   "progs": 75,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1125,
+    "utility": 284,
+    "renderer": 885
+   }
+  },
+  {
+   "at": 188,
+   "name": "room 3 in",
+   "glMB": 682.8,
+   "texMB": 617.3,
+   "rbMB": 30.4,
+   "bufMB": 35.1,
+   "nTex": 414,
+   "canvases": 142,
+   "canvasMB": 129.5,
+   "bitmaps": 131,
+   "bitmapMB": 167.1,
+   "heapMB": 193,
+   "tex": 406,
+   "geo": 581,
+   "progs": 77,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1140,
+    "utility": 285,
+    "renderer": 908
+   }
+  },
+  {
+   "at": 205,
+   "name": "room 3 out",
+   "glMB": 664,
+   "texMB": 601.8,
+   "rbMB": 28.2,
+   "bufMB": 34,
+   "nTex": 388,
+   "canvases": 142,
+   "canvasMB": 129.5,
+   "bitmaps": 131,
+   "bitmapMB": 167.1,
+   "heapMB": 157.9,
+   "tex": 380,
+   "geo": 564,
+   "progs": 75,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1147,
+    "utility": 285,
+    "renderer": 902
+   }
+  },
+  {
+   "at": 230,
+   "name": "mountain",
+   "glMB": 668,
+   "texMB": 603.7,
+   "rbMB": 28.2,
+   "bufMB": 36.1,
+   "nTex": 398,
+   "canvases": 141,
+   "canvasMB": 122.5,
+   "bitmaps": 131,
+   "bitmapMB": 167.1,
+   "heapMB": 158.9,
+   "tex": 390,
+   "geo": 584,
+   "progs": 74,
+   "rss": {
+    "browser": 191,
+    "zygote": 133,
+    "gpu-process": 1153,
+    "utility": 285,
+    "renderer": 861
+   }
+  },
+  {
+   "at": 655,
+   "name": "mural (in)",
+   "glMB": 671.7,
+   "texMB": 604.5,
+   "rbMB": 28.2,
+   "bufMB": 38.9,
+   "nTex": 399,
+   "canvases": 143,
+   "canvasMB": 123.5,
+   "bitmaps": 131,
+   "bitmapMB": 167.1,
+   "heapMB": 165.6,
+   "tex": 391,
+   "geo": 562,
+   "progs": 77,
+   "rss": {
+    "browser": 255,
+    "zygote": 133,
+    "gpu-process": 1153,
+    "utility": 294,
+    "renderer": 1103
+   }
+  },
+  {
+   "at": 667,
+   "name": "plaza again",
+   "glMB": 671.7,
+   "texMB": 604.5,
+   "rbMB": 28.2,
+   "bufMB": 38.9,
+   "nTex": 399,
+   "canvases": 143,
+   "canvasMB": 123.5,
+   "bitmaps": 131,
+   "bitmapMB": 167.1,
+   "heapMB": 165.6,
+   "tex": 391,
+   "geo": 562,
+   "progs": 77,
+   "rss": {
+    "browser": 254,
+    "zygote": 133,
+    "gpu-process": 1156,
+    "utility": 294,
+    "renderer": 1105
+   }
+  }
+ ],
+ "errors": [],
+ "top": {
+  "walked": 158069,
+  "list": [
+   {
+    "id": 1309,
+    "kind": "texture",
+    "w": 2048,
+    "h": 2048,
+    "d": 1,
+    "fmt": 32856,
+    "mip": true,
+    "bytes": 29826160,
+    "at": 18612,
+    "path": "game.level.root.children[4].children[0].material.lightMap"
+   },
+   {
+    "id": 1316,
+    "kind": "texture",
+    "w": 2048,
+    "h": 2048,
+    "d": 1,
+    "fmt": 32856,
+    "mip": true,
+    "bytes": 29826160,
+    "at": 19047,
+    "path": "game.level.root.children[5].children[0].material.lightMap"
+   },
+   {
+    "id": 1327,
+    "kind": "texture",
+    "w": 2048,
+    "h": 2048,
+    "d": 1,
+    "fmt": 32856,
+    "mip": true,
+    "bytes": 29826160,
+    "at": 19145,
+    "path": "game.level.root.children[6].children[0].material.lightMap"
+   },
+   {
+    "id": 1423,
+    "kind": "texture",
+    "w": 2048,
+    "h": 2048,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 29826160,
+    "at": 22027,
+    "path": "game.warmer.scene.children[14].children[2].material.map"
+   },
+   {
+    "id": 1800,
+    "kind": "texture",
+    "w": 2048,
+    "h": 1792,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 26097872,
+    "at": 27907,
+    "path": "game.camp.built.art.texture"
+   },
+   {
+    "id": 9,
+    "kind": "texture",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 34842,
+    "mip": false,
+    "bytes": 23328000,
+    "at": 8271,
+    "path": "game.gfx.composer.inputBuffer"
+   },
+   {
+    "id": 11,
+    "kind": "texture",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 34842,
+    "mip": false,
+    "bytes": 23328000,
+    "at": 8273,
+    "path": "game.gfx.composer.outputBuffer"
+   },
+   {
+    "id": 1176,
+    "kind": "texture",
+    "w": 2048,
+    "h": 2048,
+    "d": 1,
+    "fmt": 32856,
+    "mip": false,
+    "bytes": 16777216,
+    "at": 16058,
+    "path": "game.gfx.sun.shadow.map"
+   },
+   {
+    "id": 1177,
+    "kind": "texture",
+    "w": 2048,
+    "h": 2048,
+    "d": 1,
+    "fmt": 33190,
+    "mip": false,
+    "bytes": 16777216,
+    "at": 16058,
+    "path": "game.gfx.sun.shadow.map"
+   },
+   {
+    "id": 3038,
+    "kind": "texture",
+    "w": 2048,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 14913083,
+    "at": 96031,
+    "path": "game.facades.atlas"
+   },
+   {
+    "id": 10,
+    "kind": "texture",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 33190,
+    "mip": false,
+    "bytes": 11664000,
+    "at": 8272,
+    "path": "game.gfx.composer.inputBuffer"
+   },
+   {
+    "id": 12,
+    "kind": "renderbuffer",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 33190,
+    "mip": false,
+    "samples": 1,
+    "bytes": 11664000,
+    "at": 8273,
+    "path": "game.gfx.composer.outputBuffer"
+   },
+   {
+    "id": 1566,
+    "kind": "texture",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 32856,
+    "mip": false,
+    "bytes": 11664000,
+    "at": 23141,
+    "path": "game.gfx.outline.uniforms{normalBuffer}.value"
+   },
+   {
+    "id": 1567,
+    "kind": "renderbuffer",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 33190,
+    "mip": false,
+    "samples": 1,
+    "bytes": 11664000,
+    "at": 23141,
+    "path": "game.gfx.composer.passes[1].renderTarget"
+   },
+   {
+    "id": 1570,
+    "kind": "texture",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 32856,
+    "mip": false,
+    "bytes": 11664000,
+    "at": 24189,
+    "path": "game.gfx.aaPass.effects[0].renderTargetEdges"
+   },
+   {
+    "id": 1571,
+    "kind": "texture",
+    "w": 2160,
+    "h": 1350,
+    "d": 1,
+    "fmt": 32856,
+    "mip": false,
+    "bytes": 11664000,
+    "at": 24193,
+    "path": "game.gfx.aaPass.effects[0].renderTargetWeights"
+   },
+   {
+    "id": 1178,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17106,
+    "path": "game.level.root.children[0].children[0].material.map"
+   },
+   {
+    "id": 1290,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17396,
+    "path": "game.facades.hidden[2].material.map"
+   },
+   {
+    "id": 1291,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17399,
+    "path": "game.facades.hidden[8].material.map"
+   },
+   {
+    "id": 1292,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17403,
+    "path": "game.facades.hidden[0].material.map"
+   },
+   {
+    "id": 1293,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17407,
+    "path": "game.facades.hidden[4].material.map"
+   },
+   {
+    "id": 1294,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17411,
+    "path": "game.facades.hidden[1].material.map"
+   },
+   {
+    "id": 1295,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17414,
+    "path": "game.facades.hidden[6].material.map"
+   },
+   {
+    "id": 1296,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17416,
+    "path": "game.facades.hidden[7].material.map"
+   },
+   {
+    "id": 1297,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17428,
+    "path": "game.facades.hidden[3].material.map"
+   },
+   {
+    "id": 1298,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17431,
+    "path": "game.facades.hidden[9].material.map"
+   },
+   {
+    "id": 1299,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 32856,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 17434,
+    "path": "game.facades.skinMat.lightMap"
+   },
+   {
+    "id": 1304,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 32856,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 18562,
+    "path": "game.level.root.children[7].material.lightMap"
+   },
+   {
+    "id": 1308,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 18609,
+    "path": "game.level.root.children[4].children[0].material.map"
+   },
+   {
+    "id": 1310,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 18997,
+    "path": "game.level.root.children[4].children[1].material.map"
+   },
+   {
+    "id": 1311,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 19000,
+    "path": "game.level.root.children[4].children[2].material.map"
+   },
+   {
+    "id": 1312,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 19003,
+    "path": "game.level.root.children[4].children[3].material.map"
+   },
+   {
+    "id": 1314,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 19007,
+    "path": "game.level.root.children[4].children[6].material.map"
+   },
+   {
+    "id": 1315,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 19045,
+    "path": "game.level.root.children[5].children[0].material.map"
+   },
+   {
+    "id": 1320,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 19131,
+    "path": "game.level.root.children[5].children[4].material.map"
+   },
+   {
+    "id": 1322,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 19136,
+    "path": "game.level.root.children[5].children[7].material.map"
+   },
+   {
+    "id": 1323,
+    "kind": "texture",
+    "w": 1024,
+    "h": 1024,
+    "d": 1,
+    "fmt": 35907,
+    "mip": true,
+    "bytes": 7456539,
+    "at": 19139,
+    "path": "game.level.root.children[5].children[8].material.map"
+   },
+   {
+    "id": 13,
+    "kind": "texture",
+    "w": 768,
+    "h": 1024,
+    "d": 1,
+    "fmt": 34842,
+    "mip": false,
+    "bytes": 6291456,
+    "at": 9372,
+    "path": "game.gfx.envRT"
+   },
+   {
+    "id": 1583,
+    "kind": "texture",
+    "w": 768,
+    "h": 1024,
+    "d": 1,
+    "fmt": 34842,
+    "mip": false,
+    "bytes": 6291456,
+    "at": 26456,
+    "path": "game.warmer.scene.environment"
+   },
+   {
+    "id": 1574,
+    "kind": "texture",
+    "w": 1080,
+    "h": 675,
+    "d": 1,
+    "fmt": 34842,
+    "mip": false,
+    "bytes": 5832000,
+    "at": 24310,
+    "path": "game.nature.water.rt"
+   }
+  ],
+  "canvases": {
+   "live": 142,
+   "created": 156,
+   "bytes": 128990944,
+   "big": [
+    {
+     "w": 2048,
+     "h": 2048,
+     "inDom": false,
+     "stack": "at wT (World2Page-cR5qa8IA.js:2:699363) < at FC.addArea (World2Page-cR5qa8IA.js:2:749596) < at FC.start (World2Page-cR5qa8IA.js:2:749482) < at t.start (World2Page-cR5qa8IA.js:2:1670135)"
+    },
+    {
+     "w": 2048,
+     "h": 1792,
+     "inDom": false,
+     "stack": "at i1 (World2Page-cR5qa8IA.js:2:1450802) < at d1 (World2Page-cR5qa8IA.js:2:1460290) < at G1.build (World2Page-cR5qa8IA.js:2:1488853) < at t.start (World2Page-cR5qa8IA.js:2:1668866)"
+    },
+    {
+     "w": 2160,
+     "h": 1350,
+     "inDom": true,
+     "stack": "at World2Page-cR5qa8IA.js:2:1985457 < at lc (index-CKeqDe0r.js:2:152774) < at qc (index-CKeqDe0r.js:2:169602) < at Gc (index-CKeqDe0r.js:2:169336)"
+    },
+    {
+     "w": 2048,
+     "h": 1024,
+     "inDom": false,
+     "stack": "at y2.queue (World2Page-cR5qa8IA.js:2:1507814) < at y2.start (World2Page-cR5qa8IA.js:2:1507699) < at t.start (World2Page-cR5qa8IA.js:2:1670157)"
+    },
+    {
+     "w": 1800,
+     "h": 380,
+     "inDom": true,
+     "stack": "at oc (index-CKeqDe0r.js:2:148147) < at ru (index-CKeqDe0r.js:2:180325) < at eu (index-CKeqDe0r.js:2:178134) < at Xl (index-CKeqDe0r.js:2:178002)"
+    },
+    {
+     "w": 1024,
+     "h": 512,
+     "inDom": false,
+     "stack": "at tJ (World2Page-cR5qa8IA.js:2:1363453) < at oJ (World2Page-cR5qa8IA.js:2:1363779) < at iJ (World2Page-cR5qa8IA.js:2:1364848) < at aJ (World2Page-cR5qa8IA.js:2:1366166)"
+    },
+    {
+     "w": 1024,
+     "h": 512,
+     "inDom": false,
+     "stack": "at tJ (World2Page-cR5qa8IA.js:2:1363453) < at oJ (World2Page-cR5qa8IA.js:2:1363779) < at iJ (World2Page-cR5qa8IA.js:2:1364848) < at aJ (World2Page-cR5qa8IA.js:2:1366180)"
+    },
+    {
+     "w": 620,
+     "h": 538,
+     "inDom": false,
+     "stack": "at tJ (World2Page-cR5qa8IA.js:2:1363453) < at aJ (World2Page-cR5qa8IA.js:2:1366718) < at t.placeIceCreamVan (World2Page-cR5qa8IA.js:2:1687785) < at t.start (World2Page-cR5qa8IA.js:2:1669392)"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at World2Page-cR5qa8IA.js:2:1533415 < at r5 (World2Page-cR5qa8IA.js:2:1534311) < at u5 (World2Page-cR5qa8IA.js:2:1540626) < at async Promise.all (index 0)"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at World2Page-cR5qa8IA.js:2:1533496 < at r5 (World2Page-cR5qa8IA.js:2:1534311) < at u5 (World2Page-cR5qa8IA.js:2:1540626) < at async Promise.all (index 0)"
+    },
+    {
+     "w": 1024,
+     "h": 256,
+     "inDom": false,
+     "stack": "at oS (World2Page-cR5qa8IA.js:2:603767) < at World2Page-cR5qa8IA.js:2:1544540 < at Array.forEach (<anonymous>) < at World2Page-cR5qa8IA.js:2:1543173"
+    },
+    {
+     "w": 1024,
+     "h": 256,
+     "inDom": false,
+     "stack": "at oS (World2Page-cR5qa8IA.js:2:603767) < at World2Page-cR5qa8IA.js:2:1544540 < at Array.forEach (<anonymous>) < at World2Page-cR5qa8IA.js:2:1543173"
+    },
+    {
+     "w": 1024,
+     "h": 256,
+     "inDom": false,
+     "stack": "at oS (World2Page-cR5qa8IA.js:2:603767) < at World2Page-cR5qa8IA.js:2:1544540 < at Array.forEach (<anonymous>) < at World2Page-cR5qa8IA.js:2:1543173"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at ue (textures-CaJ2He96.js:1:15754) < at Pe (textures-CaJ2He96.js:1:23155) < at GB.makeBed (World2Page-cR5qa8IA.js:2:1010733) < at GB.create (World2Page-cR5qa8IA.js:2:1009552)"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at t.start (World2Page-cR5qa8IA.js:2:1671425)"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at World2Page-cR5qa8IA.js:2:785075"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at World2Page-cR5qa8IA.js:2:785075"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at World2Page-cR5qa8IA.js:2:785075"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at World2Page-cR5qa8IA.js:2:785075"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at World2Page-cR5qa8IA.js:2:785075"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at World2Page-cR5qa8IA.js:2:785075"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at World2Page-cR5qa8IA.js:2:785075"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at GJ.build (World2Page-cR5qa8IA.js:2:1396138)"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at V1.build (World2Page-cR5qa8IA.js:2:1483832)"
+    },
+    {
+     "w": 512,
+     "h": 512,
+     "inDom": false,
+     "stack": "at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358) < at new t (NounCharacter-BxbE6C4Y.js:2:38427) < at V1.build (World2Page-cR5qa8IA.js:2:1483832)"
+    }
+   ],
+   "groups": [
+    [
+     "512x512 at Fe (NounCharacter-BxbE6C4Y.js:2:20309) < at t.buildBody (NounCharacter-BxbE6C4Y.js:2:39358)",
+     [
+      33,
+      34603008
+     ]
+    ],
+    [
+     "576x256 at ye (NounCharacter-BxbE6C4Y.js:2:14708) < at _e (NounCharacter-BxbE6C4Y.js:2:16352)",
+     [
+      33,
+      19464192
+     ]
+    ],
+    [
+     "2048x2048 at wT (World2Page-cR5qa8IA.js:2:699363) < at FC.addArea (World2Page-cR5qa8IA.js:2:749596)",
+     [
+      1,
+      16777216
+     ]
+    ],
+    [
+     "2048x1792 at i1 (World2Page-cR5qa8IA.js:2:1450802) < at d1 (World2Page-cR5qa8IA.js:2:1460290)",
+     [
+      1,
+      14680064
+     ]
+    ],
+    [
+     "2160x1350 at World2Page-cR5qa8IA.js:2:1985457 < at lc (index-CKeqDe0r.js:2:152774)",
+     [
+      1,
+      11664000
+     ]
+    ],
+    [
+     "2048x1024 at y2.queue (World2Page-cR5qa8IA.js:2:1507814) < at y2.start (World2Page-cR5qa8IA.js:2:1507699)",
+     [
+      1,
+      8388608
+     ]
+    ],
+    [
+     "1024x512 at tJ (World2Page-cR5qa8IA.js:2:1363453) < at oJ (World2Page-cR5qa8IA.js:2:1363779)",
+     [
+      2,
+      4194304
+     ]
+    ],
+    [
+     "1024x256 at oS (World2Page-cR5qa8IA.js:2:603767) < at World2Page-cR5qa8IA.js:2:1544540",
+     [
+      3,
+      3145728
+     ]
+    ],
+    [
+     "1800x380 at oc (index-CKeqDe0r.js:2:148147) < at ru (index-CKeqDe0r.js:2:180325)",
+     [
+      1,
+      2736000
+     ]
+    ],
+    [
+     "620x538 at tJ (World2Page-cR5qa8IA.js:2:1363453) < at aJ (World2Page-cR5qa8IA.js:2:1366718)",
+     [
+      1,
+      1334240
+     ]
+    ],
+    [
+     "128x128 at ct (NounCharacter-BxbE6C4Y.js:2:25842) < at NounCharacter-BxbE6C4Y.js:2:27904",
+     [
+      19,
+      1245184
+     ]
+    ],
+    [
+     "128x128 at ct (NounCharacter-BxbE6C4Y.js:2:25842) < at NounCharacter-BxbE6C4Y.js:2:28862",
+     [
+      19,
+      1245184
+     ]
+    ],
+    [
+     "512x512 at World2Page-cR5qa8IA.js:2:1533415 < at r5 (World2Page-cR5qa8IA.js:2:1534311)",
+     [
+      1,
+      1048576
+     ]
+    ],
+    [
+     "512x512 at World2Page-cR5qa8IA.js:2:1533496 < at r5 (World2Page-cR5qa8IA.js:2:1534311)",
+     [
+      1,
+      1048576
+     ]
+    ],
+    [
+     "512x512 at ue (textures-CaJ2He96.js:1:15754) < at Pe (textures-CaJ2He96.js:1:23155)",
+     [
+      1,
+      1048576
+     ]
+    ],
+    [
+     "512x512 at Ii (CharacterSelect-NUXKJo3g.js:2:102392) < at Object.wood (CharacterSelect-NUXKJo3g.js:2:103580)",
+     [
+      1,
+      1048576
+     ]
+    ],
+    [
+     "512x128 at tJ (World2Page-cR5qa8IA.js:2:1363453) < at lJ (World2Page-cR5qa8IA.js:2:1374921)",
+     [
+      2,
+      524288
+     ]
+    ],
+    [
+     "512x256 at KC (World2Page-cR5qa8IA.js:2:789737) < at JC (World2Page-cR5qa8IA.js:2:789933)",
+     [
+      1,
+      524288
+     ]
+    ],
+    [
+     "512x256 at n (World2Page-cR5qa8IA.js:2:1476901) < at new S1 (World2Page-cR5qa8IA.js:2:1477000)",
+     [
+      1,
+      524288
+     ]
+    ],
+    [
+     "512x256 at On.ensureCell (CharacterSelect-NUXKJo3g.js:2:32547) < at On.cellFor (CharacterSelect-NUXKJo3g.js:2:32033)",
+     [
+      1,
+      524288
+     ]
+    ],
+    [
+     "512x200 at Gl (World2Page-cR5qa8IA.js:2:121724) < at World2Page-cR5qa8IA.js:2:284532",
+     [
+      1,
+      409600
+     ]
+    ],
+    [
+     "296x296 at oc (index-CKeqDe0r.js:2:148147) < at ru (index-CKeqDe0r.js:2:180325)",
+     [
+      1,
+      350464
+     ]
+    ],
+    [
+     "512x160 at tJ (World2Page-cR5qa8IA.js:2:1363453) < at World2Page-cR5qa8IA.js:2:1372520",
+     [
+      1,
+      327680
+     ]
+    ],
+    [
+     "512x160 at World2Page-cR5qa8IA.js:2:465335 < at Gv.placeMarker (World2Page-cR5qa8IA.js:2:465774)",
+     [
+      1,
+      327680
+     ]
+    ],
+    [
+     "256x256 at tt (Pond-Bm28EhAR.js:1:7874) < at new et (Pond-Bm28EhAR.js:1:8468)",
+     [
+      1,
+      262144
+     ]
+    ],
+    [
+     "256x256 at tt (Pond-Bm28EhAR.js:1:7874) < at new et (Pond-Bm28EhAR.js:1:8488)",
+     [
+      1,
+      262144
+     ]
+    ],
+    [
+     "256x256 at Gl (World2Page-cR5qa8IA.js:2:121724) < at World2Page-cR5qa8IA.js:2:284290",
+     [
+      1,
+      262144
+     ]
+    ],
+    [
+     "256x256 at n (World2Page-cR5qa8IA.js:2:1476901) < at new S1 (World2Page-cR5qa8IA.js:2:1477073)",
+     [
+      1,
+      262144
+     ]
+    ],
+    [
+     "256x256 at n (World2Page-cR5qa8IA.js:2:1476901) < at new S1 (World2Page-cR5qa8IA.js:2:1477102)",
+     [
+      1,
+      262144
+     ]
+    ],
+    [
+     "512x96 at new r8 (World2Page-cR5qa8IA.js:2:1646904) < at t.buildMountain (World2Page-cR5qa8IA.js:2:1685958)",
+     [
+      1,
+      196608
+     ]
+    ]
+   ]
+  }
+ },
+ "loads": 1
+}
