@@ -450,6 +450,8 @@ function Results({ g, ui }: { g: GolfMode; ui: GolfUiState }) {
 }
 
 const CSS = `
+body[data-golf] [data-nounfm="off"]{display:none}
+@media (max-width:760px){body[data-golf] [data-nounfm]:not([data-nounfm="off"]){bottom:200px!important}}
 .gf-root{font-family:inherit;color:#fff;z-index:30}
 .gf-root kbd{font:inherit;font-size:.75em;border:1px solid #fff6;border-radius:4px;padding:0 .3em;margin-left:.4em}
 .gf-eye{display:block;font-size:11px;letter-spacing:.14em;color:#ffe14a}
