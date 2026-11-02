@@ -626,6 +626,12 @@ export interface FootballViewApi {
   setLive(on: boolean): void;
   /** Hide the match (players, ball) but keep the stadium. */
   clearMatch(): void;
+  /**
+   * Which human is on this screen (their footballer gets the tag, the power
+   * bar, the radar highlight; the player cam's fallback). Defaults to the
+   * config's first human.
+   */
+  setLocal?(human: string | null): void;
   /** Free everything (geometry, textures, materials, audio). */
   dispose(): void;
 }

@@ -1041,6 +1041,10 @@ export class Game {
   breakDev = (o?: import('./breakdance/view/dev').BreakDevOptions) =>
     import('./breakdance/view/dev').then(m => m.breakDemo(this, o));
 
+  /** Dev: Noun Football's match view on its mock match (football/view/dev.ts). */
+  footballDev = (o?: import('./football/view/dev').FootballDevOptions) =>
+    import('./football/view/dev').then(m => m.footballDemo(this, o));
+
   /** One simulation + render step (exposed for tests/automation). */
   /** Character-select mode: physics paused, camera orbits the rider. */
   showroom = false;
